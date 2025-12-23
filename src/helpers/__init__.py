@@ -12,4 +12,5 @@ Core utilities:
 - corner_analysis: Corner speed classification
 - throttle_analysis: Engine mode detection
 - deg_analysis: Tire degradation analysis
+- car_track_matching: Car setup ↔ Track characteristic matching
 """

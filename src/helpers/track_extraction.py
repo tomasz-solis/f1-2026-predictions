@@ -23,7 +23,7 @@ Example:
     >>> print(profile['corner_density'])
 
 Author: Tomasz Solis
-Date: December 2024
+Date: December 2025
 """
 
 import pandas as pd
