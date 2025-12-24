@@ -39,11 +39,15 @@ logger = logging.getLogger(__name__)
 
 TEAM_NAME_MAP = {
     # Sauber lineage (Sauber → Alfa Romeo → Kick Sauber → Audi)
-    'Sauber': 'SAUBER',
-    'Alfa Romeo': 'SAUBER',
-    'Kick Sauber': 'SAUBER',
-    'Stake F1 Team Kick Sauber': 'SAUBER',
-    'Kick Sauber F1 Team': 'SAUBER',
+    # Audi (2026+ - continuation of Sauber)
+    'Audi': 'AUDI',
+    'Audi F1 Team': 'AUDI',
+    'Audi F1': 'AUDI',
+    'Sauber': 'AUDI',
+    'Alfa Romeo': 'AUDI',
+    'Kick Sauber': 'AUDI',
+    'Stake F1 Team Kick Sauber': 'AUDI',
+    'Kick Sauber F1 Team': 'AUDI',
     
     # AlphaTauri lineage (Toro Rosso → AlphaTauri → RB)
     'AlphaTauri': 'RB',
@@ -92,6 +96,11 @@ TEAM_NAME_MAP = {
     # Williams (stable identity)
     'Williams': 'WILLIAMS',
     'Williams Racing': 'WILLIAMS',
+
+    # Cadillac (new team 2026)
+    'Cadillac': 'CADILLAC',
+    'Cadillac F1': 'CADILLAC',
+    'Cadillac Racing': 'CADILLAC',
 }
 
 
