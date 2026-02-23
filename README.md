@@ -14,10 +14,18 @@ The Streamlit app and the main weekend flow use:
 - `src/dashboard/rendering.py`
 - `src/dashboard/update_flow.py`
 - `src/predictors/baseline_2026.py` (`Baseline2026Predictor`)
+- `src/systems/systematic_learning.py`
 - `src/systems/weight_schedule.py`
 - `src/utils/fp_blending.py`
 
 `src/predictors/qualifying.py` and `src/predictors/race.py` are compatibility wrappers that delegate to `Baseline2026Predictor`.
+
+Current dashboard tabs:
+
+- `Live Prediction`
+- `Model & Learning`
+- `Prediction Accuracy`
+- `About`
 
 ## Predictor Structure (Current)
 
@@ -49,7 +57,9 @@ streamlit run app.py --server.port 8502
 - Builds a short-stint qualifying signal from available sessions (weighted by session relevance and recency).
   - Normal weekend: blends `FP3`, `FP2`, `FP1` (FP3-weighted)
   - Sprint weekend (main qualifying): blends `Sprint Qualifying`, `FP1`, `Sprint`
-- Blends session pace with model strength using a fixed `70/30` split in the active predictor.
+- If no weekend practice pace is available, uses testing short-run profile blend as fallback (when enough teams have profiles).
+- If neither practice nor testing profile fallback is available, uses model-only path.
+- Applies model-only teammate/experience stabilization and learned per-driver/per-teammate calibration adjustments.
 - Runs Monte Carlo and returns median position with confidence bands.
 
 ### Race
@@ -60,7 +70,10 @@ Lap-by-lap Monte Carlo simulation (50 runs) with:
 - Traffic effect (P1-5: 5% better tire life, P16+: 5% worse)
 - Track-specific pit loss (Monaco: 19s, Singapore: 24s)
 - Grid influence, driver skill, lap-1 chaos, safety car luck, DNF probability
+- Strategy timing bias (undercut/overcut-aware) using track overtaking and grid context
 - Overtaking realism by zone (back/mid easier, front harder) with capped total position gains
+- Learned per-driver/per-teammate calibration adjustments in race scoring
+- Podium probability derived from ranked outcomes (with monotonic smoothing by final order)
 
 Outputs: Finish order + compound strategy distribution + pit window histogram.
 
@@ -126,6 +139,11 @@ Artifact persistence is wired through `ArtifactStore` in active runtime code pat
 - `src/dashboard/cache.py`
 - `src/predictors/baseline/race/preparation_mixin.py` (driver debut lookup for missing-driver fallback)
 
+Prediction accuracy updates also write adaptive calibration state through:
+
+- `src/systems/systematic_learning.py`
+- `data/learning_state.json`
+
 Storage mode is controlled by `USE_DB_STORAGE`:
 
 - `file_only` (default)
@@ -158,7 +176,7 @@ Rollout guidance:
 ## What Exists But Is Not The Main Dashboard Path
 
 - Bayesian ranking components (`src/models/bayesian.py`)
-- Learning method history (`src/systems/learning.py`)
+- Legacy learning-history module (`src/systems/learning.py`)
 - Additional scripts and legacy-compatible interfaces
 
 These remain useful for experiments and extensions, but the app runtime path is the baseline predictor stack listed above.

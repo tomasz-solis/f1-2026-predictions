@@ -16,7 +16,9 @@ Streamlit UI (app.py)
             -> baseline/race/*.py
             -> weight_schedule.py
             -> fp_blending.py (qualifying only)
+            -> systematic_learning.py (calibration state read/apply)
        -> ArtifactStore (file/db mode by USE_DB_STORAGE)
+       -> PredictionLogger.update_actuals() -> systematic_learning.py (calibration state update)
        -> src/dashboard/rendering.py
   -> qualifying + race outputs
 ```
@@ -27,7 +29,7 @@ Streamlit UI (app.py)
 
 - `src/dashboard/cache.py`: FastF1 cache setup, artifact version tracking, cached predictor loading.
 - `src/dashboard/layout.py`: page config, CSS/theme injection, header, sidebar controls.
-- `src/dashboard/pages.py`: per-page orchestration (live prediction, insights, accuracy, about).
+- `src/dashboard/pages.py`: per-page orchestration (`Live Prediction`, `Model & Learning`, `Prediction Accuracy`, `About`).
 - `src/dashboard/prediction_flow.py`: cached weekend prediction cascade + ACTUAL/PREDICTED grid switching.
 - `src/dashboard/rendering.py`: qualifying/race result tables and race-specific visual sections.
 - `src/dashboard/update_flow.py`: auto-update hooks for completed races and FP practice capture.
@@ -72,6 +74,8 @@ Responsibilities:
 - Pull best available session performance by weekend type.
 - Convert lap times to relative team performance.
 - Blend session pace with model strength.
+- Fall back to testing short-run profile blend when weekend practice pace is unavailable.
+- Fall back to model-only path when both practice and testing fallback are unavailable.
 
 Note: in the active baseline path, qualifying blend is fixed at 70/30.
 
@@ -123,6 +127,19 @@ Responsibilities:
   - `fallback`,
   - `dual_write`.
 - Allow Supabase rollout while keeping local-file fallback paths.
+
+### 7. Systematic Learning Calibration
+
+Files:
+
+- `src/systems/systematic_learning.py`
+- `src/utils/prediction_logger.py`
+
+Responsibilities:
+
+- Update per-driver and teammate-gap EMA error state from prediction records with actual results.
+- Persist adaptive calibration state in `data/learning_state.json`.
+- Expose bounded learned position adjustments for qualifying and race scoring paths.
 
 ## Data Model
 
@@ -187,5 +204,6 @@ File: `src/utils/weekend.py`
 
 ## Notes On Legacy Components
 
-- Bayesian ranking and learning modules still exist and are testable.
-- They are not the direct scoring path used by the dashboard’s baseline predictor flow.
+- Bayesian ranking modules still exist and are testable.
+- `src/systems/learning.py` remains a legacy/experimental path.
+- Active dashboard calibration uses `src/systems/systematic_learning.py`.

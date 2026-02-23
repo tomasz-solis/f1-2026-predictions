@@ -56,14 +56,23 @@ Competitive sessions checked for grid replacement:
 
 Practice/session blending is used in qualifying prediction through `Baseline2026Predictor.predict_qualifying()`.
 
-Important detail:
+Important details:
 
 - The predictor builds a **short-stint weighted blend** from available sessions.
+- If weekend practice pace is unavailable, it can use a **testing short-run profile fallback**.
+- If both are unavailable, qualifying runs in **model-only** mode.
 
 Session blend inputs from `src/utils/fp_blending.py`:
 
 - Normal weekend: `FP3 + FP2 + FP1` (FP3-weighted)
 - Sprint weekend (main qualifying): `Sprint Qualifying + FP1 + Sprint`
+
+When no weekend practice data exists:
+
+- `predict_qualifying()` sets `data_source` to `Testing short-run profile blend (no weekend practice data)` if fallback is available.
+- Otherwise `data_source` is `Model-only (no practice/testing data)`.
+
+In model-only mode, the qualifying stack also applies teammate/experience stabilization and learned calibration nudges.
 
 ## Sprint Race Adjustments
 
@@ -73,6 +82,7 @@ Current sprint adjustments in baseline predictor:
 
 - lower chaos level,
 - extra grid weight influence.
+- race still uses track-aware overtaking and strategy timing bias inputs.
 
 ## Prediction Tracking Integration
 

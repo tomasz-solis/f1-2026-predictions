@@ -69,6 +69,16 @@ python scripts/update_prediction_actuals.py "Bahrain Grand Prix" FP1 --year 2026
 
 This script fetches `Q` and `R` results from FastF1 and writes them into the matching prediction file.
 
+## Learning Update Side Effect
+
+When actuals are attached (dashboard or script path calling `PredictionLogger.update_actuals()`):
+
+- adaptive calibration is updated through `src/systems/systematic_learning.py`,
+- per-driver and teammate-gap EMA errors are refreshed for `qualifying` and `race`,
+- state is persisted to `data/learning_state.json`.
+
+These learned adjustments are consumed by qualifying/race scoring in the baseline predictor.
+
 ## Accuracy View
 
 In the dashboard **Prediction Accuracy** page, metrics are computed only for predictions that already include actual results.
@@ -87,3 +97,4 @@ Typical metrics shown:
 2. Actuals update depends on FastF1 availability for qualifying and race sessions.
 3. If no session has completed yet, nothing is saved.
 4. Dashboard accuracy history currently scans local files, so pure `db_only`/`fallback` mode may not show saved history unless files also exist.
+5. Learning updates require matching driver identifiers between predicted payloads and actual results.
