@@ -12,6 +12,10 @@ from src.utils.tire_degradation import (
     get_effective_tire_deg_slope,
     get_fresh_tire_advantage,
 )
+from src.utils.traffic_model import (
+    calculate_dirty_air_penalty,
+    get_track_downforce_level,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -274,10 +278,27 @@ def _get_traffic_overtake_effect(
     ahead_info = driver_info_map.get(ahead_driver, {})
     dirty_air_penalty_base = overtake_cfg.get("dirty_air_penalty_base", 0.05)
     dirty_air_penalty_track_scale = overtake_cfg.get("dirty_air_penalty_track_scale", 0.12)
+    dirty_air_cap = dirty_air_penalty_base + (track_overtaking * dirty_air_penalty_track_scale)
+
+    if dirty_air_cap <= 0.0:
+        dirty_air_penalty = 0.0
+    else:
+        track_name = race_params.get("track_name")
+        track_downforce_level = get_track_downforce_level(
+            track_name=track_name,
+            track_overtaking=track_overtaking,
+        )
+        dirty_air_penalty = min(
+            dirty_air_cap,
+            calculate_dirty_air_penalty(
+                gap_to_car_ahead_s=gap_to_ahead,
+                track_downforce_level=track_downforce_level,
+                dirty_air_window_s=dirty_air_window,
+            ),
+        )
+
     dirty_air_relief = np.clip(info.get("overtaking_skill", 0.5), 0.0, 1.0) * 0.5
-    dirty_air_penalty = (
-        dirty_air_penalty_base + (track_overtaking * dirty_air_penalty_track_scale)
-    ) * (1.0 - dirty_air_relief)
+    dirty_air_penalty *= 1.0 - dirty_air_relief
 
     effect = dirty_air_penalty
 

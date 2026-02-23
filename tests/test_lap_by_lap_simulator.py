@@ -1,6 +1,7 @@
 """Unit tests for lap-by-lap race simulator behavior."""
 
 import numpy as np
+import pytest
 
 from src.utils.lap_by_lap_simulator import (
     _get_traffic_overtake_effect,
@@ -218,6 +219,82 @@ def test_strong_defender_reduces_overtake_success():
 
     # Lower effect is better for attacker (negative = pass gain).
     assert weak_effect < strong_effect
+
+
+def test_dirty_air_penalty_is_stronger_on_monaco_than_monza():
+    """Dirty-air loss should be materially higher at Monaco than Monza for same gap."""
+    race_params = _base_race_params()
+    race_params["overtake_model"]["dirty_air_penalty_base"] = 0.05
+    race_params["overtake_model"]["dirty_air_penalty_track_scale"] = 0.12
+    race_params["overtake_model"]["pass_threshold_base"] = 10.0
+    race_params["overtake_model"]["pass_threshold_track_scale"] = 0.0
+    race_params["overtake_model"]["pass_probability_base"] = 0.0
+    race_params["overtake_model"]["pass_probability_scale"] = 0.0
+
+    driver_states = {
+        "A": {"position": 4, "cumulative_time": 100.0, "base_pace": 90.0, "has_dnf": False},
+        "B": {"position": 5, "cumulative_time": 101.0, "base_pace": 90.0, "has_dnf": False},
+    }
+    driver_ahead_map = {"B": "A"}
+    driver_info_map = {
+        "A": {"skill": 0.6, "defensive_skill": 0.8, "overtaking_skill": 0.5},
+        "B": {"skill": 0.6, "race_advantage": 0.0, "overtaking_skill": 0.0},
+    }
+
+    race_params["track_name"] = "Monaco Grand Prix"
+    monaco_effect = _get_traffic_overtake_effect(
+        driver="B",
+        driver_states=driver_states,
+        driver_info_map=driver_info_map,
+        driver_ahead_map=driver_ahead_map,
+        race_params=race_params,
+        rng=np.random.default_rng(1),
+    )
+
+    race_params["track_name"] = "Italian Grand Prix"
+    monza_effect = _get_traffic_overtake_effect(
+        driver="B",
+        driver_states=driver_states,
+        driver_info_map=driver_info_map,
+        driver_ahead_map=driver_ahead_map,
+        race_params=race_params,
+        rng=np.random.default_rng(1),
+    )
+
+    assert monaco_effect > monza_effect
+    assert monaco_effect >= monza_effect * 1.8
+    assert monaco_effect == pytest.approx(0.04, abs=0.01)
+
+
+def test_dirty_air_penalty_not_applied_beyond_gap_window():
+    """Following outside 1.8s should produce no dirty-air lap-time penalty."""
+    race_params = _base_race_params()
+    race_params["overtake_model"]["dirty_air_penalty_base"] = 0.05
+    race_params["overtake_model"]["dirty_air_penalty_track_scale"] = 0.12
+    race_params["overtake_model"]["pass_threshold_base"] = 10.0
+    race_params["overtake_model"]["pass_threshold_track_scale"] = 0.0
+    race_params["track_name"] = "Monaco Grand Prix"
+
+    driver_states = {
+        "A": {"position": 4, "cumulative_time": 100.0, "base_pace": 90.0, "has_dnf": False},
+        "B": {"position": 5, "cumulative_time": 102.0, "base_pace": 90.0, "has_dnf": False},
+    }
+    driver_ahead_map = {"B": "A"}
+    driver_info_map = {
+        "A": {"skill": 0.6, "defensive_skill": 0.8, "overtaking_skill": 0.5},
+        "B": {"skill": 0.6, "race_advantage": 0.0, "overtaking_skill": 0.0},
+    }
+
+    effect = _get_traffic_overtake_effect(
+        driver="B",
+        driver_states=driver_states,
+        driver_info_map=driver_info_map,
+        driver_ahead_map=driver_ahead_map,
+        race_params=race_params,
+        rng=np.random.default_rng(1),
+    )
+
+    assert effect == 0.0
 
 
 def test_front_overtakes_are_harder_than_backfield_overtakes():

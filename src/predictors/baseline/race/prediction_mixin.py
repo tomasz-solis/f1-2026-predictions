@@ -49,6 +49,7 @@ class BaselineRacePredictionMixin:
 
         # Merge track-specific overrides into base params
         race_params = {**base_params, **track_params}
+        race_params["track_name"] = race_name
 
         # Load additional params for lap-by-lap simulation
         race_params["fuel"] = {
