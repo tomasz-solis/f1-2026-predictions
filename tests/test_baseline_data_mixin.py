@@ -87,16 +87,16 @@ def _write_baseline_files(base_dir: Path, car: dict, drivers: dict, tracks: dict
         )
 
 
-def test_load_data_falls_back_to_files(tmp_path, monkeypatch, sample_payloads):
+def test_load_data_falls_back_to_files(tmp_path, patcher, sample_payloads):
     car, drivers, tracks = sample_payloads
     data_dir = tmp_path / "processed"
     _write_baseline_files(data_dir, car, drivers, tracks)
 
     predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
 
-    monkeypatch.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
-    monkeypatch.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
-    monkeypatch.setattr(
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr(
         "src.utils.driver_validation.validate_driver_data",
         lambda drivers_payload: ["sample warning"],
     )
@@ -110,22 +110,22 @@ def test_load_data_falls_back_to_files(tmp_path, monkeypatch, sample_payloads):
     assert predictor.year == 2026
 
 
-def test_load_data_missing_track_file_sets_empty_tracks(tmp_path, monkeypatch, sample_payloads):
+def test_load_data_missing_track_file_sets_empty_tracks(tmp_path, patcher, sample_payloads):
     car, drivers, _tracks = sample_payloads
     data_dir = tmp_path / "processed"
     _write_baseline_files(data_dir, car, drivers, tracks=None)
 
     predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
-    monkeypatch.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
-    monkeypatch.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
-    monkeypatch.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
 
     predictor.load_data()
 
     assert predictor.tracks == {}
 
 
-def test_load_data_raises_for_invalid_team_schema(tmp_path, monkeypatch, sample_payloads):
+def test_load_data_raises_for_invalid_team_schema(tmp_path, patcher, sample_payloads):
     car, drivers, tracks = sample_payloads
     data_dir = tmp_path / "processed"
     _write_baseline_files(data_dir, car, drivers, tracks)
@@ -139,7 +139,7 @@ def test_load_data_raises_for_invalid_team_schema(tmp_path, monkeypatch, sample_
     )
     predictor = DummyPredictor(data_dir=data_dir, artifact_store=store)
 
-    monkeypatch.setattr(
+    patcher.setattr(
         data_mixin_module,
         "validate_team_characteristics",
         lambda payload: (_ for _ in ()).throw(ValueError("bad team payload")),
@@ -185,12 +185,12 @@ def test_calculate_track_suitability_variants(tmp_path):
     )
 
 
-def test_get_blended_team_strength_uses_current_fallback(tmp_path, monkeypatch):
+def test_get_blended_team_strength_uses_current_fallback(tmp_path, patcher):
     predictor = DummyPredictor(data_dir=tmp_path)
     predictor.teams = {"McLaren": {"overall_performance": 0.82, "current_season_performance": []}}
     predictor.races_completed = 4
 
-    monkeypatch.setattr(predictor, "calculate_track_suitability", lambda team, race_name: 0.02)
+    patcher.setattr(predictor, "calculate_track_suitability", lambda team, race_name: 0.02)
 
     captured = {}
 
@@ -198,10 +198,10 @@ def test_get_blended_team_strength_uses_current_fallback(tmp_path, monkeypatch):
         captured.update(kwargs)
         return 0.77
 
-    monkeypatch.setattr(
+    patcher.setattr(
         data_mixin_module, "get_recommended_schedule", lambda is_regulation_change: {"ok": True}
     )
-    monkeypatch.setattr(data_mixin_module, "calculate_blended_performance", _fake_blend)
+    patcher.setattr(data_mixin_module, "calculate_blended_performance", _fake_blend)
 
     result = predictor.get_blended_team_strength("McLaren", "Bahrain Grand Prix")
 
@@ -219,9 +219,9 @@ def test_get_blended_team_strength_uses_current_fallback(tmp_path, monkeypatch):
         ({"traction": 3.0, "braking": 3.0, "lateral": 3.0, "asphalt_abrasion": 3.0}, "MEDIUM"),
     ],
 )
-def test_select_race_compound_thresholds(tmp_path, monkeypatch, stress, expected):
+def test_select_race_compound_thresholds(tmp_path, patcher, stress, expected):
     predictor = DummyPredictor(data_dir=tmp_path)
-    monkeypatch.chdir(tmp_path)
+    patcher.chdir(tmp_path)
 
     (tmp_path / "data").mkdir()
     payload = {"bahrain_grand_prix": {"tyre_stress": stress}}
@@ -234,14 +234,14 @@ def test_select_race_compound_thresholds(tmp_path, monkeypatch, stress, expected
             return 2.5
         return default
 
-    monkeypatch.setattr(data_mixin_module.config_loader, "get", _get_config)
+    patcher.setattr(data_mixin_module.config_loader, "get", _get_config)
 
     assert predictor._select_race_compound("Bahrain Grand Prix") == expected
 
 
-def test_select_race_compound_defaults_for_missing_or_invalid_file(tmp_path, monkeypatch):
+def test_select_race_compound_defaults_for_missing_or_invalid_file(tmp_path, patcher):
     predictor = DummyPredictor(data_dir=tmp_path)
-    monkeypatch.chdir(tmp_path)
+    patcher.chdir(tmp_path)
     assert predictor._select_race_compound("Bahrain Grand Prix") == "MEDIUM"
 
     (tmp_path / "data").mkdir()
@@ -249,24 +249,24 @@ def test_select_race_compound_defaults_for_missing_or_invalid_file(tmp_path, mon
     assert predictor._select_race_compound("Bahrain Grand Prix") == "MEDIUM"
 
 
-def test_get_compound_adjusted_team_strength_branches(tmp_path, monkeypatch):
+def test_get_compound_adjusted_team_strength_branches(tmp_path, patcher):
     predictor = DummyPredictor(data_dir=tmp_path)
     predictor.teams = {"McLaren": {"compound_characteristics": {"SOFT": {"laps_sampled": 20}}}}
-    monkeypatch.setattr(predictor, "get_blended_team_strength", lambda team, race_name: 0.9)
+    patcher.setattr(predictor, "get_blended_team_strength", lambda team, race_name: 0.9)
 
-    monkeypatch.setattr(
+    patcher.setattr(
         data_mixin_module,
         "should_use_compound_adjustments",
         lambda payload, min_laps_threshold: False,
     )
     assert predictor.get_compound_adjusted_team_strength("McLaren", "Bahrain", "SOFT") == 0.9
 
-    monkeypatch.setattr(
+    patcher.setattr(
         data_mixin_module,
         "should_use_compound_adjustments",
         lambda payload, min_laps_threshold: True,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         data_mixin_module, "get_compound_performance_modifier", lambda payload, compound: 0.3
     )
     assert predictor.get_compound_adjusted_team_strength("McLaren", "Bahrain", "SOFT") == 1.0
@@ -296,10 +296,10 @@ def test_testing_characteristics_profile_fallbacks(tmp_path):
     assert predictor._get_testing_characteristics_for_profile("RB", "balanced") == {}
 
 
-def test_compute_testing_profile_modifier_branches(tmp_path, monkeypatch):
+def test_compute_testing_profile_modifier_branches(tmp_path, patcher):
     predictor = DummyPredictor(data_dir=tmp_path)
 
-    monkeypatch.setattr(
+    patcher.setattr(
         predictor,
         "_get_testing_characteristics_for_profile",
         lambda team, profile: {"overall_pace": 0.9, "consistency": 0.4},
@@ -314,9 +314,7 @@ def test_compute_testing_profile_modifier_branches(tmp_path, monkeypatch):
     assert has_data is True
     assert modifier == pytest.approx(0.04)
 
-    monkeypatch.setattr(
-        predictor, "_get_testing_characteristics_for_profile", lambda team, profile: {}
-    )
+    patcher.setattr(predictor, "_get_testing_characteristics_for_profile", lambda team, profile: {})
     modifier, has_data = predictor._compute_testing_profile_modifier(
         "McLaren",
         "balanced",
@@ -345,7 +343,7 @@ def test_update_compound_characteristics_uses_cache(tmp_path):
     assert predictor.teams["McLaren"]["compound_characteristics"]["SOFT"]["laps_sampled"] == 8
 
 
-def test_update_compound_characteristics_extracts_and_persists(tmp_path, monkeypatch):
+def test_update_compound_characteristics_extracts_and_persists(tmp_path, patcher):
     predictor = DummyPredictor(data_dir=tmp_path)
     predictor.teams = {
         "McLaren": {
@@ -370,23 +368,23 @@ def test_update_compound_characteristics_extracts_and_persists(tmp_path, monkeyp
         }
     )
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "src.utils.team_mapping.map_team_to_characteristics",
         lambda raw_team, known_teams: "McLaren",
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         "src.systems.compound_analyzer.extract_compound_metrics",
         lambda team_laps, canonical_team, race_name: {"SOFT": {"laps_sampled": 12}},
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         "src.systems.compound_analyzer.normalize_compound_metrics_across_teams",
         lambda metrics, race_name: metrics,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         "src.systems.compound_analyzer.aggregate_compound_samples",
         lambda existing, new, blend_weight, race_name: new,
     )
-    monkeypatch.setattr(data_mixin_module.config_loader, "get", lambda key, default: 0.5)
+    patcher.setattr(data_mixin_module.config_loader, "get", lambda key, default: 0.5)
 
     predictor._update_compound_characteristics_from_session(
         session_laps=session_laps,
@@ -399,7 +397,7 @@ def test_update_compound_characteristics_extracts_and_persists(tmp_path, monkeyp
     assert store.saved, "Expected compound updates to be persisted when DB storage is enabled"
 
 
-def test_update_compound_characteristics_handles_empty_extraction(tmp_path, monkeypatch):
+def test_update_compound_characteristics_handles_empty_extraction(tmp_path, patcher):
     predictor = DummyPredictor(data_dir=tmp_path)
     predictor.teams = {"McLaren": {"compound_characteristics": {"SOFT": {"laps_sampled": 5}}}}
 
@@ -410,11 +408,11 @@ def test_update_compound_characteristics_handles_empty_extraction(tmp_path, monk
         }
     )
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "src.utils.team_mapping.map_team_to_characteristics",
         lambda raw_team, known_teams: "McLaren",
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         "src.systems.compound_analyzer.extract_compound_metrics",
         lambda team_laps, canonical_team, race_name: {},
     )

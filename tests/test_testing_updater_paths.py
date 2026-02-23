@@ -40,13 +40,13 @@ def test_coerce_utc_datetime_handles_timezone_aware_values():
     assert coerced.utcoffset() == timedelta(0)
 
 
-def test_get_testing_event_with_backends_records_errors_and_falls_back(monkeypatch):
+def test_get_testing_event_with_backends_records_errors_and_falls_back(patcher):
     def _mock_get_testing_event(year, test_number, backend=None):
         if backend == "f1timing":
             raise RuntimeError("backend unavailable")
         return {"EventName": "Testing"}
 
-    monkeypatch.setattr(tu.fastf1, "get_testing_event", _mock_get_testing_event)
+    patcher.setattr(tu.fastf1, "get_testing_event", _mock_get_testing_event)
     errors = []
 
     event = tu._get_testing_event_with_backends(
@@ -60,7 +60,7 @@ def test_get_testing_event_with_backends_records_errors_and_falls_back(monkeypat
     assert errors and "backend=f1timing" in errors[0]
 
 
-def test_load_testing_session_with_backends_handles_failed_backend(monkeypatch):
+def test_load_testing_session_with_backends_handles_failed_backend(patcher):
     bad_session = SimpleNamespace(laps=None)
     bad_session.load = lambda **kwargs: None
 
@@ -74,7 +74,7 @@ def test_load_testing_session_with_backends_handles_failed_backend(monkeypatch):
             return _Event(bad_session, Session1="Day 1")
         return _Event(good_session, Session1="Day 1")
 
-    monkeypatch.setattr(tu.fastf1, "get_testing_event", _mock_get_testing_event)
+    patcher.setattr(tu.fastf1, "get_testing_event", _mock_get_testing_event)
 
     errors = []
     loaded = tu._load_testing_session_with_backends(
@@ -89,7 +89,7 @@ def test_load_testing_session_with_backends_handles_failed_backend(monkeypatch):
     assert errors and "backend=f1timing" in errors[0]
 
 
-def test_load_sessions_for_non_testing_event_collects_errors(monkeypatch):
+def test_load_sessions_for_non_testing_event_collects_errors(patcher):
     session = SimpleNamespace(laps=pd.DataFrame({"LapTime": [pd.to_timedelta("0:01:30")]}))
     session.load = lambda **kwargs: None
 
@@ -98,7 +98,7 @@ def test_load_sessions_for_non_testing_event_collects_errors(monkeypatch):
             raise RuntimeError("missing")
         return session
 
-    monkeypatch.setattr(tu.fastf1, "get_session", _mock_get_session)
+    patcher.setattr(tu.fastf1, "get_session", _mock_get_session)
 
     errors = []
     loaded = tu._load_sessions_for_event(
@@ -113,14 +113,14 @@ def test_load_sessions_for_non_testing_event_collects_errors(monkeypatch):
     assert errors and "Bahrain Grand Prix::FP1" in errors[0]
 
 
-def test_load_sessions_for_testing_event_skips_future_sessions(monkeypatch):
+def test_load_sessions_for_testing_event_skips_future_sessions(patcher):
     future_event = {
         "Session1DateUtc": datetime.now(UTC) + timedelta(hours=2),
     }
 
-    monkeypatch.setattr(tu, "_get_testing_event_with_backends", lambda **kwargs: future_event)
+    patcher.setattr(tu, "_get_testing_event_with_backends", lambda **kwargs: future_event)
     load_session = MagicMock(return_value=SimpleNamespace())
-    monkeypatch.setattr(tu, "_load_testing_session_with_backends", load_session)
+    patcher.setattr(tu, "_load_testing_session_with_backends", load_session)
 
     errors = []
     loaded = tu._load_sessions_for_event(
@@ -175,7 +175,7 @@ def test_select_program_aware_laps_invalid_profile_raises():
         tu._select_program_aware_laps(laps, run_profile="invalid")
 
 
-def test_count_team_selected_laps_handles_laps_errors_and_invalid_profile(monkeypatch):
+def test_count_team_selected_laps_handles_laps_errors_and_invalid_profile(patcher):
     class BrokenSession:
         @property
         def laps(self):
@@ -191,7 +191,7 @@ def test_count_team_selected_laps_handles_laps_errors_and_invalid_profile(monkey
             }
         )
     )
-    monkeypatch.setattr(tu, "_canonicalize_team_name", lambda raw_team, known_teams: "Ferrari")
+    patcher.setattr(tu, "_canonicalize_team_name", lambda raw_team, known_teams: "Ferrari")
 
     with pytest.raises(ValueError, match="Invalid run_profile"):
         tu._count_team_selected_laps(session, {"Ferrari"}, run_profile="invalid")
@@ -250,7 +250,7 @@ def test_collect_session_metrics_unavailable_paths():
     assert any("missing Team column" in item for item in diagnostics)
 
 
-def test_collect_session_metrics_with_data(monkeypatch):
+def test_collect_session_metrics_with_data(patcher):
     laps = pd.DataFrame(
         {
             "Team": ["Ferrari"] * 8,
@@ -265,8 +265,8 @@ def test_collect_session_metrics_with_data(monkeypatch):
     )
     session = SimpleNamespace(laps=laps)
 
-    monkeypatch.setattr(tu, "_canonicalize_team_name", lambda raw_team, known_teams: "Ferrari")
-    monkeypatch.setattr(
+    patcher.setattr(tu, "_canonicalize_team_name", lambda raw_team, known_teams: "Ferrari")
+    patcher.setattr(
         tu,
         "extract_all_teams_performance",
         lambda payload, session_name: {"Ferrari": {"top_speed": 0.6}},
@@ -303,7 +303,7 @@ def test_update_from_testing_sessions_validation_errors(tmp_path):
         )
 
 
-def test_update_from_testing_sessions_unusable_discovered_sessions(tmp_path, monkeypatch):
+def test_update_from_testing_sessions_unusable_discovered_sessions(tmp_path, patcher):
     _write_characteristics(
         tmp_path,
         {
@@ -324,9 +324,9 @@ def test_update_from_testing_sessions_unusable_discovered_sessions(tmp_path, mon
         laps=pd.DataFrame({"Team": ["Ferrari"], "LapTime": [pd.to_timedelta("0:01:30")]})
     )
 
-    monkeypatch.setattr(tu, "_load_sessions_for_event", lambda **kwargs: [("FP1", session)])
-    monkeypatch.setattr(tu, "_collect_session_metrics", lambda **kwargs: ({}, {}))
-    monkeypatch.setattr(tu.fastf1.Cache, "enable_cache", lambda path, force_renew=False: None)
+    patcher.setattr(tu, "_load_sessions_for_event", lambda **kwargs: [("FP1", session)])
+    patcher.setattr(tu, "_collect_session_metrics", lambda **kwargs: ({}, {}))
+    patcher.setattr(tu.fastf1.Cache, "enable_cache", lambda path, force_renew=False: None)
 
     with pytest.raises(ValueError, match="too little completed running"):
         tu.update_from_testing_sessions(
@@ -337,7 +337,7 @@ def test_update_from_testing_sessions_unusable_discovered_sessions(tmp_path, mon
         )
 
 
-def test_update_from_testing_sessions_raises_when_no_teams_matched(tmp_path, monkeypatch):
+def test_update_from_testing_sessions_raises_when_no_teams_matched(tmp_path, patcher):
     _write_characteristics(
         tmp_path,
         {
@@ -358,14 +358,14 @@ def test_update_from_testing_sessions_raises_when_no_teams_matched(tmp_path, mon
         laps=pd.DataFrame({"Team": ["Unknown"], "LapTime": [pd.to_timedelta("0:01:30")]})
     )
 
-    monkeypatch.setattr(tu, "_load_sessions_for_event", lambda **kwargs: [("FP1", session)])
-    monkeypatch.setattr(
+    patcher.setattr(tu, "_load_sessions_for_event", lambda **kwargs: [("FP1", session)])
+    patcher.setattr(
         tu, "_collect_session_metrics", lambda **kwargs: ({"Unknown": {"overall_pace": 0.7}}, {})
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         tu, "_count_team_selected_laps", lambda session, known_teams, run_profile: {"Unknown": 5.0}
     )
-    monkeypatch.setattr(tu.fastf1.Cache, "enable_cache", lambda path, force_renew=False: None)
+    patcher.setattr(tu.fastf1.Cache, "enable_cache", lambda path, force_renew=False: None)
 
     with pytest.raises(ValueError, match="no teams were matched"):
         tu.update_from_testing_sessions(
@@ -376,7 +376,7 @@ def test_update_from_testing_sessions_raises_when_no_teams_matched(tmp_path, mon
         )
 
 
-def test_update_from_testing_sessions_writes_file_when_not_dry_run(tmp_path, monkeypatch):
+def test_update_from_testing_sessions_writes_file_when_not_dry_run(tmp_path, patcher):
     original_last_updated = "2026-01-01T00:00:00"
     _write_characteristics(
         tmp_path,
@@ -402,20 +402,18 @@ def test_update_from_testing_sessions_writes_file_when_not_dry_run(tmp_path, mon
         laps=pd.DataFrame({"Team": ["Ferrari"], "LapTime": [pd.to_timedelta("0:01:30")]})
     )
 
-    monkeypatch.setattr(tu, "_load_sessions_for_event", lambda **kwargs: [("FP1", session)])
-    monkeypatch.setattr(
+    patcher.setattr(tu, "_load_sessions_for_event", lambda **kwargs: [("FP1", session)])
+    patcher.setattr(
         tu, "_collect_session_metrics", lambda **kwargs: ({"Ferrari": {"overall_pace": 0.7}}, {})
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         tu, "_count_team_selected_laps", lambda session, known_teams, run_profile: {"Ferrari": 10.0}
     )
-    monkeypatch.setattr(
-        tu, "extract_compound_metrics", lambda team_laps, canonical_team, race_name: {}
-    )
-    monkeypatch.setattr(tu.fastf1.Cache, "enable_cache", lambda path, force_renew=False: None)
+    patcher.setattr(tu, "extract_compound_metrics", lambda team_laps, canonical_team, race_name: {})
+    patcher.setattr(tu.fastf1.Cache, "enable_cache", lambda path, force_renew=False: None)
 
     atomic_write = MagicMock()
-    monkeypatch.setattr(tu, "atomic_json_write", atomic_write)
+    patcher.setattr(tu, "atomic_json_write", atomic_write)
 
     summary = tu.update_from_testing_sessions(
         year=2026,

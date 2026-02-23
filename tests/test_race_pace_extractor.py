@@ -74,7 +74,7 @@ def test_select_best_stint_prefers_longest():
     assert selected["compound"] == "HARD"
 
 
-def test_extract_fp2_pace_returns_relative_team_pace(monkeypatch):
+def test_extract_fp2_pace_returns_relative_team_pace(patcher):
     laps = pd.concat(
         [
             _make_laps_for_team("McLaren", "NOR", base=90.0, n_laps=12),
@@ -83,7 +83,7 @@ def test_extract_fp2_pace_returns_relative_team_pace(monkeypatch):
         ignore_index=True,
     )
 
-    monkeypatch.setattr(race_pace.ff1, "get_session", lambda *_args, **_kwargs: _make_session(laps))
+    patcher.setattr(race_pace.ff1, "get_session", lambda *_args, **_kwargs: _make_session(laps))
 
     result = race_pace.extract_fp2_pace(2026, "Bahrain Grand Prix")
 
@@ -92,16 +92,16 @@ def test_extract_fp2_pace_returns_relative_team_pace(monkeypatch):
     assert round(result["McLaren"]["relative_pace"] + result["Ferrari"]["relative_pace"], 6) == 0.0
 
 
-def test_extract_fp2_pace_returns_none_without_laps(monkeypatch):
+def test_extract_fp2_pace_returns_none_without_laps(patcher):
     session = _make_session(pd.DataFrame())
     session.laps = None
-    monkeypatch.setattr(race_pace.ff1, "get_session", lambda *_args, **_kwargs: session)
+    patcher.setattr(race_pace.ff1, "get_session", lambda *_args, **_kwargs: session)
 
     assert race_pace.extract_fp2_pace(2026, "Bahrain Grand Prix") is None
 
 
-def test_extract_fp2_pace_handles_exceptions(monkeypatch):
-    monkeypatch.setattr(
+def test_extract_fp2_pace_handles_exceptions(patcher):
+    patcher.setattr(
         race_pace.ff1,
         "get_session",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("offline")),

@@ -180,6 +180,56 @@ def test_update_actuals(temp_predictions_dir, sample_quali_prediction, sample_ra
     assert len(prediction["actuals"]["race"]) == 3
 
 
+def test_update_actuals_triggers_systematic_learning(
+    temp_predictions_dir, sample_quali_prediction, sample_race_prediction
+):
+    """Updating actuals should persist adaptive learning signals."""
+    logger = PredictionLogger(predictions_dir=temp_predictions_dir)
+
+    logger.save_prediction(
+        year=2026,
+        race_name="Bahrain Grand Prix",
+        session_name="FP3",
+        qualifying_prediction=sample_quali_prediction,
+        race_prediction=sample_race_prediction,
+        weather="dry",
+    )
+
+    actual_quali = [
+        {"driver": "Norris", "team": "McLaren"},
+        {"driver": "Verstappen", "team": "Red Bull"},
+        {"driver": "Leclerc", "team": "Ferrari"},
+    ]
+    actual_race = [
+        {"driver": "Leclerc", "team": "Ferrari"},
+        {"driver": "Norris", "team": "McLaren"},
+        {"driver": "Verstappen", "team": "Red Bull"},
+    ]
+
+    assert (
+        logger.update_actuals(
+            year=2026,
+            race_name="Bahrain Grand Prix",
+            session_name="FP3",
+            qualifying_results=actual_quali,
+            race_results=actual_race,
+        )
+        is True
+    )
+
+    learning_file = Path(temp_predictions_dir).parent / "learning_state.json"
+    assert learning_file.exists()
+
+    payload = json.loads(learning_file.read_text())
+    adaptive = payload.get("adaptive_calibration", {})
+    driver_errors = adaptive.get("driver_position_error", {})
+
+    assert "qualifying" in driver_errors
+    assert "race" in driver_errors
+    assert driver_errors["qualifying"]  # Non-empty after learning update
+    assert driver_errors["race"]  # Non-empty after learning update
+
+
 def test_has_prediction_for_session(
     temp_predictions_dir, sample_quali_prediction, sample_race_prediction
 ):

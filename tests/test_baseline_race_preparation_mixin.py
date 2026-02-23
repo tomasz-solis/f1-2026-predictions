@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
+from contextlib import contextmanager
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -30,8 +34,25 @@ class DummyPreparation(BaselineRacePreparationMixin):
         return self.profile_modifier
 
 
-def test_load_track_overtaking_difficulty_from_file_and_fallbacks(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
+class DummyConfig:
+    def __init__(self, overrides: dict[str, object] | None = None):
+        self._overrides = overrides or {}
+
+    def get(self, key: str, default=None):
+        return self._overrides.get(key, default)
+
+
+@contextmanager
+def _working_directory(path: Path):
+    current = Path.cwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(current)
+
+
+def test_load_track_overtaking_difficulty_from_file_and_fallbacks(tmp_path):
     track_dir = tmp_path / "data" / "processed" / "track_characteristics"
     track_dir.mkdir(parents=True)
     track_file = track_dir / "2026_track_characteristics.json"
@@ -40,36 +61,42 @@ def test_load_track_overtaking_difficulty_from_file_and_fallbacks(tmp_path, monk
     )
 
     prep = DummyPreparation()
-    monkeypatch.setattr(prep_module, "validate_track_characteristics", lambda payload: None)
+    with _working_directory(tmp_path):
+        with patch.object(prep_module, "validate_track_characteristics", lambda payload: None):
+            assert prep._load_track_overtaking_difficulty(None) == 0.5
+            assert prep._load_track_overtaking_difficulty("Bahrain Grand Prix") == 0.82
+            assert prep._load_track_overtaking_difficulty("Unknown Race") == 0.5
 
-    assert prep._load_track_overtaking_difficulty(None) == 0.5
-    assert prep._load_track_overtaking_difficulty("Bahrain Grand Prix") == 0.82
-    assert prep._load_track_overtaking_difficulty("Unknown Race") == 0.5
-
-    track_file.write_text("{bad json")
-    assert prep._load_track_overtaking_difficulty("Bahrain Grand Prix") == 0.5
+            track_file.write_text("{bad json")
+            assert prep._load_track_overtaking_difficulty("Bahrain Grand Prix") == 0.5
 
 
-def test_load_track_overtaking_difficulty_handles_schema_validation_error(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
+def test_load_track_overtaking_difficulty_handles_schema_validation_error(tmp_path):
     track_dir = tmp_path / "data" / "processed" / "track_characteristics"
     track_dir.mkdir(parents=True)
     (track_dir / "2026_track_characteristics.json").write_text(json.dumps({"tracks": {}}))
 
     prep = DummyPreparation()
-    monkeypatch.setattr(
-        prep_module,
-        "validate_track_characteristics",
-        lambda payload: (_ for _ in ()).throw(ValueError("schema error")),
-    )
+    with _working_directory(tmp_path):
+        with patch.object(
+            prep_module,
+            "validate_track_characteristics",
+            lambda payload: (_ for _ in ()).throw(ValueError("schema error")),
+        ):
+            assert prep._load_track_overtaking_difficulty("Bahrain Grand Prix") == 0.5
 
-    assert prep._load_track_overtaking_difficulty("Bahrain Grand Prix") == 0.5
 
-
-def test_prepare_driver_info_applies_caps_and_profile_modifiers(monkeypatch):
+def test_prepare_driver_info_applies_caps_and_profile_modifiers():
     prep = DummyPreparation()
     prep.compound_strength = 0.9
     prep.profile_modifier = (0.25, True)
+    prep.config = DummyConfig(
+        {
+            "baseline_predictor.race.dnf_rate_historical_cap": 0.20,
+            "baseline_predictor.race.dnf_rate_final_cap": 0.33,
+            "baseline_predictor.race.testing_long_run_modifier_scale": 0.05,
+        }
+    )
     prep.teams = {"McLaren": {"overall_performance": 0.55, "uncertainty": 0.50}}
     prep.drivers = {
         "NOR": {
@@ -79,16 +106,6 @@ def test_prepare_driver_info_applies_caps_and_profile_modifiers(monkeypatch):
             "experience": {"tier": "rookie"},
         }
     }
-
-    monkeypatch.setattr(
-        prep_module.config_loader,
-        "get",
-        lambda key, default: {
-            "baseline_predictor.race.dnf_rate_historical_cap": 0.20,
-            "baseline_predictor.race.dnf_rate_final_cap": 0.33,
-            "baseline_predictor.race.testing_long_run_modifier_scale": 0.05,
-        }.get(key, default),
-    )
 
     info_map, long_profile_count = prep._prepare_driver_info(
         qualifying_grid=[{"driver": "NOR", "team": "McLaren", "position": 1}],
@@ -104,10 +121,18 @@ def test_prepare_driver_info_applies_caps_and_profile_modifiers(monkeypatch):
     assert info["dnf_probability"] == pytest.approx(0.33)
 
 
-def test_prepare_driver_info_with_compounds_builds_per_compound_strengths(monkeypatch):
+def test_prepare_driver_info_with_compounds_builds_per_compound_strengths():
     prep = DummyPreparation()
     prep.blended_strength = 0.7
     prep.profile_modifier = (0.1, True)
+    prep.config = DummyConfig(
+        {
+            "baseline_predictor.race.tire_physics.default_deg_slope": 0.12,
+            "baseline_predictor.race.dnf_rate_historical_cap": 0.20,
+            "baseline_predictor.race.dnf_rate_final_cap": 0.35,
+            "baseline_predictor.race.testing_long_run_modifier_scale": 0.05,
+        }
+    )
     prep.teams = {
         "McLaren": {
             "uncertainty": 0.2,
@@ -126,26 +151,14 @@ def test_prepare_driver_info_with_compounds_builds_per_compound_strengths(monkey
             "experience": {"tier": "established"},
         }
     }
-
-    monkeypatch.setattr(
-        prep_module.config_loader,
-        "get",
-        lambda key, default: {
-            "baseline_predictor.race.tire_physics.default_deg_slope": 0.12,
-            "baseline_predictor.race.dnf_rate_historical_cap": 0.20,
-            "baseline_predictor.race.dnf_rate_final_cap": 0.35,
-            "baseline_predictor.race.testing_long_run_modifier_scale": 0.05,
-        }.get(key, default),
-    )
-    monkeypatch.setattr(
+    with patch(
         "src.utils.compound_performance.get_compound_performance_modifier",
         lambda team_compound_chars, compound: 0.05 if compound == "SOFT" else 0.0,
-    )
-
-    info_map, long_profile_count = prep._prepare_driver_info_with_compounds(
-        qualifying_grid=[{"driver": "NOR", "team": "McLaren", "position": 2}],
-        race_name="Bahrain Grand Prix",
-    )
+    ):
+        info_map, long_profile_count = prep._prepare_driver_info_with_compounds(
+            qualifying_grid=[{"driver": "NOR", "team": "McLaren", "position": 2}],
+            race_name="Bahrain Grand Prix",
+        )
 
     info = info_map["NOR"]
     assert long_profile_count == 1
@@ -157,25 +170,10 @@ def test_prepare_driver_info_with_compounds_builds_per_compound_strengths(monkey
     assert info["tire_deg_by_compound"]["MEDIUM"] == pytest.approx(0.12)
 
 
-def test_get_driver_data_or_fallback_uses_teammate_profile_for_missing_lineup_driver(monkeypatch):
+def test_get_driver_data_or_fallback_uses_teammate_profile_for_missing_lineup_driver():
     prep = DummyPreparation()
-    prep.drivers = {
-        "LAW": {
-            "pace": {"quali_pace": 0.70, "race_pace": 0.65},
-            "racecraft": {"skill_score": 0.62, "overtaking_skill": 0.60},
-            "dnf_risk": {"dnf_rate": 0.03},
-            "experience": {"tier": "developing"},
-        }
-    }
-
-    monkeypatch.setattr(
-        "src.utils.lineups.load_current_lineups",
-        lambda: {"RB": ["LAW", "LIN"]},
-    )
-    monkeypatch.setattr(
-        prep_module.config_loader,
-        "get",
-        lambda key, default: {
+    prep.config = DummyConfig(
+        {
             "baseline_predictor.qualifying.default_skill": 0.5,
             "baseline_predictor.race.missing_driver_teammate_weight": 0.80,
             "baseline_predictor.race.missing_driver_default_dnf_rate": 0.10,
@@ -184,10 +182,18 @@ def test_get_driver_data_or_fallback_uses_teammate_profile_for_missing_lineup_dr
             "baseline_predictor.race.missing_driver_rookie_race_penalty": 0.07,
             "baseline_predictor.race.missing_driver_rookie_skill_penalty": 0.08,
             "baseline_predictor.race.missing_driver_rookie_overtaking_penalty": 0.06,
-        }.get(key, default),
+        }
     )
-
-    fallback = prep._get_driver_data_or_fallback("LIN", "RB")
+    prep.drivers = {
+        "LAW": {
+            "pace": {"quali_pace": 0.70, "race_pace": 0.65},
+            "racecraft": {"skill_score": 0.62, "overtaking_skill": 0.60},
+            "dnf_risk": {"dnf_rate": 0.03},
+            "experience": {"tier": "developing"},
+        }
+    }
+    with patch("src.utils.lineups.load_current_lineups", return_value={"RB": ["LAW", "LIN"]}):
+        fallback = prep._get_driver_data_or_fallback("LIN", "RB")
 
     assert fallback["pace"]["quali_pace"] == pytest.approx(0.58)
     assert fallback["pace"]["race_pace"] == pytest.approx(0.55)
@@ -198,8 +204,44 @@ def test_get_driver_data_or_fallback_uses_teammate_profile_for_missing_lineup_dr
     assert prep.drivers["LIN"] == fallback
 
 
-def test_infer_missing_driver_experience_tier_uses_debuts_csv(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
+def test_missing_driver_fallback_applies_reduced_second_year_penalties():
+    prep = DummyPreparation()
+    prep.config = DummyConfig(
+        {
+            "baseline_predictor.qualifying.default_skill": 0.5,
+            "baseline_predictor.race.missing_driver_teammate_weight": 0.80,
+            "baseline_predictor.race.missing_driver_default_dnf_rate": 0.10,
+            "baseline_predictor.race.missing_driver_rookie_dnf_penalty": 0.02,
+            "baseline_predictor.race.missing_driver_rookie_quali_penalty": 0.08,
+            "baseline_predictor.race.missing_driver_rookie_race_penalty": 0.07,
+            "baseline_predictor.race.missing_driver_rookie_skill_penalty": 0.08,
+            "baseline_predictor.race.missing_driver_rookie_overtaking_penalty": 0.06,
+            "baseline_predictor.race.missing_driver_second_year_penalty_scale": 0.50,
+        }
+    )
+    prep.drivers = {
+        "LAW": {
+            "pace": {"quali_pace": 0.70, "race_pace": 0.65},
+            "racecraft": {"skill_score": 0.62, "overtaking_skill": 0.60},
+            "dnf_risk": {"dnf_rate": 0.03},
+            "experience": {"tier": "developing"},
+        }
+    }
+    with patch("src.utils.lineups.load_current_lineups", return_value={"RB": ["LAW", "LIN"]}):
+        with patch.object(
+            prep, "_infer_missing_driver_experience_tier", return_value="second_year"
+        ):
+            fallback = prep._get_driver_data_or_fallback("LIN", "RB")
+
+    assert fallback["pace"]["quali_pace"] == pytest.approx(0.62)
+    assert fallback["pace"]["race_pace"] == pytest.approx(0.585)
+    assert fallback["racecraft"]["skill_score"] == pytest.approx(0.556)
+    assert fallback["racecraft"]["overtaking_skill"] == pytest.approx(0.55)
+    assert fallback["dnf_risk"]["dnf_rate"] == pytest.approx(0.04)
+    assert fallback["experience"]["tier"] == "second_year"
+
+
+def test_infer_missing_driver_experience_tier_uses_debuts_csv(tmp_path):
     data_dir = tmp_path / "data"
     data_dir.mkdir(parents=True)
     (data_dir / "driver_debuts.csv").write_text(
@@ -211,9 +253,10 @@ def test_infer_missing_driver_experience_tier_uses_debuts_csv(tmp_path, monkeypa
     prep = DummyPreparation()
     prep.year = 2026
 
-    assert prep._infer_missing_driver_experience_tier("HAM") == "veteran"
-    assert prep._infer_missing_driver_experience_tier("LIN") == "rookie"
-    assert prep._infer_missing_driver_experience_tier("ZZZ") == "rookie"
+    with _working_directory(tmp_path):
+        assert prep._infer_missing_driver_experience_tier("HAM") == "sunset"
+        assert prep._infer_missing_driver_experience_tier("LIN") == "rookie"
+        assert prep._infer_missing_driver_experience_tier("ZZZ") == "rookie"
 
 
 def test_infer_missing_driver_experience_tier_prefers_artifact_store():
@@ -227,6 +270,58 @@ def test_infer_missing_driver_experience_tier_prefers_artifact_store():
     prep.year = 2026
     prep.artifact_store = StubStore()
 
-    assert prep._infer_missing_driver_experience_tier("HAM") == "veteran"
+    assert prep._infer_missing_driver_experience_tier("HAM") == "sunset"
     assert prep._infer_missing_driver_experience_tier("LIN") == "rookie"
     assert prep._infer_missing_driver_experience_tier("ZZZ") == "rookie"
+
+
+def test_resolve_effective_experience_tier_for_race_upgrades_second_year_driver():
+    prep = DummyPreparation()
+    prep.year = 2026
+
+    driver_data = {
+        "experience": {
+            "tier": "rookie",
+            "years_of_experience": 0,
+            "debut_year": 2025,
+        }
+    }
+
+    assert prep._resolve_effective_experience_tier_for_race(driver_data) == "second_year"
+
+
+def test_prepare_driver_info_uses_effective_experience_tier_for_dnf_modifier():
+    prep = DummyPreparation()
+    prep.year = 2026
+    prep.compound_strength = 0.75
+    prep.profile_modifier = (0.0, False)
+    prep.config = DummyConfig(
+        {
+            "baseline_predictor.race.dnf_rate_historical_cap": 0.20,
+            "baseline_predictor.race.dnf_rate_final_cap": 0.35,
+            "baseline_predictor.race.testing_long_run_modifier_scale": 0.05,
+            "baseline_predictor.race.team_uncertainty_dnf_multiplier": 0.20,
+        }
+    )
+    prep.teams = {"Mercedes": {"overall_performance": 0.75, "uncertainty": 0.20}}
+    prep.drivers = {
+        "ANT": {
+            "pace": {"quali_pace": 0.50, "race_pace": 0.50},
+            "racecraft": {"skill_score": 0.50, "overtaking_skill": 0.50},
+            "dnf_risk": {"dnf_rate": 0.10},
+            "experience": {
+                "tier": "rookie",
+                "years_of_experience": 0,
+                "debut_year": 2025,
+            },
+        }
+    }
+
+    info_map, _ = prep._prepare_driver_info(
+        qualifying_grid=[{"driver": "ANT", "team": "Mercedes", "position": 10}],
+        race_name="Bahrain Grand Prix",
+        race_compound="MEDIUM",
+    )
+
+    # Second-year driver should receive "second_year" (+0.03) modifier, not rookie (+0.05).
+    assert info_map["ANT"]["dnf_probability"] == pytest.approx(0.13)

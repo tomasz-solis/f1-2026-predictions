@@ -49,9 +49,9 @@ def _fake_session(name: str, event_name: str = "Bahrain Grand Prix"):
     )
 
 
-def test_f1_feature_pipeline_process_session_with_metadata(monkeypatch):
+def test_f1_feature_pipeline_process_session_with_metadata(patcher):
     pipeline = F1FeaturePipeline()
-    monkeypatch.setattr(
+    patcher.setattr(
         pipeline.session_aggregator,
         "extract_all_drivers",
         lambda _session: pd.DataFrame(
@@ -69,9 +69,9 @@ def test_f1_feature_pipeline_process_session_with_metadata(monkeypatch):
     assert "fastest_lap_rel" in out.columns
 
 
-def test_f1_feature_pipeline_process_session_empty_features(monkeypatch):
+def test_f1_feature_pipeline_process_session_empty_features(patcher):
     pipeline = F1FeaturePipeline()
-    monkeypatch.setattr(
+    patcher.setattr(
         pipeline.session_aggregator, "extract_all_drivers", lambda _session: pd.DataFrame()
     )
 
@@ -79,7 +79,7 @@ def test_f1_feature_pipeline_process_session_empty_features(monkeypatch):
     assert out.empty
 
 
-def test_f1_feature_pipeline_process_multiple_sessions(monkeypatch):
+def test_f1_feature_pipeline_process_multiple_sessions(patcher):
     pipeline = F1FeaturePipeline()
 
     def _process(session, add_metadata=True):
@@ -87,7 +87,7 @@ def test_f1_feature_pipeline_process_multiple_sessions(monkeypatch):
             return pd.DataFrame([{"driver_number": "1", "event": "Bahrain Grand Prix"}])
         return pd.DataFrame([{"driver_number": "2", "event": "Saudi Arabian Grand Prix"}])
 
-    monkeypatch.setattr(pipeline, "process_session", _process)
+    patcher.setattr(pipeline, "process_session", _process)
 
     combined = pipeline.process_multiple_sessions(
         [_fake_session("FP1"), _fake_session("FP2", event_name="Saudi Arabian Grand Prix")],

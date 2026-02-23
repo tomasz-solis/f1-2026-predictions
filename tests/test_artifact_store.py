@@ -45,12 +45,12 @@ def test_write_and_read_file_roundtrip(tmp_path):
     assert missing is None
 
 
-def test_save_artifact_file_only_auto_version(monkeypatch, tmp_path):
+def test_save_artifact_file_only_auto_version(patcher, tmp_path):
     store = ArtifactStore(data_root=tmp_path)
 
-    monkeypatch.setattr(artifact_store_module, "should_write_to_file", lambda: True)
-    monkeypatch.setattr(artifact_store_module, "should_write_to_db", lambda: False)
-    monkeypatch.setattr(store, "get_latest_version", lambda artifact_type, artifact_key: 2)
+    patcher.setattr(artifact_store_module, "should_write_to_file", lambda: True)
+    patcher.setattr(artifact_store_module, "should_write_to_db", lambda: False)
+    patcher.setattr(store, "get_latest_version", lambda artifact_type, artifact_key: 2)
 
     result = store.save_artifact(
         artifact_type="custom",
@@ -64,13 +64,13 @@ def test_save_artifact_file_only_auto_version(monkeypatch, tmp_path):
     assert result["run_id"] is None
 
 
-def test_save_artifact_prefers_db_result(monkeypatch, tmp_path):
+def test_save_artifact_prefers_db_result(patcher, tmp_path):
     store = ArtifactStore(data_root=tmp_path)
 
-    monkeypatch.setattr(artifact_store_module, "should_write_to_file", lambda: False)
-    monkeypatch.setattr(artifact_store_module, "should_write_to_db", lambda: True)
+    patcher.setattr(artifact_store_module, "should_write_to_file", lambda: False)
+    patcher.setattr(artifact_store_module, "should_write_to_db", lambda: True)
     mocked_write_db = MagicMock(return_value={"id": "db-row", "version": 5})
-    monkeypatch.setattr(store, "_write_db", mocked_write_db)
+    patcher.setattr(store, "_write_db", mocked_write_db)
 
     result = store.save_artifact(
         artifact_type="custom",
@@ -83,45 +83,45 @@ def test_save_artifact_prefers_db_result(monkeypatch, tmp_path):
     mocked_write_db.assert_called_once()
 
 
-def test_save_artifact_raises_when_all_writes_fail(monkeypatch, tmp_path):
+def test_save_artifact_raises_when_all_writes_fail(patcher, tmp_path):
     store = ArtifactStore(data_root=tmp_path)
 
-    monkeypatch.setattr(artifact_store_module, "should_write_to_file", lambda: True)
-    monkeypatch.setattr(artifact_store_module, "should_write_to_db", lambda: True)
-    monkeypatch.setattr(store, "_write_file", MagicMock(side_effect=RuntimeError("file down")))
-    monkeypatch.setattr(store, "_write_db", MagicMock(side_effect=RuntimeError("db down")))
+    patcher.setattr(artifact_store_module, "should_write_to_file", lambda: True)
+    patcher.setattr(artifact_store_module, "should_write_to_db", lambda: True)
+    patcher.setattr(store, "_write_file", MagicMock(side_effect=RuntimeError("file down")))
+    patcher.setattr(store, "_write_db", MagicMock(side_effect=RuntimeError("db down")))
 
     with pytest.raises(RuntimeError, match="All writes failed"):
         store.save_artifact("custom", "alpha", {"ok": True}, version=1)
 
 
-def test_load_artifact_db_first_then_file_fallback(monkeypatch, tmp_path):
+def test_load_artifact_db_first_then_file_fallback(patcher, tmp_path):
     store = ArtifactStore(data_root=tmp_path)
 
-    monkeypatch.setattr(artifact_store_module, "should_read_db_first", lambda: True)
-    monkeypatch.setattr(store, "_read_db", MagicMock(return_value={"from": "db"}))
-    monkeypatch.setattr(store, "_read_file", MagicMock(return_value={"from": "file"}))
+    patcher.setattr(artifact_store_module, "should_read_db_first", lambda: True)
+    patcher.setattr(store, "_read_db", MagicMock(return_value={"from": "db"}))
+    patcher.setattr(store, "_read_file", MagicMock(return_value={"from": "file"}))
 
     assert store.load_artifact("custom", "alpha") == {"from": "db"}
 
-    monkeypatch.setattr(store, "_read_db", MagicMock(side_effect=RuntimeError("db fail")))
+    patcher.setattr(store, "_read_db", MagicMock(side_effect=RuntimeError("db fail")))
     assert store.load_artifact("custom", "alpha") == {"from": "file"}
 
 
-def test_list_artifacts_db_failure_falls_back_to_files(monkeypatch, tmp_path):
+def test_list_artifacts_db_failure_falls_back_to_files(patcher, tmp_path):
     store = ArtifactStore(data_root=tmp_path)
 
-    monkeypatch.setattr(artifact_store_module, "should_read_db_first", lambda: True)
-    monkeypatch.setattr(store, "_list_db", MagicMock(side_effect=RuntimeError("db fail")))
-    monkeypatch.setattr(store, "_list_files", MagicMock(return_value=[{"artifact_key": "a"}]))
+    patcher.setattr(artifact_store_module, "should_read_db_first", lambda: True)
+    patcher.setattr(store, "_list_db", MagicMock(side_effect=RuntimeError("db fail")))
+    patcher.setattr(store, "_list_files", MagicMock(return_value=[{"artifact_key": "a"}]))
 
     result = store.list_artifacts("custom")
     assert result == [{"artifact_key": "a"}]
 
 
-def test_get_latest_version_db_file_and_default(monkeypatch, tmp_path):
+def test_get_latest_version_db_file_and_default(patcher, tmp_path):
     store = ArtifactStore(data_root=tmp_path)
-    monkeypatch.setattr(artifact_store_module, "should_read_db_first", lambda: True)
+    patcher.setattr(artifact_store_module, "should_read_db_first", lambda: True)
 
     query = MagicMock()
     query.select.return_value = query
@@ -131,23 +131,23 @@ def test_get_latest_version_db_file_and_default(monkeypatch, tmp_path):
     query.execute.return_value = SimpleNamespace(data=[{"version": 7}])
     supabase = MagicMock()
     supabase.table.return_value = query
-    monkeypatch.setattr(artifact_store_module, "get_supabase_client", lambda: supabase)
+    patcher.setattr(artifact_store_module, "get_supabase_client", lambda: supabase)
 
     assert store.get_latest_version("custom", "alpha") == 7
 
-    monkeypatch.setattr(
+    patcher.setattr(
         artifact_store_module,
         "get_supabase_client",
         lambda: (_ for _ in ()).throw(RuntimeError("no db")),
     )
-    monkeypatch.setattr(store, "_read_file", lambda artifact_type, artifact_key: {"version": 3})
+    patcher.setattr(store, "_read_file", lambda artifact_type, artifact_key: {"version": 3})
     assert store.get_latest_version("custom", "alpha") == 3
 
-    monkeypatch.setattr(store, "_read_file", lambda artifact_type, artifact_key: None)
+    patcher.setattr(store, "_read_file", lambda artifact_type, artifact_key: None)
     assert store.get_latest_version("custom", "alpha") == 0
 
 
-def test_write_db_read_db_and_list_db(monkeypatch, tmp_path):
+def test_write_db_read_db_and_list_db(patcher, tmp_path):
     store = ArtifactStore(data_root=tmp_path)
 
     query = MagicMock()
@@ -165,7 +165,7 @@ def test_write_db_read_db_and_list_db(monkeypatch, tmp_path):
 
     supabase = MagicMock()
     supabase.table.return_value = query
-    monkeypatch.setattr(artifact_store_module, "get_supabase_client", lambda: supabase)
+    patcher.setattr(artifact_store_module, "get_supabase_client", lambda: supabase)
 
     row = store._write_db(
         artifact_type="custom",
@@ -183,7 +183,7 @@ def test_write_db_read_db_and_list_db(monkeypatch, tmp_path):
     assert listed == [{"artifact_key": "alpha", "version": 2}]
 
 
-def test_write_db_raises_when_no_rows_returned(monkeypatch, tmp_path):
+def test_write_db_raises_when_no_rows_returned(patcher, tmp_path):
     store = ArtifactStore(data_root=tmp_path)
 
     query = MagicMock()
@@ -192,7 +192,7 @@ def test_write_db_raises_when_no_rows_returned(monkeypatch, tmp_path):
 
     supabase = MagicMock()
     supabase.table.return_value = query
-    monkeypatch.setattr(artifact_store_module, "get_supabase_client", lambda: supabase)
+    patcher.setattr(artifact_store_module, "get_supabase_client", lambda: supabase)
 
     with pytest.raises(RuntimeError, match="DB insert returned no data"):
         store._write_db("custom", "alpha", {"ok": True}, version=1, run_uuid=None)

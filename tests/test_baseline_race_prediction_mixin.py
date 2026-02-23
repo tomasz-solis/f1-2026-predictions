@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from contextlib import ExitStack
+from unittest.mock import patch
+
+import pytest
+
 import src.predictors.baseline.race.prediction_mixin as prediction_module
 from src.predictors.baseline.race.prediction_mixin import BaselineRacePredictionMixin
 
@@ -33,44 +38,55 @@ class DummyRacePredictor(BaselineRacePredictionMixin):
         )
 
 
-def _stub_prediction_dependencies(monkeypatch):
-    monkeypatch.setattr(prediction_module, "load_track_specific_params", lambda _race_name: {})
-    monkeypatch.setattr(prediction_module, "get_tire_stress_score", lambda _race_name: 3.0)
-    monkeypatch.setattr(
-        prediction_module,
-        "get_available_compounds",
-        lambda _race_name, weather="dry": ["SOFT", "MEDIUM", "HARD", "INTERMEDIATE"],
+def _stub_prediction_dependencies(stack: ExitStack):
+    stack.enter_context(
+        patch.object(prediction_module, "load_track_specific_params", lambda _race_name: {})
     )
-    monkeypatch.setattr(
-        prediction_module,
-        "resolve_race_distance_laps",
-        lambda year, race_name, is_sprint: 60,
+    stack.enter_context(
+        patch.object(prediction_module, "get_tire_stress_score", lambda _race_name: 3.0)
     )
-    monkeypatch.setattr(
-        prediction_module,
-        "simulate_race_lap_by_lap",
-        lambda **kwargs: {
-            "finish_order": ["DRV"],
-            "dnf_drivers": [],
-            "strategies_used": kwargs["strategies"],
-        },
+    stack.enter_context(
+        patch.object(
+            prediction_module,
+            "get_available_compounds",
+            lambda _race_name, weather="dry": ["SOFT", "MEDIUM", "HARD", "INTERMEDIATE"],
+        )
     )
-    monkeypatch.setattr(
-        prediction_module,
-        "aggregate_simulation_results",
-        lambda _simulation_results: {
-            "median_positions": {"DRV": 1},
-            "position_distributions": {"DRV": [1]},
-            "dnf_rates": {"DRV": 0.0},
-            "compound_strategy_distribution": {"SOFT→MEDIUM": 1.0},
-            "pit_lap_distribution": {"lap_30-35": 1.0},
-        },
+    stack.enter_context(
+        patch.object(
+            prediction_module,
+            "resolve_race_distance_laps",
+            lambda year, race_name, is_sprint: 60,
+        )
+    )
+    stack.enter_context(
+        patch.object(
+            prediction_module,
+            "simulate_race_lap_by_lap",
+            lambda **kwargs: {
+                "finish_order": ["DRV"],
+                "dnf_drivers": [],
+                "strategies_used": kwargs["strategies"],
+            },
+        )
+    )
+    stack.enter_context(
+        patch.object(
+            prediction_module,
+            "aggregate_simulation_results",
+            lambda _simulation_results: {
+                "median_positions": {"DRV": 1},
+                "position_distributions": {"DRV": [1]},
+                "dnf_rates": {"DRV": 0.0},
+                "compound_strategy_distribution": {"SOFT→MEDIUM": 1.0},
+                "pit_lap_distribution": {"lap_30-35": 1.0},
+            },
+        )
     )
 
 
-def test_predict_race_enforces_two_compounds_for_mixed_weather(monkeypatch):
+def test_predict_race_enforces_two_compounds_for_mixed_weather():
     predictor = DummyRacePredictor()
-    _stub_prediction_dependencies(monkeypatch)
 
     enforce_flags: list[bool] = []
 
@@ -83,21 +99,24 @@ def test_predict_race_enforces_two_compounds_for_mixed_weather(monkeypatch):
             "stint_lengths": [30, 30],
         }
 
-    monkeypatch.setattr(prediction_module, "generate_pit_strategy", _fake_generate_pit_strategy)
+    with ExitStack() as stack:
+        _stub_prediction_dependencies(stack)
+        stack.enter_context(
+            patch.object(prediction_module, "generate_pit_strategy", _fake_generate_pit_strategy)
+        )
 
-    predictor.predict_race(
-        qualifying_grid=[{"driver": "DRV", "team": "Team", "position": 1}],
-        weather="mixed",
-        race_name="Bahrain Grand Prix",
-        n_simulations=1,
-    )
+        predictor.predict_race(
+            qualifying_grid=[{"driver": "DRV", "team": "Team", "position": 1}],
+            weather="mixed",
+            race_name="Bahrain Grand Prix",
+            n_simulations=1,
+        )
 
     assert enforce_flags == [True]
 
 
-def test_predict_race_allows_single_compound_rule_override_for_rain(monkeypatch):
+def test_predict_race_allows_single_compound_rule_override_for_rain():
     predictor = DummyRacePredictor()
-    _stub_prediction_dependencies(monkeypatch)
 
     enforce_flags: list[bool] = []
 
@@ -110,19 +129,23 @@ def test_predict_race_allows_single_compound_rule_override_for_rain(monkeypatch)
             "stint_lengths": [30, 30],
         }
 
-    monkeypatch.setattr(prediction_module, "generate_pit_strategy", _fake_generate_pit_strategy)
+    with ExitStack() as stack:
+        _stub_prediction_dependencies(stack)
+        stack.enter_context(
+            patch.object(prediction_module, "generate_pit_strategy", _fake_generate_pit_strategy)
+        )
 
-    predictor.predict_race(
-        qualifying_grid=[{"driver": "DRV", "team": "Team", "position": 1}],
-        weather="rain",
-        race_name="Bahrain Grand Prix",
-        n_simulations=1,
-    )
+        predictor.predict_race(
+            qualifying_grid=[{"driver": "DRV", "team": "Team", "position": 1}],
+            weather="rain",
+            race_name="Bahrain Grand Prix",
+            n_simulations=1,
+        )
 
     assert enforce_flags == [False]
 
 
-def test_predict_race_caps_extreme_backmarker_recovery(monkeypatch):
+def test_predict_race_caps_extreme_backmarker_recovery():
     class ExtremeRecoveryPredictor(BaselineRacePredictionMixin):
         seed = 11
 
@@ -153,41 +176,12 @@ def test_predict_race_caps_extreme_backmarker_recovery(monkeypatch):
 
     predictor = ExtremeRecoveryPredictor()
 
-    monkeypatch.setattr(
-        prediction_module,
-        "load_track_specific_params",
-        lambda _race_name: {"track_overtaking": 0.05},
-    )
-    monkeypatch.setattr(prediction_module, "get_tire_stress_score", lambda _race_name: 3.0)
-    monkeypatch.setattr(
-        prediction_module,
-        "get_available_compounds",
-        lambda _race_name, weather="dry": ["SOFT", "MEDIUM", "HARD"],
-    )
-    monkeypatch.setattr(
-        prediction_module,
-        "resolve_race_distance_laps",
-        lambda year, race_name, is_sprint: 60,
-    )
-    monkeypatch.setattr(
-        prediction_module,
-        "generate_pit_strategy",
-        lambda **kwargs: {
-            "num_stops": 0,
-            "pit_laps": [],
-            "compound_sequence": ["MEDIUM"],
-            "stint_lengths": [60],
-        },
-    )
-    monkeypatch.setattr(
-        prediction_module,
-        "simulate_race_lap_by_lap",
-        lambda **kwargs: {
-            "finish_order": [entry["driver"] for entry in kwargs["driver_info_map"].values()],
-            "dnf_drivers": [],
-            "strategies_used": kwargs["strategies"],
-        },
-    )
+    strategy = {
+        "num_stops": 0,
+        "pit_laps": [],
+        "compound_sequence": ["MEDIUM"],
+        "stint_lengths": [60],
+    }
 
     def _fake_aggregate(_simulation_results):
         median_positions = {}
@@ -205,7 +199,9 @@ def test_predict_race_caps_extreme_backmarker_recovery(monkeypatch):
             "pit_lap_distribution": {},
         }
 
-    monkeypatch.setattr(prediction_module, "aggregate_simulation_results", _fake_aggregate)
+    qualifying_grid = [
+        {"driver": f"D{idx:02d}", "team": f"Team{idx:02d}", "position": idx} for idx in range(1, 23)
+    ]
 
     original_config_get = prediction_module.config_loader.get
     overrides = {
@@ -224,19 +220,335 @@ def test_predict_race_caps_extreme_backmarker_recovery(monkeypatch):
             return overrides[key]
         return original_config_get(key, default)
 
-    monkeypatch.setattr(prediction_module.config_loader, "get", _config_get)
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "load_track_specific_params",
+                lambda _race_name: {"track_overtaking": 0.05},
+            )
+        )
+        stack.enter_context(
+            patch.object(prediction_module, "get_tire_stress_score", lambda _race_name: 3.0)
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "get_available_compounds",
+                lambda _race_name, weather="dry": ["SOFT", "MEDIUM", "HARD"],
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "resolve_race_distance_laps",
+                lambda year, race_name, is_sprint: 60,
+            )
+        )
+        stack.enter_context(
+            patch.object(prediction_module, "generate_pit_strategy", lambda **kwargs: strategy)
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "simulate_race_lap_by_lap",
+                lambda **kwargs: {
+                    "finish_order": [
+                        entry["driver"] for entry in kwargs["driver_info_map"].values()
+                    ],
+                    "dnf_drivers": [],
+                    "strategies_used": kwargs["strategies"],
+                },
+            )
+        )
+        stack.enter_context(
+            patch.object(prediction_module, "aggregate_simulation_results", _fake_aggregate)
+        )
+        stack.enter_context(patch.object(prediction_module.config_loader, "get", _config_get))
 
-    qualifying_grid = [
-        {"driver": f"D{idx:02d}", "team": f"Team{idx:02d}", "position": idx} for idx in range(1, 23)
-    ]
-
-    result = predictor.predict_race(
-        qualifying_grid=qualifying_grid,
-        weather="dry",
-        race_name="Bahrain Grand Prix",
-        n_simulations=1,
-    )
+        result = predictor.predict_race(
+            qualifying_grid=qualifying_grid,
+            weather="dry",
+            race_name="Bahrain Grand Prix",
+            n_simulations=1,
+        )
 
     positions = {entry["driver"]: entry["position"] for entry in result["finish_order"]}
     assert positions["D22"] > 1
     assert positions["D22"] >= 10
+
+
+def test_predict_race_podium_probability_matches_ranked_outcomes():
+    class PodiumProbabilityPredictor(BaselineRacePredictionMixin):
+        seed = 21
+
+        def _load_race_params(self) -> dict:
+            return {}
+
+        def _prepare_driver_info_with_compounds(
+            self, qualifying_grid: list[dict], race_name: str | None
+        ) -> tuple[dict, int]:
+            _ = race_name
+            info_map = {}
+            for row in qualifying_grid:
+                driver = row["driver"]
+                info_map[driver] = {
+                    "driver": driver,
+                    "team": row["team"],
+                    "grid_pos": row["position"],
+                    "team_strength": 0.5,
+                    "team_strength_by_compound": {"SOFT": 0.5, "MEDIUM": 0.5, "HARD": 0.5},
+                    "tire_deg_by_compound": {"SOFT": 0.1, "MEDIUM": 0.1, "HARD": 0.1},
+                    "skill": 0.5,
+                    "race_advantage": 0.0,
+                    "overtaking_skill": 0.5,
+                    "defensive_skill": 0.5,
+                    "dnf_probability": 0.0,
+                }
+            return info_map, 0
+
+    predictor = PodiumProbabilityPredictor()
+
+    qualifying_grid = [
+        {"driver": "A", "team": "TeamA", "position": 10},
+        {"driver": "B", "team": "TeamB", "position": 11},
+        {"driver": "C", "team": "TeamC", "position": 12},
+        {"driver": "D", "team": "TeamD", "position": 13},
+    ]
+
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch.object(prediction_module, "load_track_specific_params", lambda _race_name: {})
+        )
+        stack.enter_context(
+            patch.object(prediction_module, "get_tire_stress_score", lambda _race_name: 3.0)
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "get_available_compounds",
+                lambda _race_name, weather="dry": ["SOFT", "MEDIUM", "HARD"],
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "resolve_race_distance_laps",
+                lambda year, race_name, is_sprint: 60,
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "generate_pit_strategy",
+                lambda **kwargs: {
+                    "num_stops": 1,
+                    "pit_laps": [30],
+                    "compound_sequence": ["SOFT", "MEDIUM"],
+                    "stint_lengths": [30, 30],
+                },
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "simulate_race_lap_by_lap",
+                lambda **kwargs: {
+                    "finish_order": [
+                        entry["driver"] for entry in kwargs["driver_info_map"].values()
+                    ],
+                    "dnf_drivers": [],
+                    "strategies_used": kwargs["strategies"],
+                },
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "aggregate_simulation_results",
+                lambda _simulation_results: {
+                    "median_positions": {"A": 10, "B": 11, "C": 12, "D": 13},
+                    "position_distributions": {
+                        "A": [10, 10, 10],
+                        "B": [11, 11, 11],
+                        "C": [12, 12, 12],
+                        "D": [13, 13, 13],
+                    },
+                    "dnf_rates": {"A": 0.0, "B": 0.0, "C": 0.0, "D": 0.0},
+                    "compound_strategy_distribution": {"SOFT→MEDIUM": 1.0},
+                    "pit_lap_distribution": {"lap_30-35": 1.0},
+                },
+            )
+        )
+
+        result = predictor.predict_race(
+            qualifying_grid=qualifying_grid,
+            weather="dry",
+            race_name="Bahrain Grand Prix",
+            n_simulations=3,
+        )
+
+    by_position = sorted(result["finish_order"], key=lambda row: row["position"])
+    assert by_position[0]["podium_probability"] == 100.0
+    assert by_position[1]["podium_probability"] == 100.0
+    assert by_position[2]["podium_probability"] == 100.0
+    assert by_position[3]["podium_probability"] == 0.0
+
+
+def test_predict_race_applies_learned_position_adjustment():
+    class _CalibrationStub:
+        def get_combined_position_adjustment(
+            self,
+            *,
+            team,
+            driver,
+            teammates,
+            session,
+            min_samples,
+            driver_error_scale,
+            teammate_gap_scale,
+            max_adjustment,
+        ):
+            _ = (
+                team,
+                teammates,
+                session,
+                min_samples,
+                driver_error_scale,
+                teammate_gap_scale,
+                max_adjustment,
+            )
+            return 2.0 if driver == "A" else -1.5
+
+    class _Config:
+        def get(self, key, default=None):
+            overrides = {
+                "baseline_predictor.race.learning.position_adjustment_scale": 1.0,
+                "baseline_predictor.race.grid_anchor.base": 0.4,
+                "baseline_predictor.race.grid_anchor.track_scale": 0.0,
+                "baseline_predictor.race.grid_anchor.min": 0.4,
+                "baseline_predictor.race.grid_anchor.sprint_min": 0.4,
+            }
+            return overrides.get(key, default)
+
+    class LearnedAdjustmentPredictor(BaselineRacePredictionMixin):
+        seed = 77
+
+        def __init__(self):
+            self.calibration_system = _CalibrationStub()
+            self.config = _Config()
+
+        def _load_race_params(self) -> dict:
+            return {}
+
+        def _prepare_driver_info_with_compounds(
+            self, qualifying_grid: list[dict], race_name: str | None
+        ) -> tuple[dict, int]:
+            _ = race_name
+            info_map = {}
+            for row in qualifying_grid:
+                info_map[row["driver"]] = {
+                    "driver": row["driver"],
+                    "team": row["team"],
+                    "grid_pos": row["position"],
+                    "team_strength": 0.5,
+                    "team_strength_by_compound": {"SOFT": 0.5, "MEDIUM": 0.5, "HARD": 0.5},
+                    "tire_deg_by_compound": {"SOFT": 0.1, "MEDIUM": 0.1, "HARD": 0.1},
+                    "skill": 0.5,
+                    "race_advantage": 0.0,
+                    "overtaking_skill": 0.5,
+                    "defensive_skill": 0.5,
+                    "dnf_probability": 0.0,
+                }
+            return info_map, 0
+
+    predictor = LearnedAdjustmentPredictor()
+
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch.object(prediction_module, "load_track_specific_params", lambda _race_name: {})
+        )
+        stack.enter_context(
+            patch.object(prediction_module, "get_tire_stress_score", lambda _race_name: 3.0)
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "get_available_compounds",
+                lambda _race_name, weather="dry": ["SOFT", "MEDIUM", "HARD"],
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "resolve_race_distance_laps",
+                lambda year, race_name, is_sprint: 60,
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "generate_pit_strategy",
+                lambda **kwargs: {
+                    "num_stops": 0,
+                    "pit_laps": [],
+                    "compound_sequence": ["MEDIUM"],
+                    "stint_lengths": [60],
+                },
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "simulate_race_lap_by_lap",
+                lambda **kwargs: {
+                    "finish_order": [
+                        entry["driver"] for entry in kwargs["driver_info_map"].values()
+                    ],
+                    "dnf_drivers": [],
+                    "strategies_used": kwargs["strategies"],
+                },
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "aggregate_simulation_results",
+                lambda _simulation_results: {
+                    "median_positions": {"A": 2, "B": 1},
+                    "position_distributions": {"A": [2, 2, 2], "B": [1, 1, 1]},
+                    "dnf_rates": {"A": 0.0, "B": 0.0},
+                    "compound_strategy_distribution": {"MEDIUM": 1.0},
+                    "pit_lap_distribution": {},
+                },
+            )
+        )
+
+        result = predictor.predict_race(
+            qualifying_grid=[
+                {"driver": "A", "team": "TeamX", "position": 2},
+                {"driver": "B", "team": "TeamX", "position": 1},
+            ],
+            weather="dry",
+            race_name="Bahrain Grand Prix",
+            n_simulations=3,
+        )
+
+    by_position = sorted(result["finish_order"], key=lambda row: row["position"])
+    assert by_position[0]["driver"] == "A"
+    assert by_position[1]["driver"] == "B"
+
+
+@pytest.mark.parametrize(
+    ("input_values", "expected_first", "expected_last"),
+    [
+        ([100.0, 2.0, 10.0, 0.0], 100.0, 0.0),
+        ([75.0, 60.0, 62.0, 20.0], 75.0, 20.0),
+    ],
+)
+def test_enforce_non_increasing_podium_probabilities(input_values, expected_first, expected_last):
+    smoothed = BaselineRacePredictionMixin._enforce_non_increasing(input_values)
+
+    assert smoothed[0] == expected_first
+    assert smoothed[-1] == expected_last
+    assert all(smoothed[idx] >= smoothed[idx + 1] for idx in range(len(smoothed) - 1))

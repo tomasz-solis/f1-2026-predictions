@@ -138,23 +138,52 @@ baseline_predictor:
     driver_offset_cap: 0.12
     driver_signal_softness: 0.20
     weekend_form_std: 0.0
-    model_only_team_weight_multiplier: 0.82
-    model_only_skill_weight_multiplier: 1.35
+    model_only_team_weight_multiplier: 0.90
+    model_only_skill_weight_multiplier: 1.10
     model_only_team_compression_multiplier: 0.87
-    model_only_driver_offset_cap_multiplier: 1.33
+    model_only_driver_offset_cap_multiplier: 1.10
     model_only_driver_signal_shrink: 0.35
     model_only_experience_shrink:
       rookie: 0.45
+      second_year: 0.30
       developing: 0.20
+      sunset: 0.05
       unknown: 0.30
     model_only_noise_multiplier: 1.12
     model_only_teammate_setup_multiplier: 1.10
     model_only_weekend_form_multiplier: 1.0
+    model_only_teammate_anchor_experience_multiplier:
+      rookie: 0.30
+      second_year: 0.45
+      developing: 0.55
+      sunset: 1.00
+      unknown: 0.45
+    model_only_teammate_gap_cap_by_experience:
+      rookie: 0.14
+      second_year: 0.10
+      developing: 0.08
+      unknown: 0.10
+    model_only_teammate_gap_cap_max_races_by_experience:
+      rookie: 40
+      second_year: 55
+      developing: 55
+      unknown: 45
+    model_only_teammate_gap_cap_min_scale: 0.20
+    model_only_negative_delta_threshold: 0.08
+    model_only_negative_delta_shrink_scale: 1.0
+    model_only_negative_delta_shrink_cap: 0.25
 
     # Program-aware testing/practice modifier
     # Uses short-run profile characteristics to make a small team-strength adjustment.
     testing_short_run_modifier_scale: 0.04
     preferred_short_run_compound: "SOFT"
+    testing_fallback_min_teams: 8
+    testing_fallback_absolute_blend_weight: 0.22
+    testing_fallback_modifier_scale: 0.06
+    testing_fallback_modifier_clip_range: [-0.03, 0.03]
+    testing_fallback_short_weight_min: 0.35
+    testing_fallback_short_weight_max: 0.85
+    testing_fallback_divergence_scale: 1.4
 
     # FP blend controls
     fp_blend_weight: 0.70
@@ -189,6 +218,7 @@ baseline_predictor:
     missing_driver_rookie_race_penalty: 0.07
     missing_driver_rookie_skill_penalty: 0.08
     missing_driver_rookie_overtaking_penalty: 0.06
+    missing_driver_second_year_penalty_scale: 0.55
 
     # Weather-based base chaos (unpredictability)
     # Reduced from 0.35 to improve realism and reduce tail variance
@@ -403,6 +433,11 @@ baseline_predictor:
       max_gain_race_advantage_scale: 2.5
       max_gain_floor: 4.0
       max_gain_ceiling: 11.0
+
+    podium_probability:
+      min_sample_count: 250
+      resample_seed_offset: 99173
+      enforce_monotonic: true
 
     # Pit strategy constraints
     strategy_constraints:

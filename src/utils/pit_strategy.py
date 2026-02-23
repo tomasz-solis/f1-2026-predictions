@@ -6,6 +6,7 @@ import numpy as np
 
 from src.types.prediction_types import PitStrategy
 from src.utils import config_loader
+from src.utils.strategy_optimizer import calculate_pit_timing_bias_laps
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,9 @@ def generate_pit_strategy(
     rng: np.random.Generator,
     driver_risk_profile: float | None = None,
     enforce_two_compound_rule: bool = True,
+    track_overtaking: float | None = None,
+    grid_position: int | None = None,
+    strategy_signal: float = 0.0,
 ) -> PitStrategy:
     """Generate Monte Carlo pit strategy for one driver in one simulation.
 
@@ -68,7 +72,19 @@ def generate_pit_strategy(
             num_stops += 1
 
     # Generate pit laps based on number of stops
-    pit_laps = _sample_pit_laps(race_distance, num_stops, rng)
+    pit_timing_bias_laps = calculate_pit_timing_bias_laps(
+        track_overtaking=track_overtaking,
+        grid_position=grid_position,
+        race_distance=race_distance,
+        strategy_signal=strategy_signal,
+    )
+
+    pit_laps = _sample_pit_laps(
+        race_distance,
+        num_stops,
+        rng,
+        timing_bias_laps=pit_timing_bias_laps,
+    )
 
     # Generate compound sequence (dry races enforce >=2 compounds, wet does not).
     compound_sequence = _sample_compound_sequence(
@@ -106,7 +122,12 @@ def generate_pit_strategy(
     return strategy
 
 
-def _sample_pit_laps(race_distance: int, num_stops: int, rng: np.random.Generator) -> list[int]:
+def _sample_pit_laps(
+    race_distance: int,
+    num_stops: int,
+    rng: np.random.Generator,
+    timing_bias_laps: float = 0.0,
+) -> list[int]:
     """Sample pit lap numbers from realistic windows."""
     # Load pit windows from config
     one_stop_window = config_loader.get(
@@ -155,7 +176,7 @@ def _sample_pit_laps(race_distance: int, num_stops: int, rng: np.random.Generato
         # Single stop: sample from one_stop window
         lap = int(
             rng.normal(
-                loc=(one_stop_scaled[0] + one_stop_scaled[1]) / 2.0,
+                loc=((one_stop_scaled[0] + one_stop_scaled[1]) / 2.0) + timing_bias_laps,
                 scale=one_stop_variance,
             )
         )
@@ -166,7 +187,8 @@ def _sample_pit_laps(race_distance: int, num_stops: int, rng: np.random.Generato
         # Two stops: sample from both windows
         lap1 = int(
             rng.normal(
-                loc=(two_stop_first_scaled[0] + two_stop_first_scaled[1]) / 2.0,
+                loc=((two_stop_first_scaled[0] + two_stop_first_scaled[1]) / 2.0)
+                + (timing_bias_laps * 0.75),
                 scale=two_stop_variance,
             )
         )
@@ -174,7 +196,8 @@ def _sample_pit_laps(race_distance: int, num_stops: int, rng: np.random.Generato
 
         lap2 = int(
             rng.normal(
-                loc=(two_stop_second_scaled[0] + two_stop_second_scaled[1]) / 2.0,
+                loc=((two_stop_second_scaled[0] + two_stop_second_scaled[1]) / 2.0)
+                + timing_bias_laps,
                 scale=two_stop_variance,
             )
         )

@@ -18,6 +18,49 @@ logger = logging.getLogger("src.predictors.baseline_2026")
 class BaselineRacePreparationMixin:
     """Race preparation methods for Baseline2026Predictor."""
 
+    def _resolve_effective_experience_tier_for_race(self, driver_data: dict) -> str:
+        """Resolve experience tier for the current prediction year."""
+        experience = driver_data.get("experience", {}) if isinstance(driver_data, dict) else {}
+        stored_tier = str(experience.get("tier", "unknown"))
+        if stored_tier == "sophomore":
+            stored_tier = "second_year"
+
+        current_year = int(getattr(self, "year", 2026))
+        stored_years = experience.get("years_of_experience", 0)
+        debut_year = experience.get("debut_year")
+
+        try:
+            effective_years = int(stored_years)
+        except (TypeError, ValueError):
+            effective_years = None
+
+        try:
+            debut_year_int = int(debut_year) if debut_year is not None else None
+        except (TypeError, ValueError):
+            debut_year_int = None
+
+        if debut_year_int is not None and current_year >= debut_year_int:
+            computed_years = current_year - debut_year_int
+            if effective_years is None:
+                effective_years = computed_years
+            else:
+                effective_years = max(effective_years, computed_years)
+
+        if effective_years is None:
+            return stored_tier
+
+        if effective_years <= 0:
+            return "rookie"
+        if effective_years == 1:
+            return "second_year"
+        if effective_years <= 3:
+            return "developing"
+        if effective_years <= 6:
+            return "established"
+        if effective_years <= 14:
+            return "veteran"
+        return "sunset"
+
     def _is_known_lineup_driver(self, driver_code: str, team: str) -> bool:
         """Return True if driver is in configured active lineups."""
         try:
@@ -133,11 +176,15 @@ class BaselineRacePreparationMixin:
         years_experience = max(0, current_year - int(debut_year))
         if years_experience == 0:
             return "rookie"
+        if years_experience == 1:
+            return "second_year"
         if years_experience <= 3:
             return "developing"
         if years_experience <= 6:
             return "established"
-        return "veteran"
+        if years_experience <= 14:
+            return "veteran"
+        return "sunset"
 
     def _build_missing_driver_fallback(self, driver_code: str, team: str) -> dict:
         """Build a synthetic profile for known active-lineup drivers missing characteristics."""
@@ -162,6 +209,16 @@ class BaselineRacePreparationMixin:
         rookie_overtaking_penalty = cfg.get(
             "baseline_predictor.race.missing_driver_rookie_overtaking_penalty", 0.06
         )
+        second_year_penalty_scale = float(
+            cfg.get(
+                "baseline_predictor.race.missing_driver_second_year_penalty_scale",
+                cfg.get("baseline_predictor.race.missing_driver_sophomore_penalty_scale", 0.55),
+            )
+        )
+        second_year_penalty_scale = float(np.clip(second_year_penalty_scale, 0.0, 1.0))
+
+        if inferred_tier == "sophomore":
+            inferred_tier = "second_year"
 
         teammate_entry = self._get_teammate_driver_data(driver_code, team)
         if teammate_entry:
@@ -196,6 +253,13 @@ class BaselineRacePreparationMixin:
                 skill_score -= rookie_skill_penalty
                 overtaking_skill -= rookie_overtaking_penalty
                 dnf_rate += rookie_dnf_penalty
+            elif inferred_tier == "second_year":
+                # Year-2 drivers get a reduced penalty profile versus pure rookies.
+                quali_pace -= rookie_quali_penalty * second_year_penalty_scale
+                race_pace -= rookie_race_penalty * second_year_penalty_scale
+                skill_score -= rookie_skill_penalty * second_year_penalty_scale
+                overtaking_skill -= rookie_overtaking_penalty * second_year_penalty_scale
+                dnf_rate += rookie_dnf_penalty * second_year_penalty_scale
 
             logger.info(
                 f"Driver {driver_code} missing characteristics; using teammate-informed fallback from "
@@ -230,6 +294,12 @@ class BaselineRacePreparationMixin:
             neutral_skill -= rookie_skill_penalty
             neutral_overtaking -= rookie_overtaking_penalty
             neutral_dnf += rookie_dnf_penalty
+        elif inferred_tier == "second_year":
+            neutral_pace -= rookie_quali_penalty * second_year_penalty_scale
+            neutral_race -= rookie_race_penalty * second_year_penalty_scale
+            neutral_skill -= rookie_skill_penalty * second_year_penalty_scale
+            neutral_overtaking -= rookie_overtaking_penalty * second_year_penalty_scale
+            neutral_dnf += rookie_dnf_penalty * second_year_penalty_scale
         return {
             "pace": {
                 "quali_pace": float(np.clip(neutral_pace, 0.0, 1.0)),
@@ -345,12 +415,14 @@ class BaselineRacePreparationMixin:
                 dnf_rate_historical_cap,
             )
 
-            experience_tier = driver_data.get("experience", {}).get("tier", "established")
+            experience_tier = self._resolve_effective_experience_tier_for_race(driver_data)
             experience_modifiers = {
                 "rookie": 0.05,
+                "second_year": 0.03,
                 "developing": 0.02,
                 "established": 0.00,
                 "veteran": -0.01,
+                "sunset": -0.005,
             }
             experience_dnf_modifier = experience_modifiers.get(experience_tier, 0.0)
 
@@ -489,12 +561,14 @@ class BaselineRacePreparationMixin:
                 dnf_rate_historical_cap,
             )
 
-            experience_tier = driver_data.get("experience", {}).get("tier", "established")
+            experience_tier = self._resolve_effective_experience_tier_for_race(driver_data)
             experience_modifiers = {
                 "rookie": 0.05,
+                "second_year": 0.03,
                 "developing": 0.02,
                 "established": 0.00,
                 "veteran": -0.01,
+                "sunset": -0.005,
             }
             experience_dnf_modifier = experience_modifiers.get(experience_tier, 0.0)
 

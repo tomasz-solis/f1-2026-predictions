@@ -132,6 +132,7 @@ class Config:
             ("baseline_predictor.race.missing_driver_teammate_weight", float, 0.0, 1.0),
             ("baseline_predictor.race.missing_driver_default_dnf_rate", float, 0.0, 1.0),
             ("baseline_predictor.race.missing_driver_rookie_dnf_penalty", float, 0.0, 0.5),
+            ("baseline_predictor.race.missing_driver_second_year_penalty_scale", float, 0.0, 1.0),
             ("baseline_predictor.race.min_laps_for_compound_data", int, 1, 500),
             ("baseline_predictor.race.weekend_long_run_min_laps", int, 1, 70),
             ("baseline_predictor.race.long_run_outlier_threshold", float, 0.1, 5.0),
@@ -178,10 +179,18 @@ class Config:
             )
 
         fallback_tier = self.get("baseline_predictor.race.default_experience_tier", "developing")
-        if fallback_tier not in {"rookie", "developing", "established", "veteran"}:
+        if fallback_tier not in {
+            "rookie",
+            "second_year",
+            "sophomore",
+            "developing",
+            "established",
+            "veteran",
+            "sunset",
+        }:
             raise ValueError(
                 "baseline_predictor.race.default_experience_tier must be one of: "
-                "rookie, developing, established, veteran"
+                "rookie, second_year, developing, established, veteran, sunset"
             )
 
         clip_range = self.get("baseline_predictor.race.testing_modifier_clip_range", [-0.04, 0.04])

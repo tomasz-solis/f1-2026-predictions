@@ -11,7 +11,7 @@ from src.utils.driver_numbers import (
 from src.utils.performance_tracker import PerformanceTracker
 
 
-def test_qualifying_predictor_wrapper_delegates(monkeypatch):
+def test_qualifying_predictor_wrapper_delegates(patcher):
     class _FakeBaseline:
         def __init__(self, data_dir: str = "data/processed"):
             self.data_dir = data_dir
@@ -19,7 +19,7 @@ def test_qualifying_predictor_wrapper_delegates(monkeypatch):
         def predict_qualifying(self, year: int, race_name: str):
             return {"grid": [{"driver": "NOR"}], "year": year, "race": race_name}
 
-    monkeypatch.setattr(qualifying_wrapper, "Baseline2026Predictor", _FakeBaseline)
+    patcher.setattr(qualifying_wrapper, "Baseline2026Predictor", _FakeBaseline)
 
     predictor = qualifying_wrapper.QualifyingPredictor(data_dir="tmp")
     out = predictor.predict(
@@ -35,7 +35,7 @@ def test_qualifying_predictor_wrapper_delegates(monkeypatch):
     assert predictor.driver_ranker is None
 
 
-def test_race_predictor_wrapper_delegates(monkeypatch):
+def test_race_predictor_wrapper_delegates(patcher):
     class _FakeBaseline:
         def __init__(self, data_dir: str = "data/processed"):
             self.data_dir = data_dir
@@ -48,7 +48,7 @@ def test_race_predictor_wrapper_delegates(monkeypatch):
                 "n_simulations": n_simulations,
             }
 
-    monkeypatch.setattr(race_wrapper, "Baseline2026Predictor", _FakeBaseline)
+    patcher.setattr(race_wrapper, "Baseline2026Predictor", _FakeBaseline)
 
     predictor = race_wrapper.RacePredictor(data_dir="tmp")
     grid = [{"position": 1, "driver": "NOR", "team": "McLaren"}]

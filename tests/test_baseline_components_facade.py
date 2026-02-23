@@ -15,7 +15,7 @@ from src.predictors.baseline.race_mixin import BaselineRaceMixin
 from src.predictors.baseline_2026 import Baseline2026Predictor
 
 
-def test_data_loader_delegates_to_data_mixin(monkeypatch):
+def test_data_loader_delegates_to_data_mixin(patcher):
     predictor = object()
     loader = BaselineDataLoader(predictor)
     calls: dict[str, object] = {}
@@ -23,33 +23,33 @@ def test_data_loader_delegates_to_data_mixin(monkeypatch):
     def _fake_load_data(self):
         calls["self"] = self
 
-    monkeypatch.setattr(BaselineDataMixin, "load_data", _fake_load_data)
+    patcher.setattr(BaselineDataMixin, "load_data", _fake_load_data)
 
     loader.load_data()
 
     assert calls["self"] is predictor
 
 
-def test_strength_calculator_delegates_to_data_mixin(monkeypatch):
+def test_strength_calculator_delegates_to_data_mixin(patcher):
     predictor = object()
     calculator = BaselineStrengthCalculator(predictor)
 
-    monkeypatch.setattr(
+    patcher.setattr(
         BaselineDataMixin,
         "calculate_track_suitability",
         lambda self, team, race_name: 0.12,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         BaselineDataMixin,
         "get_blended_team_strength",
         lambda self, team, race_name: 0.77,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         BaselineDataMixin,
         "_select_race_compound",
         lambda self, race_name: "SOFT",
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         BaselineDataMixin,
         "get_compound_adjusted_team_strength",
         lambda self, team, race_name, compound: 0.81,
@@ -68,7 +68,7 @@ def test_strength_calculator_delegates_to_data_mixin(monkeypatch):
     )
 
 
-def test_engines_delegate_to_mixins(monkeypatch):
+def test_engines_delegate_to_mixins(patcher):
     predictor = object()
     qualifying_engine = BaselineQualifyingEngine(predictor)
     race_engine = BaselineRaceEngine(predictor)
@@ -89,9 +89,9 @@ def test_engines_delegate_to_mixins(monkeypatch):
         calls["race_kwargs"] = kwargs
         return {"finish_order": []}
 
-    monkeypatch.setattr(BaselineQualifyingMixin, "predict_qualifying", _fake_predict_qualifying)
-    monkeypatch.setattr(BaselineQualifyingMixin, "predict_sprint_race", _fake_predict_sprint_race)
-    monkeypatch.setattr(BaselineRaceMixin, "predict_race", _fake_predict_race)
+    patcher.setattr(BaselineQualifyingMixin, "predict_qualifying", _fake_predict_qualifying)
+    patcher.setattr(BaselineQualifyingMixin, "predict_sprint_race", _fake_predict_sprint_race)
+    patcher.setattr(BaselineRaceMixin, "predict_race", _fake_predict_race)
 
     qualifying_result = qualifying_engine.predict(
         year=2026,
@@ -201,7 +201,7 @@ def test_baseline_predictor_facade_methods_delegate_to_components():
     )
 
 
-def test_predictor_initialization_uses_components(monkeypatch, tmp_path):
+def test_predictor_initialization_uses_components(patcher, tmp_path):
     calls: dict[str, object] = {}
 
     class _StubDataLoader:
@@ -231,17 +231,17 @@ def test_predictor_initialization_uses_components(monkeypatch, tmp_path):
         def __init__(self, data_root):
             self.data_root = data_root
 
-    monkeypatch.setattr(predictor_module, "BaselineDataLoader", _StubDataLoader)
-    monkeypatch.setattr(predictor_module, "BaselineStrengthCalculator", _StubStrengthCalculator)
-    monkeypatch.setattr(predictor_module, "BaselineQualifyingEngine", _StubQualifyingEngine)
-    monkeypatch.setattr(predictor_module, "BaselineRaceEngine", _StubRaceEngine)
-    monkeypatch.setattr(
+    patcher.setattr(predictor_module, "BaselineDataLoader", _StubDataLoader)
+    patcher.setattr(predictor_module, "BaselineStrengthCalculator", _StubStrengthCalculator)
+    patcher.setattr(predictor_module, "BaselineQualifyingEngine", _StubQualifyingEngine)
+    patcher.setattr(predictor_module, "BaselineRaceEngine", _StubRaceEngine)
+    patcher.setattr(
         predictor_module,
         "create_baseline_if_missing",
         lambda data_dir: calls.setdefault("data_dir", data_dir),
     )
-    monkeypatch.setattr(predictor_module, "ArtifactStore", _StubArtifactStore)
-    monkeypatch.setattr(predictor_module, "Config", lambda: object())
+    patcher.setattr(predictor_module, "ArtifactStore", _StubArtifactStore)
+    patcher.setattr(predictor_module, "Config", lambda: object())
 
     predictor = Baseline2026Predictor(data_dir=str(tmp_path / "processed"), seed=99)
 

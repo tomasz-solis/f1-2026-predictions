@@ -1,5 +1,7 @@
 """Unit tests for pit strategy generation and validation."""
 
+from unittest.mock import patch
+
 import numpy as np
 
 from src.utils.pit_strategy import (
@@ -375,3 +377,39 @@ class TestEdgeCases:
             available_compounds=["INTERMEDIATE", "WET"],
             enforce_two_compound_rule=False,
         )
+
+    def test_monaco_like_track_biases_later_than_monza_like(self):
+        """Hard-to-pass tracks should bias pit timing later than easy-to-pass tracks."""
+        import src.utils.pit_strategy as pit_strategy_module
+
+        def _config_get(key: str, default=None):
+            overrides = {
+                "baseline_predictor.race.tire_strategy.stop_probability.medium_stress_1stop": 1.0,
+                "baseline_predictor.race.strategy_constraints.pit_lap_variance.one_stop": 0.0,
+                "baseline_predictor.race.tire_strategy.windows.one_stop": [23, 37],
+                "baseline_predictor.race.strategy_constraints.min_pit_lap": 5,
+                "baseline_predictor.race.strategy_constraints.max_pit_lap_from_end": 5,
+            }
+            return overrides.get(key, default)
+
+        with patch.object(pit_strategy_module.config_loader, "get", _config_get):
+            monaco_strategy = generate_pit_strategy(
+                race_distance=60,
+                tire_stress_score=3.0,
+                available_compounds=["SOFT", "MEDIUM", "HARD"],
+                rng=np.random.default_rng(7),
+                track_overtaking=0.95,  # hard overtaking -> overcut tendency
+                grid_position=5,
+            )
+            monza_strategy = generate_pit_strategy(
+                race_distance=60,
+                tire_stress_score=3.0,
+                available_compounds=["SOFT", "MEDIUM", "HARD"],
+                rng=np.random.default_rng(7),
+                track_overtaking=0.20,  # easy overtaking -> undercut tendency
+                grid_position=5,
+            )
+
+        assert monaco_strategy["num_stops"] == 1
+        assert monza_strategy["num_stops"] == 1
+        assert monaco_strategy["pit_laps"][0] > monza_strategy["pit_laps"][0]

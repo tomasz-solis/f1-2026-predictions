@@ -16,7 +16,7 @@ def _make_session(results: pd.DataFrame):
     return _Session(results)
 
 
-def test_extract_race_data_success(monkeypatch):
+def test_extract_race_data_success(patcher):
     quali_results = pd.DataFrame(
         [
             {"Abbreviation": "VER", "Position": 2},
@@ -37,7 +37,7 @@ def test_extract_race_data_success(monkeypatch):
             return _make_session(quali_results)
         return _make_session(race_results)
 
-    monkeypatch.setattr(race_data.ff1, "get_session", _get_session)
+    patcher.setattr(race_data.ff1, "get_session", _get_session)
 
     result = race_data.extract_race_data(2026, "Bahrain Grand Prix")
 
@@ -50,7 +50,7 @@ def test_extract_race_data_success(monkeypatch):
     assert result["NOR"]["dn"] is True
 
 
-def test_extract_race_data_uses_status_fallback_for_dnf(monkeypatch):
+def test_extract_race_data_uses_status_fallback_for_dnf(patcher):
     quali_results = pd.DataFrame([{"Abbreviation": "HAM", "Position": 5}])
     race_results = pd.DataFrame(
         [
@@ -63,7 +63,7 @@ def test_extract_race_data_uses_status_fallback_for_dnf(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr(
+    patcher.setattr(
         race_data.ff1,
         "get_session",
         lambda _year, _race_name, session_type: _make_session(
@@ -76,8 +76,8 @@ def test_extract_race_data_uses_status_fallback_for_dnf(monkeypatch):
     assert result["HAM"]["dnf"] is True
 
 
-def test_extract_race_data_returns_none_on_exception(monkeypatch):
-    monkeypatch.setattr(
+def test_extract_race_data_returns_none_on_exception(patcher):
+    patcher.setattr(
         race_data.ff1,
         "get_session",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("boom")),
@@ -86,7 +86,7 @@ def test_extract_race_data_returns_none_on_exception(monkeypatch):
     assert race_data.extract_race_data(2026, "Bahrain Grand Prix") is None
 
 
-def test_extract_season_filters_testing_events(monkeypatch):
+def test_extract_season_filters_testing_events(patcher):
     schedule = pd.DataFrame(
         [
             {"EventName": "Pre-Season Test", "EventFormat": "testing"},
@@ -95,8 +95,8 @@ def test_extract_season_filters_testing_events(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr(race_data.ff1, "get_event_schedule", lambda _year: schedule)
-    monkeypatch.setattr(
+    patcher.setattr(race_data.ff1, "get_event_schedule", lambda _year: schedule)
+    patcher.setattr(
         race_data,
         "extract_race_data",
         lambda _year, race_name: (

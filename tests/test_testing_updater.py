@@ -258,7 +258,7 @@ def test_normalize_testing_event_sessions_day_labels():
     assert event["Session3"] == "Practice 3"
 
 
-def test_update_from_testing_sessions_handles_null_testing_characteristics(tmp_path, monkeypatch):
+def test_update_from_testing_sessions_handles_null_testing_characteristics(tmp_path, patcher):
     from src.systems import testing_updater
 
     data_dir = tmp_path / "data" / "processed" / "car_characteristics"
@@ -282,12 +282,12 @@ def test_update_from_testing_sessions_handles_null_testing_characteristics(tmp_p
         )
     )
 
-    monkeypatch.setattr(
+    patcher.setattr(
         testing_updater,
         "_load_sessions_for_event",
         lambda **kwargs: [("Day 1", object())],
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         testing_updater,
         "_collect_session_metrics",
         lambda **kwargs: ({"McLaren": {"overall_pace": 0.7}}, {}),
@@ -303,7 +303,7 @@ def test_update_from_testing_sessions_handles_null_testing_characteristics(tmp_p
     assert summary["updated_teams"] == ["McLaren"]
 
 
-def test_update_from_testing_sessions_supports_characteristics_year_override(tmp_path, monkeypatch):
+def test_update_from_testing_sessions_supports_characteristics_year_override(tmp_path, patcher):
     from src.systems import testing_updater
 
     data_dir = tmp_path / "data" / "processed" / "car_characteristics"
@@ -326,12 +326,12 @@ def test_update_from_testing_sessions_supports_characteristics_year_override(tmp
         )
     )
 
-    monkeypatch.setattr(
+    patcher.setattr(
         testing_updater,
         "_load_sessions_for_event",
         lambda **kwargs: [("Day 1", object())],
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         testing_updater,
         "_collect_session_metrics",
         lambda **kwargs: ({"McLaren": {"overall_pace": 0.7}}, {}),
@@ -348,7 +348,7 @@ def test_update_from_testing_sessions_supports_characteristics_year_override(tmp
     assert summary["characteristics_year"] == 2026
 
 
-def test_update_from_testing_sessions_tracks_team_sessions_used(tmp_path, monkeypatch):
+def test_update_from_testing_sessions_tracks_team_sessions_used(tmp_path, patcher):
     from src.systems import testing_updater
 
     data_dir = tmp_path / "data" / "processed" / "car_characteristics"
@@ -372,7 +372,7 @@ def test_update_from_testing_sessions_tracks_team_sessions_used(tmp_path, monkey
         )
     )
 
-    monkeypatch.setattr(
+    patcher.setattr(
         testing_updater,
         "_load_sessions_for_event",
         lambda **kwargs: [("Day 1", object()), ("Day 2", object())],
@@ -384,12 +384,12 @@ def test_update_from_testing_sessions_tracks_team_sessions_used(tmp_path, monkey
             return {"McLaren": {"overall_pace": 0.6}}, {}
         return {"McLaren": {"overall_pace": 0.8}}, {}
 
-    monkeypatch.setattr(
+    patcher.setattr(
         testing_updater,
         "_collect_session_metrics",
         _mock_collect_session_metrics,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         testing_updater,
         "_count_team_selected_laps",
         lambda session, known_teams, run_profile: {"McLaren": 10.0},
@@ -412,7 +412,7 @@ def test_update_from_testing_sessions_tracks_team_sessions_used(tmp_path, monkey
     assert updated["directionality_meta"]["session_aggregation"] == "median"
 
 
-def test_update_from_testing_sessions_includes_run_profile_in_summary(tmp_path, monkeypatch):
+def test_update_from_testing_sessions_includes_run_profile_in_summary(tmp_path, patcher):
     from src.systems import testing_updater
 
     data_dir = tmp_path / "data" / "processed" / "car_characteristics"
@@ -436,17 +436,17 @@ def test_update_from_testing_sessions_includes_run_profile_in_summary(tmp_path, 
         )
     )
 
-    monkeypatch.setattr(
+    patcher.setattr(
         testing_updater,
         "_load_sessions_for_event",
         lambda **kwargs: [("Day 1", object())],
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         testing_updater,
         "_collect_session_metrics",
         lambda **kwargs: ({"McLaren": {"overall_pace": 0.7}}, {}),
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         testing_updater,
         "_count_team_selected_laps",
         lambda session, known_teams, run_profile: {"McLaren": 8.0},
@@ -470,9 +470,7 @@ def test_update_from_testing_sessions_includes_run_profile_in_summary(tmp_path, 
     assert "long_run" in updated["teams"]["McLaren"]["testing_characteristics_profiles"]
 
 
-def test_update_from_testing_sessions_suggests_fresh_cache_on_data_not_loaded(
-    tmp_path, monkeypatch
-):
+def test_update_from_testing_sessions_suggests_fresh_cache_on_data_not_loaded(tmp_path, patcher):
     from src.systems import testing_updater
 
     data_dir = tmp_path / "data" / "processed" / "car_characteristics"
@@ -495,7 +493,7 @@ def test_update_from_testing_sessions_suggests_fresh_cache_on_data_not_loaded(
         )
     )
 
-    monkeypatch.setattr(
+    patcher.setattr(
         testing_updater,
         "_load_sessions_for_event",
         lambda **kwargs: [],
@@ -510,7 +508,7 @@ def test_update_from_testing_sessions_suggests_fresh_cache_on_data_not_loaded(
         kwargs["error_messages"].extend(error_messages)
         return []
 
-    monkeypatch.setattr(testing_updater, "_load_sessions_for_event", _inject_errors)
+    patcher.setattr(testing_updater, "_load_sessions_for_event", _inject_errors)
 
     try:
         testing_updater.update_from_testing_sessions(
@@ -528,7 +526,7 @@ def test_update_from_testing_sessions_suggests_fresh_cache_on_data_not_loaded(
     assert "--force-renew-cache" in message
 
 
-def test_update_from_testing_sessions_uses_session_event_name_for_compounds(tmp_path, monkeypatch):
+def test_update_from_testing_sessions_uses_session_event_name_for_compounds(tmp_path, patcher):
     from src.systems import testing_updater
 
     data_dir = tmp_path / "data" / "processed" / "car_characteristics"
@@ -564,23 +562,23 @@ def test_update_from_testing_sessions_uses_session_event_name_for_compounds(tmp_
     def _mock_load_sessions_for_event(**kwargs):
         return [("Day 1", DummySession())]
 
-    monkeypatch.setattr(testing_updater, "_load_sessions_for_event", _mock_load_sessions_for_event)
-    monkeypatch.setattr(
+    patcher.setattr(testing_updater, "_load_sessions_for_event", _mock_load_sessions_for_event)
+    patcher.setattr(
         testing_updater,
         "_collect_session_metrics",
         lambda **kwargs: ({"McLaren": {"overall_pace": 0.7}}, {}),
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         testing_updater,
         "_count_team_selected_laps",
         lambda session, known_teams, run_profile: {"McLaren": 10.0},
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         testing_updater,
         "extract_compound_metrics",
         lambda team_laps, canonical_team, race_name: {"SOFT": {"laps_sampled": 10}},
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         testing_updater,
         "normalize_compound_metrics_across_teams",
         lambda metrics, race_name: {"McLaren": {"SOFT": {"laps_sampled": 10}}},
@@ -592,7 +590,7 @@ def test_update_from_testing_sessions_uses_session_event_name_for_compounds(tmp_
         race_names.append(race_name)
         return new
 
-    monkeypatch.setattr(testing_updater, "aggregate_compound_samples", _capture_aggregate)
+    patcher.setattr(testing_updater, "aggregate_compound_samples", _capture_aggregate)
 
     summary = testing_updater.update_from_testing_sessions(
         year=2026,

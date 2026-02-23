@@ -37,16 +37,16 @@ def _write_characteristics_file(path: Path) -> None:
     path.write_text(json.dumps(payload))
 
 
-def test_load_race_session_enriches_results_and_uses_cache(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)
+def test_load_race_session_enriches_results_and_uses_cache(patcher, tmp_path):
+    patcher.chdir(tmp_path)
 
     results = pd.DataFrame({"Abbreviation": ["LEC"], "Position": [1]})
     session = MagicMock()
     session.results = results
 
     enable_cache = MagicMock()
-    monkeypatch.setattr(updater.fastf1.Cache, "enable_cache", enable_cache)
-    monkeypatch.setattr(
+    patcher.setattr(updater.fastf1.Cache, "enable_cache", enable_cache)
+    patcher.setattr(
         updater.fastf1,
         "get_session",
         lambda year, race_name, session_name: session,
@@ -78,7 +78,7 @@ def test_extract_team_performance_missing_laps_or_team_column():
     )
 
 
-def test_extract_team_performance_equal_pace_and_missing_team(monkeypatch):
+def test_extract_team_performance_equal_pace_and_missing_team(patcher):
     rows = []
     for team in ("Ferrari", "McLaren"):
         for lap in range(2, 9):
@@ -93,7 +93,7 @@ def test_extract_team_performance_equal_pace_and_missing_team(monkeypatch):
             )
 
     session = SimpleNamespace(laps=pd.DataFrame(rows))
-    monkeypatch.setattr(updater, "map_team_to_characteristics", lambda raw, known_teams: str(raw))
+    patcher.setattr(updater, "map_team_to_characteristics", lambda raw, known_teams: str(raw))
 
     result = updater.extract_team_performance_from_telemetry(
         session,
@@ -105,7 +105,7 @@ def test_extract_team_performance_equal_pace_and_missing_team(monkeypatch):
     assert "Red Bull" not in result
 
 
-def test_extract_team_performance_skips_insufficient_valid_laps(monkeypatch):
+def test_extract_team_performance_skips_insufficient_valid_laps(patcher):
     laps = pd.DataFrame(
         {
             "Team": ["Ferrari"] * 4,
@@ -121,13 +121,13 @@ def test_extract_team_performance_skips_insufficient_valid_laps(monkeypatch):
         }
     )
     session = SimpleNamespace(laps=laps)
-    monkeypatch.setattr(updater, "map_team_to_characteristics", lambda raw, known_teams: str(raw))
+    patcher.setattr(updater, "map_team_to_characteristics", lambda raw, known_teams: str(raw))
 
     result = updater.extract_team_performance_from_telemetry(session, ["Ferrari"])
     assert result == {}
 
 
-def test_update_team_characteristics_position_fallback_and_file_save(monkeypatch, tmp_path):
+def test_update_team_characteristics_position_fallback_and_file_save(patcher, tmp_path):
     characteristics_file = (
         tmp_path / "processed" / "car_characteristics" / "2026_car_characteristics.json"
     )
@@ -143,11 +143,11 @@ def test_update_team_characteristics_position_fallback_and_file_save(monkeypatch
         def save_artifact(self, artifact_type, artifact_key, data, version):
             raise RuntimeError("db save failed")
 
-    monkeypatch.setattr(updater, "ArtifactStore", FailingStore)
-    monkeypatch.setattr(
+    patcher.setattr(updater, "ArtifactStore", FailingStore)
+    patcher.setattr(
         updater, "extract_team_performance_from_telemetry", lambda session, team_names: {}
     )
-    monkeypatch.setattr(updater, "map_team_to_characteristics", lambda raw, known_teams: str(raw))
+    patcher.setattr(updater, "map_team_to_characteristics", lambda raw, known_teams: str(raw))
 
     race_results = pd.DataFrame({"TeamName": ["Ferrari"], "Position": [2]})
     session = SimpleNamespace(event=None, name="Race Session", laps=pd.DataFrame())
@@ -163,7 +163,7 @@ def test_update_team_characteristics_position_fallback_and_file_save(monkeypatch
     assert Path(str(characteristics_file) + ".backup").exists()
 
 
-def test_update_team_characteristics_handles_compound_extraction_failure(monkeypatch, tmp_path):
+def test_update_team_characteristics_handles_compound_extraction_failure(patcher, tmp_path):
     characteristics_file = (
         tmp_path / "processed" / "car_characteristics" / "2026_car_characteristics.json"
     )
@@ -182,14 +182,14 @@ def test_update_team_characteristics_handles_compound_extraction_failure(monkeyp
             self.saved = True
 
     store = Store(data_root=tmp_path)
-    monkeypatch.setattr(updater, "ArtifactStore", lambda data_root: store)
-    monkeypatch.setattr(
+    patcher.setattr(updater, "ArtifactStore", lambda data_root: store)
+    patcher.setattr(
         updater,
         "extract_team_performance_from_telemetry",
         lambda session, team_names: {"Ferrari": 0.8},
     )
-    monkeypatch.setattr(updater, "map_team_to_characteristics", lambda raw, known_teams: "Ferrari")
-    monkeypatch.setattr(
+    patcher.setattr(updater, "map_team_to_characteristics", lambda raw, known_teams: "Ferrari")
+    patcher.setattr(
         updater,
         "extract_compound_metrics",
         lambda team_laps, canonical_team, race_name: (_ for _ in ()).throw(
@@ -214,32 +214,30 @@ def test_update_team_characteristics_handles_compound_extraction_failure(monkeyp
     assert store.saved is True
 
 
-def test_update_bayesian_driver_ratings_skips_when_no_valid_positions(monkeypatch):
+def test_update_bayesian_driver_ratings_skips_when_no_valid_positions(patcher):
     race_results = pd.DataFrame({"Abbreviation": ["LEC"], "Position": [pd.NA]})
 
     bayesian_cls = MagicMock()
-    monkeypatch.setattr(updater, "BayesianDriverRanking", bayesian_cls)
-    monkeypatch.setattr("src.models.priors_factory.PriorsFactory.create_priors", lambda self: {})
+    patcher.setattr(updater, "BayesianDriverRanking", bayesian_cls)
+    patcher.setattr("src.models.priors_factory.PriorsFactory.create_priors", lambda self: {})
 
     updater.update_bayesian_driver_ratings(race_results)
 
     bayesian_cls.return_value.update.assert_not_called()
 
 
-def test_update_from_race_skips_team_update_when_characteristics_missing(monkeypatch, tmp_path):
+def test_update_from_race_skips_team_update_when_characteristics_missing(patcher, tmp_path):
     data_dir = tmp_path / "processed"
     (data_dir / "car_characteristics").mkdir(parents=True)
 
     race_results = pd.DataFrame({"Abbreviation": ["LEC"], "Position": [1]})
     session = SimpleNamespace(name="Race")
 
-    monkeypatch.setattr(
-        updater, "load_race_session", lambda year, race_name: (race_results, session)
-    )
+    patcher.setattr(updater, "load_race_session", lambda year, race_name: (race_results, session))
     team_update = MagicMock()
     bayesian_update = MagicMock()
-    monkeypatch.setattr(updater, "update_team_characteristics", team_update)
-    monkeypatch.setattr(updater, "update_bayesian_driver_ratings", bayesian_update)
+    patcher.setattr(updater, "update_team_characteristics", team_update)
+    patcher.setattr(updater, "update_bayesian_driver_ratings", bayesian_update)
 
     updater.update_from_race(2026, "Bahrain Grand Prix", str(data_dir))
 
@@ -247,8 +245,8 @@ def test_update_from_race_skips_team_update_when_characteristics_missing(monkeyp
     bayesian_update.assert_called_once_with(race_results)
 
 
-def test_update_from_race_reraises_load_errors(monkeypatch):
-    monkeypatch.setattr(
+def test_update_from_race_reraises_load_errors(patcher):
+    patcher.setattr(
         updater,
         "load_race_session",
         lambda year, race_name: (_ for _ in ()).throw(RuntimeError("load failed")),

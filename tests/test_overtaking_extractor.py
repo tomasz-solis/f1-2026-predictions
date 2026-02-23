@@ -18,7 +18,7 @@ def _make_race_session(laps: pd.DataFrame | None):
     return _Session(laps)
 
 
-def test_extract_overtakes_from_race_counts_position_changes(monkeypatch):
+def test_extract_overtakes_from_race_counts_position_changes(patcher):
     laps = pd.DataFrame(
         [
             # Lap 1
@@ -45,7 +45,7 @@ def test_extract_overtakes_from_race_counts_position_changes(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr(
+    patcher.setattr(
         overtaking.ff1, "get_session", lambda *_args, **_kwargs: _make_race_session(laps)
     )
 
@@ -57,9 +57,9 @@ def test_extract_overtakes_from_race_counts_position_changes(monkeypatch):
     assert stats["max_changes_in_lap"] == 2
 
 
-def test_extract_overtakes_from_race_handles_missing_laps(monkeypatch):
+def test_extract_overtakes_from_race_handles_missing_laps(patcher):
     session = _make_race_session(laps=None)
-    monkeypatch.setattr(overtaking.ff1, "get_session", lambda *_args, **_kwargs: session)
+    patcher.setattr(overtaking.ff1, "get_session", lambda *_args, **_kwargs: session)
     assert overtaking.extract_overtakes_from_race(2026, "Bahrain Grand Prix") is None
 
 
@@ -71,15 +71,15 @@ def test_classify_overtaking_difficulty_thresholds():
     assert overtaking.classify_overtaking_difficulty(7.5) == ("very_easy", 1.0)
 
 
-def test_calculate_overtaking_likelihood_aggregates_years(monkeypatch):
+def test_calculate_overtaking_likelihood_aggregates_years(patcher):
     schedule = pd.DataFrame(
         [
             {"EventName": "Bahrain Grand Prix"},
             {"EventName": "Pre-Season Testing"},
         ]
     )
-    monkeypatch.setattr(overtaking.ff1, "get_event_schedule", lambda _year: schedule)
-    monkeypatch.setattr(
+    patcher.setattr(overtaking.ff1, "get_event_schedule", lambda _year: schedule)
+    patcher.setattr(
         overtaking,
         "extract_overtakes_from_race",
         lambda year, race_name: {

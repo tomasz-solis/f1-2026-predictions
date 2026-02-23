@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import numpy as np
@@ -22,9 +23,74 @@ from src.utils.track_data_loader import (
 )
 from src.utils.validation_helpers import validate_enum, validate_positive_int
 
+logger = logging.getLogger("src.predictors.baseline_2026")
+
 
 class BaselineRacePredictionMixin:
     """Race prediction method implementation for Baseline2026Predictor."""
+
+    @staticmethod
+    def _enforce_non_increasing(values: list[float]) -> list[float]:
+        """Apply isotonic-style smoothing so sequence is non-increasing."""
+        if not values:
+            return values
+
+        # Pool adjacent violators for monotone decreasing fit.
+        blocks: list[list[float]] = []  # [start, end, avg, count]
+        for idx, value in enumerate(values):
+            blocks.append([float(idx), float(idx), float(value), 1.0])
+            while len(blocks) >= 2 and blocks[-2][2] < blocks[-1][2]:
+                right = blocks.pop()
+                left = blocks.pop()
+                merged_count = left[3] + right[3]
+                merged_avg = ((left[2] * left[3]) + (right[2] * right[3])) / merged_count
+                blocks.append([left[0], right[1], merged_avg, merged_count])
+
+        smoothed = [0.0 for _ in values]
+        for start, end, avg, _ in blocks:
+            for idx in range(int(start), int(end) + 1):
+                smoothed[idx] = float(avg)
+        return smoothed
+
+    def _get_learned_position_adjustment(
+        self,
+        *,
+        team: str,
+        driver: str,
+        teammates: list[str],
+        session: str = "race",
+    ) -> float:
+        """Return learned position adjustment from systematic calibration state."""
+        calibration_system = getattr(self, "calibration_system", None)
+        if calibration_system is None:
+            return 0.0
+
+        getter = getattr(calibration_system, "get_combined_position_adjustment", None)
+        if not callable(getter):
+            return 0.0
+
+        cfg = getattr(self, "config", config_loader)
+        min_samples = int(cfg.get("baseline_predictor.learning.min_samples", 1))
+        driver_error_scale = float(cfg.get("baseline_predictor.learning.driver_error_scale", 0.18))
+        teammate_gap_scale = float(cfg.get("baseline_predictor.learning.teammate_gap_scale", 0.10))
+        max_adjustment = float(cfg.get("baseline_predictor.learning.max_adjustment", 2.5))
+
+        try:
+            return float(
+                getter(
+                    team=team,
+                    driver=driver,
+                    teammates=teammates,
+                    session=session,
+                    min_samples=max(1, min_samples),
+                    driver_error_scale=driver_error_scale,
+                    teammate_gap_scale=teammate_gap_scale,
+                    max_adjustment=max_adjustment,
+                )
+            )
+        except Exception as exc:
+            logger.debug(f"Could not load learned race adjustment for {driver}: {exc}")
+            return 0.0
 
     def predict_race(
         self,
@@ -244,12 +310,16 @@ class BaselineRacePredictionMixin:
                         "stint_lengths": [race_distance],
                     }
                 else:
+                    driver_info = driver_info_map.get(driver, {})
                     strategies[driver] = generate_pit_strategy(
                         race_distance=race_distance,
                         tire_stress_score=tire_stress_score,
                         available_compounds=available_compounds,
                         rng=rng,
                         enforce_two_compound_rule=enforce_two_compound_rule,
+                        track_overtaking=race_params.get("track_overtaking"),
+                        grid_position=driver_info.get("grid_pos"),
+                        strategy_signal=driver_info.get("race_advantage", 0.0),
                     )
 
             # Simulate race lap-by-lap
@@ -324,6 +394,14 @@ class BaselineRacePredictionMixin:
 
         # Build finish order from blended position scores
         finish_order = []
+        blended_samples_by_driver: dict[str, list[float]] = {}
+        team_to_drivers: dict[str, list[str]] = {}
+        for driver_code, info in driver_info_map.items():
+            team_to_drivers.setdefault(info["team"], []).append(driver_code)
+        learning_position_scale = float(
+            cfg.get("baseline_predictor.race.learning.position_adjustment_scale", 0.70)
+        )
+
         for driver_code, median_pos in aggregated["median_positions"].items():
             info = driver_info_map[driver_code]
             positions = aggregated["position_distributions"][driver_code]
@@ -383,6 +461,13 @@ class BaselineRacePredictionMixin:
                 + (grid_anchor_weight * info["grid_pos"])
                 - racecraft_adjustment
             )
+            learned_position_adjustment = self._get_learned_position_adjustment(
+                team=info["team"],
+                driver=driver_code,
+                teammates=team_to_drivers.get(info["team"], []),
+                session="race",
+            )
+            position_blend_score -= learned_position_adjustment * learning_position_scale
             position_blend_score = max(position_blend_score, min_position_score)
 
             blended_position_samples = [
@@ -391,19 +476,16 @@ class BaselineRacePredictionMixin:
                 - racecraft_adjustment
                 for p in positions
             ]
+            if learned_position_adjustment:
+                blended_position_samples = [
+                    sample - (learned_position_adjustment * learning_position_scale)
+                    for sample in blended_position_samples
+                ]
             blended_position_samples = [
                 max(sample_position, min_position_score)
                 for sample_position in blended_position_samples
             ]
-
-            p5 = int(np.percentile(blended_position_samples, 5))
-            p95 = int(np.percentile(blended_position_samples, 95))
-
-            podium_prob = (
-                sum(1 for p in blended_position_samples if p <= 3.0)
-                / len(blended_position_samples)
-                * 100.0
-            )
+            blended_samples_by_driver[driver_code] = blended_position_samples
 
             finish_order.append(
                 {
@@ -411,13 +493,75 @@ class BaselineRacePredictionMixin:
                     "team": info["team"],
                     "median_position": median_pos,
                     "position_blend_score": round(position_blend_score, 4),
-                    "p5": p5,
-                    "p95": p95,
+                    "p5": int(np.percentile(blended_position_samples, 5)),
+                    "p95": int(np.percentile(blended_position_samples, 95)),
                     "confidence": round(confidence, 1),
-                    "podium_probability": round(podium_prob, 1),
+                    # Filled after cross-driver sample ranking for consistency with final ordering.
+                    "podium_probability": 0.0,
                     "dnf_probability": round(aggregated["dnf_rates"].get(driver_code, 0.0), 3),
                 }
             )
+
+        # Podium probability must come from ranked outcomes (relative order), not
+        # absolute blended score thresholds, otherwise P2 can show as 0%.
+        podium_prob_by_driver: dict[str, float] = {}
+        rank_samples_by_driver: dict[str, list[int]] = {
+            driver: [] for driver in blended_samples_by_driver.keys()
+        }
+        if blended_samples_by_driver:
+            sample_lengths = [len(samples) for samples in blended_samples_by_driver.values()]
+            sample_count = min(sample_lengths) if sample_lengths else 0
+            if sample_count > 0:
+                podium_counts: dict[str, int] = {driver: 0 for driver in blended_samples_by_driver}
+                minimum_podium_samples = int(
+                    cfg.get("baseline_predictor.race.podium_probability.min_sample_count", 250)
+                )
+                minimum_podium_samples = max(1, minimum_podium_samples)
+                use_resampling = sample_count < minimum_podium_samples
+                draw_count = minimum_podium_samples if use_resampling else sample_count
+
+                resample_rng = None
+                if use_resampling:
+                    resample_seed_offset = int(
+                        cfg.get(
+                            "baseline_predictor.race.podium_probability.resample_seed_offset",
+                            99173,
+                        )
+                    )
+                    resample_rng = np.random.default_rng(base_seed + resample_seed_offset)
+
+                for sample_idx in range(draw_count):
+                    if resample_rng is None:
+                        ranked = sorted(
+                            blended_samples_by_driver.items(),
+                            key=lambda item: (item[1][sample_idx], item[0]),
+                        )
+                    else:
+                        ranked = sorted(
+                            (
+                                driver_code,
+                                samples[int(resample_rng.integers(0, sample_count))],
+                            )
+                            for driver_code, samples in blended_samples_by_driver.items()
+                        )
+                        ranked = sorted(ranked, key=lambda item: (item[1], item[0]))
+                    for rank_index, (driver_code, _) in enumerate(ranked, start=1):
+                        rank_samples_by_driver[driver_code].append(rank_index)
+                    for driver_code, _ in ranked[:3]:
+                        podium_counts[driver_code] += 1
+
+                podium_prob_by_driver = {
+                    driver: (count / draw_count) * 100.0 for driver, count in podium_counts.items()
+                }
+
+        for row in finish_order:
+            row["podium_probability"] = round(podium_prob_by_driver.get(row["driver"], 0.0), 1)
+            rank_samples = rank_samples_by_driver.get(row["driver"], [])
+            if rank_samples:
+                row["position_blend_score"] = round(float(np.mean(rank_samples)), 4)
+                row["median_position"] = int(np.median(rank_samples))
+                row["p5"] = int(np.percentile(rank_samples, 5))
+                row["p95"] = int(np.percentile(rank_samples, 95))
 
         # Sort by blended position score
         finish_order.sort(key=lambda x: x["position_blend_score"])
@@ -425,6 +569,12 @@ class BaselineRacePredictionMixin:
         # Assign final positions
         for i, item in enumerate(finish_order):
             item["position"] = i + 1
+
+        if cfg.get("baseline_predictor.race.podium_probability.enforce_monotonic", True):
+            raw_podium_values = [float(row.get("podium_probability", 0.0)) for row in finish_order]
+            smoothed_values = self._enforce_non_increasing(raw_podium_values)
+            for row, smoothed in zip(finish_order, smoothed_values, strict=True):
+                row["podium_probability"] = round(float(np.clip(smoothed, 0.0, 100.0)), 1)
 
         return {
             "finish_order": finish_order,

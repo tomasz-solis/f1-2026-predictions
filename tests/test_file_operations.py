@@ -30,11 +30,11 @@ def test_atomic_json_write_skips_backup_when_disabled(tmp_path):
     assert backup.exists() is False
 
 
-def test_atomic_json_write_raises_and_preserves_original_on_move_failure(tmp_path, monkeypatch):
+def test_atomic_json_write_raises_and_preserves_original_on_move_failure(tmp_path, patcher):
     target = tmp_path / "state.json"
     target.write_text(json.dumps({"old": True}))
 
-    monkeypatch.setattr(
+    patcher.setattr(
         file_ops.shutil, "move", lambda src, dst: (_ for _ in ()).throw(RuntimeError("disk full"))
     )
 
@@ -45,7 +45,7 @@ def test_atomic_json_write_raises_and_preserves_original_on_move_failure(tmp_pat
     assert list(tmp_path.glob(f".{target.name}.*.tmp")) == []
 
 
-def test_restore_from_backup_success_and_failures(tmp_path, monkeypatch):
+def test_restore_from_backup_success_and_failures(tmp_path, patcher):
     target = tmp_path / "state.json"
     target.write_text(json.dumps({"current": True}))
     backup = Path(str(target) + ".backup")
@@ -57,7 +57,7 @@ def test_restore_from_backup_success_and_failures(tmp_path, monkeypatch):
     missing = tmp_path / "missing.json"
     assert file_ops.restore_from_backup(missing) is False
 
-    monkeypatch.setattr(
+    patcher.setattr(
         file_ops.shutil, "copy2", lambda src, dst: (_ for _ in ()).throw(OSError("no copy"))
     )
     assert file_ops.restore_from_backup(target) is False

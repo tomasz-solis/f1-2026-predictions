@@ -19,7 +19,7 @@ def _make_session(*, laps: pd.DataFrame | None = None, results: pd.DataFrame | N
     return _Session(laps, results)
 
 
-def test_extract_fp_order_from_laps_handles_variation_fallback(monkeypatch):
+def test_extract_fp_order_from_laps_handles_variation_fallback(patcher):
     laps = pd.DataFrame(
         [
             {
@@ -60,7 +60,7 @@ def test_extract_fp_order_from_laps_handles_variation_fallback(monkeypatch):
             raise ValueError("missing")
         return _make_session(laps=laps)
 
-    monkeypatch.setattr(session_extractor.ff1, "get_session", _get_session)
+    patcher.setattr(session_extractor.ff1, "get_session", _get_session)
 
     order = session_extractor.extract_fp_order_from_laps(2026, "Bahrain Grand Prix", "FP1")
 
@@ -68,7 +68,7 @@ def test_extract_fp_order_from_laps_handles_variation_fallback(monkeypatch):
     assert len(order) == 5
 
 
-def test_extract_fp_order_from_laps_requires_minimum_teams(monkeypatch):
+def test_extract_fp_order_from_laps_requires_minimum_teams(patcher):
     laps = pd.DataFrame(
         [
             {
@@ -85,7 +85,7 @@ def test_extract_fp_order_from_laps_requires_minimum_teams(monkeypatch):
             },
         ]
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         session_extractor.ff1,
         "get_session",
         lambda *_args, **_kwargs: _make_session(laps=laps),
@@ -94,7 +94,7 @@ def test_extract_fp_order_from_laps_requires_minimum_teams(monkeypatch):
     assert session_extractor.extract_fp_order_from_laps(2026, "Bahrain Grand Prix", "FP1") is None
 
 
-def test_extract_quali_order_from_positions(monkeypatch):
+def test_extract_quali_order_from_positions(patcher):
     results = pd.DataFrame(
         [
             {"TeamName": "McLaren", "Position": 1},
@@ -104,7 +104,7 @@ def test_extract_quali_order_from_positions(monkeypatch):
             {"TeamName": "Williams", "Position": 5},
         ]
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         session_extractor.ff1,
         "get_session",
         lambda *_args, **_kwargs: _make_session(results=results),
@@ -116,9 +116,9 @@ def test_extract_quali_order_from_positions(monkeypatch):
     assert order["Williams"] == 5
 
 
-def test_extract_session_order_safe_switches_methods(monkeypatch):
-    monkeypatch.setattr(session_extractor, "extract_fp_order_from_laps", lambda *_args: {"FP": 1})
-    monkeypatch.setattr(
+def test_extract_session_order_safe_switches_methods(patcher):
+    patcher.setattr(session_extractor, "extract_fp_order_from_laps", lambda *_args: {"FP": 1})
+    patcher.setattr(
         session_extractor,
         "extract_quali_order_from_positions",
         lambda *_args: {"Q": 1},
@@ -138,8 +138,8 @@ def test_calculate_order_mae():
     assert mae == (1 + 0 + 1) / 3
 
 
-def test_test_session_as_predictor_fixed_failure_path(monkeypatch):
-    monkeypatch.setattr(session_extractor, "extract_session_order_safe", lambda *_args: None)
+def test_test_session_as_predictor_fixed_failure_path(patcher):
+    patcher.setattr(session_extractor, "extract_session_order_safe", lambda *_args: None)
 
     result = session_extractor.test_session_as_predictor_fixed(
         2026, "Bahrain Grand Prix", "FP2", target_session="Q"
@@ -149,13 +149,13 @@ def test_test_session_as_predictor_fixed_failure_path(monkeypatch):
     assert "FP2 data not available" in result["reason"]
 
 
-def test_test_session_as_predictor_fixed_with_driver_metrics(monkeypatch):
+def test_test_session_as_predictor_fixed_with_driver_metrics(patcher):
     def _extract(_year: int, _race: str, session_type: str):
         if session_type == "FP2":
             return {"McLaren": 1, "Ferrari": 2}
         return {"McLaren": 2, "Ferrari": 1}
 
-    monkeypatch.setattr(session_extractor, "extract_session_order_safe", _extract)
+    patcher.setattr(session_extractor, "extract_session_order_safe", _extract)
 
     class _Ranker:
         def predict_positions(self, team_predictions, team_lineups, session_type):

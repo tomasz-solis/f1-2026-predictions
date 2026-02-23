@@ -19,6 +19,7 @@ from src.predictors.baseline.components import (
     BaselineRaceEngine,
     BaselineStrengthCalculator,
 )
+from src.systems.systematic_learning import SystematicLearningSystem
 from src.types.prediction_types import QualifyingGridEntry
 from src.utils.config_loader import Config
 from src.utils.data_generator import create_baseline_if_missing
@@ -63,6 +64,9 @@ class Baseline2026Predictor(
 
         self.artifact_store = artifact_store or ArtifactStore(
             data_root=self.data_dir.parent if self.data_dir.name == "processed" else self.data_dir
+        )
+        self.calibration_system = SystematicLearningSystem(
+            state_file=self.artifact_store.data_root / "learning_state.json"
         )
         self.config = config or Config()
 

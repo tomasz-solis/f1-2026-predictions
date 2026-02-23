@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from src.persistence.artifact_store import ArtifactStore
+from src.systems.systematic_learning import SystematicLearningSystem
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,9 @@ class PredictionLogger:
         # the predictions subdirectory in the right place
         data_root = self.predictions_dir.parent
         self.artifact_store = ArtifactStore(data_root=data_root)
+        self.learning_system = SystematicLearningSystem(
+            state_file=data_root / "learning_state.json"
+        )
 
     def save_prediction(
         self,
@@ -263,6 +267,18 @@ class PredictionLogger:
             with open(filepath, "w") as f:
                 json.dump(prediction, f, indent=2)
             logger.info(f"Updated actuals in {filepath}")
+
+        try:
+            learning_summary = self.learning_system.update_from_prediction_record(prediction)
+            if learning_summary.get("sessions_updated", 0) > 0:
+                logger.info(
+                    "Updated adaptive calibration from actual results "
+                    f"(sessions={learning_summary['sessions_updated']}, "
+                    f"drivers={learning_summary['driver_updates']}, "
+                    f"pairs={learning_summary['pair_updates']})"
+                )
+        except Exception as e:
+            logger.warning(f"Could not update adaptive calibration from actuals: {e}")
 
         return True
 

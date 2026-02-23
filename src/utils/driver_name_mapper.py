@@ -27,6 +27,7 @@ class DriverNameMapper:
         "STR": "Stroll",
         # Alpine
         "GAS": "Gasly",
+        "COL": "Colapinto",
         "DOO": "Doohan",
         # Williams
         "ALB": "Albon",
@@ -37,8 +38,13 @@ class DriverNameMapper:
         # Sauber/Audi
         "HUL": "Hulkenberg",
         "BOR": "Bortoleto",
-        # RB/AlphaTauri
+        # RB
+        "LAW": "Lawson",
+        "LIN": "Lindblad",
         "TSU": "Tsunoda",
+        # Cadillac
+        "BOT": "Bottas",
+        # Red Bull
         "HAD": "Hadjar",
     }
 
@@ -69,6 +75,8 @@ class DriverNameMapper:
         "stroll": "STR",
         "pierre gasly": "GAS",
         "gasly": "GAS",
+        "franco colapinto": "COL",
+        "colapinto": "COL",
         "jack doohan": "DOO",
         "doohan": "DOO",
         "alex albon": "ALB",
@@ -83,8 +91,14 @@ class DriverNameMapper:
         "hulkenberg": "HUL",
         "gabriel bortoleto": "BOR",
         "bortoleto": "BOR",
+        "liam lawson": "LAW",
+        "lawson": "LAW",
+        "arnaud lindblad": "LIN",
+        "lindblad": "LIN",
         "yuki tsunoda": "TSU",
         "tsunoda": "TSU",
+        "valtteri bottas": "BOT",
+        "bottas": "BOT",
         "isack hadjar": "HAD",
         "hadjar": "HAD",
     }

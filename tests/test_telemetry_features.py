@@ -75,11 +75,11 @@ def _sample_session_laps() -> _FakeLaps:
     )
 
 
-def test_session_feature_aggregator_extract_driver_session(monkeypatch):
+def test_session_feature_aggregator_extract_driver_session(patcher):
     lap_extractor = LapFeatureExtractor()
     aggregator = SessionFeatureAggregator(lap_extractor)
 
-    monkeypatch.setattr(
+    patcher.setattr(
         lap_extractor,
         "extract_features",
         lambda _lap: {
@@ -97,11 +97,11 @@ def test_session_feature_aggregator_extract_driver_session(monkeypatch):
     assert "slow_corner_speed_std" in driver_features
 
 
-def test_session_feature_aggregator_extract_all_drivers(monkeypatch):
+def test_session_feature_aggregator_extract_all_drivers(patcher):
     lap_extractor = LapFeatureExtractor()
     aggregator = SessionFeatureAggregator(lap_extractor)
 
-    monkeypatch.setattr(
+    patcher.setattr(
         lap_extractor,
         "extract_features",
         lambda _lap: {"slow_corner_speed": 120.0, "avg_speed_full_throttle": 301.0},

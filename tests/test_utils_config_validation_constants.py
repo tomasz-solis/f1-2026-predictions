@@ -62,14 +62,14 @@ def test_production_config_weighted_mae_and_fallback(tmp_path):
     assert cfg.get_expected_mae("unknown") == 4.0
 
 
-def test_load_production_config_and_get_best_method(monkeypatch, tmp_path):
+def test_load_production_config_and_get_best_method(patcher, tmp_path):
     config_file = tmp_path / "production_config.json"
     config_file.write_text(json.dumps(_sample_config()))
 
     loaded = load_production_config(str(config_file))
     assert isinstance(loaded, ProductionConfig)
 
-    monkeypatch.setattr("src.utils.config.load_production_config", lambda: loaded)
+    patcher.setattr("src.utils.config.load_production_config", lambda: loaded)
     best = get_best_method("conventional")
     assert best["method"] == "blend"
 

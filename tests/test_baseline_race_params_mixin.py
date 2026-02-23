@@ -117,7 +117,7 @@ def test_calculate_driver_race_score_without_overtaking_boost():
     assert score > 0
 
 
-def test_load_race_params_reads_expected_config_keys(monkeypatch):
+def test_load_race_params_reads_expected_config_keys(patcher):
     helper = DummyRaceParams()
     calls = []
 
@@ -125,7 +125,7 @@ def test_load_race_params_reads_expected_config_keys(monkeypatch):
         calls.append(key)
         return default
 
-    monkeypatch.setattr(params_module.config_loader, "get", _fake_get)
+    patcher.setattr(params_module.config_loader, "get", _fake_get)
 
     params = helper._load_race_params()
 

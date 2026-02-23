@@ -8,33 +8,33 @@ import pytest
 import src.persistence.db as db_module
 
 
-def test_get_supabase_client_raises_when_db_disabled(monkeypatch):
-    monkeypatch.setattr(db_module, "_supabase_client", None)
-    monkeypatch.setattr(db_module, "is_db_enabled", lambda: False)
+def test_get_supabase_client_raises_when_db_disabled(patcher):
+    patcher.setattr(db_module, "_supabase_client", None)
+    patcher.setattr(db_module, "is_db_enabled", lambda: False)
 
     with pytest.raises(RuntimeError, match="not enabled"):
         db_module.get_supabase_client()
 
 
-def test_get_supabase_client_raises_when_credentials_missing(monkeypatch):
-    monkeypatch.setattr(db_module, "_supabase_client", None)
-    monkeypatch.setattr(db_module, "is_db_enabled", lambda: True)
-    monkeypatch.setattr(db_module, "SUPABASE_URL", None)
-    monkeypatch.setattr(db_module, "SUPABASE_KEY", None)
+def test_get_supabase_client_raises_when_credentials_missing(patcher):
+    patcher.setattr(db_module, "_supabase_client", None)
+    patcher.setattr(db_module, "is_db_enabled", lambda: True)
+    patcher.setattr(db_module, "SUPABASE_URL", None)
+    patcher.setattr(db_module, "SUPABASE_KEY", None)
 
     with pytest.raises(RuntimeError, match="environment variables must be set"):
         db_module.get_supabase_client()
 
 
-def test_get_supabase_client_initializes_once(monkeypatch):
+def test_get_supabase_client_initializes_once(patcher):
     created = object()
     create_client = MagicMock(return_value=created)
 
-    monkeypatch.setattr(db_module, "_supabase_client", None)
-    monkeypatch.setattr(db_module, "is_db_enabled", lambda: True)
-    monkeypatch.setattr(db_module, "SUPABASE_URL", "https://example.supabase.co")
-    monkeypatch.setattr(db_module, "SUPABASE_KEY", "secret")
-    monkeypatch.setattr(db_module, "create_client", create_client)
+    patcher.setattr(db_module, "_supabase_client", None)
+    patcher.setattr(db_module, "is_db_enabled", lambda: True)
+    patcher.setattr(db_module, "SUPABASE_URL", "https://example.supabase.co")
+    patcher.setattr(db_module, "SUPABASE_KEY", "secret")
+    patcher.setattr(db_module, "create_client", create_client)
 
     first = db_module.get_supabase_client()
     second = db_module.get_supabase_client()
@@ -44,12 +44,12 @@ def test_get_supabase_client_initializes_once(monkeypatch):
     create_client.assert_called_once_with("https://example.supabase.co", "secret")
 
 
-def test_get_supabase_client_wraps_creation_errors(monkeypatch):
-    monkeypatch.setattr(db_module, "_supabase_client", None)
-    monkeypatch.setattr(db_module, "is_db_enabled", lambda: True)
-    monkeypatch.setattr(db_module, "SUPABASE_URL", "https://example.supabase.co")
-    monkeypatch.setattr(db_module, "SUPABASE_KEY", "secret")
-    monkeypatch.setattr(
+def test_get_supabase_client_wraps_creation_errors(patcher):
+    patcher.setattr(db_module, "_supabase_client", None)
+    patcher.setattr(db_module, "is_db_enabled", lambda: True)
+    patcher.setattr(db_module, "SUPABASE_URL", "https://example.supabase.co")
+    patcher.setattr(db_module, "SUPABASE_KEY", "secret")
+    patcher.setattr(
         db_module,
         "create_client",
         lambda url, key: (_ for _ in ()).throw(RuntimeError("connect fail")),
@@ -59,7 +59,7 @@ def test_get_supabase_client_wraps_creation_errors(monkeypatch):
         db_module.get_supabase_client()
 
 
-def test_check_connection_success(monkeypatch):
+def test_check_connection_success(patcher):
     query = MagicMock()
     query.select.return_value = query
     query.limit.return_value = query
@@ -68,14 +68,14 @@ def test_check_connection_success(monkeypatch):
     client = MagicMock()
     client.table.return_value = query
 
-    monkeypatch.setattr(db_module, "get_supabase_client", lambda: client)
+    patcher.setattr(db_module, "get_supabase_client", lambda: client)
 
     message = db_module.check_connection()
     assert "healthy" in message
 
 
-def test_check_connection_failure(monkeypatch):
-    monkeypatch.setattr(
+def test_check_connection_failure(patcher):
+    patcher.setattr(
         db_module,
         "get_supabase_client",
         lambda: (_ for _ in ()).throw(RuntimeError("auth failed")),
@@ -85,8 +85,8 @@ def test_check_connection_failure(monkeypatch):
         db_module.check_connection()
 
 
-def test_close_client_resets_singleton(monkeypatch):
-    monkeypatch.setattr(db_module, "_supabase_client", object())
+def test_close_client_resets_singleton(patcher):
+    patcher.setattr(db_module, "_supabase_client", object())
     db_module.close_client()
 
     assert db_module._supabase_client is None

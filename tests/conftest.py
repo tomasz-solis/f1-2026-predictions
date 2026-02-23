@@ -2,9 +2,55 @@
 Shared test fixtures and configuration.
 """
 
+import os
+from contextlib import ExitStack
+from pathlib import Path
+from unittest.mock import patch
+
 import pytest
 
 from src.models.bayesian import DriverPrior
+
+
+class TestPatcher:
+    """Small patch helper backed by unittest.mock for test-only replacements."""
+
+    _UNSET = object()
+
+    def __init__(self) -> None:
+        self._stack = ExitStack()
+
+    def setattr(self, target, name=_UNSET, value=_UNSET) -> None:
+        """
+        Patch attributes in two supported forms:
+        - setattr(obj, "attr_name", replacement)
+        - setattr("dotted.path.to.symbol", replacement)
+        """
+        if value is self._UNSET:
+            if name is self._UNSET:
+                raise TypeError("setattr expected replacement value")
+            self._stack.enter_context(patch(target, new=name))
+            return
+        if name is self._UNSET:
+            raise TypeError("setattr expected attribute name for object target")
+        self._stack.enter_context(patch.object(target, name, new=value))
+
+    def chdir(self, path: Path) -> None:
+        previous_cwd = Path.cwd()
+        os.chdir(path)
+        self._stack.callback(os.chdir, previous_cwd)
+
+    def close(self) -> None:
+        self._stack.close()
+
+
+@pytest.fixture
+def patcher():
+    helper = TestPatcher()
+    try:
+        yield helper
+    finally:
+        helper.close()
 
 
 @pytest.fixture

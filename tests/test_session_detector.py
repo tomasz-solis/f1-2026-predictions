@@ -61,13 +61,13 @@ def test_is_session_completed_competitive_requires_results():
             assert detector.is_session_completed(2026, "Bahrain Grand Prix", "Q") is True
 
 
-def test_get_completed_sessions_uses_per_session_validation(monkeypatch):
+def test_get_completed_sessions_uses_per_session_validation(patcher):
     detector = SessionDetector()
 
     def _mock_completed(year: int, race_name: str, session_name: str) -> bool:
         return session_name in {"FP1", "FP3"}
 
-    monkeypatch.setattr(detector, "is_session_completed", _mock_completed)
+    patcher.setattr(detector, "is_session_completed", _mock_completed)
     completed = detector.get_completed_sessions(2026, "Bahrain Grand Prix", is_sprint=False)
 
     assert completed == ["FP1", "FP3"]
