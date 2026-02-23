@@ -42,6 +42,7 @@ target-version = ["py313"]
 line-length = 100
 target-version = "py313"
 src = ["src", "tests"]
+extend-exclude = ["notebooks"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
