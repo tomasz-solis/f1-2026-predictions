@@ -382,7 +382,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
 
 
 def render_model_insights_page() -> None:
-    st.header("How the Model Works")
+    st.header("Model and Learning Runtime")
 
     st.markdown("""
     ### Runtime path
@@ -390,30 +390,31 @@ def render_model_insights_page() -> None:
     The dashboard currently runs `Baseline2026Predictor` for both qualifying and race.
 
     **1. Team strength**
-    - Uses baseline (pre-season), testing directionality, and current-season performance
-    - Applies a race-by-race weight schedule that quickly shifts toward current-season data
+    - Uses baseline (pre-season), testing directionality, and current-season performance.
+    - Applies a race-by-race weight schedule that shifts toward current-season data.
+    - Uses compound-aware modifiers when validated compound samples are available.
 
     **2. Qualifying**
-    - Builds qualifying signal from short-stint pace across available sessions
-    - Blends session pace with model strength (fixed 70/30 in the active predictor)
-    - Applies a small short-run characteristics modifier when profile data exists
-    - Runs Monte Carlo simulations and reports the median grid with confidence ranges
+    - Uses best available weekend practice data for team pace blending.
+    - Falls back to testing short-run profiles when no weekend practice data is available.
+    - Applies model-only stabilization for teammate gaps and experience tiers.
+    - Runs Monte Carlo simulations and reports median/interval grid outputs.
 
     **3. Race**
-    - Uses either predicted qualifying grid or actual qualifying results when available
-    - Uses long-run race signals plus grid position, team pace, and driver skill
-    - Overtaking model considers pace delta, track overtaking ease, attacking/defending skill, and position zone (front passes hardest)
-    - Applies a small long-run characteristics modifier when profile data exists
-    - Includes lap-one chaos, strategy variance, safety car luck, and DNF probability
+    - Uses predicted or actual qualifying grid depending on session availability.
+    - Uses lap-by-lap simulation with team pace, racecraft, strategy, and reliability.
+    - Applies track-aware overtaking and pit timing bias (undercut/overcut tendency).
+    - Derives podium probability from ranked simulation outcomes for consistency.
 
-    **4. What exists in the repo but is not a direct race score term here**
-    - Bayesian ranking components
-    - Testing updater outputs (including tire degradation slope estimates)
+    **4. Learning**
+    - Saved predictions with actuals update a persistent calibration state.
+    - Driver and teammate residual errors are tracked per session type.
+    - Learned adjustments are applied in qualifying and race scoring.
 
-    **5. Learning behavior**
-    - Auto-updater can ingest completed races into team characteristics
-    - Learning history tracks method MAE
-    - In this runtime path, qualifying blend weight is fixed inside the predictor
+    **5. Supporting systems**
+    - Auto-updater ingests completed races into characteristics.
+    - Testing updater refreshes run-profile and compound characteristics.
+    - Bayesian ranking tools remain available for offline analysis workflows.
     """)
 
     st.subheader("Key Hyperparameters")
@@ -424,8 +425,9 @@ def render_model_insights_page() -> None:
         st.markdown("""
         **Qualifying (active path):**
         - Team/driver score: 70% team + 30% driver
-        - Practice blend: 70% session pace + 30% model strength
-        - Output: median grid from Monte Carlo runs
+        - Practice blend when available; testing fallback otherwise
+        - Model-only teammate gap controls + learned adjustment offsets
+        - Output: Monte Carlo median grid + confidence intervals
         """)
 
     with col2:
@@ -435,6 +437,7 @@ def render_model_insights_page() -> None:
         - Grid influence: dynamic by overtaking difficulty
         - Driver skill term: 20%
         - DNF probability + chaos + strategy + safety car modifiers
+        - Podium probability from ranked outcomes with monotonic smoothing
         """)
 
 
@@ -582,7 +585,7 @@ def render_about_page() -> None:
     st.header("About This Project")
 
     st.markdown("""
-    #### Racecraft Labs Prediction Engine
+    #### Trackside Labs Prediction Engine
 
     This project focuses on weekend predictions for the 2026 season.
 
@@ -621,9 +624,11 @@ def render_about_page() -> None:
 def render_page(page: str, enable_logging: bool) -> None:
     if page == "Live Prediction":
         render_live_prediction_page(enable_logging)
-    elif page == "Model Insights":
+    elif page in {"Model & Learning", "Model Insights"}:
         render_model_insights_page()
     elif page == "Prediction Accuracy":
         render_prediction_accuracy_page()
+    elif page == "About":
+        render_about_page()
     else:
         render_about_page()

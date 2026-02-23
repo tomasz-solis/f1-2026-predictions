@@ -17,6 +17,14 @@ BRAND_TAGLINE = "Motorsport data forecasting and telemetry insights"
 BRAND_DISCLAIMER = "Independent analytics project • not affiliated with any racing series, teams, or governing bodies"
 # Header alignment toggle. Options: "left" or "center".
 BRAND_HEADER_ALIGNMENT = "left"
+BRAND_MODEL_VERSION = "v1.2"
+BRAND_LAST_UPDATED = "2026-02-23"
+NAVIGATION_PAGES = [
+    "Live Prediction",
+    "Model & Learning",
+    "Prediction Accuracy",
+    "About",
+]
 
 _CUSTOM_CSS = """
 <style>
@@ -420,7 +428,7 @@ def render_header() -> None:
 def render_sidebar() -> tuple[str, bool]:
     page = st.radio(
         "Navigation",
-        ["Live Prediction", "Model Insights", "Prediction Accuracy", "About"],
+        NAVIGATION_PAGES,
         horizontal=True,
     )
 
@@ -433,7 +441,7 @@ def render_sidebar() -> tuple[str, bool]:
                 "for later accuracy analysis. Max 1 prediction per session."
             ),
         )
-        st.markdown("**Model Version:** v1.0")
-        st.markdown("**Last Updated:** 2026-02-01")
+        st.markdown(f"**Model Version:** {BRAND_MODEL_VERSION}")
+        st.markdown(f"**Last Updated:** {BRAND_LAST_UPDATED}")
 
     return page, enable_logging

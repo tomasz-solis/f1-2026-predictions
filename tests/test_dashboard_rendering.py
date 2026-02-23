@@ -13,38 +13,36 @@ class _Ctx:
         return False
 
 
-def _stub_streamlit(monkeypatch):
+def _stub_streamlit(patcher):
     calls: list[tuple[str, str]] = []
 
-    monkeypatch.setattr(
-        rendering.st, "subheader", lambda msg: calls.append(("subheader", str(msg)))
-    )
-    monkeypatch.setattr(rendering.st, "caption", lambda msg: calls.append(("caption", str(msg))))
-    monkeypatch.setattr(rendering.st, "info", lambda msg: calls.append(("info", str(msg))))
-    monkeypatch.setattr(rendering.st, "warning", lambda msg: calls.append(("warning", str(msg))))
-    monkeypatch.setattr(rendering.st, "success", lambda msg: calls.append(("success", str(msg))))
-    monkeypatch.setattr(rendering.st, "header", lambda msg: calls.append(("header", str(msg))))
-    monkeypatch.setattr(
+    patcher.setattr(rendering.st, "subheader", lambda msg: calls.append(("subheader", str(msg))))
+    patcher.setattr(rendering.st, "caption", lambda msg: calls.append(("caption", str(msg))))
+    patcher.setattr(rendering.st, "info", lambda msg: calls.append(("info", str(msg))))
+    patcher.setattr(rendering.st, "warning", lambda msg: calls.append(("warning", str(msg))))
+    patcher.setattr(rendering.st, "success", lambda msg: calls.append(("success", str(msg))))
+    patcher.setattr(rendering.st, "header", lambda msg: calls.append(("header", str(msg))))
+    patcher.setattr(
         rendering.st, "markdown", lambda msg, **_kwargs: calls.append(("markdown", str(msg)))
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         rendering.st,
         "metric",
         lambda *args, **kwargs: calls.append(
             ("metric", str(kwargs.get("label", args[0] if args else "")))
         ),
     )
-    monkeypatch.setattr(rendering.st, "progress", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(rendering.st, "write", lambda msg: calls.append(("write", str(msg))))
-    monkeypatch.setattr(rendering.st, "dataframe", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(rendering.st, "columns", lambda n: [_Ctx() for _ in range(n)])
-    monkeypatch.setattr(rendering.st, "expander", lambda _label: _Ctx())
+    patcher.setattr(rendering.st, "progress", lambda *_args, **_kwargs: None)
+    patcher.setattr(rendering.st, "write", lambda msg: calls.append(("write", str(msg))))
+    patcher.setattr(rendering.st, "dataframe", lambda *_args, **_kwargs: None)
+    patcher.setattr(rendering.st, "columns", lambda n: [_Ctx() for _ in range(n)])
+    patcher.setattr(rendering.st, "expander", lambda _label: _Ctx())
 
     return calls
 
 
-def test_render_compound_strategies_shows_top_entries(monkeypatch):
-    calls = _stub_streamlit(monkeypatch)
+def test_render_compound_strategies_shows_top_entries(patcher):
+    calls = _stub_streamlit(patcher)
 
     rendering._render_compound_strategies(
         {
@@ -60,8 +58,8 @@ def test_render_compound_strategies_shows_top_entries(monkeypatch):
     assert metric_labels[:3] == ["SOFT->MEDIUM", "MEDIUM->HARD", "SOFT->HARD"]
 
 
-def test_render_pit_lap_distribution_builds_summary(monkeypatch):
-    calls = _stub_streamlit(monkeypatch)
+def test_render_pit_lap_distribution_builds_summary(patcher):
+    calls = _stub_streamlit(patcher)
 
     rendering._render_pit_lap_distribution({"lap_10-15": 10, "lap_20-25": 30, "lap_15-20": 20})
 
@@ -70,8 +68,8 @@ def test_render_pit_lap_distribution_builds_summary(monkeypatch):
     assert any("Most likely pit window" in msg for msg in info_messages)
 
 
-def test_render_race_result_warns_on_high_dnf(monkeypatch):
-    calls = _stub_streamlit(monkeypatch)
+def test_render_race_result_warns_on_high_dnf(patcher):
+    calls = _stub_streamlit(patcher)
 
     df = pd.DataFrame(
         [
@@ -108,8 +106,8 @@ def test_render_race_result_warns_on_high_dnf(monkeypatch):
     assert any("High DNF risk" in msg for msg in warning_messages)
 
 
-def test_render_qualifying_result_splits_grid_columns(monkeypatch):
-    calls = _stub_streamlit(monkeypatch)
+def test_render_qualifying_result_splits_grid_columns(patcher):
+    calls = _stub_streamlit(patcher)
     df = pd.DataFrame(
         [{"position": idx, "driver": f"D{idx:02d}", "team": "Team"} for idx in range(1, 23)]
     )
@@ -122,21 +120,21 @@ def test_render_qualifying_result_splits_grid_columns(monkeypatch):
     assert any("P16-22" in block for block in markdown_blocks)
 
 
-def test_display_prediction_result_routes_race_sections(monkeypatch):
-    calls = _stub_streamlit(monkeypatch)
+def test_display_prediction_result_routes_race_sections(patcher):
+    calls = _stub_streamlit(patcher)
     routed: list[str] = []
 
-    monkeypatch.setattr(
+    patcher.setattr(
         rendering,
         "_render_compound_strategies",
         lambda _strategies: routed.append("compound"),
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         rendering,
         "_render_pit_lap_distribution",
         lambda _distribution: routed.append("pit"),
     )
-    monkeypatch.setattr(rendering, "_render_race_result", lambda _df: routed.append("race"))
+    patcher.setattr(rendering, "_render_race_result", lambda _df: routed.append("race"))
 
     rendering.display_prediction_result(
         result={
@@ -164,11 +162,11 @@ def test_display_prediction_result_routes_race_sections(monkeypatch):
     assert ("success", "Using ACTUAL grid from completed session") in calls
 
 
-def test_display_prediction_result_routes_qualifying_sections(monkeypatch):
-    calls = _stub_streamlit(monkeypatch)
+def test_display_prediction_result_routes_qualifying_sections(patcher):
+    calls = _stub_streamlit(patcher)
     routed: list[str] = []
 
-    monkeypatch.setattr(rendering, "_render_qualifying_result", lambda _df: routed.append("quali"))
+    patcher.setattr(rendering, "_render_qualifying_result", lambda _df: routed.append("quali"))
 
     rendering.display_prediction_result(
         result={

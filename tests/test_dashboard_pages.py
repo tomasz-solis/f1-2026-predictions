@@ -5,7 +5,7 @@ import pandas as pd
 from src.dashboard import pages
 
 
-def test_load_race_options_filters_testing_and_tags_sprint(monkeypatch):
+def test_load_race_options_filters_testing_and_tags_sprint(patcher):
     pages._load_race_options_cached.clear()
 
     schedule = pd.DataFrame(
@@ -19,24 +19,24 @@ def test_load_race_options_filters_testing_and_tags_sprint(monkeypatch):
         }
     )
 
-    monkeypatch.setattr(pages.fastf1, "get_event_schedule", lambda year: schedule)
-    monkeypatch.setattr(pages.st, "error", lambda _msg: (_ for _ in ()).throw(AssertionError))
+    patcher.setattr(pages.fastf1, "get_event_schedule", lambda year: schedule)
+    patcher.setattr(pages.st, "error", lambda _msg: (_ for _ in ()).throw(AssertionError))
 
     options = pages._load_race_options()
 
     assert options == ["Bahrain Grand Prix", "Chinese Grand Prix (Sprint)"]
 
 
-def test_load_race_options_uses_fallback_when_schedule_fails(monkeypatch):
+def test_load_race_options_uses_fallback_when_schedule_fails(patcher):
     pages._load_race_options_cached.clear()
 
     errors: list[str] = []
-    monkeypatch.setattr(
+    patcher.setattr(
         pages.fastf1,
         "get_event_schedule",
         lambda _year: (_ for _ in ()).throw(RuntimeError("offline")),
     )
-    monkeypatch.setattr(pages.st, "error", lambda message: errors.append(str(message)))
+    patcher.setattr(pages.st, "error", lambda message: errors.append(str(message)))
 
     options = pages._load_race_options()
 
@@ -45,7 +45,7 @@ def test_load_race_options_uses_fallback_when_schedule_fails(monkeypatch):
     assert "Bahrain Grand Prix" in options
 
 
-def test_save_prediction_if_enabled_saves_new_session(monkeypatch):
+def test_save_prediction_if_enabled_saves_new_session(patcher):
     saved_payload: dict = {}
     info_messages: list[str] = []
 
@@ -64,10 +64,10 @@ def test_save_prediction_if_enabled_saves_new_session(monkeypatch):
         def save_prediction(self, **kwargs):
             saved_payload.update(kwargs)
 
-    monkeypatch.setattr("src.utils.session_detector.SessionDetector", _Detector)
-    monkeypatch.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
-    monkeypatch.setattr(pages.st, "info", lambda message: info_messages.append(str(message)))
-    monkeypatch.setattr(pages.st, "warning", lambda _message: None)
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+    patcher.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
+    patcher.setattr(pages.st, "info", lambda message: info_messages.append(str(message)))
+    patcher.setattr(pages.st, "warning", lambda _message: None)
 
     pages._save_prediction_if_enabled(
         enable_logging=True,
@@ -88,7 +88,7 @@ def test_save_prediction_if_enabled_saves_new_session(monkeypatch):
     assert "Prediction saved for accuracy tracking (after FP3)" in info_messages
 
 
-def test_save_prediction_if_enabled_reports_existing_prediction(monkeypatch):
+def test_save_prediction_if_enabled_reports_existing_prediction(patcher):
     info_messages: list[str] = []
 
     class _Detector:
@@ -102,9 +102,9 @@ def test_save_prediction_if_enabled_reports_existing_prediction(monkeypatch):
         def save_prediction(self, **_kwargs):
             raise AssertionError("save should not be called")
 
-    monkeypatch.setattr("src.utils.session_detector.SessionDetector", _Detector)
-    monkeypatch.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
-    monkeypatch.setattr(pages.st, "info", lambda message: info_messages.append(str(message)))
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+    patcher.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
+    patcher.setattr(pages.st, "info", lambda message: info_messages.append(str(message)))
 
     pages._save_prediction_if_enabled(
         enable_logging=True,
@@ -121,7 +121,7 @@ def test_save_prediction_if_enabled_reports_existing_prediction(monkeypatch):
     assert "Prediction for SQ already saved (max 1 per session)" in info_messages
 
 
-def test_save_prediction_if_enabled_handles_no_completed_sessions(monkeypatch):
+def test_save_prediction_if_enabled_handles_no_completed_sessions(patcher):
     info_messages: list[str] = []
 
     class _Detector:
@@ -132,9 +132,9 @@ def test_save_prediction_if_enabled_handles_no_completed_sessions(monkeypatch):
         def has_prediction_for_session(self, year: int, race_name: str, session_name: str):
             return False
 
-    monkeypatch.setattr("src.utils.session_detector.SessionDetector", _Detector)
-    monkeypatch.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
-    monkeypatch.setattr(pages.st, "info", lambda message: info_messages.append(str(message)))
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+    patcher.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
+    patcher.setattr(pages.st, "info", lambda message: info_messages.append(str(message)))
 
     pages._save_prediction_if_enabled(
         enable_logging=True,
@@ -151,14 +151,14 @@ def test_save_prediction_if_enabled_handles_no_completed_sessions(monkeypatch):
     assert "No completed sessions yet; prediction not saved" in info_messages[0]
 
 
-def test_render_prediction_results_routes_normal_weekend(monkeypatch):
+def test_render_prediction_results_routes_normal_weekend(patcher):
     rendered_sections: list[str] = []
 
-    monkeypatch.setattr(pages.st, "success", lambda _msg: None)
-    monkeypatch.setattr(pages.st, "markdown", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(pages.st, "header", lambda _msg: None)
-    monkeypatch.setattr(pages.st, "info", lambda _msg: None)
-    monkeypatch.setattr(
+    patcher.setattr(pages.st, "success", lambda _msg: None)
+    patcher.setattr(pages.st, "markdown", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "header", lambda _msg: None)
+    patcher.setattr(pages.st, "info", lambda _msg: None)
+    patcher.setattr(
         pages,
         "display_prediction_result",
         lambda _result, title, is_race=False: rendered_sections.append(
@@ -180,14 +180,14 @@ def test_render_prediction_results_routes_normal_weekend(monkeypatch):
     ]
 
 
-def test_render_prediction_results_routes_sprint_weekend(monkeypatch):
+def test_render_prediction_results_routes_sprint_weekend(patcher):
     rendered_sections: list[str] = []
 
-    monkeypatch.setattr(pages.st, "success", lambda _msg: None)
-    monkeypatch.setattr(pages.st, "markdown", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(pages.st, "header", lambda _msg: None)
-    monkeypatch.setattr(pages.st, "info", lambda _msg: None)
-    monkeypatch.setattr(
+    patcher.setattr(pages.st, "success", lambda _msg: None)
+    patcher.setattr(pages.st, "markdown", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "header", lambda _msg: None)
+    patcher.setattr(pages.st, "info", lambda _msg: None)
+    patcher.setattr(
         pages,
         "display_prediction_result",
         lambda _result, title, is_race=False: rendered_sections.append(
@@ -213,22 +213,22 @@ def test_render_prediction_results_routes_sprint_weekend(monkeypatch):
     ]
 
 
-def test_render_page_routes_by_selected_tab(monkeypatch):
+def test_render_page_routes_by_selected_tab(patcher):
     called: list[str] = []
 
-    monkeypatch.setattr(
-        pages, "render_live_prediction_page", lambda _enabled: called.append("live")
-    )
-    monkeypatch.setattr(pages, "render_model_insights_page", lambda: called.append("insights"))
-    monkeypatch.setattr(pages, "render_prediction_accuracy_page", lambda: called.append("accuracy"))
-    monkeypatch.setattr(pages, "render_about_page", lambda: called.append("about"))
+    patcher.setattr(pages, "render_live_prediction_page", lambda _enabled: called.append("live"))
+    patcher.setattr(pages, "render_model_insights_page", lambda: called.append("insights"))
+    patcher.setattr(pages, "render_prediction_accuracy_page", lambda: called.append("accuracy"))
+    patcher.setattr(pages, "render_about_page", lambda: called.append("about"))
 
     pages.render_page("Live Prediction", enable_logging=True)
+    pages.render_page("Model & Learning", enable_logging=False)
     pages.render_page("Model Insights", enable_logging=False)
     pages.render_page("Prediction Accuracy", enable_logging=False)
+    pages.render_page("About", enable_logging=False)
     pages.render_page("Other", enable_logging=False)
 
-    assert called == ["live", "insights", "accuracy", "about"]
+    assert called == ["live", "insights", "insights", "accuracy", "about", "about"]
 
 
 class _Ctx:
@@ -239,33 +239,33 @@ class _Ctx:
         return False
 
 
-def _stub_page_streamlit(monkeypatch):
-    monkeypatch.setattr(pages.st, "header", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(pages.st, "subheader", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(pages.st, "markdown", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(pages.st, "info", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(pages.st, "success", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(pages.st, "metric", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(pages.st, "write", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(pages.st, "warning", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(pages.st, "columns", lambda n: [_Ctx() for _ in range(n)])
-    monkeypatch.setattr(pages.st, "expander", lambda _label: _Ctx())
+def _stub_page_streamlit(patcher):
+    patcher.setattr(pages.st, "header", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "subheader", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "markdown", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "info", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "success", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "metric", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "write", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "warning", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "columns", lambda n: [_Ctx() for _ in range(n)])
+    patcher.setattr(pages.st, "expander", lambda _label: _Ctx())
 
 
-def test_render_model_insights_page_executes(monkeypatch):
-    _stub_page_streamlit(monkeypatch)
+def test_render_model_insights_page_executes(patcher):
+    _stub_page_streamlit(patcher)
     pages.render_model_insights_page()
 
 
-def test_render_about_page_executes(monkeypatch):
-    _stub_page_streamlit(monkeypatch)
+def test_render_about_page_executes(patcher):
+    _stub_page_streamlit(patcher)
     pages.render_about_page()
 
 
-def test_render_prediction_accuracy_page_handles_no_predictions(monkeypatch):
-    _stub_page_streamlit(monkeypatch)
+def test_render_prediction_accuracy_page_handles_no_predictions(patcher):
+    _stub_page_streamlit(patcher)
     messages: list[str] = []
-    monkeypatch.setattr(pages.st, "info", lambda message: messages.append(str(message)))
+    patcher.setattr(pages.st, "info", lambda message: messages.append(str(message)))
 
     class _Logger:
         def get_all_predictions(self, year: int):
@@ -275,18 +275,18 @@ def test_render_prediction_accuracy_page_handles_no_predictions(monkeypatch):
     class _Metrics:
         pass
 
-    monkeypatch.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
-    monkeypatch.setattr("src.utils.prediction_metrics.PredictionMetrics", _Metrics)
+    patcher.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
+    patcher.setattr("src.utils.prediction_metrics.PredictionMetrics", _Metrics)
 
     pages.render_prediction_accuracy_page()
 
     assert any("No predictions saved yet" in message for message in messages)
 
 
-def test_render_prediction_accuracy_page_with_actuals(monkeypatch):
-    _stub_page_streamlit(monkeypatch)
+def test_render_prediction_accuracy_page_with_actuals(patcher):
+    _stub_page_streamlit(patcher)
     writes: list[str] = []
-    monkeypatch.setattr(pages.st, "write", lambda message: writes.append(str(message)))
+    patcher.setattr(pages.st, "write", lambda message: writes.append(str(message)))
 
     prediction_record = {
         "metadata": {"race_name": "Bahrain Grand Prix", "session_name": "FP3"},
@@ -333,8 +333,8 @@ def test_render_prediction_accuracy_page_with_actuals(monkeypatch):
                 },
             }
 
-    monkeypatch.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
-    monkeypatch.setattr("src.utils.prediction_metrics.PredictionMetrics", _Metrics)
+    patcher.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
+    patcher.setattr("src.utils.prediction_metrics.PredictionMetrics", _Metrics)
 
     pages.render_prediction_accuracy_page()
 

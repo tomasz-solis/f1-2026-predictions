@@ -32,23 +32,23 @@ class _StatusText:
         self.was_cleared = True
 
 
-def _stub_streamlit(monkeypatch):
+def _stub_streamlit(patcher):
     calls: list[tuple[str, str]] = []
     progress_bar = _ProgressBar()
     status_text = _StatusText()
     cache_calls: list[str] = []
 
-    monkeypatch.setattr(update_flow.st, "info", lambda msg: calls.append(("info", str(msg))))
-    monkeypatch.setattr(update_flow.st, "success", lambda msg: calls.append(("success", str(msg))))
-    monkeypatch.setattr(update_flow.st, "warning", lambda msg: calls.append(("warning", str(msg))))
-    monkeypatch.setattr(update_flow.st, "progress", lambda _initial=0: progress_bar)
-    monkeypatch.setattr(update_flow.st, "empty", lambda: status_text)
-    monkeypatch.setattr(
+    patcher.setattr(update_flow.st, "info", lambda msg: calls.append(("info", str(msg))))
+    patcher.setattr(update_flow.st, "success", lambda msg: calls.append(("success", str(msg))))
+    patcher.setattr(update_flow.st, "warning", lambda msg: calls.append(("warning", str(msg))))
+    patcher.setattr(update_flow.st, "progress", lambda _initial=0: progress_bar)
+    patcher.setattr(update_flow.st, "empty", lambda: status_text)
+    patcher.setattr(
         update_flow.st,
         "cache_resource",
         SimpleNamespace(clear=lambda: cache_calls.append("resource")),
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         update_flow.st,
         "cache_data",
         SimpleNamespace(clear=lambda: cache_calls.append("data")),
@@ -57,11 +57,11 @@ def _stub_streamlit(monkeypatch):
     return calls, progress_bar, status_text, cache_calls
 
 
-def test_auto_update_if_needed_skips_when_no_new_races(monkeypatch):
-    calls, progress_bar, status_text, cache_calls = _stub_streamlit(monkeypatch)
+def test_auto_update_if_needed_skips_when_no_new_races(patcher):
+    calls, progress_bar, status_text, cache_calls = _stub_streamlit(patcher)
 
-    monkeypatch.setattr("src.utils.auto_updater.needs_update", lambda: (False, []))
-    monkeypatch.setattr(
+    patcher.setattr("src.utils.auto_updater.needs_update", lambda: (False, []))
+    patcher.setattr(
         "src.utils.auto_updater.auto_update_from_races",
         lambda _callback=None: (_ for _ in ()).throw(AssertionError("should not be called")),
     )
@@ -74,10 +74,10 @@ def test_auto_update_if_needed_skips_when_no_new_races(monkeypatch):
     assert cache_calls == []
 
 
-def test_auto_update_if_needed_runs_update_and_clears_cache(monkeypatch):
-    calls, progress_bar, status_text, cache_calls = _stub_streamlit(monkeypatch)
+def test_auto_update_if_needed_runs_update_and_clears_cache(patcher):
+    calls, progress_bar, status_text, cache_calls = _stub_streamlit(patcher)
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "src.utils.auto_updater.needs_update",
         lambda: (True, ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"]),
     )
@@ -87,7 +87,7 @@ def test_auto_update_if_needed_runs_update_and_clears_cache(monkeypatch):
         progress_callback(2, 2, "Learning race 2")
         return 2
 
-    monkeypatch.setattr("src.utils.auto_updater.auto_update_from_races", _auto_update)
+    patcher.setattr("src.utils.auto_updater.auto_update_from_races", _auto_update)
 
     update_flow.auto_update_if_needed()
 
@@ -100,13 +100,11 @@ def test_auto_update_if_needed_runs_update_and_clears_cache(monkeypatch):
     assert cache_calls == ["resource", "data"]
 
 
-def test_auto_update_if_needed_raises_when_update_is_incomplete(monkeypatch):
-    calls, _progress_bar, _status_text, cache_calls = _stub_streamlit(monkeypatch)
+def test_auto_update_if_needed_raises_when_update_is_incomplete(patcher):
+    calls, _progress_bar, _status_text, cache_calls = _stub_streamlit(patcher)
 
-    monkeypatch.setattr(
-        "src.utils.auto_updater.needs_update", lambda: (True, ["Bahrain Grand Prix"])
-    )
-    monkeypatch.setattr("src.utils.auto_updater.auto_update_from_races", lambda _callback: 0)
+    patcher.setattr("src.utils.auto_updater.needs_update", lambda: (True, ["Bahrain Grand Prix"]))
+    patcher.setattr("src.utils.auto_updater.auto_update_from_races", lambda _callback: 0)
 
     with pytest.raises(RuntimeError, match="Race refresh incomplete"):
         update_flow.auto_update_if_needed()
@@ -115,23 +113,23 @@ def test_auto_update_if_needed_raises_when_update_is_incomplete(monkeypatch):
     assert cache_calls == []
 
 
-def test_load_practice_update_state_handles_invalid_json(monkeypatch, tmp_path):
+def test_load_practice_update_state_handles_invalid_json(patcher, tmp_path):
     state_file = tmp_path / "practice_state.json"
     state_file.write_text("{invalid json")
-    monkeypatch.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
+    patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
 
     assert update_flow._load_practice_update_state() == {"races": {}}
 
 
-def test_auto_update_practice_characteristics_no_completed_fp(monkeypatch, tmp_path):
+def test_auto_update_practice_characteristics_no_completed_fp(patcher, tmp_path):
     state_file = tmp_path / "practice_state.json"
-    monkeypatch.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
+    patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
 
     class _Detector:
         def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool):
             return []
 
-    monkeypatch.setattr("src.utils.session_detector.SessionDetector", _Detector)
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
 
     result = update_flow.auto_update_practice_characteristics_if_needed(
         year=2026,
@@ -143,7 +141,7 @@ def test_auto_update_practice_characteristics_no_completed_fp(monkeypatch, tmp_p
 
 
 def test_auto_update_practice_characteristics_skips_if_sessions_already_processed(
-    monkeypatch,
+    patcher,
     tmp_path,
 ):
     state_file = tmp_path / "practice_state.json"
@@ -158,14 +156,14 @@ def test_auto_update_practice_characteristics_skips_if_sessions_already_processe
             }
         )
     )
-    monkeypatch.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
+    patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
 
     class _Detector:
         def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool):
             return ["FP2", "FP1"]
 
-    monkeypatch.setattr("src.utils.session_detector.SessionDetector", _Detector)
-    monkeypatch.setattr(
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+    patcher.setattr(
         "src.systems.testing_updater.update_from_testing_sessions",
         lambda **_kwargs: (_ for _ in ()).throw(AssertionError("should not update")),
     )
@@ -179,15 +177,15 @@ def test_auto_update_practice_characteristics_skips_if_sessions_already_processe
     assert result == {"updated": False, "completed_fp_sessions": ["FP1", "FP2"]}
 
 
-def test_auto_update_practice_characteristics_updates_state(monkeypatch, tmp_path):
+def test_auto_update_practice_characteristics_updates_state(patcher, tmp_path):
     state_file = tmp_path / "practice_state.json"
-    monkeypatch.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
+    patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
 
     class _Detector:
         def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool):
             return ["FP2", "FP1"]
 
-    monkeypatch.setattr("src.utils.session_detector.SessionDetector", _Detector)
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
 
     config_values = {
         "baseline_predictor.practice_capture.new_weight": 0.4,
@@ -195,7 +193,7 @@ def test_auto_update_practice_characteristics_updates_state(monkeypatch, tmp_pat
         "baseline_predictor.practice_capture.session_aggregation": "laps_weighted",
         "baseline_predictor.practice_capture.run_profile": "balanced",
     }
-    monkeypatch.setattr(
+    patcher.setattr(
         "src.utils.config_loader.get",
         lambda key, default=None: config_values.get(key, default),
     )
@@ -206,7 +204,7 @@ def test_auto_update_practice_characteristics_updates_state(monkeypatch, tmp_pat
         captured_kwargs.update(kwargs)
         return {"updated_teams": ["Ferrari", "McLaren", "Mercedes"]}
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "src.systems.testing_updater.update_from_testing_sessions",
         _update_from_testing_sessions,
     )

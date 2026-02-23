@@ -11,7 +11,7 @@ class _Context:
         return False
 
 
-def test_brand_asset_path_and_page_icon_resolution(tmp_path, monkeypatch):
+def test_brand_asset_path_and_page_icon_resolution(tmp_path, patcher):
     first = tmp_path / "first"
     second = tmp_path / "second"
     first.mkdir()
@@ -19,8 +19,8 @@ def test_brand_asset_path_and_page_icon_resolution(tmp_path, monkeypatch):
     icon = second / "mark.png"
     icon.write_bytes(b"png-bytes")
 
-    monkeypatch.setattr(layout, "BRAND_ASSET_DIRS", (first, second))
-    monkeypatch.setattr(layout, "BRAND_FAVICON_FILE", "mark.png")
+    patcher.setattr(layout, "BRAND_ASSET_DIRS", (first, second))
+    patcher.setattr(layout, "BRAND_FAVICON_FILE", "mark.png")
 
     assert layout._brand_asset_path("mark.png") == icon
     assert layout._page_icon() == str(icon)
@@ -29,28 +29,28 @@ def test_brand_asset_path_and_page_icon_resolution(tmp_path, monkeypatch):
     assert layout._page_icon() == "F1"
 
 
-def test_header_alignment_normalization(monkeypatch):
-    monkeypatch.setattr(layout, "BRAND_HEADER_ALIGNMENT", "center")
+def test_header_alignment_normalization(patcher):
+    patcher.setattr(layout, "BRAND_HEADER_ALIGNMENT", "center")
     assert layout._header_alignment() == "center"
 
-    monkeypatch.setattr(layout, "BRAND_HEADER_ALIGNMENT", "left")
+    patcher.setattr(layout, "BRAND_HEADER_ALIGNMENT", "left")
     assert layout._header_alignment() == "left"
 
-    monkeypatch.setattr(layout, "BRAND_HEADER_ALIGNMENT", "invalid")
+    patcher.setattr(layout, "BRAND_HEADER_ALIGNMENT", "invalid")
     assert layout._header_alignment() == "left"
 
 
-def test_configure_page_and_render_global_styles_call_streamlit(monkeypatch):
+def test_configure_page_and_render_global_styles_call_streamlit(patcher):
     config_calls = []
     markdown_calls = []
 
-    monkeypatch.setattr(layout.st, "set_page_config", lambda **kwargs: config_calls.append(kwargs))
-    monkeypatch.setattr(
+    patcher.setattr(layout.st, "set_page_config", lambda **kwargs: config_calls.append(kwargs))
+    patcher.setattr(
         layout.st,
         "markdown",
         lambda body, unsafe_allow_html=False: markdown_calls.append((body, unsafe_allow_html)),
     )
-    monkeypatch.setattr(layout, "_page_icon", lambda: "ICON")
+    patcher.setattr(layout, "_page_icon", lambda: "ICON")
 
     layout.configure_page()
     layout.render_global_styles()
@@ -76,15 +76,15 @@ def test_build_asset_data_uri_supports_png_and_svg(tmp_path):
     assert layout._build_asset_data_uri(str(png)) == png_uri
 
 
-def test_render_header_renders_logo_when_asset_exists(tmp_path, monkeypatch):
+def test_render_header_renders_logo_when_asset_exists(tmp_path, patcher):
     logo = tmp_path / "wordmark.png"
     logo.write_bytes(b"image")
     output: list[str] = []
 
-    monkeypatch.setattr(layout, "_brand_asset_path", lambda filename: logo)
-    monkeypatch.setattr(layout, "_build_asset_data_uri", lambda path: "data:image/png;base64,abc")
-    monkeypatch.setattr(layout, "_header_alignment", lambda: "center")
-    monkeypatch.setattr(
+    patcher.setattr(layout, "_brand_asset_path", lambda filename: logo)
+    patcher.setattr(layout, "_build_asset_data_uri", lambda path: "data:image/png;base64,abc")
+    patcher.setattr(layout, "_header_alignment", lambda: "center")
+    patcher.setattr(
         layout.st,
         "markdown",
         lambda body, unsafe_allow_html=False: output.append(body),
@@ -96,13 +96,13 @@ def test_render_header_renders_logo_when_asset_exists(tmp_path, monkeypatch):
     assert '<img class="brand-logo"' in output[0]
 
 
-def test_render_header_falls_back_to_text_when_logo_missing(tmp_path, monkeypatch):
+def test_render_header_falls_back_to_text_when_logo_missing(tmp_path, patcher):
     missing = tmp_path / "missing.png"
     output: list[str] = []
 
-    monkeypatch.setattr(layout, "_brand_asset_path", lambda filename: missing)
-    monkeypatch.setattr(layout, "_header_alignment", lambda: "left")
-    monkeypatch.setattr(
+    patcher.setattr(layout, "_brand_asset_path", lambda filename: missing)
+    patcher.setattr(layout, "_header_alignment", lambda: "left")
+    patcher.setattr(
         layout.st,
         "markdown",
         lambda body, unsafe_allow_html=False: output.append(body),
@@ -115,13 +115,18 @@ def test_render_header_falls_back_to_text_when_logo_missing(tmp_path, monkeypatc
     assert '<img class="brand-logo"' not in output[0]
 
 
-def test_render_sidebar_returns_page_and_logging_toggle(monkeypatch):
-    calls = {"markdown": []}
+def test_render_sidebar_returns_page_and_logging_toggle(patcher):
+    calls = {"markdown": [], "radio_label": None, "radio_options": None}
 
-    monkeypatch.setattr(layout.st, "radio", lambda *args, **kwargs: "Prediction Accuracy")
-    monkeypatch.setattr(layout.st, "expander", lambda *args, **kwargs: _Context())
-    monkeypatch.setattr(layout.st, "checkbox", lambda *args, **kwargs: True)
-    monkeypatch.setattr(
+    def _radio(label, options, **_kwargs):
+        calls["radio_label"] = label
+        calls["radio_options"] = list(options)
+        return "Prediction Accuracy"
+
+    patcher.setattr(layout.st, "radio", _radio)
+    patcher.setattr(layout.st, "expander", lambda *args, **kwargs: _Context())
+    patcher.setattr(layout.st, "checkbox", lambda *args, **kwargs: True)
+    patcher.setattr(
         layout.st,
         "markdown",
         lambda body: calls["markdown"].append(body),
@@ -131,4 +136,6 @@ def test_render_sidebar_returns_page_and_logging_toggle(monkeypatch):
 
     assert page == "Prediction Accuracy"
     assert enable_logging is True
+    assert calls["radio_label"] == "Navigation"
+    assert calls["radio_options"] == layout.NAVIGATION_PAGES
     assert any("Model Version" in text for text in calls["markdown"])

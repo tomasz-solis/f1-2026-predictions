@@ -3,12 +3,12 @@
 from src.dashboard import cache
 
 
-def test_enable_fastf1_cache_creates_dir_and_enables_cache(monkeypatch, tmp_path):
+def test_enable_fastf1_cache_creates_dir_and_enables_cache(patcher, tmp_path):
     cache_dir = tmp_path / "fastf1_cache"
-    monkeypatch.setattr(cache, "_FASTF1_CACHE_DIR", cache_dir)
+    patcher.setattr(cache, "_FASTF1_CACHE_DIR", cache_dir)
 
     seen_paths: list[str] = []
-    monkeypatch.setattr(cache.fastf1.Cache, "enable_cache", lambda path: seen_paths.append(path))
+    patcher.setattr(cache.fastf1.Cache, "enable_cache", lambda path: seen_paths.append(path))
 
     cache.enable_fastf1_cache()
 
@@ -16,9 +16,9 @@ def test_enable_fastf1_cache_creates_dir_and_enables_cache(monkeypatch, tmp_path
     assert seen_paths == [str(cache_dir)]
 
 
-def test_enable_fastf1_cache_swallows_cache_errors(monkeypatch, tmp_path):
-    monkeypatch.setattr(cache, "_FASTF1_CACHE_DIR", tmp_path / "fastf1_cache")
-    monkeypatch.setattr(
+def test_enable_fastf1_cache_swallows_cache_errors(patcher, tmp_path):
+    patcher.setattr(cache, "_FASTF1_CACHE_DIR", tmp_path / "fastf1_cache")
+    patcher.setattr(
         cache.fastf1.Cache,
         "enable_cache",
         lambda _path: (_ for _ in ()).throw(RuntimeError("cache unavailable")),
@@ -28,7 +28,7 @@ def test_enable_fastf1_cache_swallows_cache_errors(monkeypatch, tmp_path):
     cache.enable_fastf1_cache()
 
 
-def test_get_file_timestamps_reports_existing_and_missing_files(monkeypatch):
+def test_get_file_timestamps_reports_existing_and_missing_files(patcher):
     class _FakePath:
         def __init__(self, raw_path: str, exists: bool):
             self._raw_path = raw_path
@@ -41,12 +41,12 @@ def test_get_file_timestamps_reports_existing_and_missing_files(monkeypatch):
             return self._raw_path
 
     existing_files = {"data/2025_pirelli_info.json", "config/default.yaml"}
-    monkeypatch.setattr(
+    patcher.setattr(
         cache,
         "Path",
         lambda file_path: _FakePath(file_path, file_path in existing_files),
     )
-    monkeypatch.setattr(cache.os.path, "getmtime", lambda _path: 123.456)
+    patcher.setattr(cache.os.path, "getmtime", lambda _path: 123.456)
 
     timestamps = cache._get_file_timestamps()
 
@@ -56,7 +56,7 @@ def test_get_file_timestamps_reports_existing_and_missing_files(monkeypatch):
     assert timestamps["src/predictors/baseline_2026.py"] == (0, "")
 
 
-def test_get_artifact_versions_combines_store_and_file_timestamps(monkeypatch):
+def test_get_artifact_versions_combines_store_and_file_timestamps(patcher):
     class _Store:
         def __init__(self, data_root: str):
             assert data_root == "data"
@@ -68,8 +68,8 @@ def test_get_artifact_versions_combines_store_and_file_timestamps(monkeypatch):
                 return {"version": 3, "updated_at": "2026-02-02T00:00:00"}
             raise RuntimeError("db error")
 
-    monkeypatch.setattr(cache, "ArtifactStore", _Store)
-    monkeypatch.setattr(cache, "_get_file_timestamps", lambda: {"config/default.yaml": (9, "9.1")})
+    patcher.setattr(cache, "ArtifactStore", _Store)
+    patcher.setattr(cache, "_get_file_timestamps", lambda: {"config/default.yaml": (9, "9.1")})
 
     versions = cache.get_artifact_versions()
 

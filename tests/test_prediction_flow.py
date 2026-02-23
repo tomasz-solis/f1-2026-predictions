@@ -7,7 +7,7 @@ import pytest
 from src.dashboard import prediction_flow
 
 
-def test_run_prediction_executes_on_repeated_calls(monkeypatch):
+def test_run_prediction_executes_on_repeated_calls(patcher):
     """
     Prediction orchestration must execute every call.
 
@@ -21,8 +21,8 @@ def test_run_prediction_executes_on_repeated_calls(monkeypatch):
         "finish_order": [{"driver": "VER", "team": "Red Bull Racing", "position": 1}]
     }
 
-    monkeypatch.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
-    monkeypatch.setattr(
+    patcher.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
+    patcher.setattr(
         prediction_flow,
         "fetch_grid_if_available",
         lambda year, race_name, session_name, predicted_grid: (predicted_grid, "PREDICTED"),
@@ -36,7 +36,7 @@ def test_run_prediction_executes_on_repeated_calls(monkeypatch):
     assert mock_predictor.predict_race.call_count == 2
 
 
-def test_run_prediction_sprint_path_refreshes_both_competitive_grids(monkeypatch):
+def test_run_prediction_sprint_path_refreshes_both_competitive_grids(patcher):
     """Sprint flow should fetch both SQ and Q grids when available."""
     mock_predictor = MagicMock()
     mock_predictor.predict_qualifying.side_effect = [
@@ -50,7 +50,7 @@ def test_run_prediction_sprint_path_refreshes_both_competitive_grids(monkeypatch
         "finish_order": [{"driver": "NOR", "team": "McLaren", "position": 1}]
     }
 
-    monkeypatch.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
+    patcher.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
 
     grid_sessions: list[str] = []
 
@@ -58,7 +58,7 @@ def test_run_prediction_sprint_path_refreshes_both_competitive_grids(monkeypatch
         grid_sessions.append(session_name)
         return predicted_grid, "ACTUAL"
 
-    monkeypatch.setattr(prediction_flow, "fetch_grid_if_available", _fetch_grid)
+    patcher.setattr(prediction_flow, "fetch_grid_if_available", _fetch_grid)
 
     artifact_versions = {"car_characteristics::2026::car_characteristics": (1, "ts")}
     result = prediction_flow.run_prediction(
@@ -75,7 +75,7 @@ def test_run_prediction_sprint_path_refreshes_both_competitive_grids(monkeypatch
     assert mock_predictor.predict_race.call_count == 1
 
 
-def test_run_prediction_uses_explicit_year_for_fastf1_refresh(monkeypatch):
+def test_run_prediction_uses_explicit_year_for_fastf1_refresh(patcher):
     """The orchestration layer should pass the requested season to all refresh calls."""
     mock_predictor = MagicMock()
     mock_predictor.predict_qualifying.return_value = {
@@ -85,7 +85,7 @@ def test_run_prediction_uses_explicit_year_for_fastf1_refresh(monkeypatch):
         "finish_order": [{"driver": "VER", "team": "Red Bull Racing", "position": 1}]
     }
 
-    monkeypatch.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
+    patcher.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
 
     years_seen: list[int] = []
 
@@ -93,7 +93,7 @@ def test_run_prediction_uses_explicit_year_for_fastf1_refresh(monkeypatch):
         years_seen.append(year)
         return predicted_grid, "PREDICTED"
 
-    monkeypatch.setattr(prediction_flow, "fetch_grid_if_available", _fetch_grid)
+    patcher.setattr(prediction_flow, "fetch_grid_if_available", _fetch_grid)
 
     artifact_versions = {"car_characteristics::2026::car_characteristics": (1, "ts")}
     prediction_flow.run_prediction(
@@ -108,15 +108,15 @@ def test_run_prediction_uses_explicit_year_for_fastf1_refresh(monkeypatch):
     assert mock_predictor.predict_qualifying.call_args.kwargs["year"] == 2027
 
 
-def test_fetch_grid_if_available_uses_actual_grid_for_completed_session(monkeypatch):
+def test_fetch_grid_if_available_uses_actual_grid_for_completed_session(patcher):
     from src.utils import actual_results_fetcher
 
-    monkeypatch.setattr(
+    patcher.setattr(
         actual_results_fetcher,
         "is_competitive_session_completed",
         lambda year, race_name, session_name: True,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         actual_results_fetcher,
         "fetch_actual_session_results",
         lambda year, race_name, session_name: [
@@ -135,15 +135,15 @@ def test_fetch_grid_if_available_uses_actual_grid_for_completed_session(monkeypa
     assert grid[0]["driver"] == "VER"
 
 
-def test_fetch_grid_if_available_fails_closed_when_completed_results_missing(monkeypatch):
+def test_fetch_grid_if_available_fails_closed_when_completed_results_missing(patcher):
     from src.utils import actual_results_fetcher
 
-    monkeypatch.setattr(
+    patcher.setattr(
         actual_results_fetcher,
         "is_competitive_session_completed",
         lambda year, race_name, session_name: True,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         actual_results_fetcher,
         "fetch_actual_session_results",
         lambda year, race_name, session_name: None,
