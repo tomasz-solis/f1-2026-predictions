@@ -199,11 +199,31 @@ def _render_prediction_results(prediction_results: dict, is_sprint: bool) -> Non
         )
 
 
+@st.cache_data(ttl=1800, show_spinner=False)
+def _run_prediction_cached(
+    race_name: str,
+    weather: str,
+    artifact_versions_key: tuple[tuple[str, tuple[int, str]], ...],
+    is_sprint: bool,
+    year: int,
+) -> dict:
+    """Run prediction with caching for unchanged inputs and artifact versions."""
+    artifact_versions = dict(artifact_versions_key)
+    return run_prediction(
+        race_name,
+        weather,
+        artifact_versions,
+        is_sprint=is_sprint,
+        year=year,
+    )
+
+
 def execute_live_prediction_pipeline(
     race_name: str,
     weather: str,
     year: int = DEFAULT_SEASON,
     force_refresh: bool = True,
+    use_cached_prediction: bool = False,
     progress_callback: Callable[[str], None] | None = None,
 ) -> dict:
     """
@@ -216,6 +236,7 @@ def execute_live_prediction_pipeline(
         weather: Weather forecast for the race
         year: Season year
         force_refresh: If True, clears FastF1 cache and forces re-check of session completion
+        use_cached_prediction: If True, reuses cached prediction results when inputs are unchanged
         progress_callback: Optional callback for progress updates
     """
     pipeline_timing: dict[str, float] = {}
@@ -260,15 +281,26 @@ def execute_live_prediction_pipeline(
 
     # Capture versions after updates so cache invalidation keys include latest writes.
     prediction_start = time.time()
-    _notify("Running qualifying and race simulations...")
     artifact_versions = get_artifact_versions()
-    prediction_results = run_prediction(
-        race_name,
-        weather,
-        artifact_versions,
-        is_sprint=is_sprint,
-        year=year,
-    )
+    if use_cached_prediction and not force_refresh:
+        _notify("Running qualifying and race simulations (cache enabled)...")
+        artifact_versions_key = tuple(sorted(artifact_versions.items()))
+        prediction_results = _run_prediction_cached(
+            race_name=race_name,
+            weather=weather,
+            artifact_versions_key=artifact_versions_key,
+            is_sprint=is_sprint,
+            year=year,
+        )
+    else:
+        _notify("Running qualifying and race simulations...")
+        prediction_results = run_prediction(
+            race_name,
+            weather,
+            artifact_versions,
+            is_sprint=is_sprint,
+            year=year,
+        )
     pipeline_timing["prediction_run"] = time.time() - prediction_start
     pipeline_timing["total"] = time.time() - pipeline_start
 
@@ -296,30 +328,34 @@ def render_live_prediction_page(enable_logging: bool) -> None:
     with col2:
         weather = st.selectbox("Weather Forecast", ["dry", "rain", "mixed"])
 
-    # Add force refresh toggle in sidebar
-    with st.sidebar:
-        st.markdown("### Data Refresh Options")
-        force_refresh = st.checkbox(
-            "Force Data Refresh",
-            value=True,
-            help="Re-fetch session data from FastF1 on every click. "
-            "Disable to use cached data (faster but may be stale).",
-        )
+    st.markdown("### Run Options")
+    run_mode = st.radio(
+        "Prediction Mode",
+        ["Use Cached Prediction", "Force Data Refresh"],
+        index=0,
+        help=(
+            "Choose exactly one mode. Cached mode reuses unchanged results. "
+            "Force refresh clears source caches and recomputes."
+        ),
+    )
+    use_cached_prediction = run_mode == "Use Cached Prediction"
+    force_refresh = run_mode == "Force Data Refresh"
 
     if st.button("Generate Prediction", type="primary"):
         status_placeholder = st.empty()
 
-        with st.spinner("Running simulation..."):
+        with st.spinner("Running simulation pipeline..."):
             try:
 
                 def update_status(message: str) -> None:
-                    status_placeholder.info(message)
+                    status_placeholder.info(f"Loading: {message}")
 
                 pipeline_output = execute_live_prediction_pipeline(
                     race_name=race_name,
                     weather=weather,
                     year=DEFAULT_SEASON,
                     force_refresh=force_refresh,
+                    use_cached_prediction=use_cached_prediction,
                     progress_callback=update_status,
                 )
                 prediction_results = pipeline_output["prediction_results"]

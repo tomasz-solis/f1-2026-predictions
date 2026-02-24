@@ -139,3 +139,7 @@ def test_render_sidebar_returns_page_and_logging_toggle(patcher):
     assert calls["radio_label"] == "Navigation"
     assert calls["radio_options"] == layout.NAVIGATION_PAGES
     assert any("Model Version" in text for text in calls["markdown"])
+
+
+def test_custom_css_keeps_streamlit_spinner_visible():
+    assert '[data-testid="stSpinner"] { display: none !important; }' not in layout._CUSTOM_CSS

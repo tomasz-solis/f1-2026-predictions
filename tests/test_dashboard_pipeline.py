@@ -313,3 +313,127 @@ def test_execute_live_prediction_pipeline_with_force_refresh_clears_cache_and_re
     # Verify caches were cleared (since force_refresh=True)
     assert "clear_resource" in call_order
     assert "clear_data" in call_order
+
+
+def test_run_prediction_cached_reuses_result_for_unchanged_inputs(patcher):
+    pages._run_prediction_cached.clear()
+    run_calls = {"count": 0}
+
+    def _run_prediction(
+        race_name: str,
+        weather: str,
+        versions: dict,
+        is_sprint: bool,
+        year: int,
+    ):
+        run_calls["count"] += 1
+        assert race_name == "Bahrain Grand Prix"
+        assert weather == "dry"
+        assert versions == {"k": (1, "ts")}
+        assert is_sprint is False
+        assert year == 2026
+        return {"qualifying": {"grid": []}, "race": {"finish_order": []}}
+
+    patcher.setattr(pages, "run_prediction", _run_prediction)
+
+    cache_key = (("k", (1, "ts")),)
+    pages._run_prediction_cached("Bahrain Grand Prix", "dry", cache_key, False, 2026)
+    pages._run_prediction_cached("Bahrain Grand Prix", "dry", cache_key, False, 2026)
+
+    assert run_calls["count"] == 1
+    pages._run_prediction_cached.clear()
+
+
+def test_execute_live_prediction_pipeline_uses_cached_prediction_wrapper_when_enabled(patcher):
+    call_order: list[str] = []
+
+    patcher.setattr(pages, "auto_update_if_needed", lambda force_recheck=False: None)
+    patcher.setattr(pages, "is_sprint_weekend", lambda year, race_name: False)
+    patcher.setattr(
+        pages,
+        "auto_update_practice_characteristics_if_needed",
+        lambda year, race_name, is_sprint, force_recheck=False: {
+            "updated": False,
+            "completed_fp_sessions": [],
+        },
+    )
+    patcher.setattr(pages, "get_artifact_versions", lambda: {"k": (1, "ts")})
+    patcher.setattr(
+        pages,
+        "_run_prediction_cached",
+        lambda race_name, weather, artifact_versions_key, is_sprint, year: (
+            call_order.append("cached"),
+            {"qualifying": {"grid": []}, "race": {"finish_order": []}},
+        )[1],
+    )
+    patcher.setattr(
+        pages,
+        "run_prediction",
+        lambda race_name, weather, _versions, is_sprint, year: (
+            call_order.append("direct"),
+            {"qualifying": {"grid": []}, "race": {"finish_order": []}},
+        )[1],
+    )
+
+    pages.execute_live_prediction_pipeline(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+        use_cached_prediction=True,
+    )
+
+    assert call_order == ["cached"]
+
+
+def test_execute_live_prediction_pipeline_force_refresh_bypasses_prediction_cache(patcher):
+    call_order: list[str] = []
+
+    patcher.setattr(pages, "auto_update_if_needed", lambda force_recheck=False: None)
+    patcher.setattr(pages, "is_sprint_weekend", lambda year, race_name: False)
+    patcher.setattr(
+        pages,
+        "auto_update_practice_characteristics_if_needed",
+        lambda year, race_name, is_sprint, force_recheck=False: {
+            "updated": False,
+            "completed_fp_sessions": [],
+        },
+    )
+    patcher.setattr(pages, "_clear_fastf1_race_cache", lambda year, race_name: None)
+    patcher.setattr(pages, "get_artifact_versions", lambda: {"k": (1, "ts")})
+    patcher.setattr(
+        pages.st,
+        "cache_resource",
+        type("_CacheResource", (), {"clear": staticmethod(lambda: None)}),
+    )
+    patcher.setattr(
+        pages.st,
+        "cache_data",
+        type("_CacheData", (), {"clear": staticmethod(lambda: None)}),
+    )
+    patcher.setattr(
+        pages,
+        "_run_prediction_cached",
+        lambda race_name, weather, artifact_versions_key, is_sprint, year: (
+            call_order.append("cached"),
+            {"qualifying": {"grid": []}, "race": {"finish_order": []}},
+        )[1],
+    )
+    patcher.setattr(
+        pages,
+        "run_prediction",
+        lambda race_name, weather, _versions, is_sprint, year: (
+            call_order.append("direct"),
+            {"qualifying": {"grid": []}, "race": {"finish_order": []}},
+        )[1],
+    )
+
+    pages.execute_live_prediction_pipeline(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=True,
+        use_cached_prediction=True,
+    )
+
+    assert call_order == ["direct"]

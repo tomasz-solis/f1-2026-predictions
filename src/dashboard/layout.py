@@ -338,8 +338,6 @@ footer {visibility: hidden;}
 footer, [data-testid="stFooter"] { display: none !important; }
 #MainMenu { visibility: hidden !important; }
 
-[data-testid="stSpinner"] { display: none !important; }
-
 /* Custom footer on same content rail */
 .brand-footer {
   margin-top: 2.6rem;
