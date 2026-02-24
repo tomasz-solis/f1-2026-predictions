@@ -218,17 +218,31 @@ def test_render_page_routes_by_selected_tab(patcher):
 
     patcher.setattr(pages, "render_live_prediction_page", lambda _enabled: called.append("live"))
     patcher.setattr(pages, "render_model_insights_page", lambda: called.append("insights"))
+    patcher.setattr(pages, "render_team_comparison_page", lambda: called.append("comparison"))
     patcher.setattr(pages, "render_prediction_accuracy_page", lambda: called.append("accuracy"))
-    patcher.setattr(pages, "render_about_page", lambda: called.append("about"))
+    patcher.setattr(pages, "render_contact_page", lambda: called.append("contact"))
 
+    pages.render_page("Prediction", enable_logging=True)
     pages.render_page("Live Prediction", enable_logging=True)
     pages.render_page("Model & Learning", enable_logging=False)
     pages.render_page("Model Insights", enable_logging=False)
+    pages.render_page("Team Comparison", enable_logging=False)
     pages.render_page("Prediction Accuracy", enable_logging=False)
+    pages.render_page("Contact", enable_logging=False)
     pages.render_page("About", enable_logging=False)
     pages.render_page("Other", enable_logging=False)
 
-    assert called == ["live", "insights", "insights", "accuracy", "about", "about"]
+    assert called == [
+        "live",
+        "live",
+        "insights",
+        "insights",
+        "comparison",
+        "accuracy",
+        "contact",
+        "contact",
+        "live",
+    ]
 
 
 class _Ctx:
@@ -244,11 +258,29 @@ def _stub_page_streamlit(patcher):
     patcher.setattr(pages.st, "subheader", lambda *_args, **_kwargs: None)
     patcher.setattr(pages.st, "markdown", lambda *_args, **_kwargs: None)
     patcher.setattr(pages.st, "info", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "caption", lambda *_args, **_kwargs: None)
     patcher.setattr(pages.st, "success", lambda *_args, **_kwargs: None)
     patcher.setattr(pages.st, "metric", lambda *_args, **_kwargs: None)
     patcher.setattr(pages.st, "write", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "dataframe", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "plotly_chart", lambda *_args, **_kwargs: None)
+    patcher.setattr(
+        pages.st,
+        "selectbox",
+        lambda _label, options, index=0, **_kwargs: options[index] if options else None,
+    )
+    patcher.setattr(
+        pages.st,
+        "multiselect",
+        lambda _label, options, default=None, **_kwargs: default if default is not None else [],
+    )
     patcher.setattr(pages.st, "warning", lambda *_args, **_kwargs: None)
-    patcher.setattr(pages.st, "columns", lambda n: [_Ctx() for _ in range(n)])
+    patcher.setattr(
+        pages.st,
+        "columns",
+        lambda n, **_kwargs: [_Ctx() for _ in range(n if isinstance(n, int) else len(n))],
+    )
+    patcher.setattr(pages.st, "container", lambda *_args, **_kwargs: _Ctx())
     patcher.setattr(pages.st, "expander", lambda _label: _Ctx())
 
 
@@ -257,9 +289,19 @@ def test_render_model_insights_page_executes(patcher):
     pages.render_model_insights_page()
 
 
-def test_render_about_page_executes(patcher):
+def test_render_team_comparison_page_executes(patcher):
     _stub_page_streamlit(patcher)
-    pages.render_about_page()
+    calls: list[int] = []
+    patcher.setattr(pages, "_render_team_comparison_section", lambda year: calls.append(year))
+
+    pages.render_team_comparison_page()
+
+    assert calls == [pages.DEFAULT_SEASON]
+
+
+def test_render_contact_page_executes(patcher):
+    _stub_page_streamlit(patcher)
+    pages.render_contact_page()
 
 
 def test_render_prediction_accuracy_page_handles_no_predictions(patcher):
@@ -339,3 +381,55 @@ def test_render_prediction_accuracy_page_with_actuals(patcher):
     pages.render_prediction_accuracy_page()
 
     assert any("Bahrain Grand Prix" in message for message in writes)
+
+
+def test_build_team_comparison_dataframe_uses_profile_metrics():
+    teams_payload = {
+        "Team A": {
+            "overall_performance": 0.8,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.7,
+                    "slow_corner_performance": 0.6,
+                    "medium_corner_performance": 0.5,
+                    "fast_corner_performance": 0.4,
+                    "braking_performance": 0.65,
+                    "top_speed": 0.55,
+                    "tire_deg_performance": 0.75,
+                }
+            },
+        },
+        "Team B": {
+            "overall_performance": 0.7,
+            "testing_characteristics": {
+                "run_profile": "balanced",
+                "overall_pace": 0.2,
+            },
+        },
+    }
+
+    frame, neutral_fallbacks = pages._build_team_comparison_dataframe(
+        teams_payload=teams_payload,
+        selected_teams=["Team A", "Team B"],
+        profile="balanced",
+    )
+
+    assert list(frame["Team"]) == ["Team A", "Team B"]
+    assert frame.loc[frame["Team"] == "Team A", "Slow Corners"].iloc[0] == 0.6
+    assert frame.loc[frame["Team"] == "Team B", "Slow Corners"].iloc[0] == 0.5
+    assert neutral_fallbacks > 0
+
+
+def test_team_brand_color_uses_flagship_palette():
+    assert pages._team_brand_color("Ferrari") == "#DC0000"
+    assert pages._team_brand_color("Scuderia Ferrari") == "#DC0000"
+    assert pages._team_brand_color("McLaren") == "#FF8700"
+    assert pages._team_brand_color("Unknown Team") == pages._DEFAULT_TEAM_COLOR
+
+
+def test_default_team_selection_prefers_big4_order():
+    teams = ["Williams", "Ferrari", "McLaren", "Red Bull Racing", "Mercedes", "Aston Martin"]
+
+    selected = pages._default_team_selection(teams, max_teams=4)
+
+    assert selected == ["McLaren", "Mercedes", "Ferrari", "Red Bull Racing"]

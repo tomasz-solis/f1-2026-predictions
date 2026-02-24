@@ -116,29 +116,50 @@ def test_render_header_falls_back_to_text_when_logo_missing(tmp_path, patcher):
 
 
 def test_render_sidebar_returns_page_and_logging_toggle(patcher):
-    calls = {"markdown": [], "radio_label": None, "radio_options": None}
+    calls = {
+        "markdown": [],
+        "segmented_label": None,
+        "segmented_options": None,
+        "radio_called": False,
+    }
 
-    def _radio(label, options, **_kwargs):
-        calls["radio_label"] = label
-        calls["radio_options"] = list(options)
+    def _segmented_control(label, options, **_kwargs):
+        calls["segmented_label"] = label
+        calls["segmented_options"] = list(options)
         return "Prediction Accuracy"
 
+    def _radio(*_args, **_kwargs):
+        calls["radio_called"] = True
+        return "Prediction"
+
+    patcher.setattr(layout.st, "segmented_control", _segmented_control)
     patcher.setattr(layout.st, "radio", _radio)
     patcher.setattr(layout.st, "expander", lambda *args, **kwargs: _Context())
     patcher.setattr(layout.st, "checkbox", lambda *args, **kwargs: True)
     patcher.setattr(
         layout.st,
         "markdown",
-        lambda body: calls["markdown"].append(body),
+        lambda body, **_kwargs: calls["markdown"].append(body),
     )
 
     page, enable_logging = layout.render_sidebar()
 
     assert page == "Prediction Accuracy"
     assert enable_logging is True
-    assert calls["radio_label"] == "Navigation"
-    assert calls["radio_options"] == layout.NAVIGATION_PAGES
+    assert calls["segmented_label"] == "Navigation"
+    assert calls["segmented_options"] == layout.NAVIGATION_PAGES
+    assert calls["radio_called"] is False
     assert any("Model Version" in text for text in calls["markdown"])
+
+
+def test_navigation_pages_match_dashboard_order():
+    assert layout.NAVIGATION_PAGES == [
+        "Prediction",
+        "Team Comparison",
+        "Prediction Accuracy",
+        "Model & Learning",
+        "Contact",
+    ]
 
 
 def test_custom_css_keeps_streamlit_spinner_visible():
