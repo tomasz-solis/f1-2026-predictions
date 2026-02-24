@@ -207,3 +207,35 @@ pytest tests/test_baseline_2026_integration.py
 pytest tests/test_dashboard_smoke.py
 pytest tests/test_testing_updater.py
 ```
+
+## Backtesting and Ablations
+
+Run a baseline 2025 backtest (full schedule if available via FastF1):
+
+```bash
+python scripts/backtest_2025_season.py --year 2025
+```
+
+Fast iteration on a subset:
+
+```bash
+python scripts/backtest_2025_season.py --year 2025 --max-races 6
+```
+
+Run ablations with overfitting checks (train/test split + generalization gap):
+
+```bash
+python scripts/backtest_2025_season.py \
+  --year 2025 \
+  --max-races 8 \
+  --experiment "higher_grid_anchor:baseline_predictor.race.grid_anchor.base=0.45" \
+  --experiment "lower_sc_noise:baseline_predictor.race.safety_car_luck_range=0.15"
+```
+
+Outputs are written under `reports/backtest_2025/`:
+
+- per-experiment race metrics (`race_results.csv`)
+- summary payloads (`summary.json`)
+- cross-experiment comparison (`experiment_comparison.csv`)
+- recommendation report with guardrails against overfitting (`recommendations.md`)
+- race MAE distribution plot when matplotlib is available (`race_mae_distribution.png`)
