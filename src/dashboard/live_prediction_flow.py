@@ -1,0 +1,224 @@
+"""Core flow helpers for live prediction dashboard page."""
+
+from __future__ import annotations
+
+import time
+from collections.abc import Callable
+from typing import Any
+
+PredictionResults = dict[str, Any]
+ArtifactVersion = tuple[int, str]
+ArtifactVersions = dict[str, ArtifactVersion]
+ArtifactVersionsKey = tuple[tuple[str, ArtifactVersion], ...]
+
+PredictionRunFn = Callable[[str, str, ArtifactVersions, bool, int], PredictionResults]
+PredictionRunCachedFn = Callable[[str, str, ArtifactVersionsKey, bool, int], PredictionResults]
+
+
+def save_prediction_if_enabled_core(
+    *,
+    enable_logging: bool,
+    prediction_results: PredictionResults,
+    is_sprint: bool,
+    race_name: str,
+    weather: str,
+    year: int,
+    detector_factory: Callable[[], Any],
+    prediction_logger_factory: Callable[[], Any],
+    st_module: Any,
+) -> None:
+    """Persist prediction artifacts for later accuracy tracking."""
+    if not enable_logging:
+        return
+
+    detector = detector_factory()
+    logger_inst = prediction_logger_factory()
+    latest_session = detector.get_latest_completed_session(year, race_name, is_sprint)
+
+    if latest_session:
+        if not logger_inst.has_prediction_for_session(year, race_name, latest_session):
+            try:
+                if is_sprint:
+                    quali_grid = prediction_results["main_quali"]["grid"]
+                    race_finish = prediction_results["main_race"]["finish_order"]
+                    fp_blend_info = prediction_results.get("main_quali", {}).get(
+                        "fp_blend_info", {}
+                    )
+                else:
+                    quali_grid = prediction_results["qualifying"]["grid"]
+                    race_finish = prediction_results["race"]["finish_order"]
+                    fp_blend_info = prediction_results.get("qualifying", {}).get(
+                        "fp_blend_info", {}
+                    )
+
+                logger_inst.save_prediction(
+                    year=year,
+                    race_name=race_name,
+                    session_name=latest_session,
+                    qualifying_prediction=quali_grid,
+                    race_prediction=race_finish,
+                    weather=weather,
+                    fp_blend_info=fp_blend_info,
+                )
+                st_module.info(f"Prediction saved for accuracy tracking (after {latest_session})")
+            except Exception as exc:
+                st_module.warning(f"Could not save prediction: {exc}")
+        else:
+            st_module.info(f"Prediction for {latest_session} already saved (max 1 per session)")
+    else:
+        st_module.info(
+            "No completed sessions yet; prediction not saved (will save after FP1/FP2/FP3/SQ)"
+        )
+
+
+def render_prediction_results_core(
+    *,
+    prediction_results: PredictionResults,
+    is_sprint: bool,
+    display_prediction_result_fn: Callable[[PredictionResults, str, bool], None],
+    st_module: Any,
+) -> None:
+    """Render prediction result sections for sprint and non-sprint weekends."""
+    first_result = list(prediction_results.values())[0]
+    timing = first_result.get("timing", {})
+    if timing:
+        st_module.success(f"Predictions complete in {timing['total']:.2f}s")
+    else:
+        st_module.success("Predictions complete.")
+
+    if is_sprint:
+        st_module.markdown("---")
+        st_module.header("Sprint Weekend Cascade")
+        st_module.info(
+            "Full weekend flow: Sprint Qualifying → Sprint Race → Main Qualifying → Main Race"
+        )
+
+        display_prediction_result_fn(
+            prediction_results["sprint_quali"],
+            "Sprint Qualifying Prediction",
+            False,
+        )
+        display_prediction_result_fn(
+            prediction_results["sprint_race"],
+            "Sprint Race Prediction",
+            True,
+        )
+        display_prediction_result_fn(
+            prediction_results["main_quali"],
+            "Main Qualifying Prediction",
+            False,
+        )
+        display_prediction_result_fn(
+            prediction_results["main_race"],
+            "Main Race Prediction",
+            True,
+        )
+    else:
+        st_module.markdown("---")
+        st_module.header("Normal Weekend Cascade")
+        st_module.info("Weekend flow: Qualifying → Race")
+
+        display_prediction_result_fn(
+            prediction_results["qualifying"],
+            "Qualifying Prediction",
+            False,
+        )
+        display_prediction_result_fn(
+            prediction_results["race"],
+            "Race Prediction",
+            True,
+        )
+
+
+def execute_live_prediction_pipeline_core(
+    *,
+    race_name: str,
+    weather: str,
+    year: int,
+    force_refresh: bool,
+    use_cached_prediction: bool,
+    progress_callback: Callable[[str], None] | None,
+    clear_fastf1_race_cache_fn: Callable[[int, str], None],
+    auto_update_if_needed_fn: Callable[[bool], None],
+    is_sprint_weekend_fn: Callable[[int, str], bool],
+    auto_update_practice_characteristics_if_needed_fn: Callable[..., dict[str, Any]],
+    clear_resource_cache_fn: Callable[[], None],
+    clear_data_cache_fn: Callable[[], None],
+    get_artifact_versions_fn: Callable[[], ArtifactVersions],
+    run_prediction_fn: PredictionRunFn,
+    run_prediction_cached_fn: PredictionRunCachedFn,
+) -> dict[str, Any]:
+    """
+    Refresh input data and execute a prediction run.
+
+    Kept separate from Streamlit rendering so tests can assert refresh call order.
+    """
+    pipeline_timing: dict[str, float] = {}
+    pipeline_start = time.time()
+
+    def _notify(message: str) -> None:
+        if progress_callback is not None:
+            progress_callback(message)
+
+    if force_refresh:
+        _notify("Clearing FastF1 cache for fresh data...")
+        clear_start = time.time()
+        clear_fastf1_race_cache_fn(year, race_name)
+        pipeline_timing["cache_clear"] = time.time() - clear_start
+
+    update_start = time.time()
+    _notify("Checking completed races and model updates...")
+    auto_update_if_needed_fn(force_refresh)
+    pipeline_timing["race_update_check"] = time.time() - update_start
+
+    weekend_start = time.time()
+    _notify("Resolving weekend format...")
+    is_sprint = is_sprint_weekend_fn(year, race_name)
+    pipeline_timing["weekend_lookup"] = time.time() - weekend_start
+
+    practice_start = time.time()
+    _notify("Checking completed practice sessions...")
+    practice_update = auto_update_practice_characteristics_if_needed_fn(
+        year=year,
+        race_name=race_name,
+        is_sprint=is_sprint,
+        force_recheck=force_refresh,
+    )
+    pipeline_timing["practice_update_check"] = time.time() - practice_start
+
+    if practice_update.get("updated") or force_refresh:
+        _notify("Refreshing local caches after updates...")
+        clear_resource_cache_fn()
+        clear_data_cache_fn()
+
+    prediction_start = time.time()
+    artifact_versions = get_artifact_versions_fn()
+    if use_cached_prediction and not force_refresh:
+        _notify("Running qualifying and race simulations (cache enabled)...")
+        artifact_versions_key = tuple(sorted(artifact_versions.items()))
+        prediction_results = run_prediction_cached_fn(
+            race_name=race_name,
+            weather=weather,
+            artifact_versions_key=artifact_versions_key,
+            is_sprint=is_sprint,
+            year=year,
+        )
+    else:
+        _notify("Running qualifying and race simulations...")
+        prediction_results = run_prediction_fn(
+            race_name,
+            weather,
+            artifact_versions,
+            is_sprint=is_sprint,
+            year=year,
+        )
+    pipeline_timing["prediction_run"] = time.time() - prediction_start
+    pipeline_timing["total"] = time.time() - pipeline_start
+
+    return {
+        "prediction_results": prediction_results,
+        "is_sprint": is_sprint,
+        "practice_update": practice_update,
+        "pipeline_timing": pipeline_timing,
+        "practice_update_error": None,
+    }

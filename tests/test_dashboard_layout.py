@@ -126,7 +126,7 @@ def test_render_sidebar_returns_page_and_logging_toggle(patcher):
     def _segmented_control(label, options, **_kwargs):
         calls["segmented_label"] = label
         calls["segmented_options"] = list(options)
-        return "Prediction Accuracy"
+        return "Team Comparison"
 
     def _radio(*_args, **_kwargs):
         calls["radio_called"] = True
@@ -144,7 +144,7 @@ def test_render_sidebar_returns_page_and_logging_toggle(patcher):
 
     page, enable_logging = layout.render_sidebar()
 
-    assert page == "Prediction Accuracy"
+    assert page == "Team Comparison"
     assert enable_logging is True
     assert calls["segmented_label"] == "Navigation"
     assert calls["segmented_options"] == layout.NAVIGATION_PAGES
@@ -156,7 +156,6 @@ def test_navigation_pages_match_dashboard_order():
     assert layout.NAVIGATION_PAGES == [
         "Prediction",
         "Team Comparison",
-        "Prediction Accuracy",
         "Model & Learning",
         "Contact",
     ]
