@@ -8,17 +8,11 @@ dashboard when new FP sessions are completed.
 
 from __future__ import annotations
 
-import json
 import logging
-import warnings
-from collections import defaultdict
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import fastf1
-import numpy as np
-import pandas as pd
-from pandas.errors import SettingWithCopyWarning
 
 from src.extractors.performance import extract_all_teams_performance
 from src.systems.compound_analyzer import (
@@ -26,8 +20,120 @@ from src.systems.compound_analyzer import (
     extract_compound_metrics,
     normalize_compound_metrics_across_teams,
 )
+from src.systems.testing_updater_flow import (
+    apply_team_updates as _apply_team_updates,
+)
+from src.systems.testing_updater_flow import (
+    collect_sessions_for_events as _collect_sessions_for_events,
+)
+from src.systems.testing_updater_flow import (
+    load_characteristics_payload as _load_characteristics_payload,
+)
+from src.systems.testing_updater_flow import (
+    raise_if_no_loaded_sessions as _raise_if_no_loaded_sessions,
+)
+from src.systems.testing_updater_flow import (
+    validate_update_options as _validate_update_options,
+)
+from src.systems.testing_updater_flow import (
+    write_characteristics_if_needed as _write_characteristics_if_needed,
+)
+from src.systems.testing_updater_metrics import (
+    _aggregate_metric_samples,
+    _blend_directionality,
+    _build_directionality_from_metrics,
+    _canonicalize_team_name,
+    _classify_run_laps,
+    _estimate_tire_deg_slope,
+    _extract_team_payload,
+    _filter_valid_laps,
+    _median_lap_seconds,
+    _median_timedelta_seconds,
+    _normalize_lower_better,
+    _normalize_tire_deg_scores,
+    _select_program_aware_laps,
+)
+from src.systems.testing_updater_metrics import (
+    _collect_session_metrics as _collect_session_metrics_impl,
+)
+from src.systems.testing_updater_metrics import (
+    _count_team_selected_laps as _count_team_selected_laps_impl,
+)
+from src.systems.testing_updater_metrics import (
+    _count_team_valid_laps as _count_team_valid_laps_impl,
+)
+from src.systems.testing_updater_metrics import (
+    _extract_session_compound_metrics as _extract_session_compound_metrics_impl,
+)
+from src.systems.testing_updater_sessions import (
+    coerce_utc_datetime as _coerce_utc_datetime_impl,
+)
+from src.systems.testing_updater_sessions import (
+    extract_testing_day as _extract_testing_day_impl,
+)
+from src.systems.testing_updater_sessions import (
+    extract_testing_number as _extract_testing_number_impl,
+)
+from src.systems.testing_updater_sessions import (
+    get_testing_event_with_backends as _get_testing_event_with_backends_impl,
+)
+from src.systems.testing_updater_sessions import (
+    is_testing_event as _is_testing_event_impl,
+)
+from src.systems.testing_updater_sessions import (
+    load_sessions_for_event as _load_sessions_for_event_impl,
+)
+from src.systems.testing_updater_sessions import (
+    load_testing_session_with_backends as _load_testing_session_with_backends_impl,
+)
+from src.systems.testing_updater_sessions import (
+    normalize_name as _normalize_name_impl,
+)
+from src.systems.testing_updater_sessions import (
+    normalize_testing_event_sessions as _normalize_testing_event_sessions_impl,
+)
+from src.systems.testing_updater_sessions import (
+    resolve_testing_backends as _resolve_testing_backends_impl,
+)
+from src.systems.testing_updater_sessions import (
+    resolve_testing_cache_dir as _resolve_testing_cache_dir_impl,
+)
+from src.systems.testing_updater_sessions import (
+    testing_session_has_started as _testing_session_has_started_impl,
+)
 from src.utils.file_operations import atomic_json_write
-from src.utils.team_mapping import map_team_to_characteristics
+
+__all__ = [
+    "_aggregate_metric_samples",
+    "_blend_directionality",
+    "_build_directionality_from_metrics",
+    "_canonicalize_team_name",
+    "_classify_run_laps",
+    "_coerce_utc_datetime",
+    "_count_team_selected_laps",
+    "_count_team_valid_laps",
+    "_extract_testing_day",
+    "_extract_testing_number",
+    "_extract_team_payload",
+    "_filter_valid_laps",
+    "_get_testing_event_with_backends",
+    "_is_testing_event",
+    "_load_sessions_for_event",
+    "_load_testing_session_with_backends",
+    "_median_lap_seconds",
+    "_median_timedelta_seconds",
+    "_normalize_lower_better",
+    "_normalize_testing_event_sessions",
+    "_normalize_tire_deg_scores",
+    "_resolve_testing_backends",
+    "_resolve_testing_cache_dir",
+    "_select_program_aware_laps",
+    "_testing_session_has_started",
+    "extract_all_teams_performance",
+    "extract_compound_metrics",
+    "normalize_compound_metrics_across_teams",
+    "update_from_testing_sessions",
+]
 
 logger = logging.getLogger(__name__)
 logging.getLogger("fastf1").setLevel(logging.CRITICAL)
@@ -55,59 +161,50 @@ _TESTING_BACKENDS = ("f1timing", "fastf1", None)
 _TESTING_CACHE_ROOT = Path("data/raw")
 _DEFAULT_TESTING_CACHE_DIR = _TESTING_CACHE_ROOT / ".fastf1_cache_testing"
 
-_DIRECTIONALITY_KEYS = (
-    "max_speed",
-    "slow_corner_speed",
-    "medium_corner_speed",
-    "high_corner_speed",
-)
-
 _SESSION_AGGREGATION_MODES = ("mean", "median", "laps_weighted")
 _RUN_PROFILE_MODES = ("balanced", "all", "short_run", "long_run")
 _PROFILES_FOR_STORAGE = ("balanced", "short_run", "long_run")
-_SHORT_STINT_MAX_LAPS = 5
-_LONG_STINT_MIN_LAPS = 8
+_TESTING_CHARACTERISTIC_METRICS = (
+    "slow_corner_performance",
+    "medium_corner_performance",
+    "fast_corner_performance",
+    "braking_performance",
+    "top_speed",
+    "overall_pace",
+    "consistency",
+    "tire_deg_slope",
+    "tire_deg_performance",
+)
 
 
 def _normalize_name(value: str) -> str:
     """Normalize names for robust matching."""
-    return "".join(char for char in value.lower() if char.isalnum())
+    return _normalize_name_impl(value)
 
 
 def _is_testing_event(event_name: str) -> bool:
     """Best-effort detection of testing events from user-provided name."""
-    normalized = _normalize_name(event_name)
-    return "test" in normalized
+    return _is_testing_event_impl(event_name)
 
 
 def _extract_testing_day(session_name: str) -> int | None:
     """Map session label to a testing day number (1..3) if possible."""
-    normalized = _normalize_name(session_name)
-    for day in (1, 2, 3):
-        if str(day) in normalized:
-            return day
-    return None
+    return _extract_testing_day_impl(session_name)
 
 
 def _extract_testing_number(event_name: str) -> int | None:
     """Parse explicit test number from event name (e.g., 'Testing 2')."""
-    normalized = _normalize_name(event_name)
-    for number in (1, 2, 3):
-        if f"test{number}" in normalized or f"testing{number}" in normalized:
-            return number
-    return None
+    return _extract_testing_number_impl(event_name)
 
 
 def _resolve_testing_backends(
     preferred_backend: str | None = "auto",
 ) -> tuple[str | None, ...]:
     """Resolve backend preference into an ordered list of backends to try."""
-    if preferred_backend in (None, "auto"):
-        return _TESTING_BACKENDS
-    if preferred_backend in ("fastf1", "f1timing"):
-        return (preferred_backend,)
-
-    raise ValueError("Invalid testing backend. Use one of: auto, fastf1, f1timing.")
+    return _resolve_testing_backends_impl(
+        preferred_backend=preferred_backend,
+        default_backends=_TESTING_BACKENDS,
+    )
 
 
 def _resolve_testing_cache_dir(cache_dir: str | None = None) -> Path:
@@ -116,49 +213,28 @@ def _resolve_testing_cache_dir(cache_dir: str | None = None) -> Path:
 
     Relative paths are kept under data/raw to avoid repository root clutter.
     """
-    if not cache_dir:
-        return _DEFAULT_TESTING_CACHE_DIR
-
-    candidate = Path(cache_dir).expanduser()
-    if candidate.is_absolute():
-        return candidate
-
-    cleaned_parts = tuple(part for part in candidate.parts if part not in ("", "."))
-    if not cleaned_parts:
-        return _DEFAULT_TESTING_CACHE_DIR
-
-    relative_candidate = Path(*cleaned_parts)
-    if relative_candidate.parts[:2] == ("data", "raw"):
-        return relative_candidate
-
-    return _TESTING_CACHE_ROOT / relative_candidate
+    return _resolve_testing_cache_dir_impl(
+        cache_dir=cache_dir,
+        default_cache_dir=_DEFAULT_TESTING_CACHE_DIR,
+        cache_root=_TESTING_CACHE_ROOT,
+    )
 
 
 def _coerce_utc_datetime(value) -> datetime | None:
     """Convert FastF1 event datetime values to UTC-aware datetime."""
-    if value is None or pd.isna(value):
-        return None
-
-    timestamp = pd.Timestamp(value)
-    if timestamp.tzinfo is None:
-        timestamp = timestamp.tz_localize("UTC")
-    else:
-        timestamp = timestamp.tz_convert("UTC")
-
-    return timestamp.to_pydatetime()
+    return _coerce_utc_datetime_impl(value)
 
 
 def _testing_session_has_started(
     event: fastf1.events.Event, day_number: int, now_utc: datetime | None = None
 ) -> bool:
     """Check whether a testing day has started based on UTC session timestamp."""
-    session_dt_utc = _coerce_utc_datetime(event.get(f"Session{day_number}DateUtc"))
-    if session_dt_utc is None:
-        return True
-
-    now = now_utc or datetime.now(UTC)
-    # Keep a small tolerance for clock skew between systems.
-    return session_dt_utc <= (now + timedelta(minutes=15))
+    return _testing_session_has_started_impl(
+        event=event,
+        day_number=day_number,
+        now_utc=now_utc,
+        coerce_utc_datetime_fn=_coerce_utc_datetime,
+    )
 
 
 def _get_testing_event_with_backends(
@@ -168,26 +244,14 @@ def _get_testing_event_with_backends(
     error_messages: list[str] | None = None,
 ) -> fastf1.events.Event | None:
     """Load a testing event, trying explicit backends before auto mode."""
-    for backend in testing_backends:
-        kwargs = {"backend": backend} if backend is not None else {}
-        backend_label = backend or "auto"
-        try:
-            return fastf1.get_testing_event(year, test_number, **kwargs)
-        except Exception as exc:
-            logger.debug(
-                "Unable to load testing event %s/%s via backend %s: %s",
-                year,
-                test_number,
-                backend_label,
-                exc,
-            )
-            if error_messages is not None:
-                error_messages.append(
-                    f"testing_event#{test_number} backend={backend_label} -> "
-                    f"{type(exc).__name__}: {exc}"
-                )
-
-    return None
+    return _get_testing_event_with_backends_impl(
+        year=year,
+        test_number=test_number,
+        testing_backends=testing_backends,
+        error_messages=error_messages,
+        fastf1_get_testing_event=fastf1.get_testing_event,
+        logger_obj=logger,
+    )
 
 
 def _normalize_testing_event_sessions(event: fastf1.events.Event) -> None:
@@ -197,15 +261,7 @@ def _normalize_testing_event_sessions(event: fastf1.events.Event) -> None:
     Some schedules expose "Day 1/2/3". FastF1 Session initialization expects
     canonical names like "Practice 1/2/3".
     """
-    for day_number in (1, 2, 3):
-        key = f"Session{day_number}"
-        value = event.get(key)
-        if not isinstance(value, str):
-            continue
-        if _normalize_name(value) == f"day{day_number}":
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", SettingWithCopyWarning)
-                event[key] = f"Practice {day_number}"
+    _normalize_testing_event_sessions_impl(event)
 
 
 def _load_testing_session_with_backends(
@@ -221,36 +277,16 @@ def _load_testing_session_with_backends(
     This avoids reporting sessions as discovered when `session.laps` would still
     raise DataNotLoadedError after `load()`.
     """
-    for backend in testing_backends:
-        kwargs = {"backend": backend} if backend is not None else {}
-        backend_label = backend or "auto"
-        try:
-            event = fastf1.get_testing_event(year, test_number, **kwargs)
-            _normalize_testing_event_sessions(event)
-            session = event.get_session(day_number)
-            session.load(laps=True, telemetry=False, weather=False, messages=False)
-            laps = session.laps
-            if laps is None:
-                raise ValueError("laps are None after session.load()")
-            # Access row count to force DataNotLoadedError if load is incomplete.
-            _ = len(laps)
-            return session
-        except Exception as exc:
-            logger.debug(
-                "Unable to load testing session %s/%s day %s via backend %s: %s",
-                year,
-                test_number,
-                day_number,
-                backend_label,
-                exc,
-            )
-            if error_messages is not None:
-                error_messages.append(
-                    f"testing#{test_number}/day{day_number} backend={backend_label} -> "
-                    f"{type(exc).__name__}: {exc}"
-                )
-
-    return None
+    return _load_testing_session_with_backends_impl(
+        year=year,
+        test_number=test_number,
+        day_number=day_number,
+        testing_backends=testing_backends,
+        error_messages=error_messages,
+        fastf1_get_testing_event=fastf1.get_testing_event,
+        normalize_testing_event_sessions_fn=_normalize_testing_event_sessions,
+        logger_obj=logger,
+    )
 
 
 def _load_sessions_for_event(
@@ -267,233 +303,21 @@ def _load_sessions_for_event(
     1) For non-testing events: use regular `get_session(event_name, session_name)`.
     2) For testing events: use `get_testing_event` + `get_testing_session`.
     """
-    loaded: list[tuple[str, fastf1.core.Session]] = []
-
-    if not _is_testing_event(event_name):
-        for session_name in session_candidates:
-            try:
-                session = fastf1.get_session(year, event_name, session_name)
-                session.load(laps=True, telemetry=False, weather=False, messages=False)
-                loaded.append((session_name, session))
-            except Exception as exc:
-                logger.debug(
-                    f"Skipping unavailable session {year} {event_name} {session_name}: {exc}"
-                )
-                if error_messages is not None:
-                    error_messages.append(
-                        f"{event_name}::{session_name} -> {type(exc).__name__}: {exc}"
-                    )
-        return loaded
-
-    explicit_test_number = _extract_testing_number(event_name)
-    test_numbers = [explicit_test_number] if explicit_test_number else [1, 2, 3]
-
-    day_candidates = []
-    for session_name in session_candidates:
-        maybe_day = _extract_testing_day(session_name)
-        if maybe_day is not None and maybe_day not in day_candidates:
-            day_candidates.append(maybe_day)
-    if not day_candidates:
-        day_candidates = [1, 2, 3]
-
-    now_utc = datetime.now(UTC)
-
-    for test_number in test_numbers:
-        event = _get_testing_event_with_backends(
-            year=year,
-            test_number=test_number,
-            testing_backends=testing_backends,
-            error_messages=error_messages,
-        )
-        if event is None:
-            continue
-
-        for day_number in day_candidates:
-            if not _testing_session_has_started(event, day_number, now_utc=now_utc):
-                if error_messages is not None:
-                    error_messages.append(
-                        f"testing#{test_number}/day{day_number} -> session has not started yet"
-                    )
-                continue
-
-            session = _load_testing_session_with_backends(
-                year=year,
-                test_number=test_number,
-                day_number=day_number,
-                testing_backends=testing_backends,
-                error_messages=error_messages,
-            )
-            if session is None:
-                continue
-
-            label = f"Testing {test_number} Day {day_number}"
-            loaded.append((label, session))
-
-    return loaded
-
-
-def _canonicalize_team_name(raw_team: str, known_teams: set[str]) -> str | None:
-    """Map session team name to canonical team key used in characteristics JSON."""
-    return map_team_to_characteristics(raw_team, known_teams=known_teams)
-
-
-def _filter_valid_laps(team_laps: pd.DataFrame) -> pd.DataFrame:
-    """Filter to representative non-pit laps."""
-    if team_laps.empty:
-        return team_laps
-    if "LapTime" not in team_laps.columns:
-        return team_laps.iloc[0:0].copy()
-
-    # For testing updates we prioritize availability over strict pit filtering.
-    # Timed laps are enough to infer early directionality.
-    mask = team_laps["LapTime"].notna()
-    # Testing sessions often have sparse/inconsistent IsAccurate flags.
-    # Enforce this only when explicit True rows exist.
-    if "IsAccurate" in team_laps.columns:
-        accurate = team_laps["IsAccurate"]
-        accurate_true = accurate.eq(True)
-        if accurate.notna().any() and bool(accurate_true.any()):
-            mask &= accurate_true
-
-    return team_laps[mask].copy()
-
-
-def _strip_in_out_laps(team_laps: pd.DataFrame) -> pd.DataFrame:
-    """Remove in-laps/out-laps when pit timing columns are available."""
-    if team_laps.empty:
-        return team_laps
-
-    filtered = team_laps.copy()
-    if "PitOutTime" in filtered.columns:
-        filtered = filtered[filtered["PitOutTime"].isna()]
-    if "PitInTime" in filtered.columns:
-        filtered = filtered[filtered["PitInTime"].isna()]
-
-    return filtered
-
-
-def _classify_run_laps(team_laps: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Split team laps into short-run and long-run candidate subsets.
-
-    Uses stint lengths when available; otherwise falls back to lap-time quantiles.
-    """
-    if team_laps.empty:
-        return team_laps, team_laps
-
-    cleaned = _strip_in_out_laps(team_laps)
-    if cleaned.empty:
-        cleaned = team_laps
-
-    short_chunks: list[pd.DataFrame] = []
-    long_chunks: list[pd.DataFrame] = []
-
-    has_stint = "Stint" in cleaned.columns and bool(cleaned["Stint"].notna().any())
-
-    if has_stint:
-        grouping_cols = ["Driver", "Stint"]
-        for _, stint_laps in cleaned.groupby(grouping_cols, dropna=False):
-            timed = stint_laps[stint_laps["LapTime"].notna()].copy()
-            if len(timed) < 2:
-                continue
-            stint_len = len(timed)
-            if stint_len <= _SHORT_STINT_MAX_LAPS:
-                short_chunks.append(timed)
-            if stint_len >= _LONG_STINT_MIN_LAPS:
-                long_chunks.append(timed)
-    else:
-        lap_seconds = pd.to_timedelta(cleaned["LapTime"], errors="coerce").dt.total_seconds()
-        lap_seconds = lap_seconds.dropna()
-        if not lap_seconds.empty:
-            short_threshold = lap_seconds.quantile(0.35)
-            long_threshold = lap_seconds.quantile(0.65)
-            short_chunks.append(cleaned[lap_seconds <= short_threshold].copy())
-            long_chunks.append(cleaned[lap_seconds >= long_threshold].copy())
-
-    short_laps = (
-        pd.concat(short_chunks, ignore_index=False) if short_chunks else cleaned.iloc[0:0].copy()
+    return _load_sessions_for_event_impl(
+        year=year,
+        event_name=event_name,
+        session_candidates=session_candidates,
+        testing_backends=testing_backends,
+        error_messages=error_messages,
+        is_testing_event_fn=_is_testing_event,
+        extract_testing_number_fn=_extract_testing_number,
+        extract_testing_day_fn=_extract_testing_day,
+        get_testing_event_with_backends_fn=_get_testing_event_with_backends,
+        testing_session_has_started_fn=_testing_session_has_started,
+        load_testing_session_with_backends_fn=_load_testing_session_with_backends,
+        fastf1_get_session=fastf1.get_session,
+        logger_obj=logger,
     )
-    long_laps = (
-        pd.concat(long_chunks, ignore_index=False) if long_chunks else cleaned.iloc[0:0].copy()
-    )
-
-    return short_laps, long_laps
-
-
-def _select_stint_representative_laps(team_laps: pd.DataFrame) -> pd.DataFrame:
-    """
-    Reduce laps to one representative lap per driver/stint(/compound) slice.
-
-    This avoids over-weighting teams with longer programs in the same session.
-    """
-    if team_laps.empty:
-        return team_laps
-
-    grouping_cols = ["Driver"]
-    if "Stint" in team_laps.columns and bool(team_laps["Stint"].notna().any()):
-        grouping_cols.append("Stint")
-    if "Compound" in team_laps.columns and bool(team_laps["Compound"].notna().any()):
-        grouping_cols.append("Compound")
-
-    rows = []
-    for _, laps in team_laps.groupby(grouping_cols, dropna=False):
-        timed = laps[laps["LapTime"].notna()].copy()
-        if timed.empty:
-            continue
-
-        lap_seconds = pd.to_timedelta(timed["LapTime"], errors="coerce").dt.total_seconds()
-        valid_idx = lap_seconds.dropna().index
-        if valid_idx.empty:
-            continue
-
-        median_value = float(lap_seconds.loc[valid_idx].median())
-        representative_idx = (lap_seconds.loc[valid_idx] - median_value).abs().idxmin()
-        rows.append(timed.loc[representative_idx])
-
-    if not rows:
-        return team_laps
-
-    return pd.DataFrame(rows).copy()
-
-
-def _select_program_aware_laps(team_laps: pd.DataFrame, run_profile: str) -> pd.DataFrame:
-    """
-    Select representative laps with program-aware run filtering.
-
-    Modes:
-    - all: use all valid laps
-    - short_run: prefer short stints
-    - long_run: prefer long stints
-    - balanced: blend short + long stints
-    """
-    if team_laps.empty:
-        return team_laps
-
-    if run_profile not in _RUN_PROFILE_MODES:
-        raise ValueError(
-            f"Invalid run_profile '{run_profile}'. Use one of: {', '.join(_RUN_PROFILE_MODES)}"
-        )
-
-    if run_profile == "all":
-        selected = team_laps
-    else:
-        short_laps, long_laps = _classify_run_laps(team_laps)
-        if run_profile == "short_run":
-            selected = short_laps if not short_laps.empty else team_laps
-        elif run_profile == "long_run":
-            selected = long_laps if not long_laps.empty else team_laps
-        else:
-            if not short_laps.empty and not long_laps.empty:
-                selected = pd.concat([short_laps, long_laps], ignore_index=False)
-            elif not short_laps.empty:
-                selected = short_laps
-            elif not long_laps.empty:
-                selected = long_laps
-            else:
-                selected = team_laps
-
-    representative = _select_stint_representative_laps(selected)
-    return representative if not representative.empty else selected
 
 
 def _count_team_selected_laps(
@@ -501,184 +325,28 @@ def _count_team_selected_laps(
     known_teams: set[str],
     run_profile: str = "all",
 ) -> dict[str, float]:
-    """Count selected laps per team for a specific run-profile strategy."""
-    try:
-        laps = session.laps
-    except Exception:
-        return {}
-
-    if laps is None or laps.empty or "Team" not in laps.columns:
-        return {}
-
-    if run_profile not in _RUN_PROFILE_MODES:
-        raise ValueError(
-            f"Invalid run_profile '{run_profile}'. Use one of: {', '.join(_RUN_PROFILE_MODES)}"
-        )
-
-    counts: dict[str, float] = {}
-    raw_teams = laps["Team"].dropna().unique()
-    for raw_team in raw_teams:
-        canonical_team = _canonicalize_team_name(str(raw_team), known_teams)
-        if not canonical_team:
-            continue
-
-        team_laps = laps[laps["Team"] == raw_team]
-        valid_laps = _filter_valid_laps(team_laps)
-        if valid_laps.empty:
-            continue
-
-        selected_laps = _select_program_aware_laps(valid_laps, run_profile=run_profile)
-        if selected_laps.empty:
-            selected_laps = valid_laps
-
-        counts[canonical_team] = counts.get(canonical_team, 0.0) + float(len(selected_laps))
-
-    return counts
+    """Compatibility wrapper around extracted lap-count helper."""
+    return _count_team_selected_laps_impl(
+        session=session,
+        known_teams=known_teams,
+        run_profile=run_profile,
+        canonicalize_team_name_fn=_canonicalize_team_name,
+        filter_valid_laps_fn=_filter_valid_laps,
+        select_program_aware_laps_fn=_select_program_aware_laps,
+    )
 
 
-def _median_timedelta_seconds(series: pd.Series) -> float | None:
-    """Get median timedelta in seconds if available."""
-    if series is None or series.empty:
-        return None
-
-    values = pd.to_timedelta(series, errors="coerce").dropna()
-    if values.empty:
-        return None
-
-    return float(values.dt.total_seconds().median())
-
-
-def _median_lap_seconds(team_laps: pd.DataFrame) -> float | None:
-    """Get median lap time in seconds for a team slice."""
-    if "LapTime" not in team_laps.columns or team_laps.empty:
-        return None
-
-    lap_seconds = pd.to_timedelta(team_laps["LapTime"], errors="coerce").dt.total_seconds()
-    lap_seconds = lap_seconds.dropna()
-    if lap_seconds.empty:
-        return None
-
-    return float(lap_seconds.median())
-
-
-def _estimate_tire_deg_slope(team_laps: pd.DataFrame) -> float | None:
-    """
-    Estimate team tire degradation slope from same-stint runs.
-
-    Returns slope in seconds/lap (higher means more degradation).
-    """
-    if team_laps.empty or "LapNumber" not in team_laps.columns:
-        return None
-
-    grouping_cols = ["Driver"]
-    if "Stint" in team_laps.columns:
-        grouping_cols.append("Stint")
-    if "Compound" in team_laps.columns:
-        grouping_cols.append("Compound")
-
-    slopes = []
-    for _, stint_laps in team_laps.groupby(grouping_cols, dropna=False):
-        stint = stint_laps.sort_values("LapNumber")
-        if len(stint) < 3:
-            continue
-
-        lap_seconds = pd.to_timedelta(stint["LapTime"], errors="coerce").dt.total_seconds()
-        lap_seconds = lap_seconds.dropna()
-        if len(lap_seconds) < 3:
-            continue
-
-        x = np.arange(len(lap_seconds), dtype=float)
-        y = lap_seconds.to_numpy(dtype=float)
-
-        slope = float(np.polyfit(x, y, 1)[0])
-        if -0.3 <= slope <= 1.0:
-            slopes.append(slope)
-
-    if not slopes:
-        return None
-
-    return float(np.median(slopes))
-
-
-def _normalize_tire_deg_scores(
-    tire_deg_slopes: dict[str, float],
-) -> dict[str, dict[str, float]]:
-    """Normalize tire degradation to 0-1 performance scale (1.0 = best tire life)."""
-    if not tire_deg_slopes:
-        return {}
-
-    min_slope = min(tire_deg_slopes.values())
-    max_slope = max(tire_deg_slopes.values())
-
-    normalized = {}
-    for team, slope in tire_deg_slopes.items():
-        if max_slope > min_slope:
-            perf = 1.0 - ((slope - min_slope) / (max_slope - min_slope))
-        else:
-            perf = 0.5
-
-        normalized[team] = {
-            "tire_deg_slope": float(slope),
-            "tire_deg_performance": float(np.clip(perf, 0.0, 1.0)),
-        }
-
-    return normalized
-
-
-def _normalize_lower_better(metric_values: dict[str, float]) -> dict[str, float]:
-    """Normalize a lower-is-better metric into 0-1 scale."""
-    if not metric_values:
-        return {}
-
-    best = min(metric_values.values())
-    worst = max(metric_values.values())
-    if worst <= best:
-        return {team: 0.5 for team in metric_values}
-
-    normalized = {}
-    for team, value in metric_values.items():
-        score = 1.0 - ((value - best) / (worst - best))
-        normalized[team] = float(np.clip(score, 0.0, 1.0))
-
-    return normalized
-
-
-def _extract_team_payload(valid_laps: pd.DataFrame) -> dict:
-    """Build payload expected by extract_all_teams_performance()."""
-    payload = {}
-
-    sector_times = {}
-    if "Sector1Time" in valid_laps.columns:
-        s1 = _median_timedelta_seconds(valid_laps["Sector1Time"])
-        if s1 is not None:
-            sector_times["s1"] = s1
-    if "Sector2Time" in valid_laps.columns:
-        s2 = _median_timedelta_seconds(valid_laps["Sector2Time"])
-        if s2 is not None:
-            sector_times["s2"] = s2
-    if "Sector3Time" in valid_laps.columns:
-        s3 = _median_timedelta_seconds(valid_laps["Sector3Time"])
-        if s3 is not None:
-            sector_times["s3"] = s3
-    if sector_times:
-        payload["sector_times"] = sector_times
-
-    speed_columns = [
-        col for col in ("SpeedST", "SpeedFL", "SpeedI2", "SpeedI1") if col in valid_laps
-    ]
-    if speed_columns:
-        speed_values = []
-        for col in speed_columns:
-            speed_values.extend(valid_laps[col].dropna().tolist())
-        if speed_values:
-            payload["speed_profile"] = {"top_speed": float(np.nanmedian(speed_values))}
-
-    lap_seconds = pd.to_timedelta(valid_laps["LapTime"], errors="coerce").dt.total_seconds()
-    lap_seconds = lap_seconds.dropna()
-    if len(lap_seconds) >= 2:
-        payload["consistency"] = {"std_lap_time": float(lap_seconds.std(ddof=0))}
-
-    return payload
+def _count_team_valid_laps(
+    session: fastf1.core.Session,
+    known_teams: set[str],
+) -> dict[str, float]:
+    """Compatibility wrapper around extracted valid-lap helper."""
+    return _count_team_valid_laps_impl(
+        session=session,
+        known_teams=known_teams,
+        canonicalize_team_name_fn=_canonicalize_team_name,
+        filter_valid_laps_fn=_filter_valid_laps,
+    )
 
 
 def _collect_session_metrics(
@@ -688,184 +356,40 @@ def _collect_session_metrics(
     run_profile: str = "balanced",
     diagnostics: list[str] | None = None,
 ) -> tuple[dict[str, dict[str, float]], dict[str, dict[str, float]]]:
-    """Collect normalized directionality metrics and tire degradation metrics per team."""
-    try:
-        laps = session.laps
-    except Exception as exc:
-        logger.debug(f"Session laps unavailable for {session_key}: {exc}")
-        if diagnostics is not None:
-            diagnostics.append(f"{session_key}: laps unavailable ({type(exc).__name__})")
-        return {}, {}
-
-    if laps is None or laps.empty:
-        if diagnostics is not None:
-            diagnostics.append(f"{session_key}: no laps loaded")
-        return {}, {}
-
-    if "Team" not in laps.columns:
-        if diagnostics is not None:
-            diagnostics.append(f"{session_key}: laps missing Team column")
-        return {}, {}
-
-    per_team_payload = {}
-    tire_deg_slopes = {}
-    lap_pace_seconds = {}
-    raw_teams = laps["Team"].dropna().unique()
-    mapped_team_count = 0
-    selected_lap_count = 0
-
-    for raw_team in raw_teams:
-        canonical_team = _canonicalize_team_name(str(raw_team), known_teams)
-        if not canonical_team:
-            continue
-        mapped_team_count += 1
-
-        team_laps = laps[laps["Team"] == raw_team]
-        valid_laps = _filter_valid_laps(team_laps)
-        # Allow early-session partial data (e.g., testing day in progress).
-        if len(valid_laps) < 1:
-            continue
-
-        representative_laps = _select_program_aware_laps(valid_laps, run_profile=run_profile)
-        if representative_laps.empty:
-            representative_laps = valid_laps
-        selected_lap_count += len(representative_laps)
-
-        median_lap_seconds = _median_lap_seconds(representative_laps)
-        if median_lap_seconds is not None:
-            lap_pace_seconds[canonical_team] = median_lap_seconds
-
-        payload = _extract_team_payload(representative_laps)
-        if payload:
-            per_team_payload.setdefault(canonical_team, {})[session_key] = payload
-
-        if run_profile in ("balanced", "long_run"):
-            _, long_laps = _classify_run_laps(valid_laps)
-            tire_source = long_laps if not long_laps.empty else valid_laps
-        else:
-            tire_source = valid_laps
-
-        slope = _estimate_tire_deg_slope(tire_source)
-        if slope is not None:
-            tire_deg_slopes[canonical_team] = slope
-
-    normalized_perf = extract_all_teams_performance(per_team_payload, session_name=session_key)
-    normalized_pace = _normalize_lower_better(lap_pace_seconds)
-    for team, pace_score in normalized_pace.items():
-        normalized_perf.setdefault(team, {})["overall_pace"] = pace_score
-
-    normalized_tire = _normalize_tire_deg_scores(tire_deg_slopes)
-
-    if diagnostics is not None:
-        diagnostics.append(
-            f"{session_key}: teams={len(raw_teams)} mapped={mapped_team_count} "
-            f"perf_teams={len(normalized_perf)} tire_teams={len(normalized_tire)} "
-            f"selected_laps={selected_lap_count} profile={run_profile}"
-        )
-
-    return normalized_perf, normalized_tire
+    """Compatibility wrapper that preserves monkeypatchable module-level dependencies."""
+    return _collect_session_metrics_impl(
+        session=session,
+        session_key=session_key,
+        known_teams=known_teams,
+        run_profile=run_profile,
+        diagnostics=diagnostics,
+        canonicalize_team_name_fn=_canonicalize_team_name,
+        filter_valid_laps_fn=_filter_valid_laps,
+        select_program_aware_laps_fn=_select_program_aware_laps,
+        classify_run_laps_fn=_classify_run_laps,
+        median_lap_seconds_fn=_median_lap_seconds,
+        extract_team_payload_fn=_extract_team_payload,
+        estimate_tire_deg_slope_fn=_estimate_tire_deg_slope,
+        extract_all_teams_performance_fn=extract_all_teams_performance,
+        normalize_lower_better_fn=_normalize_lower_better,
+        normalize_tire_deg_scores_fn=_normalize_tire_deg_scores,
+    )
 
 
-def _build_directionality_from_metrics(
-    metrics: dict[str, float], directionality_scale: float = 0.10
-) -> dict[str, float]:
-    """
-    Convert 0-1 relative performance metrics into centered directionality deltas.
-
-    Centered around 0 so testing modifier remains small in weight schedule blending.
-    """
-    metric_map = {
-        "max_speed": "top_speed",
-        "slow_corner_speed": "slow_corner_performance",
-        "medium_corner_speed": "medium_corner_performance",
-        "high_corner_speed": "fast_corner_performance",
-    }
-
-    fallback_pace = metrics.get("overall_pace")
-    directionality = {}
-    for key, metric_name in metric_map.items():
-        if metric_name in metrics:
-            value = float(metrics[metric_name])
-        elif fallback_pace is not None and metric_name != "top_speed":
-            # Conservative fallback: use overall pace only for corner directionality
-            # when granular sector telemetry is still sparse.
-            value = float(fallback_pace)
-        else:
-            value = 0.5
-        centered = (value - 0.5) * directionality_scale
-        directionality[key] = round(float(np.clip(centered, -0.2, 0.2)), 4)
-
-    return directionality
-
-
-def _blend_directionality(
-    old_directionality: dict[str, float],
-    new_directionality: dict[str, float],
-    new_weight: float,
-) -> dict[str, float]:
-    """Blend current and newly extracted directionality to reduce noise."""
-    bounded_weight = float(np.clip(new_weight, 0.0, 1.0))
-
-    blended = {}
-    for key in _DIRECTIONALITY_KEYS:
-        old_value = float(old_directionality.get(key, 0.0))
-        new_value = float(new_directionality.get(key, 0.0))
-        blended[key] = round(((1.0 - bounded_weight) * old_value) + (bounded_weight * new_value), 4)
-
-    return blended
-
-
-def _count_team_valid_laps(session: fastf1.core.Session, known_teams: set[str]) -> dict[str, float]:
-    """Count valid timed laps per canonical team for session weighting."""
-    try:
-        laps = session.laps
-    except Exception:
-        return {}
-
-    if laps is None or laps.empty or "Team" not in laps.columns:
-        return {}
-
-    counts: dict[str, float] = {}
-    raw_teams = laps["Team"].dropna().unique()
-    for raw_team in raw_teams:
-        canonical_team = _canonicalize_team_name(str(raw_team), known_teams)
-        if not canonical_team:
-            continue
-
-        team_laps = laps[laps["Team"] == raw_team]
-        valid_laps = _filter_valid_laps(team_laps)
-        if valid_laps.empty:
-            continue
-
-        counts[canonical_team] = counts.get(canonical_team, 0.0) + float(len(valid_laps))
-
-    return counts
-
-
-def _aggregate_metric_samples(
-    samples: list[tuple[float, float]],
-    session_aggregation: str,
-) -> float | None:
-    """Aggregate session metric samples with explicit strategy."""
-    if not samples:
-        return None
-
-    values = np.array([float(value) for value, _ in samples], dtype=float)
-    if values.size == 0:
-        return None
-
-    if session_aggregation == "median":
-        return float(np.median(values))
-
-    if session_aggregation == "laps_weighted":
-        weights = np.array([max(0.0, float(weight)) for _, weight in samples], dtype=float)
-        total_weight = float(np.sum(weights))
-        if total_weight > 0:
-            return float(np.average(values, weights=weights))
-        return float(np.mean(values))
-
-    # Default and backward-compatible behavior.
-    return float(np.mean(values))
+def _extract_session_compound_metrics(
+    session: fastf1.core.Session,
+    event_name: str,
+    known_teams: set[str],
+) -> dict[str, dict[str, dict[str, float | str | None]]]:
+    """Compatibility wrapper that keeps compound helpers patchable in this module."""
+    return _extract_session_compound_metrics_impl(
+        session=session,
+        event_name=event_name,
+        known_teams=known_teams,
+        canonicalize_team_name_fn=_canonicalize_team_name,
+        extract_compound_metrics_fn=extract_compound_metrics,
+        normalize_compound_metrics_across_teams_fn=normalize_compound_metrics_across_teams,
+    )
 
 
 def update_from_testing_sessions(
@@ -894,26 +418,13 @@ def update_from_testing_sessions(
         raise ValueError("At least one event name is required")
 
     target_year = characteristics_year or year
-    characteristics_file = (
-        Path(data_dir) / "car_characteristics" / f"{target_year}_car_characteristics.json"
+    characteristics_file, characteristics = _load_characteristics_payload(data_dir, target_year)
+    _validate_update_options(
+        session_aggregation=session_aggregation,
+        run_profile=run_profile,
+        session_aggregation_modes=_SESSION_AGGREGATION_MODES,
+        run_profile_modes=_RUN_PROFILE_MODES,
     )
-    if not characteristics_file.exists():
-        raise FileNotFoundError(f"Characteristics file not found: {characteristics_file}")
-
-    with open(characteristics_file) as f:
-        characteristics = json.load(f)
-
-    if "teams" not in characteristics:
-        raise ValueError(
-            f"Invalid characteristics format in {characteristics_file}: missing 'teams'"
-        )
-
-    if session_aggregation not in _SESSION_AGGREGATION_MODES:
-        raise ValueError(
-            f"Invalid session aggregation mode. Use one of: {', '.join(_SESSION_AGGREGATION_MODES)}"
-        )
-    if run_profile not in _RUN_PROFILE_MODES:
-        raise ValueError(f"Invalid run profile mode. Use one of: {', '.join(_RUN_PROFILE_MODES)}")
 
     session_candidates = sessions or DEFAULT_SESSION_CANDIDATES
     known_teams = set(characteristics["teams"].keys())
@@ -923,307 +434,47 @@ def update_from_testing_sessions(
     cache_path.mkdir(parents=True, exist_ok=True)
     fastf1.Cache.enable_cache(str(cache_path), force_renew=force_renew_cache)
 
-    metric_samples: dict[str, dict[str, list[tuple[float, float]]]] = defaultdict(
-        lambda: defaultdict(list)
+    collection = _collect_sessions_for_events(
+        year=year,
+        events=events,
+        session_candidates=session_candidates,
+        testing_backends=testing_backends,
+        known_teams=known_teams,
+        run_profile=run_profile,
+        profiles_for_storage=_PROFILES_FOR_STORAGE,
+        load_sessions_for_event=_load_sessions_for_event,
+        collect_session_metrics=_collect_session_metrics,
+        count_team_selected_laps=_count_team_selected_laps,
+        extract_session_compound_metrics=_extract_session_compound_metrics,
+        logger=logger,
     )
-    profile_metric_samples: dict[str, dict[str, dict[str, list[tuple[float, float]]]]] = {
-        profile: defaultdict(lambda: defaultdict(list)) for profile in _PROFILES_FOR_STORAGE
-    }
-    team_sessions_used: dict[str, set[str]] = defaultdict(set)
-    team_profile_sessions_used: dict[str, dict[str, set[str]]] = defaultdict(
-        lambda: defaultdict(set)
+    _raise_if_no_loaded_sessions(
+        discovered_sessions=collection.discovered_sessions,
+        loaded_sessions=collection.loaded_sessions,
+        extraction_diagnostics=collection.extraction_diagnostics,
+        load_errors=collection.load_errors,
     )
-    loaded_sessions = []
-    discovered_sessions = []
-    load_errors: list[str] = []
-    extraction_diagnostics: list[str] = []
-    compound_metrics_by_session: dict[
-        str, tuple[str, dict[str, dict[str, dict[str, float | str | None]]]]
-    ] = {}
-
-    for event_name in events:
-        event_sessions = _load_sessions_for_event(
-            year=year,
-            event_name=event_name,
-            session_candidates=session_candidates,
-            testing_backends=testing_backends,
-            error_messages=load_errors,
-        )
-        for session_name, session in event_sessions:
-            session_id = f"{event_name}::{session_name}"
-            discovered_sessions.append(session_id)
-
-            profiles_to_collect = []
-            for profile in (*_PROFILES_FOR_STORAGE, run_profile):
-                if profile not in profiles_to_collect:
-                    profiles_to_collect.append(profile)
-
-            profile_results: dict[
-                str, tuple[dict[str, dict[str, float]], dict[str, dict[str, float]]]
-            ] = {}
-            for profile in profiles_to_collect:
-                perf_by_profile, tire_by_profile = _collect_session_metrics(
-                    session=session,
-                    session_key=session_name,
-                    known_teams=known_teams,
-                    run_profile=profile,
-                    diagnostics=(extraction_diagnostics if profile == run_profile else None),
-                )
-                profile_results[profile] = (perf_by_profile, tire_by_profile)
-
-                if profile in _PROFILES_FOR_STORAGE and (perf_by_profile or tire_by_profile):
-                    profile_weights = _count_team_selected_laps(
-                        session=session,
-                        known_teams=known_teams,
-                        run_profile=profile,
-                    )
-                    for team, metrics in perf_by_profile.items():
-                        for metric_name, value in metrics.items():
-                            profile_metric_samples[profile][team][metric_name].append(
-                                (float(value), float(profile_weights.get(team, 1.0)))
-                            )
-                            team_profile_sessions_used[team][profile].add(session_id)
-                    for team, metrics in tire_by_profile.items():
-                        for metric_name, value in metrics.items():
-                            profile_metric_samples[profile][team][metric_name].append(
-                                (float(value), float(profile_weights.get(team, 1.0)))
-                            )
-                            team_profile_sessions_used[team][profile].add(session_id)
-
-            normalized_perf, normalized_tire = profile_results.get(run_profile, ({}, {}))
-
-            if not normalized_perf and not normalized_tire:
-                continue
-
-            loaded_sessions.append(session_id)
-            team_lap_weights = _count_team_selected_laps(
-                session=session,
-                known_teams=known_teams,
-                run_profile=run_profile,
-            )
-
-            for team, metrics in normalized_perf.items():
-                for metric_name, value in metrics.items():
-                    metric_samples[team][metric_name].append(
-                        (float(value), float(team_lap_weights.get(team, 1.0)))
-                    )
-                    team_sessions_used[team].add(session_id)
-
-            for team, metrics in normalized_tire.items():
-                for metric_name, value in metrics.items():
-                    metric_samples[team][metric_name].append(
-                        (float(value), float(team_lap_weights.get(team, 1.0)))
-                    )
-                    team_sessions_used[team].add(session_id)
-
-            # Extract compound-specific metrics
-            try:
-                laps = session.laps
-                if laps is not None and not laps.empty and "Team" in laps.columns:
-                    session_compound_metrics = {}
-                    raw_teams = laps["Team"].dropna().unique()
-
-                    for raw_team in raw_teams:
-                        canonical_team = _canonicalize_team_name(str(raw_team), known_teams)
-                        if not canonical_team:
-                            continue
-
-                        team_laps = laps[laps["Team"] == raw_team]
-                        compound_data = extract_compound_metrics(
-                            team_laps, canonical_team, event_name
-                        )
-
-                        if compound_data:
-                            session_compound_metrics[canonical_team] = compound_data
-
-                    # Normalize compound metrics across teams for this session (track-aware)
-                    if session_compound_metrics:
-                        normalized_compound_metrics = normalize_compound_metrics_across_teams(
-                            session_compound_metrics, event_name
-                        )
-                        compound_metrics_by_session[session_id] = (
-                            event_name,
-                            normalized_compound_metrics,
-                        )
-                        logger.debug(
-                            f"  Extracted compound metrics for {len(normalized_compound_metrics)} teams"
-                        )
-            except Exception as exc:
-                logger.warning(f"  Failed to extract compound metrics from {session_id}: {exc}")
-
-    if not loaded_sessions:
-        if discovered_sessions:
-            unique_discovered = []
-            seen_discovered = set()
-            for session_id in discovered_sessions:
-                if session_id not in seen_discovered:
-                    seen_discovered.add(session_id)
-                    unique_discovered.append(session_id)
-                if len(unique_discovered) >= 5:
-                    break
-
-            raise ValueError(
-                "Sessions were found, but no usable team telemetry could be extracted yet. "
-                "This usually means the session has too little completed running. "
-                f"Detected sessions: {unique_discovered}. "
-                f"Extraction diagnostics: {extraction_diagnostics[:3]}"
-            )
-
-        unique_errors = []
-        seen = set()
-        for msg in load_errors:
-            if msg not in seen:
-                seen.add(msg)
-                unique_errors.append(msg)
-            if len(unique_errors) >= 3:
-                break
-
-        details = f" First errors: {unique_errors}" if unique_errors else ""
-        all_data_not_loaded = bool(unique_errors) and all(
-            "DataNotLoadedError" in error for error in unique_errors
-        )
-        cache_hint = ""
-        if all_data_not_loaded:
-            cache_hint = (
-                " Likely cache issue; retry with a fresh cache directory "
-                "(e.g. --cache-dir _tmp_fastf1_cache_testing_2026 "
-                "--force-renew-cache; it will be created under data/raw)."
-            )
-        raise ValueError(
-            "No loadable sessions found. Verify event names and data availability in FastF1 cache/API."
-            + cache_hint
-            + details
-        )
 
     now_iso = datetime.now().isoformat()
-    updated_teams = []
-
-    for team_name, samples in metric_samples.items():
-        if team_name not in characteristics["teams"]:
-            continue
-
-        averaged_metrics: dict[str, float] = {}
-        for metric_name, values in samples.items():
-            aggregated = _aggregate_metric_samples(values, session_aggregation=session_aggregation)
-            if aggregated is not None:
-                averaged_metrics[metric_name] = aggregated
-
-        if not averaged_metrics:
-            continue
-
-        extracted_directionality = _build_directionality_from_metrics(
-            averaged_metrics,
-            directionality_scale=directionality_scale,
-        )
-
-        team_data = characteristics["teams"][team_name]
-        current_directionality = team_data.get("directionality")
-        if not isinstance(current_directionality, dict):
-            current_directionality = {}
-        blended_directionality = _blend_directionality(
-            old_directionality=current_directionality,
-            new_directionality=extracted_directionality,
-            new_weight=new_weight,
-        )
-
-        team_data["directionality"] = blended_directionality
-        team_data["last_updated"] = now_iso
-
-        testing_characteristics = team_data.get("testing_characteristics")
-        if not isinstance(testing_characteristics, dict):
-            testing_characteristics = {}
-        for metric_name in (
-            "slow_corner_performance",
-            "medium_corner_performance",
-            "fast_corner_performance",
-            "braking_performance",
-            "top_speed",
-            "overall_pace",
-            "consistency",
-            "tire_deg_slope",
-            "tire_deg_performance",
-        ):
-            if metric_name in averaged_metrics:
-                testing_characteristics[metric_name] = round(
-                    float(averaged_metrics[metric_name]), 4
-                )
-
-        testing_characteristics["last_updated"] = now_iso
-        testing_characteristics["sessions_used"] = len(team_sessions_used.get(team_name, set()))
-        testing_characteristics["session_aggregation"] = session_aggregation
-        testing_characteristics["run_profile"] = run_profile
-        team_data["testing_characteristics"] = testing_characteristics
-
-        existing_profiles = team_data.get("testing_characteristics_profiles")
-        if not isinstance(existing_profiles, dict):
-            existing_profiles = {}
-
-        for profile in _PROFILES_FOR_STORAGE:
-            profile_samples = profile_metric_samples.get(profile, {}).get(team_name, {})
-            profile_metrics: dict[str, float] = {}
-            for metric_name, values in profile_samples.items():
-                aggregated = _aggregate_metric_samples(
-                    values, session_aggregation=session_aggregation
-                )
-                if aggregated is not None:
-                    profile_metrics[metric_name] = aggregated
-
-            if not profile_metrics:
-                continue
-
-            profile_data = existing_profiles.get(profile)
-            if not isinstance(profile_data, dict):
-                profile_data = {}
-
-            for metric_name in (
-                "slow_corner_performance",
-                "medium_corner_performance",
-                "fast_corner_performance",
-                "braking_performance",
-                "top_speed",
-                "overall_pace",
-                "consistency",
-                "tire_deg_slope",
-                "tire_deg_performance",
-            ):
-                if metric_name in profile_metrics:
-                    profile_data[metric_name] = round(float(profile_metrics[metric_name]), 4)
-
-            profile_data["last_updated"] = now_iso
-            profile_data["sessions_used"] = len(
-                team_profile_sessions_used[team_name].get(profile, set())
-            )
-            profile_data["session_aggregation"] = session_aggregation
-            profile_data["run_profile"] = profile
-            existing_profiles[profile] = profile_data
-
-        team_data["testing_characteristics_profiles"] = existing_profiles
-
-        # Update compound-specific characteristics
-        existing_compound_chars = team_data.get("compound_characteristics")
-        if not isinstance(existing_compound_chars, dict):
-            existing_compound_chars = {}
-
-        # Aggregate compound metrics from all sessions
-        for _session_id, session_payload in compound_metrics_by_session.items():
-            session_event_name, session_compounds = session_payload
-            if team_name in session_compounds:
-                new_compound_data = session_compounds[team_name]
-                # Blend with existing data
-                existing_compound_chars = aggregate_compound_samples(
-                    existing_compound_chars,
-                    new_compound_data,
-                    blend_weight=new_weight,
-                    race_name=session_event_name,
-                )
-
-        # Update last_updated timestamp for each compound
-        if existing_compound_chars:
-            for compound_data in existing_compound_chars.values():
-                compound_data["last_updated"] = now_iso
-
-        team_data["compound_characteristics"] = existing_compound_chars
-        updated_teams.append(team_name)
+    updated_teams = _apply_team_updates(
+        characteristics=characteristics,
+        metric_samples=collection.metric_samples,
+        profile_metric_samples=collection.profile_metric_samples,
+        team_sessions_used=collection.team_sessions_used,
+        team_profile_sessions_used=collection.team_profile_sessions_used,
+        compound_metrics_by_session=collection.compound_metrics_by_session,
+        now_iso=now_iso,
+        session_aggregation=session_aggregation,
+        run_profile=run_profile,
+        directionality_scale=directionality_scale,
+        new_weight=new_weight,
+        profiles_for_storage=_PROFILES_FOR_STORAGE,
+        testing_characteristic_metrics=_TESTING_CHARACTERISTIC_METRICS,
+        aggregate_metric_samples=_aggregate_metric_samples,
+        build_directionality_from_metrics=_build_directionality_from_metrics,
+        blend_directionality=_blend_directionality,
+        aggregate_compound_samples=aggregate_compound_samples,
+    )
 
     if not updated_teams:
         raise ValueError(
@@ -1236,7 +487,7 @@ def update_from_testing_sessions(
         "year": year,
         "characteristics_year": target_year,
         "events": events,
-        "sessions_loaded": loaded_sessions,
+        "sessions_loaded": collection.loaded_sessions,
         "testing_backend": testing_backend or "auto",
         "cache_dir": str(cache_path),
         "force_renew_cache": force_renew_cache,
@@ -1247,22 +498,19 @@ def update_from_testing_sessions(
         "profiles_captured": list(_PROFILES_FOR_STORAGE),
     }
 
-    if not dry_run:
-        current_version = characteristics.get("version", 0)
-        try:
-            current_version = int(current_version)
-        except (TypeError, ValueError):
-            current_version = 0
-
-        characteristics["last_updated"] = now_iso
-        characteristics["version"] = current_version + 1
-        atomic_json_write(characteristics_file, characteristics, create_backup=True)
+    _write_characteristics_if_needed(
+        characteristics_file=characteristics_file,
+        characteristics=characteristics,
+        now_iso=now_iso,
+        dry_run=dry_run,
+        atomic_json_write=atomic_json_write,
+    )
 
     return {
         "year": year,
         "characteristics_year": target_year,
         "events": events,
-        "loaded_sessions": loaded_sessions,
+        "loaded_sessions": collection.loaded_sessions,
         "updated_teams": sorted(updated_teams),
         "characteristics_file": str(characteristics_file),
         "testing_backend": testing_backend or "auto",
