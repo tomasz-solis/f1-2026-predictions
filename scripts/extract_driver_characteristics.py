@@ -85,6 +85,33 @@ def load_driver_debuts(csv_path: str = "data/driver_debuts.csv") -> dict[str, in
     return debuts
 
 
+def _iter_non_testing_race_names(year: int) -> list[str]:
+    """Return race names for a season, excluding testing events."""
+    schedule = ff1.get_event_schedule(year)
+    races = schedule[schedule["EventFormat"] != "testing"]
+    race_names = []
+    for _, event in races.iterrows():
+        race_name = event["EventName"]
+        if race_name:
+            race_names.append(race_name)
+    return race_names
+
+
+def _load_completed_race_session(year: int, race_name: str):
+    """Load race session only when race is completed (not future scheduled)."""
+    session = ff1.get_session(year, race_name, "R")
+
+    race_date = session.date
+    if pd.isna(race_date):
+        return None
+    if not hasattr(race_date, "tz") or race_date.tz is None:
+        race_date = race_date.tz_localize("UTC")
+    if race_date > pd.Timestamp.now(tz="UTC"):
+        return None
+
+    return session
+
+
 def calculate_driver_pace_gap(driver_laps, teammate_laps, session_type="R") -> float:
     """
     Calculate pace gap to teammate (%).
@@ -129,86 +156,69 @@ def extract_teammate_comparisons(years: list[int]) -> list[dict]:
         logger.info(f"Processing {year} season (weight={year_weight:.1f})...")
 
         try:
-            schedule = ff1.get_event_schedule(year)
-            races = schedule[schedule["EventFormat"] != "testing"]
-
-            for _, event in races.iterrows():
-                race_name = event["EventName"]
-                if not race_name:
-                    continue
-
-                try:
-                    session = ff1.get_session(year, race_name, "R")
-
-                    # Check if race has happened
-                    race_date = session.date
-                    if pd.isna(race_date):
-                        continue
-                    if not hasattr(race_date, "tz") or race_date.tz is None:
-                        race_date = race_date.tz_localize("UTC")
-                    if race_date > pd.Timestamp.now(tz="UTC"):
-                        continue
-
-                    logger.info(f"  {race_name}...")
-                    session.load(laps=True, telemetry=False)
-
-                    laps = session.laps
-                    results = session.results
-
-                    # For each team, compare teammates
-                    for team in laps["Team"].unique():
-                        if pd.isna(team):
-                            continue
-
-                        team_drivers = laps[laps["Team"] == team]["Driver"].unique()
-                        if len(team_drivers) != 2:
-                            continue
-
-                        d1, d2 = team_drivers[0], team_drivers[1]
-                        laps_d1 = laps.pick_drivers(d1)
-                        laps_d2 = laps.pick_drivers(d2)
-
-                        # Calculate pace gap
-                        gap = calculate_driver_pace_gap(laps_d1, laps_d2, "R")
-                        if gap is None:
-                            continue
-
-                        # Get driver abbreviations
-                        try:
-                            d1_code = results.loc[results["Abbreviation"] == d1].iloc[0][
-                                "Abbreviation"
-                            ]
-                            d2_code = results.loc[results["Abbreviation"] == d2].iloc[0][
-                                "Abbreviation"
-                            ]
-                        except (KeyError, ValueError, TypeError):
-                            continue
-
-                        # Sample size confidence (more laps = higher confidence)
-                        sample_size = min(len(laps_d1), len(laps_d2))
-                        confidence = min(1.0, sample_size / 30.0)  # 30+ laps = full confidence
-
-                        # Store comparison (A vs B)
-                        comparisons.append(
-                            {
-                                "driver_a": d1_code,
-                                "driver_b": d2_code,
-                                "gap_pct": gap,  # Positive = A slower than B
-                                "year": year,
-                                "race": race_name,
-                                "confidence": confidence,
-                                "recency_weight": year_weight,
-                                "weight": confidence * year_weight,
-                            }
-                        )
-
-                except Exception as e:
-                    logger.debug(f"  Failed: {e}")
-                    continue
-
+            race_names = _iter_non_testing_race_names(year)
         except Exception as e:
             logger.error(f"Failed to load {year} schedule: {e}")
             continue
+
+        for race_name in race_names:
+            try:
+                session = _load_completed_race_session(year, race_name)
+                if session is None:
+                    continue
+
+                logger.info(f"  {race_name}...")
+                session.load(laps=True, telemetry=False)
+
+                laps = session.laps
+                results = session.results
+
+                # For each team, compare teammates
+                for team in laps["Team"].unique():
+                    if pd.isna(team):
+                        continue
+
+                    team_drivers = laps[laps["Team"] == team]["Driver"].unique()
+                    if len(team_drivers) != 2:
+                        continue
+
+                    d1, d2 = team_drivers[0], team_drivers[1]
+                    laps_d1 = laps.pick_drivers(d1)
+                    laps_d2 = laps.pick_drivers(d2)
+
+                    # Calculate pace gap
+                    gap = calculate_driver_pace_gap(laps_d1, laps_d2, "R")
+                    if gap is None:
+                        continue
+
+                    # Get driver abbreviations
+                    try:
+                        d1_code = results.loc[results["Abbreviation"] == d1].iloc[0]["Abbreviation"]
+                        d2_code = results.loc[results["Abbreviation"] == d2].iloc[0]["Abbreviation"]
+                    except (KeyError, ValueError, TypeError):
+                        continue
+
+                    # Sample size confidence (more laps = higher confidence)
+                    sample_size = min(len(laps_d1), len(laps_d2))
+                    confidence = min(1.0, sample_size / 30.0)  # 30+ laps = full confidence
+
+                    # Store comparison (A vs B)
+                    comparisons.append(
+                        {
+                            "driver_a": d1_code,
+                            "driver_b": d2_code,
+                            "gap_pct": gap,  # Positive = A slower than B
+                            "year": year,
+                            "race": race_name,
+                            "confidence": confidence,
+                            "recency_weight": year_weight,
+                            "weight": confidence * year_weight,
+                        }
+                    )
+
+            except Exception as e:
+                logger.debug(f"  Failed: {e}")
+                continue
 
     logger.info(f"Extracted {len(comparisons)} teammate comparisons")
     return comparisons
@@ -296,49 +306,37 @@ def calculate_racecraft_scores(years: list[int], ratings: dict[str, float]) -> d
 
     for year in years:
         try:
-            schedule = ff1.get_event_schedule(year)
-            races = schedule[schedule["EventFormat"] != "testing"]
-
-            for _, event in races.iterrows():
-                race_name = event["EventName"]
-                if not race_name:
-                    continue
-
-                try:
-                    session = ff1.get_session(year, race_name, "R")
-
-                    race_date = session.date
-                    if pd.isna(race_date):
-                        continue
-                    if not hasattr(race_date, "tz") or race_date.tz is None:
-                        race_date = race_date.tz_localize("UTC")
-                    if race_date > pd.Timestamp.now(tz="UTC"):
-                        continue
-
-                    session.load(laps=False, telemetry=False)
-                    results = session.results
-
-                    # Sort by driver rating (pace-based expected position)
-                    expected_order = []
-                    for _, row in results.iterrows():
-                        driver = row["Abbreviation"]
-                        if driver in ratings:
-                            expected_order.append((driver, ratings[driver], row["Position"]))
-
-                    expected_order.sort(key=lambda x: x[1], reverse=True)
-
-                    # Compare expected vs actual
-                    for expected_pos, (driver, _rating, actual_pos) in enumerate(expected_order, 1):
-                        if pd.notna(actual_pos) and actual_pos <= 20:
-                            # Positive = beat expectations (good racecraft)
-                            racecraft_gain = expected_pos - actual_pos
-                            racecraft_scores[driver].append(racecraft_gain)
-
-                except Exception:
-                    continue
-
+            race_names = _iter_non_testing_race_names(year)
         except Exception:
             continue
+
+        for race_name in race_names:
+            try:
+                session = _load_completed_race_session(year, race_name)
+                if session is None:
+                    continue
+
+                session.load(laps=False, telemetry=False)
+                results = session.results
+
+                # Sort by driver rating (pace-based expected position)
+                expected_order = []
+                for _, row in results.iterrows():
+                    driver = row["Abbreviation"]
+                    if driver in ratings:
+                        expected_order.append((driver, ratings[driver], row["Position"]))
+
+                expected_order.sort(key=lambda x: x[1], reverse=True)
+
+                # Compare expected vs actual
+                for expected_pos, (driver, _rating, actual_pos) in enumerate(expected_order, 1):
+                    if pd.notna(actual_pos) and actual_pos <= 20:
+                        # Positive = beat expectations (good racecraft)
+                        racecraft_gain = expected_pos - actual_pos
+                        racecraft_scores[driver].append(racecraft_gain)
+
+            except Exception:
+                continue
 
     # Average racecraft scores
     racecraft_ratings = {}
@@ -368,54 +366,42 @@ def calculate_experience_and_consistency(years: list[int], driver_debuts: dict[s
 
     for year in years:
         try:
-            schedule = ff1.get_event_schedule(year)
-            races = schedule[schedule["EventFormat"] != "testing"]
-
-            for _, event in races.iterrows():
-                race_name = event["EventName"]
-                if not race_name:
-                    continue
-
-                try:
-                    session = ff1.get_session(year, race_name, "R")
-
-                    race_date = session.date
-                    if pd.isna(race_date):
-                        continue
-                    if not hasattr(race_date, "tz") or race_date.tz is None:
-                        race_date = race_date.tz_localize("UTC")
-                    if race_date > pd.Timestamp.now(tz="UTC"):
-                        continue
-
-                    session.load(laps=False, telemetry=False)
-                    results = session.results
-
-                    for _, row in results.iterrows():
-                        driver = row["Abbreviation"]
-                        status = str(row["Status"]).lower()
-
-                        driver_stats[driver]["seasons"].add(year)
-                        driver_stats[driver]["total_races"] += 1
-
-                        # Only count CRASH-related DNFs (driver error), not mechanical failures
-                        if any(
-                            word in status
-                            for word in [
-                                "accident",
-                                "collision",
-                                "crash",
-                                "damage",
-                                "spun",
-                            ]
-                        ):
-                            driver_stats[driver]["dnf_count"] += 1
-                            driver_stats[driver]["crash_count"] += 1
-
-                except Exception:
-                    continue
-
+            race_names = _iter_non_testing_race_names(year)
         except Exception:
             continue
+
+        for race_name in race_names:
+            try:
+                session = _load_completed_race_session(year, race_name)
+                if session is None:
+                    continue
+
+                session.load(laps=False, telemetry=False)
+                results = session.results
+
+                for _, row in results.iterrows():
+                    driver = row["Abbreviation"]
+                    status = str(row["Status"]).lower()
+
+                    driver_stats[driver]["seasons"].add(year)
+                    driver_stats[driver]["total_races"] += 1
+
+                    # Only count CRASH-related DNFs (driver error), not mechanical failures
+                    if any(
+                        word in status
+                        for word in [
+                            "accident",
+                            "collision",
+                            "crash",
+                            "damage",
+                            "spun",
+                        ]
+                    ):
+                        driver_stats[driver]["dnf_count"] += 1
+                        driver_stats[driver]["crash_count"] += 1
+
+            except Exception:
+                continue
 
     # Process into output format
     output = {}
@@ -503,16 +489,11 @@ def main():
     for year in years:
         try:
             # Get championship standings
-            schedule = ff1.get_event_schedule(year)
-            last_race = schedule[schedule["EventFormat"] != "testing"].iloc[-1]
-            session = ff1.get_session(year, last_race["EventName"], "R")
-
-            race_date = session.date
-            if pd.isna(race_date):
+            race_names = _iter_non_testing_race_names(year)
+            if not race_names:
                 continue
-            if not hasattr(race_date, "tz") or race_date.tz is None:
-                race_date = race_date.tz_localize("UTC")
-            if race_date > pd.Timestamp.now(tz="UTC"):
+            session = _load_completed_race_session(year, race_names[-1])
+            if session is None:
                 continue
 
             session.load(laps=False, telemetry=False)
