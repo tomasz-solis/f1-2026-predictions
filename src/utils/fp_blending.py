@@ -8,10 +8,13 @@ from enum import Enum
 from typing import Any
 
 import fastf1 as ff1
-import numpy as np
 import pandas as pd
 
 from src.utils import config_loader
+from src.utils.fp_blending_flow import blend_available_sessions, build_session_priority
+from src.utils.fp_blending_flow import (
+    extract_team_performance_from_laps as _extract_team_performance_from_laps,
+)
 from src.utils.team_mapping import map_team_to_characteristics
 
 logging.getLogger("fastf1").setLevel(logging.CRITICAL)
@@ -296,65 +299,18 @@ def get_fp_team_performance(
             )
             return None, None, FPDataError.INSUFFICIENT_LAPS
 
-        # Build representative per-driver pace signal for requested run focus.
-        best_times = []
-
-        for driver in laps["Driver"].unique():
-            driver_laps = laps[laps["Driver"] == driver]
-
-            # Filter valid laps
-            valid_laps = driver_laps[
-                (driver_laps["LapTime"].notna())
-                & (driver_laps["Compound"].notna())  # On tire compound
-            ]
-
-            if len(valid_laps) == 0:
-                continue
-
-            representative_time = _extract_representative_lap_time(
-                valid_laps,
-                run_focus=run_focus,
-                min_long_run_laps=min_long_run_laps,
-                preferred_short_run_compound=preferred_short_run_compound,
-                long_run_outlier_threshold=long_run_outlier_threshold,
-                long_run_trim_ends=long_run_trim_ends,
-            )
-            if representative_time is None:
-                continue
-
-            team_raw = driver_laps["Team"].iloc[0]
-            if pd.isna(team_raw):
-                continue
-            team = map_team_to_characteristics(team_raw) or str(team_raw)
-
-            best_times.append({"driver": driver, "team": team, "time": representative_time})
-
-        if not best_times:
+        team_performance = _extract_team_performance_from_laps(
+            laps=laps,
+            run_focus=run_focus,
+            min_long_run_laps=min_long_run_laps,
+            preferred_short_run_compound=preferred_short_run_compound,
+            long_run_outlier_threshold=float(long_run_outlier_threshold),
+            long_run_trim_ends=long_run_trim_ends,
+            extract_representative_lap_time_fn=_extract_representative_lap_time,
+            map_team_to_characteristics_fn=map_team_to_characteristics,
+        )
+        if team_performance is None:
             return None, None, FPDataError.INSUFFICIENT_LAPS
-
-        # Get median time per team (robust to one driver having issues)
-        team_times = {}
-
-        for entry in best_times:
-            team = entry["team"]
-            if team not in team_times:
-                team_times[team] = []
-            team_times[team].append(entry["time"])
-
-        team_medians = {team: np.median(times) for team, times in team_times.items()}
-
-        # Convert to relative performance (0-1 scale)
-        # Invert: Faster time = Higher score
-        fastest = min(team_medians.values())
-        slowest = max(team_medians.values())
-
-        if fastest == slowest:
-            return {team: 0.5 for team in team_medians}, laps, None
-
-        team_performance = {
-            team: 1.0 - (time - fastest) / (slowest - fastest)
-            for team, time in team_medians.items()
-        }
 
         return team_performance, laps, None
 
@@ -411,25 +367,10 @@ def get_best_fp_performance(
     if stage not in {"auto", "sprint", "main"}:
         raise ValueError("qualifying_stage must be one of: 'auto', 'sprint', 'main'")
 
-    session_priority: list[tuple[str, str, float]]
-    if is_sprint:
-        if stage == "sprint":
-            # Sprint Qualifying prediction should be anchored to pre-SQ context.
-            session_priority = [("FP1", "FP1 short-stint", 1.0)]
-        else:
-            # Main qualifying: blend all available short-run signals.
-            session_priority = [
-                ("Sprint Qualifying", "Sprint Qualifying short-stint", 1.00),
-                ("Sprint", "Sprint pace signal", 0.55),
-                ("FP1", "FP1 short-stint", 0.70),
-            ]
-    else:
-        # Normal weekend: blend short-stint signals instead of hard FP3 fallback.
-        session_priority = [
-            ("FP3", "FP3 short-stint", 1.00),
-            ("FP2", "FP2 short-stint", 0.82),
-            ("FP1", "FP1 short-stint", 0.68),
-        ]
+    session_priority = build_session_priority(
+        is_sprint=is_sprint,
+        qualifying_stage=stage,
+    )
 
     errors_encountered = []
     available_sessions: list[dict[str, Any]] = []
@@ -449,45 +390,24 @@ def get_best_fp_performance(
         if error:
             errors_encountered.append((session_code, error))
 
-    if available_sessions:
-        if len(available_sessions) == 1:
-            selected = available_sessions[0]
-            if predicted_race_weather is not None:
-                fp_weather = get_fp_session_weather(year, race_name, selected["code"])
-                if fp_weather and fp_weather != predicted_race_weather:
+    blended_result = blend_available_sessions(available_sessions)
+    if blended_result is not None:
+        session_label, blended_data, blended_laps, primary_code = blended_result
+        if predicted_race_weather is not None:
+            fp_weather = get_fp_session_weather(year, race_name, primary_code)
+            if fp_weather and fp_weather != predicted_race_weather:
+                if len(available_sessions) == 1:
                     logger.warning(
-                        f"{selected['code']} weather was {fp_weather} but race prediction uses "
+                        f"{primary_code} weather was {fp_weather} but race prediction uses "
                         f"{predicted_race_weather}; FP blend confidence may be reduced"
                     )
-            logger.info(f"Using {selected['label']} for blending")
-            return selected["label"], selected["data"], selected["laps"]
-
-        weighted_totals: dict[str, float] = {}
-        weighted_counts: dict[str, float] = {}
-        for session_info in available_sessions:
-            weight = float(session_info["weight"])
-            for team, score in session_info["data"].items():
-                weighted_totals[team] = weighted_totals.get(team, 0.0) + (score * weight)
-                weighted_counts[team] = weighted_counts.get(team, 0.0) + weight
-
-        blended = {
-            team: weighted_totals[team] / weighted_counts[team]
-            for team in weighted_totals
-            if weighted_counts.get(team, 0.0) > 0.0
-        }
-        if blended:
-            included = " + ".join([item["code"] for item in available_sessions])
-            primary = max(available_sessions, key=lambda item: item["weight"])
-            session_label = f"Short-stint blend ({included})"
-            if predicted_race_weather is not None:
-                fp_weather = get_fp_session_weather(year, race_name, primary["code"])
-                if fp_weather and fp_weather != predicted_race_weather:
+                else:
                     logger.warning(
-                        f"Primary FP weather ({primary['code']}: {fp_weather}) differs from "
+                        f"Primary FP weather ({primary_code}: {fp_weather}) differs from "
                         f"race prediction weather ({predicted_race_weather})"
                     )
-            logger.info(f"Using {session_label} for blending")
-            return session_label, blended, primary["laps"]
+        logger.info(f"Using {session_label} for blending")
+        return session_label, blended_data, blended_laps
 
     # Log why we're falling back to model-only
     if errors_encountered:
