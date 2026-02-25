@@ -6,11 +6,17 @@ import json
 import logging
 from pathlib import Path
 
-import numpy as np
-
 from src.types.prediction_types import DriverRaceInfo, QualifyingGridEntry
 from src.utils import config_loader
 from src.utils.schema_validation import validate_track_characteristics
+
+from .preparation_flow import (
+    build_missing_driver_fallback,
+    infer_missing_driver_experience_tier,
+    prepare_driver_info_core,
+    prepare_driver_info_with_compounds_core,
+    resolve_effective_experience_tier_for_race,
+)
 
 logger = logging.getLogger("src.predictors.baseline_2026")
 
@@ -20,46 +26,11 @@ class BaselineRacePreparationMixin:
 
     def _resolve_effective_experience_tier_for_race(self, driver_data: dict) -> str:
         """Resolve experience tier for the current prediction year."""
-        experience = driver_data.get("experience", {}) if isinstance(driver_data, dict) else {}
-        stored_tier = str(experience.get("tier", "unknown"))
-        if stored_tier == "sophomore":
-            stored_tier = "second_year"
-
         current_year = int(getattr(self, "year", 2026))
-        stored_years = experience.get("years_of_experience", 0)
-        debut_year = experience.get("debut_year")
-
-        try:
-            effective_years = int(stored_years)
-        except (TypeError, ValueError):
-            effective_years = None
-
-        try:
-            debut_year_int = int(debut_year) if debut_year is not None else None
-        except (TypeError, ValueError):
-            debut_year_int = None
-
-        if debut_year_int is not None and current_year >= debut_year_int:
-            computed_years = current_year - debut_year_int
-            if effective_years is None:
-                effective_years = computed_years
-            else:
-                effective_years = max(effective_years, computed_years)
-
-        if effective_years is None:
-            return stored_tier
-
-        if effective_years <= 0:
-            return "rookie"
-        if effective_years == 1:
-            return "second_year"
-        if effective_years <= 3:
-            return "developing"
-        if effective_years <= 6:
-            return "established"
-        if effective_years <= 14:
-            return "veteran"
-        return "sunset"
+        return resolve_effective_experience_tier_for_race(
+            driver_data=driver_data,
+            current_year=current_year,
+        )
 
     def _is_known_lineup_driver(self, driver_code: str, team: str) -> bool:
         """Return True if driver is in configured active lineups."""
@@ -167,151 +138,23 @@ class BaselineRacePreparationMixin:
 
     def _infer_missing_driver_experience_tier(self, driver_code: str) -> str:
         """Infer tier for missing driver profiles from debut CSV and current prediction year."""
-        debut_years = self._load_driver_debut_years()
-        debut_year = debut_years.get(driver_code)
-        if debut_year is None:
-            return "rookie"
-
         current_year = int(getattr(self, "year", 2026))
-        years_experience = max(0, current_year - int(debut_year))
-        if years_experience == 0:
-            return "rookie"
-        if years_experience == 1:
-            return "second_year"
-        if years_experience <= 3:
-            return "developing"
-        if years_experience <= 6:
-            return "established"
-        if years_experience <= 14:
-            return "veteran"
-        return "sunset"
+        return infer_missing_driver_experience_tier(
+            driver_code=driver_code,
+            current_year=current_year,
+            load_driver_debut_years_fn=self._load_driver_debut_years,
+        )
 
     def _build_missing_driver_fallback(self, driver_code: str, team: str) -> dict:
         """Build a synthetic profile for known active-lineup drivers missing characteristics."""
-        cfg = getattr(self, "config", config_loader)
-        default_skill = cfg.get("baseline_predictor.qualifying.default_skill", 0.5)
-        inferred_tier = self._infer_missing_driver_experience_tier(driver_code)
-        teammate_weight = cfg.get("baseline_predictor.race.missing_driver_teammate_weight", 0.75)
-        teammate_weight = float(np.clip(teammate_weight, 0.0, 1.0))
-        default_dnf = cfg.get("baseline_predictor.race.missing_driver_default_dnf_rate", 0.10)
-        rookie_dnf_penalty = cfg.get(
-            "baseline_predictor.race.missing_driver_rookie_dnf_penalty", 0.02
+        return build_missing_driver_fallback(
+            driver_code=driver_code,
+            team=team,
+            config=getattr(self, "config", config_loader),
+            infer_missing_driver_experience_tier_fn=self._infer_missing_driver_experience_tier,
+            get_teammate_driver_data_fn=self._get_teammate_driver_data,
+            logger=logger,
         )
-        rookie_quali_penalty = cfg.get(
-            "baseline_predictor.race.missing_driver_rookie_quali_penalty", 0.08
-        )
-        rookie_race_penalty = cfg.get(
-            "baseline_predictor.race.missing_driver_rookie_race_penalty", 0.07
-        )
-        rookie_skill_penalty = cfg.get(
-            "baseline_predictor.race.missing_driver_rookie_skill_penalty", 0.08
-        )
-        rookie_overtaking_penalty = cfg.get(
-            "baseline_predictor.race.missing_driver_rookie_overtaking_penalty", 0.06
-        )
-        second_year_penalty_scale = float(
-            cfg.get(
-                "baseline_predictor.race.missing_driver_second_year_penalty_scale",
-                cfg.get("baseline_predictor.race.missing_driver_sophomore_penalty_scale", 0.55),
-            )
-        )
-        second_year_penalty_scale = float(np.clip(second_year_penalty_scale, 0.0, 1.0))
-
-        if inferred_tier == "sophomore":
-            inferred_tier = "second_year"
-
-        teammate_entry = self._get_teammate_driver_data(driver_code, team)
-        if teammate_entry:
-            teammate_code, teammate_data = teammate_entry
-            teammate_pace = teammate_data.get("pace", {})
-            teammate_racecraft = teammate_data.get("racecraft", {})
-            teammate_dnf = teammate_data.get("dnf_risk", {}).get("dnf_rate", default_dnf)
-
-            # Regress toward neutral defaults so a missing profile isn't a hard clone of teammate.
-            quali_pace = (
-                teammate_weight * teammate_pace.get("quali_pace", 0.5)
-                + (1.0 - teammate_weight) * 0.5
-            )
-            race_pace = (
-                teammate_weight * teammate_pace.get("race_pace", 0.5)
-                + (1.0 - teammate_weight) * 0.5
-            )
-            skill_score = (
-                teammate_weight * teammate_racecraft.get("skill_score", default_skill)
-                + (1.0 - teammate_weight) * default_skill
-            )
-            overtaking_skill = (
-                teammate_weight * teammate_racecraft.get("overtaking_skill", default_skill)
-                + (1.0 - teammate_weight) * default_skill
-            )
-            dnf_rate = teammate_dnf
-
-            if inferred_tier == "rookie":
-                # Keep rookies anchored below teammate baseline in model-only conditions.
-                quali_pace -= rookie_quali_penalty
-                race_pace -= rookie_race_penalty
-                skill_score -= rookie_skill_penalty
-                overtaking_skill -= rookie_overtaking_penalty
-                dnf_rate += rookie_dnf_penalty
-            elif inferred_tier == "second_year":
-                # Year-2 drivers get a reduced penalty profile versus pure rookies.
-                quali_pace -= rookie_quali_penalty * second_year_penalty_scale
-                race_pace -= rookie_race_penalty * second_year_penalty_scale
-                skill_score -= rookie_skill_penalty * second_year_penalty_scale
-                overtaking_skill -= rookie_overtaking_penalty * second_year_penalty_scale
-                dnf_rate += rookie_dnf_penalty * second_year_penalty_scale
-
-            logger.info(
-                f"Driver {driver_code} missing characteristics; using teammate-informed fallback from "
-                f"{teammate_code} for {team} (tier={inferred_tier})"
-            )
-            return {
-                "pace": {
-                    "quali_pace": float(np.clip(quali_pace, 0.0, 1.0)),
-                    "race_pace": float(np.clip(race_pace, 0.0, 1.0)),
-                },
-                "racecraft": {
-                    "skill_score": float(np.clip(skill_score, 0.0, 1.0)),
-                    "overtaking_skill": float(np.clip(overtaking_skill, 0.0, 1.0)),
-                },
-                "dnf_risk": {
-                    "dnf_rate": float(np.clip(max(teammate_dnf, dnf_rate), 0.0, 0.35)),
-                },
-                "experience": {"tier": inferred_tier},
-            }
-
-        logger.warning(
-            f"Driver {driver_code} missing characteristics; using neutral fallback for {team}"
-        )
-        neutral_pace = 0.5
-        neutral_race = 0.5
-        neutral_skill = default_skill
-        neutral_overtaking = default_skill
-        neutral_dnf = default_dnf
-        if inferred_tier == "rookie":
-            neutral_pace -= rookie_quali_penalty
-            neutral_race -= rookie_race_penalty
-            neutral_skill -= rookie_skill_penalty
-            neutral_overtaking -= rookie_overtaking_penalty
-            neutral_dnf += rookie_dnf_penalty
-        elif inferred_tier == "second_year":
-            neutral_pace -= rookie_quali_penalty * second_year_penalty_scale
-            neutral_race -= rookie_race_penalty * second_year_penalty_scale
-            neutral_skill -= rookie_skill_penalty * second_year_penalty_scale
-            neutral_overtaking -= rookie_overtaking_penalty * second_year_penalty_scale
-            neutral_dnf += rookie_dnf_penalty * second_year_penalty_scale
-        return {
-            "pace": {
-                "quali_pace": float(np.clip(neutral_pace, 0.0, 1.0)),
-                "race_pace": float(np.clip(neutral_race, 0.0, 1.0)),
-            },
-            "racecraft": {
-                "skill_score": float(np.clip(neutral_skill, 0.0, 1.0)),
-                "overtaking_skill": float(np.clip(neutral_overtaking, 0.0, 1.0)),
-            },
-            "dnf_risk": {"dnf_rate": float(np.clip(neutral_dnf, 0.0, 0.35))},
-            "experience": {"tier": inferred_tier},
-        }
 
     def _load_track_overtaking_difficulty(self, race_name: str | None) -> float:
         """Load track overtaking difficulty from characteristics file."""
@@ -338,117 +181,17 @@ class BaselineRacePreparationMixin:
         race_compound: str = "MEDIUM",
     ) -> tuple[dict[str, DriverRaceInfo], int]:
         """Build driver info map with team strength, profile modifiers, skills, and DNF probabilities."""
-        cfg = getattr(self, "config", config_loader)
-        driver_info_map: dict[str, DriverRaceInfo] = {}
-        teams_with_long_profile = set()
-
-        dnf_rate_historical_cap = cfg.get("baseline_predictor.race.dnf_rate_historical_cap", 0.20)
-        dnf_rate_final_cap = cfg.get("baseline_predictor.race.dnf_rate_final_cap", 0.35)
-        long_profile_scale = cfg.get(
-            "baseline_predictor.race.testing_long_run_modifier_scale", 0.05
+        return prepare_driver_info_core(
+            qualifying_grid=qualifying_grid,
+            race_name=race_name,
+            race_compound=race_compound,
+            teams=self.teams,
+            config=getattr(self, "config", config_loader),
+            get_compound_adjusted_team_strength_fn=self.get_compound_adjusted_team_strength,
+            compute_testing_profile_modifier_fn=self._compute_testing_profile_modifier,
+            get_driver_data_or_fallback_fn=self._get_driver_data_or_fallback,
+            resolve_effective_experience_tier_for_race_fn=self._resolve_effective_experience_tier_for_race,
         )
-        long_profile_weights = cfg.get(
-            "baseline_predictor.race.testing_profile_weights.long_run",
-            {
-                "overall_pace": 0.50,
-                "tire_deg_performance": 0.35,
-                "consistency": 0.15,
-            },
-        )
-        defensive_skill_weights = cfg.get(
-            "baseline_predictor.race.defensive_skill_weights",
-            {
-                "overtaking_component": 0.65,
-                "skill_component": 0.35,
-            },
-        )
-        team_uncertainty_dnf_multiplier = cfg.get(
-            "baseline_predictor.race.team_uncertainty_dnf_multiplier", 0.20
-        )
-
-        for entry in qualifying_grid:
-            driver_code = entry["driver"]
-            team = entry["team"]
-            grid_pos = entry["position"]
-
-            # Get base team strength with compound adjustment
-            if race_name:
-                team_strength = self.get_compound_adjusted_team_strength(
-                    team, race_name, race_compound
-                )
-            else:
-                team_strength = self.teams.get(team, {}).get("overall_performance", 0.50)
-
-            # Add long-run testing profile modifier
-            long_modifier, has_long_profile = self._compute_testing_profile_modifier(
-                team=team,
-                profile="long_run",
-                metric_weights=long_profile_weights,
-                scale=long_profile_scale,
-            )
-            team_strength = np.clip(team_strength + long_modifier, 0.0, 1.0)
-            if has_long_profile:
-                teams_with_long_profile.add(team)
-
-            driver_data = self._get_driver_data_or_fallback(driver_code, team)
-
-            pace_data = driver_data.get("pace", {})
-            quali_pace = pace_data.get("quali_pace", 0.5)
-            race_pace = pace_data.get("race_pace", 0.5)
-            race_advantage = race_pace - quali_pace
-
-            racecraft = driver_data.get("racecraft", {})
-            skill = racecraft.get("skill_score", 0.5)
-            overtaking_skill = racecraft.get("overtaking_skill", 0.5)
-            defensive_skill = racecraft.get("defensive_skill")
-            if defensive_skill is None:
-                # Backward-compatible fallback: reuse core racecraft signal when
-                # explicit defensive skill is not present in extracted data.
-                defensive_skill = (
-                    defensive_skill_weights.get("overtaking_component", 0.65) * overtaking_skill
-                    + defensive_skill_weights.get("skill_component", 0.35) * skill
-                )
-            defensive_skill = np.clip(defensive_skill, 0.0, 1.0)
-
-            dnf_rate = min(
-                driver_data.get("dnf_risk", {}).get("dnf_rate", 0.10),
-                dnf_rate_historical_cap,
-            )
-
-            experience_tier = self._resolve_effective_experience_tier_for_race(driver_data)
-            experience_modifiers = {
-                "rookie": 0.05,
-                "second_year": 0.03,
-                "developing": 0.02,
-                "established": 0.00,
-                "veteran": -0.01,
-                "sunset": -0.005,
-            }
-            experience_dnf_modifier = experience_modifiers.get(experience_tier, 0.0)
-
-            team_uncertainty = self.teams.get(team, {}).get("uncertainty", 0.30)
-            if team_uncertainty >= 0.40:
-                adjusted_dnf = (
-                    dnf_rate
-                    + experience_dnf_modifier
-                    + (team_uncertainty * team_uncertainty_dnf_multiplier)
-                )
-            else:
-                adjusted_dnf = dnf_rate + experience_dnf_modifier
-
-            driver_info_map[driver_code] = {
-                "driver": driver_code,
-                "team": team,
-                "grid_pos": grid_pos,
-                "team_strength": team_strength,
-                "skill": skill,
-                "race_advantage": race_advantage,
-                "overtaking_skill": overtaking_skill,
-                "defensive_skill": defensive_skill,
-                "dnf_probability": max(0.0, min(adjusted_dnf, dnf_rate_final_cap)),
-            }
-
-        return driver_info_map, len(teams_with_long_profile)
 
     def _prepare_driver_info_with_compounds(
         self,
@@ -456,144 +199,16 @@ class BaselineRacePreparationMixin:
         race_name: str | None,
     ) -> tuple[dict[str, DriverRaceInfo], int]:
         """Build driver info map with per-compound team strengths for lap-by-lap simulation."""
-        cfg = getattr(self, "config", config_loader)
         from src.utils.compound_performance import get_compound_performance_modifier
 
-        driver_info_map: dict[str, DriverRaceInfo] = {}
-        teams_with_long_profile = set()
-
-        dnf_rate_historical_cap = cfg.get("baseline_predictor.race.dnf_rate_historical_cap", 0.20)
-        dnf_rate_final_cap = cfg.get("baseline_predictor.race.dnf_rate_final_cap", 0.35)
-        long_profile_scale = cfg.get(
-            "baseline_predictor.race.testing_long_run_modifier_scale", 0.05
+        return prepare_driver_info_with_compounds_core(
+            qualifying_grid=qualifying_grid,
+            race_name=race_name,
+            teams=self.teams,
+            config=getattr(self, "config", config_loader),
+            get_blended_team_strength_fn=self.get_blended_team_strength,
+            compute_testing_profile_modifier_fn=self._compute_testing_profile_modifier,
+            get_driver_data_or_fallback_fn=self._get_driver_data_or_fallback,
+            resolve_effective_experience_tier_for_race_fn=self._resolve_effective_experience_tier_for_race,
+            get_compound_performance_modifier_fn=get_compound_performance_modifier,
         )
-        long_profile_weights = cfg.get(
-            "baseline_predictor.race.testing_profile_weights.long_run",
-            {
-                "overall_pace": 0.50,
-                "tire_deg_performance": 0.35,
-                "consistency": 0.15,
-            },
-        )
-        default_tire_deg_slope = cfg.get(
-            "baseline_predictor.race.tire_physics.default_deg_slope", 0.15
-        )
-        defensive_skill_weights = cfg.get(
-            "baseline_predictor.race.defensive_skill_weights",
-            {
-                "overtaking_component": 0.65,
-                "skill_component": 0.35,
-            },
-        )
-        team_uncertainty_dnf_multiplier = cfg.get(
-            "baseline_predictor.race.team_uncertainty_dnf_multiplier", 0.20
-        )
-
-        for entry in qualifying_grid:
-            driver_code = entry["driver"]
-            team = entry["team"]
-            grid_pos = entry["position"]
-
-            # Use weekend-aware team strength so race simulation starts from the same
-            # blended baseline logic as qualifying.
-            if race_name:
-                base_team_strength = self.get_blended_team_strength(team, race_name)
-            else:
-                base_team_strength = self.teams.get(team, {}).get("overall_performance", 0.50)
-
-            # Add long-run testing profile modifier
-            long_modifier, has_long_profile = self._compute_testing_profile_modifier(
-                team=team,
-                profile="long_run",
-                metric_weights=long_profile_weights,
-                scale=long_profile_scale,
-            )
-            base_team_strength = np.clip(base_team_strength + long_modifier, 0.0, 1.0)
-            if has_long_profile:
-                teams_with_long_profile.add(team)
-
-            # Pre-compute per-compound team strengths
-            team_compound_chars = self.teams.get(team, {}).get("compound_characteristics", {})
-
-            team_strength_by_compound = {}
-            tire_deg_by_compound = {}
-
-            for compound in ["SOFT", "MEDIUM", "HARD"]:
-                if compound in team_compound_chars:
-                    # Compound-specific modifier
-                    modifier = get_compound_performance_modifier(team_compound_chars, compound)
-                    adjusted_strength = base_team_strength + modifier
-
-                    # Tire degradation slope
-                    tire_deg_slope = team_compound_chars[compound].get(
-                        "tire_deg_slope", default_tire_deg_slope
-                    )
-                else:
-                    # Fallback: no compound data available
-                    adjusted_strength = base_team_strength
-                    tire_deg_slope = default_tire_deg_slope
-
-                team_strength_by_compound[compound] = np.clip(adjusted_strength, 0.0, 1.0)
-                tire_deg_by_compound[compound] = tire_deg_slope
-
-            # Get driver characteristics
-            driver_data = self._get_driver_data_or_fallback(driver_code, team)
-
-            pace_data = driver_data.get("pace", {})
-            quali_pace = pace_data.get("quali_pace", 0.5)
-            race_pace = pace_data.get("race_pace", 0.5)
-            race_advantage = race_pace - quali_pace
-
-            racecraft = driver_data.get("racecraft", {})
-            skill = racecraft.get("skill_score", 0.5)
-            overtaking_skill = racecraft.get("overtaking_skill", 0.5)
-            defensive_skill = racecraft.get("defensive_skill")
-            if defensive_skill is None:
-                defensive_skill = (
-                    defensive_skill_weights.get("overtaking_component", 0.65) * overtaking_skill
-                    + defensive_skill_weights.get("skill_component", 0.35) * skill
-                )
-            defensive_skill = np.clip(defensive_skill, 0.0, 1.0)
-
-            # DNF probability
-            dnf_rate = min(
-                driver_data.get("dnf_risk", {}).get("dnf_rate", 0.10),
-                dnf_rate_historical_cap,
-            )
-
-            experience_tier = self._resolve_effective_experience_tier_for_race(driver_data)
-            experience_modifiers = {
-                "rookie": 0.05,
-                "second_year": 0.03,
-                "developing": 0.02,
-                "established": 0.00,
-                "veteran": -0.01,
-                "sunset": -0.005,
-            }
-            experience_dnf_modifier = experience_modifiers.get(experience_tier, 0.0)
-
-            team_uncertainty = self.teams.get(team, {}).get("uncertainty", 0.30)
-            if team_uncertainty >= 0.40:
-                adjusted_dnf = (
-                    dnf_rate
-                    + experience_dnf_modifier
-                    + (team_uncertainty * team_uncertainty_dnf_multiplier)
-                )
-            else:
-                adjusted_dnf = dnf_rate + experience_dnf_modifier
-
-            driver_info_map[driver_code] = {
-                "driver": driver_code,
-                "team": team,
-                "grid_pos": grid_pos,
-                "team_strength": base_team_strength,  # Base strength
-                "team_strength_by_compound": team_strength_by_compound,  # Per-compound
-                "tire_deg_by_compound": tire_deg_by_compound,  # Per-compound deg slopes
-                "skill": skill,
-                "race_advantage": race_advantage,
-                "overtaking_skill": overtaking_skill,
-                "defensive_skill": defensive_skill,
-                "dnf_probability": max(0.0, min(adjusted_dnf, dnf_rate_final_cap)),
-            }
-
-        return driver_info_map, len(teams_with_long_profile)

@@ -1,0 +1,309 @@
+"""Preparation helpers for qualifying driver strength assembly."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any
+
+import numpy as np
+
+
+def resolve_effective_experience_tier(
+    driver_data: dict[str, Any],
+    prediction_year: int | None,
+) -> str:
+    """Resolve experience tier at prediction time to avoid stale preseason labels."""
+    experience = driver_data.get("experience", {}) if isinstance(driver_data, dict) else {}
+    stored_tier = str(experience.get("tier", "unknown"))
+    if stored_tier == "sophomore":
+        stored_tier = "second_year"
+    if prediction_year is None:
+        return stored_tier
+
+    stored_years = experience.get("years_of_experience", 0)
+    debut_year = experience.get("debut_year")
+    try:
+        effective_years = int(stored_years)
+    except (TypeError, ValueError):
+        effective_years = None
+
+    try:
+        debut_year_int = int(debut_year) if debut_year is not None else None
+    except (TypeError, ValueError):
+        debut_year_int = None
+
+    if debut_year_int is not None and prediction_year >= debut_year_int:
+        computed_years = prediction_year - debut_year_int
+        if effective_years is None:
+            effective_years = computed_years
+        else:
+            effective_years = max(effective_years, computed_years)
+
+    if effective_years is None:
+        return stored_tier
+
+    if effective_years <= 0:
+        return "rookie"
+    if effective_years == 1:
+        return "second_year"
+    if effective_years <= 3:
+        return "developing"
+    if effective_years <= 6:
+        return "established"
+    if effective_years <= 14:
+        return "veteran"
+    return "sunset"
+
+
+def extract_experience_total_races(driver_data: dict[str, Any]) -> int | None:
+    """Extract total races from driver profile when available."""
+    experience = driver_data.get("experience", {}) if isinstance(driver_data, dict) else {}
+    total_races = experience.get("total_races")
+    try:
+        parsed = int(total_races)
+    except (TypeError, ValueError):
+        return None
+    if parsed < 0:
+        return None
+    return parsed
+
+
+def _score_profile(
+    profile_metrics: dict[str, float] | None,
+    metric_weights: dict[str, float],
+) -> float | None:
+    if not profile_metrics:
+        return None
+
+    weighted_sum = 0.0
+    total_weight = 0.0
+    for metric_name, weight in metric_weights.items():
+        try:
+            metric_weight = float(weight)
+        except (TypeError, ValueError):
+            continue
+        if metric_weight <= 0:
+            continue
+        value = profile_metrics.get(metric_name)
+        if value is None:
+            continue
+        try:
+            metric_value = float(value)
+        except (TypeError, ValueError):
+            continue
+        if not np.isfinite(metric_value):
+            continue
+        metric_value = float(np.clip(metric_value, 0.0, 1.0))
+        weighted_sum += metric_value * metric_weight
+        total_weight += metric_weight
+    if total_weight <= 0:
+        return None
+    return float(np.clip(weighted_sum / total_weight, 0.0, 1.0))
+
+
+def build_testing_short_run_fallback(
+    *,
+    lineups: dict[str, list[str]],
+    metric_weights: dict[str, float],
+    cfg: Any,
+    get_testing_characteristics_for_profile: Callable[[str, str], dict[str, float] | None],
+) -> dict[str, float] | None:
+    """Build a team-pace fallback from stored short-run testing profiles."""
+    min_teams = int(cfg.get("baseline_predictor.qualifying.testing_fallback_min_teams", 8))
+    if min_teams < 2:
+        min_teams = 2
+    short_weight_min = float(
+        cfg.get("baseline_predictor.qualifying.testing_fallback_short_weight_min", 0.35)
+    )
+    short_weight_max = float(
+        cfg.get("baseline_predictor.qualifying.testing_fallback_short_weight_max", 0.85)
+    )
+    divergence_scale = float(
+        cfg.get("baseline_predictor.qualifying.testing_fallback_divergence_scale", 1.4)
+    )
+
+    team_scores: dict[str, float] = {}
+    for team in lineups:
+        short_profile = get_testing_characteristics_for_profile(team, "short_run")
+        balanced_profile = get_testing_characteristics_for_profile(team, "balanced")
+        short_score = _score_profile(short_profile, metric_weights=metric_weights)
+        balanced_score = _score_profile(balanced_profile, metric_weights=metric_weights)
+
+        if short_score is None and balanced_score is None:
+            continue
+        if short_score is None:
+            team_scores[team] = float(balanced_score)
+            continue
+        if balanced_score is None:
+            team_scores[team] = float(short_score)
+            continue
+
+        divergence = abs(float(short_score) - float(balanced_score))
+        short_weight = float(
+            np.clip(
+                1.0 - (divergence * divergence_scale),
+                min(short_weight_min, short_weight_max),
+                max(short_weight_min, short_weight_max),
+            )
+        )
+        blended_score = (short_weight * float(short_score)) + (
+            (1.0 - short_weight) * float(balanced_score)
+        )
+        team_scores[team] = float(np.clip(blended_score, 0.0, 1.0))
+
+    if len(team_scores) < min_teams:
+        return None
+
+    return team_scores
+
+
+def apply_testing_fallback_adjustment(
+    *,
+    model_strengths: dict[str, float],
+    testing_fallback_performance: dict[str, float] | None,
+    cfg: Any,
+) -> dict[str, float]:
+    """
+    Apply a conservative testing-derived adjustment on top of model strengths.
+
+    Testing programs are noisy (fuel/load/run-plan effects), so we use them as a
+    bounded relative nudge instead of treating them as direct pace replacement.
+    """
+    if not testing_fallback_performance:
+        return model_strengths
+
+    absolute_blend_weight = float(
+        cfg.get("baseline_predictor.qualifying.testing_fallback_absolute_blend_weight", 0.22)
+    )
+    absolute_blend_weight = float(np.clip(absolute_blend_weight, 0.0, 1.0))
+    scale = float(cfg.get("baseline_predictor.qualifying.testing_fallback_modifier_scale", 0.06))
+    clip_range = cfg.get(
+        "baseline_predictor.qualifying.testing_fallback_modifier_clip_range", [-0.03, 0.03]
+    )
+    if (
+        isinstance(clip_range, list)
+        and len(clip_range) == 2
+        and float(clip_range[0]) < float(clip_range[1])
+    ):
+        min_clip, max_clip = float(clip_range[0]), float(clip_range[1])
+    else:
+        min_clip, max_clip = -0.03, 0.03
+
+    values = [float(v) for v in testing_fallback_performance.values() if np.isfinite(float(v))]
+    if not values:
+        return model_strengths
+    field_median = float(np.median(values))
+
+    adjusted: dict[str, float] = {}
+    for team, model_score in model_strengths.items():
+        fallback_score = testing_fallback_performance.get(team)
+        if fallback_score is None:
+            adjusted[team] = model_score
+            continue
+
+        blended_base = ((1.0 - absolute_blend_weight) * float(model_score)) + (
+            absolute_blend_weight * float(fallback_score)
+        )
+        centered = float(fallback_score) - field_median
+        modifier = float(np.clip(centered * scale, min_clip, max_clip))
+        adjusted[team] = float(np.clip(blended_base + modifier, 0.0, 1.0))
+
+    return adjusted
+
+
+def build_driver_list_with_strengths_core(
+    *,
+    lineups: dict[str, list[str]],
+    fp_performance: dict[str, float] | None,
+    testing_fallback_performance: dict[str, float] | None,
+    race_name: str,
+    prediction_year: int | None,
+    drivers: dict[str, dict[str, Any]],
+    cfg: Any,
+    short_profile_weights: dict[str, float],
+    get_blended_team_strength_fn: Callable[[str, str], float],
+    compute_testing_profile_modifier_fn: Callable[..., tuple[float, bool]],
+    blend_team_strength_fn: Callable[..., dict[str, float]],
+    apply_testing_fallback_adjustment_fn: Callable[..., dict[str, float]],
+    resolve_effective_experience_tier_fn: Callable[[dict[str, Any], int | None], str],
+    extract_experience_total_races_fn: Callable[[dict[str, Any]], int | None],
+    get_learned_position_adjustment_fn: Callable[..., float],
+    get_driver_data_or_fallback_fn: Callable[[str, str], dict[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], int]:
+    """Build driver list with blended team/driver strengths and testing modifiers."""
+    all_drivers: list[dict[str, Any]] = []
+    model_strengths: dict[str, float] = {}
+    teams_with_short_profile = 0
+
+    short_profile_scale = cfg.get(
+        "baseline_predictor.qualifying.testing_short_run_modifier_scale", 0.04
+    )
+    fp_blend_weight = cfg.get("baseline_predictor.qualifying.fp_blend_weight", 0.7)
+    default_skill = cfg.get("baseline_predictor.qualifying.default_skill", 0.5)
+    default_team_strength = cfg.get("baseline_predictor.qualifying.default_team_strength", 0.5)
+
+    for team in lineups:
+        model_strength = get_blended_team_strength_fn(team, race_name)
+        short_modifier, has_short_profile = compute_testing_profile_modifier_fn(
+            team=team,
+            profile="short_run",
+            metric_weights=short_profile_weights,
+            scale=short_profile_scale,
+        )
+        model_strength = np.clip(model_strength + short_modifier, 0.0, 1.0)
+        if has_short_profile:
+            teams_with_short_profile += 1
+        model_strengths[team] = model_strength
+
+    if fp_performance is not None:
+        blended_strengths = blend_team_strength_fn(
+            model_strengths,
+            fp_performance,
+            blend_weight=fp_blend_weight,
+        )
+    else:
+        blended_strengths = apply_testing_fallback_adjustment_fn(
+            model_strengths=model_strengths,
+            testing_fallback_performance=testing_fallback_performance,
+        )
+
+    for team, team_drivers in lineups.items():
+        team_strength = blended_strengths.get(team, default_team_strength)
+        for driver_code in team_drivers:
+            driver_data = drivers.get(driver_code)
+            if not driver_data:
+                if callable(get_driver_data_or_fallback_fn):
+                    try:
+                        driver_data = get_driver_data_or_fallback_fn(driver_code, team)
+                    except ValueError:
+                        driver_data = {}
+                else:
+                    driver_data = {}
+            skill = driver_data.get("racecraft", {}).get("skill_score", default_skill)
+            quali_pace = driver_data.get("pace", {}).get("quali_pace", 0.5)
+            experience_tier = resolve_effective_experience_tier_fn(
+                driver_data=driver_data,
+                prediction_year=prediction_year,
+            )
+            experience_total_races = extract_experience_total_races_fn(driver_data)
+            learned_position_adjustment = get_learned_position_adjustment_fn(
+                team=team,
+                driver=driver_code,
+                teammates=team_drivers,
+                session="qualifying",
+            )
+
+            all_drivers.append(
+                {
+                    "driver": driver_code,
+                    "team": team,
+                    "team_strength": team_strength,
+                    "skill": skill,
+                    "quali_pace": quali_pace,
+                    "experience_tier": experience_tier,
+                    "experience_total_races": experience_total_races,
+                    "learned_position_adjustment": learned_position_adjustment,
+                }
+            )
+
+    return all_drivers, teams_with_short_profile
