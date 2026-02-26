@@ -226,6 +226,172 @@ def test_update_bayesian_driver_ratings_skips_when_no_valid_positions(patcher):
     bayesian_cls.return_value.update.assert_not_called()
 
 
+def test_update_bayesian_driver_ratings_persists_driver_characteristics_updates(patcher):
+    from src.models.bayesian import DriverPrior
+
+    race_results = pd.DataFrame(
+        {
+            "Abbreviation": ["LEC", "NOR"],
+            "Position": [1, 2],
+            "race_name": ["Bahrain Grand Prix", "Bahrain Grand Prix"],
+            "year": [2026, 2026],
+        }
+    )
+
+    priors = {
+        "LEC": DriverPrior(
+            driver_number="16",
+            driver_code="LEC",
+            team="Ferrari",
+            team_tier="top",
+            mu=16.0,
+            sigma=2.0,
+        ),
+        "NOR": DriverPrior(
+            driver_number="4",
+            driver_code="NOR",
+            team="McLaren",
+            team_tier="top",
+            mu=15.0,
+            sigma=2.1,
+        ),
+    }
+
+    patcher.setattr("src.models.priors_factory.PriorsFactory.create_priors", lambda self: priors)
+
+    class _Store:
+        def __init__(self, data_root):
+            self.saved = []
+
+        def load_artifact(self, artifact_type, artifact_key):
+            if artifact_type == "driver_characteristics":
+                return {
+                    "version": 1,
+                    "drivers": {
+                        "LEC": {
+                            "racecraft": {"skill_score": 0.55, "overtaking_skill": 0.58},
+                            "pace": {"quali_pace": 0.62, "race_pace": 0.60},
+                            "dnf_risk": {"dnf_rate": 0.08},
+                        },
+                        "NOR": {
+                            "racecraft": {"skill_score": 0.60, "overtaking_skill": 0.61},
+                            "pace": {"quali_pace": 0.66, "race_pace": 0.64},
+                            "dnf_risk": {"dnf_rate": 0.07},
+                        },
+                    },
+                }
+            return None
+
+        def get_latest_version(self, artifact_type, artifact_key):
+            return 1
+
+        def save_artifact(self, artifact_type, artifact_key, data, version):
+            self.saved.append((artifact_type, artifact_key, data, version))
+
+    store = _Store("data")
+    patcher.setattr(updater, "ArtifactStore", lambda data_root: store)
+    patcher.setattr(updater.config_loader, "get", lambda key, default=None: default)
+
+    updater.update_bayesian_driver_ratings(race_results)
+
+    assert len(store.saved) == 1
+    artifact_type, artifact_key, payload, version = store.saved[0]
+    assert artifact_type == "driver_characteristics"
+    assert artifact_key == "2026::driver_characteristics"
+    assert version == payload["version"]
+    assert payload["version"] >= 2
+    assert payload["drivers"]["LEC"]["racecraft"]["skill_score"] != 0.55
+    assert "bayesian" in payload["drivers"]["LEC"]
+
+
+def test_load_driver_characteristics_payload_prefers_year_scoped_fallback(tmp_path, patcher):
+    patcher.chdir(tmp_path)
+
+    legacy_path = Path("data/processed/driver_characteristics.json")
+    legacy_path.parent.mkdir(parents=True, exist_ok=True)
+    legacy_path.write_text(json.dumps({"source": "legacy"}))
+
+    year_path = Path("data/processed/driver_characteristics/2027_driver_characteristics.json")
+    year_path.parent.mkdir(parents=True, exist_ok=True)
+    year_path.write_text(json.dumps({"source": "year_scoped"}))
+
+    class _Store:
+        def load_artifact(self, artifact_type, artifact_key):
+            return None
+
+    payload = updater._load_driver_characteristics_payload(_Store(), year=2027)
+
+    assert payload == {"source": "year_scoped"}
+
+
+def test_update_bayesian_driver_ratings_writes_year_scoped_fallback_on_store_save_failure(
+    patcher, tmp_path
+):
+    from src.models.bayesian import DriverPrior
+
+    patcher.chdir(tmp_path)
+
+    race_results = pd.DataFrame(
+        {
+            "Abbreviation": ["LEC", "NOR"],
+            "Position": [1, 2],
+            "race_name": ["Bahrain Grand Prix", "Bahrain Grand Prix"],
+            "year": [2027, 2027],
+        }
+    )
+
+    priors = {
+        "LEC": DriverPrior(
+            driver_number="16",
+            driver_code="LEC",
+            team="Ferrari",
+            team_tier="top",
+            mu=16.0,
+            sigma=2.0,
+        ),
+        "NOR": DriverPrior(
+            driver_number="4",
+            driver_code="NOR",
+            team="McLaren",
+            team_tier="top",
+            mu=15.0,
+            sigma=2.1,
+        ),
+    }
+    patcher.setattr("src.models.priors_factory.PriorsFactory.create_priors", lambda self: priors)
+    patcher.setattr(updater.config_loader, "get", lambda key, default=None: default)
+
+    class _Store:
+        def __init__(self, data_root):
+            self.data_root = data_root
+
+        def load_artifact(self, artifact_type, artifact_key):
+            if artifact_type == "driver_characteristics":
+                return {
+                    "version": 1,
+                    "drivers": {
+                        "LEC": {"racecraft": {"skill_score": 0.55}},
+                        "NOR": {"racecraft": {"skill_score": 0.60}},
+                    },
+                }
+            return None
+
+        def get_latest_version(self, artifact_type, artifact_key):
+            return 1
+
+        def save_artifact(self, artifact_type, artifact_key, data, version):
+            raise RuntimeError("store unavailable")
+
+    patcher.setattr(updater, "ArtifactStore", _Store)
+
+    updater.update_bayesian_driver_ratings(race_results)
+
+    year_fallback = Path("data/processed/driver_characteristics/2027_driver_characteristics.json")
+    legacy_fallback = Path("data/processed/driver_characteristics.json")
+    assert year_fallback.exists()
+    assert not legacy_fallback.exists()
+
+
 def test_update_from_race_skips_team_update_when_characteristics_missing(patcher, tmp_path):
     data_dir = tmp_path / "processed"
     (data_dir / "car_characteristics").mkdir(parents=True)

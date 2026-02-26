@@ -74,15 +74,31 @@ def sample_payloads() -> tuple[dict, dict, dict]:
     return car, drivers, tracks
 
 
-def _write_baseline_files(base_dir: Path, car: dict, drivers: dict, tracks: dict | None) -> None:
+def _write_baseline_files(
+    base_dir: Path,
+    car: dict,
+    drivers: dict,
+    tracks: dict | None,
+    *,
+    year: int = 2026,
+    write_legacy_driver_file: bool = True,
+) -> None:
     (base_dir / "car_characteristics").mkdir(parents=True, exist_ok=True)
     (base_dir / "track_characteristics").mkdir(parents=True, exist_ok=True)
 
-    (base_dir / "car_characteristics" / "2026_car_characteristics.json").write_text(json.dumps(car))
-    (base_dir / "driver_characteristics.json").write_text(json.dumps(drivers))
+    (base_dir / "car_characteristics" / f"{year}_car_characteristics.json").write_text(
+        json.dumps(car)
+    )
+    if write_legacy_driver_file:
+        (base_dir / "driver_characteristics.json").write_text(json.dumps(drivers))
+    else:
+        (base_dir / "driver_characteristics").mkdir(parents=True, exist_ok=True)
+        (base_dir / "driver_characteristics" / f"{year}_driver_characteristics.json").write_text(
+            json.dumps(drivers)
+        )
 
     if tracks is not None:
-        (base_dir / "track_characteristics" / "2026_track_characteristics.json").write_text(
+        (base_dir / "track_characteristics" / f"{year}_track_characteristics.json").write_text(
             json.dumps(tracks)
         )
 
@@ -123,6 +139,31 @@ def test_load_data_missing_track_file_sets_empty_tracks(tmp_path, patcher, sampl
     predictor.load_data()
 
     assert predictor.tracks == {}
+
+
+def test_load_data_uses_season_scoped_driver_fallback_file(tmp_path, patcher, sample_payloads):
+    car, drivers, tracks = sample_payloads
+    car_2027 = {**car, "year": 2027}
+    data_dir = tmp_path / "processed"
+    _write_baseline_files(
+        data_dir,
+        car_2027,
+        drivers,
+        tracks,
+        year=2027,
+        write_legacy_driver_file=False,
+    )
+
+    predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
+    predictor.season_year = 2027
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
+
+    predictor.load_data()
+
+    assert "NOR" in predictor.drivers
+    assert predictor.year == 2027
 
 
 def test_load_data_raises_for_invalid_team_schema(tmp_path, patcher, sample_payloads):

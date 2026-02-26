@@ -17,6 +17,7 @@ def predict_race_core(
     n_simulations: int,
     is_sprint: bool,
     race_compound: str,
+    year: int,
     cfg: Any,
     base_seed: int,
     load_race_params: Any,
@@ -156,7 +157,7 @@ def predict_race_core(
     )
 
     race_distance = resolve_race_distance_laps(
-        year=2026,
+        year=year,
         race_name=race_name,
         is_sprint=is_sprint,
     )

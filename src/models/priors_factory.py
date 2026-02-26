@@ -10,6 +10,7 @@ Generates Bayesian Priors by combining:
 """
 
 import json
+import logging
 from collections import defaultdict
 from pathlib import Path
 
@@ -17,12 +18,17 @@ import numpy as np
 
 from src.models.bayesian import DriverPrior
 
+logger = logging.getLogger(__name__)
+
 
 class PriorsFactory:
-    def __init__(self, data_dir="data/processed"):
+    def __init__(self, data_dir="data/processed", season_year: int = 2026):
         self.data_dir = Path(data_dir)
+        self.season_year = int(season_year)
         self.driver_file = self.data_dir / "driver_characteristics.json"
-        self.car_file = self.data_dir / "car_characteristics/2026_car_characteristics.json"
+        self.car_file = (
+            self.data_dir / "car_characteristics" / f"{self.season_year}_car_characteristics.json"
+        )
 
     def load_data(self):
         """Load artifacts or initialize fallbacks."""
@@ -31,16 +37,19 @@ class PriorsFactory:
             with open(self.driver_file) as f:
                 self.drivers = json.load(f)["drivers"]
         else:
-            print("No driver characteristics found. Using an empty dictionary.")
+            logger.warning("No driver characteristics found. Using an empty dictionary.")
             self.drivers = {}
 
         # 2. Load Car Data (Testing) OR Fallback to Derived Baseline
         if self.car_file.exists():
-            print("Loading testing data from 2026_car_characteristics.json")
+            logger.info("Loading testing data from %s", self.car_file.name)
             with open(self.car_file) as f:
                 self.cars = json.load(f)["teams"]
         else:
-            print("No 2026 testing data found. Deriving car performance from 2025 driver pace.")
+            logger.warning(
+                "No %s testing data found. Deriving car performance from historical driver pace.",
+                self.season_year,
+            )
             self.cars = self._derive_tiers_from_drivers()
 
     def create_priors(self) -> dict:
@@ -191,6 +200,6 @@ class PriorsFactory:
             :5
         ]
         team_strings = [f"{t}: {d['base_rating']:.1f}" for t, d in top_teams]
-        print(f"   Derived baselines: {', '.join(team_strings)}...")
+        logger.info("Derived baselines: %s ...", ", ".join(team_strings))
 
         return derived_cars

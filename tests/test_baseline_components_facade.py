@@ -112,6 +112,7 @@ def test_engines_delegate_to_mixins(patcher):
         n_simulations=5,
         is_sprint=False,
         race_compound="MEDIUM",
+        year=2027,
     )
 
     assert calls["qualifying_self"] is predictor
@@ -125,6 +126,7 @@ def test_engines_delegate_to_mixins(patcher):
     assert calls["sprint_kwargs"]["race_name"] == "Chinese Grand Prix"
     assert calls["race_self"] is predictor
     assert calls["race_kwargs"]["race_name"] == "Bahrain Grand Prix"
+    assert calls["race_kwargs"]["year"] == 2027
     assert qualifying_result == {"grid": []}
     assert sprint_result == {"finish_order": []}
     assert race_result == {"finish_order": []}
@@ -198,6 +200,12 @@ def test_baseline_predictor_facade_methods_delegate_to_components():
     )
     assert predictor.predict_race([], weather="dry", race_name="Monza Grand Prix")["kind"] == (
         "race"
+    )
+    assert (
+        predictor.predict_race([], weather="dry", race_name="Monza Grand Prix", year=2027)[
+            "kwargs"
+        ]["year"]
+        == 2027
     )
 
 

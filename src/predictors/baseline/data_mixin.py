@@ -24,6 +24,14 @@ from src.utils.schema_validation import (
 logger = logging.getLogger("src.predictors.baseline_2026")
 
 
+def _driver_characteristics_fallback_paths(data_dir: Path, year: int) -> tuple[Path, ...]:
+    """Return season-aware driver-characteristics fallback candidates."""
+    return (
+        data_dir / "driver_characteristics" / f"{year}_driver_characteristics.json",
+        data_dir / "driver_characteristics.json",
+    )
+
+
 class BaselineDataMixin:
     """Shared data and team-strength methods for Baseline2026Predictor."""
 
@@ -33,19 +41,23 @@ class BaselineDataMixin:
             self._compound_cache = {}
 
     def load_data(self) -> None:
-        """Load 2026 team data and driver characteristics with schema validation."""
+        """Load season data and driver characteristics with schema validation."""
+        target_year = int(getattr(self, "season_year", 2026))
         # Use injected artifact store or create new one
         store = getattr(self, "artifact_store", None) or ArtifactStore(data_root=self.data_dir)
 
-        # Load and validate 2026 car characteristics
+        # Load and validate season car characteristics
         data = store.load_artifact(
-            artifact_type="car_characteristics", artifact_key="2026::car_characteristics"
+            artifact_type="car_characteristics",
+            artifact_key=f"{target_year}::car_characteristics",
         )
 
         if not data:
             # Fallback to file for backward compatibility
             logger.warning("Could not load car characteristics from DB, falling back to file")
-            car_file = self.data_dir / "car_characteristics/2026_car_characteristics.json"
+            car_file = (
+                self.data_dir / "car_characteristics" / f"{target_year}_car_characteristics.json"
+            )
             with open(car_file) as f:
                 data = json.load(f)
 
@@ -76,15 +88,30 @@ class BaselineDataMixin:
 
         # Load and validate driver characteristics
         driver_data = store.load_artifact(
-            artifact_type="driver_characteristics", artifact_key="2026::driver_characteristics"
+            artifact_type="driver_characteristics",
+            artifact_key=f"{target_year}::driver_characteristics",
         )
 
         if not driver_data:
             # Fallback to file for backward compatibility
             logger.warning("Could not load driver characteristics from DB, falling back to file")
-            driver_file = self.data_dir / "driver_characteristics.json"
-            with open(driver_file) as f:
-                driver_data = json.load(f)
+            driver_data = None
+            for driver_file in _driver_characteristics_fallback_paths(self.data_dir, target_year):
+                if not driver_file.exists():
+                    continue
+                with open(driver_file) as f:
+                    driver_data = json.load(f)
+                logger.info(
+                    "Loaded driver characteristics fallback from %s for season %s",
+                    driver_file,
+                    target_year,
+                )
+                break
+            if driver_data is None:
+                raise FileNotFoundError(
+                    f"Could not locate driver characteristics fallback for season {target_year} "
+                    f"under {self.data_dir}"
+                )
 
         # Validate driver characteristics before using
         try:
@@ -107,13 +134,18 @@ class BaselineDataMixin:
 
         # Load track characteristics for weight schedule system
         track_data = store.load_artifact(
-            artifact_type="track_characteristics", artifact_key="2026::track_characteristics"
+            artifact_type="track_characteristics",
+            artifact_key=f"{target_year}::track_characteristics",
         )
 
         if not track_data:
             # Fallback to file for backward compatibility
             logger.warning("Could not load track characteristics from DB, falling back to file")
-            track_file = self.data_dir / "track_characteristics/2026_track_characteristics.json"
+            track_file = (
+                self.data_dir
+                / "track_characteristics"
+                / f"{target_year}_track_characteristics.json"
+            )
             try:
                 with open(track_file) as f:
                     track_data = json.load(f)
@@ -127,7 +159,7 @@ class BaselineDataMixin:
 
         # Store races completed and year for weight schedule (from car characteristics)
         self.races_completed = data.get("races_completed", 0)
-        self.year = data.get("year", 2026)
+        self.year = data.get("year", target_year)
 
     def calculate_track_suitability(self, team: str, race_name: str) -> float:
         """Calculate track-car suitability modifier (-0.1 to +0.1) based on car directionality vs track composition."""
@@ -213,14 +245,34 @@ class BaselineDataMixin:
         """Select primary race compound based on track tire stress characteristics."""
         cfg = getattr(self, "config", config_loader)
         try:
-            # Try 2026 pirelli info first
-            pirelli_file_2026 = Path("data/2026_pirelli_info.json")
-            pirelli_file_2025 = Path("data/2025_pirelli_info.json")
+            season_year = int(getattr(self, "season_year", getattr(self, "year", 2026)))
+            candidate_years = [season_year]
+            if season_year > 2020:
+                candidate_years.append(season_year - 1)
+            if 2025 not in candidate_years:
+                candidate_years.append(2025)
 
-            pirelli_file = pirelli_file_2026 if pirelli_file_2026.exists() else pirelli_file_2025
-
-            if not pirelli_file.exists():
+            pirelli_file = next(
+                (
+                    Path("data") / f"{candidate_year}_pirelli_info.json"
+                    for candidate_year in candidate_years
+                ),
+                None,
+            )
+            if pirelli_file is None:
                 return "MEDIUM"  # Default fallback
+            if not pirelli_file.exists():
+                fallback_file = next(
+                    (
+                        Path("data") / f"{candidate_year}_pirelli_info.json"
+                        for candidate_year in candidate_years[1:]
+                        if (Path("data") / f"{candidate_year}_pirelli_info.json").exists()
+                    ),
+                    None,
+                )
+                if fallback_file is None:
+                    return "MEDIUM"
+                pirelli_file = fallback_file
 
             with open(pirelli_file) as f:
                 pirelli_data = json.load(f)
@@ -453,18 +505,16 @@ class BaselineDataMixin:
             storage_mode = getattr(store, "storage_mode", "file_only") if store else "file_only"
             if store and storage_mode in {"db_only", "fallback", "dual_write"}:
                 try:
-                    car_data = store.load_artifact(
-                        "car_characteristics", "2026::car_characteristics"
-                    )
+                    season_year = int(getattr(self, "season_year", getattr(self, "year", 2026)))
+                    artifact_key = f"{season_year}::car_characteristics"
+                    car_data = store.load_artifact("car_characteristics", artifact_key)
                     if car_data:
                         for team_name in normalized_compound_metrics:
                             if team_name in car_data.get("teams", {}):
                                 car_data["teams"][team_name]["compound_characteristics"] = (
                                     self.teams[team_name].get("compound_characteristics", {})
                                 )
-                        store.save_artifact(
-                            "car_characteristics", "2026::car_characteristics", car_data
-                        )
+                        store.save_artifact("car_characteristics", artifact_key, car_data)
                         logger.debug(
                             "Persisted compound characteristics for "
                             f"{len(normalized_compound_metrics)} teams to DB"

@@ -8,6 +8,7 @@ Adaptive learning after each race:
 """
 
 import logging
+from datetime import datetime
 from pathlib import Path
 
 import fastf1
@@ -27,6 +28,115 @@ from src.utils import config_loader
 from src.utils.team_mapping import map_team_to_characteristics
 
 logger = logging.getLogger(__name__)
+
+
+def _driver_characteristics_fallback_paths(year: int) -> tuple[Path, ...]:
+    """
+    Return fallback file paths for driver characteristics in priority order.
+
+    First preference is season-scoped fallback to avoid cross-year contamination.
+    Legacy unscoped path is read-only compatibility.
+    """
+    processed_root = Path("data/processed")
+    return (
+        processed_root / "driver_characteristics" / f"{year}_driver_characteristics.json",
+        processed_root / "driver_characteristics.json",
+    )
+
+
+def _coerce_season_year(race_results: pd.DataFrame, default_year: int = 2026) -> int:
+    """Resolve season year from race results payload with safe fallback."""
+    if "year" not in race_results.columns or race_results.empty:
+        return default_year
+    raw_year = race_results["year"].iloc[0]
+    try:
+        return int(raw_year)
+    except (TypeError, ValueError):
+        return default_year
+
+
+def _load_driver_characteristics_payload(
+    store: ArtifactStore,
+    year: int,
+) -> dict | None:
+    """Load driver characteristics from artifact store with file fallback."""
+    artifact_key = f"{year}::driver_characteristics"
+    payload = store.load_artifact(
+        artifact_type="driver_characteristics",
+        artifact_key=artifact_key,
+    )
+    if payload:
+        return payload
+
+    for fallback_file in _driver_characteristics_fallback_paths(year):
+        if not fallback_file.exists():
+            continue
+        try:
+            import json
+
+            with open(fallback_file) as f:
+                fallback_payload = json.load(f)
+            logger.info(
+                "Loaded driver characteristics fallback from %s for season %s",
+                fallback_file,
+                year,
+            )
+            return fallback_payload
+        except Exception as exc:
+            logger.warning(
+                "Could not read driver characteristics fallback %s: %s",
+                fallback_file,
+                exc,
+            )
+            continue
+    return None
+
+
+def _persist_driver_characteristics_payload(
+    store: ArtifactStore,
+    payload: dict,
+    year: int,
+) -> None:
+    """Persist updated driver characteristics payload with artifact-store fallback."""
+    artifact_key = f"{year}::driver_characteristics"
+    fallback_file = _driver_characteristics_fallback_paths(year)[0]
+    fallback_file.parent.mkdir(parents=True, exist_ok=True)
+
+    current_version_raw = payload.get("version", 0)
+    try:
+        current_version = int(current_version_raw)
+    except (TypeError, ValueError):
+        current_version = 0
+
+    latest_store_version = 0
+    try:
+        latest_store_version = int(store.get_latest_version("driver_characteristics", artifact_key))
+    except Exception:
+        latest_store_version = 0
+    new_version = max(current_version, latest_store_version) + 1
+
+    payload["version"] = new_version
+    payload["last_updated"] = datetime.now().isoformat()
+    payload["bayesian_last_updated_year"] = year
+
+    try:
+        store.save_artifact(
+            artifact_type="driver_characteristics",
+            artifact_key=artifact_key,
+            data=payload,
+            version=new_version,
+        )
+    except Exception as exc:
+        logger.warning(
+            "ArtifactStore save failed for driver characteristics: %s. "
+            "Falling back to season-scoped file %s.",
+            exc,
+            fallback_file,
+        )
+        import json
+
+        with open(fallback_file, "w") as f:
+            json.dump(payload, f, indent=2)
 
 
 def load_race_session(year: int, race_name: str) -> tuple[pd.DataFrame, fastf1.core.Session]:
@@ -162,7 +272,8 @@ def update_bayesian_driver_ratings(race_results: pd.DataFrame) -> None:
     # Create priors for drivers
     from src.models.priors_factory import PriorsFactory
 
-    factory = PriorsFactory()
+    season_year = _coerce_season_year(race_results)
+    factory = PriorsFactory(season_year=season_year)
     priors = factory.create_priors()
 
     bayesian = BayesianDriverRanking(priors)
@@ -182,7 +293,66 @@ def update_bayesian_driver_ratings(race_results: pd.DataFrame) -> None:
     session_name = str(race_results.get("race_name", pd.Series(["Race"])).iloc[0])
     bayesian.update(observations=observations, session_name=session_name, confidence=1.0)
 
-    logger.info(f"Updated Bayesian ratings for {len(observations)} drivers")
+    store = ArtifactStore(data_root="data")
+    driver_payload = _load_driver_characteristics_payload(store, season_year)
+    if not isinstance(driver_payload, dict):
+        logger.warning("Could not load driver characteristics payload to persist Bayesian updates")
+        return
+
+    drivers_payload = driver_payload.get("drivers")
+    if not isinstance(drivers_payload, dict):
+        logger.warning(
+            "Driver characteristics payload missing 'drivers'; skipping Bayesian persistence"
+        )
+        return
+
+    blend_weight = float(config_loader.get("bayesian.runtime_skill_blend_weight", 0.25))
+    blend_weight = float(max(0.0, min(blend_weight, 1.0)))
+    touched_drivers = 0
+    for driver_code, (mu, sigma) in bayesian.ratings.items():
+        driver_entry = drivers_payload.get(driver_code)
+        if not isinstance(driver_entry, dict):
+            continue
+
+        racecraft_payload = driver_entry.get("racecraft")
+        if not isinstance(racecraft_payload, dict):
+            racecraft_payload = {}
+            driver_entry["racecraft"] = racecraft_payload
+
+        existing_skill_raw = racecraft_payload.get("skill_score", 0.5)
+        try:
+            existing_skill = float(existing_skill_raw)
+        except (TypeError, ValueError):
+            existing_skill = 0.5
+        existing_skill = float(max(0.0, min(existing_skill, 1.0)))
+
+        bayesian_skill = float(max(0.0, min((float(mu) - 1.0) / 19.0, 1.0)))
+        blended_skill = ((1.0 - blend_weight) * existing_skill) + (blend_weight * bayesian_skill)
+        blended_skill = float(max(0.0, min(blended_skill, 1.0)))
+        racecraft_payload["skill_score"] = blended_skill
+
+        driver_entry["bayesian"] = {
+            "rating_mu": float(mu),
+            "rating_sigma": float(sigma),
+            "normalized_skill_score": bayesian_skill,
+            "blended_skill_score": blended_skill,
+            "blend_weight": blend_weight,
+            "last_session": session_name,
+            "last_updated": datetime.now().isoformat(),
+            "season_year": season_year,
+        }
+        touched_drivers += 1
+
+    if touched_drivers == 0:
+        logger.warning("Bayesian update produced no persisted driver changes")
+        return
+
+    _persist_driver_characteristics_payload(store, driver_payload, season_year)
+    logger.info(
+        "Updated Bayesian ratings for %s drivers and persisted %s driver profile updates",
+        len(observations),
+        touched_drivers,
+    )
 
 
 def update_from_race(year: int, race_name: str, data_dir: str = "data/processed") -> None:

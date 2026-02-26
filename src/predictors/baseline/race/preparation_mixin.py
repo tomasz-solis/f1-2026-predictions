@@ -162,8 +162,9 @@ class BaselineRacePreparationMixin:
             return 0.5
 
         try:
+            season_year = int(getattr(self, "season_year", getattr(self, "year", 2026)))
             track_file = Path(
-                "data/processed/track_characteristics/2026_track_characteristics.json"
+                f"data/processed/track_characteristics/{season_year}_track_characteristics.json"
             )
             with open(track_file) as f:
                 track_data = json.load(f)

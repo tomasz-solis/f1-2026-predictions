@@ -38,12 +38,15 @@ class Baseline2026Predictor(
         self,
         data_dir: str = "data/processed",
         seed: int = 42,
+        season_year: int = 2026,
         config: Config | None = None,
         artifact_store: ArtifactStore | None = None,
     ):
         """Initialize predictor with optional injectable config/artifact store."""
         BaselineDataMixin.__init__(self)
         self.seed = seed
+        self.season_year = int(season_year)
+        self.year = self.season_year
 
         data_dir_path = Path(data_dir)
         if not data_dir_path.is_absolute():
@@ -145,6 +148,7 @@ class Baseline2026Predictor(
         n_simulations: int = 50,
         is_sprint: bool = False,
         race_compound: str = "MEDIUM",
+        year: int | None = None,
     ) -> dict[str, Any]:
         """Delegate race prediction to the race engine."""
         return self.race_engine.predict(
@@ -154,4 +158,5 @@ class Baseline2026Predictor(
             n_simulations=n_simulations,
             is_sprint=is_sprint,
             race_compound=race_compound,
+            year=year,
         )

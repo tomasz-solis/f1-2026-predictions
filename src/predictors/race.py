@@ -7,6 +7,7 @@ implementation now delegates to `Baseline2026Predictor`.
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 from src.predictors.baseline_2026 import Baseline2026Predictor
@@ -38,11 +39,25 @@ class RacePredictor:
         verbose: bool = False,
         n_simulations: int = 50,
     ) -> dict[str, Any]:
-        # `year`, `fp2_pace`, and `verbose` are currently ignored by baseline API.
-        _ = (year, fp2_pace, verbose)
-        return self._predictor.predict_race(
-            qualifying_grid=qualifying_grid,
-            weather=weather_forecast,
-            race_name=race_name,
-            n_simulations=n_simulations,
+        # `fp2_pace` and `verbose` are legacy wrapper parameters.
+        _ = (fp2_pace, verbose)
+        predict_race = self._predictor.predict_race
+        try:
+            signature = inspect.signature(predict_race)
+            parameters = signature.parameters
+        except (TypeError, ValueError):
+            parameters = {}
+
+        supports_var_kwargs = any(
+            parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
         )
+        kwargs: dict[str, Any] = {
+            "qualifying_grid": qualifying_grid,
+            "weather": weather_forecast,
+            "race_name": race_name,
+            "n_simulations": n_simulations,
+        }
+        if supports_var_kwargs or "year" in parameters:
+            kwargs["year"] = year
+
+        return predict_race(**kwargs)
