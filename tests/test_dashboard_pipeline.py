@@ -254,6 +254,82 @@ def test_execute_live_prediction_pipeline_emits_progress_and_timing(patcher):
     assert timing["total"] >= 0.0
 
 
+def test_execute_live_prediction_pipeline_passes_year_to_auto_update_when_supported(patcher):
+    seen_calls: list[tuple[int, bool]] = []
+
+    def _auto_update(year: int, force_recheck: bool = False):
+        seen_calls.append((year, force_recheck))
+
+    patcher.setattr(pages, "auto_update_if_needed", _auto_update)
+    patcher.setattr(pages, "_clear_fastf1_race_cache", lambda year, race_name: None)
+    patcher.setattr(pages, "is_sprint_weekend", lambda year, race_name: False)
+    patcher.setattr(
+        pages,
+        "auto_update_practice_characteristics_if_needed",
+        lambda year, race_name, is_sprint, force_recheck=False: {
+            "updated": False,
+            "completed_fp_sessions": [],
+        },
+    )
+    patcher.setattr(pages, "get_artifact_versions", lambda: {"k": (1, "ts")})
+    patcher.setattr(
+        pages,
+        "run_prediction",
+        lambda race_name, weather, _versions, is_sprint, year: {
+            "qualifying": {"grid": []},
+            "race": {"finish_order": []},
+        },
+    )
+
+    pages.execute_live_prediction_pipeline(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2027,
+        force_refresh=True,
+    )
+
+    assert seen_calls == [(2027, True)]
+
+
+def test_execute_live_prediction_pipeline_passes_year_to_artifact_versions_when_supported(patcher):
+    seen_years: list[int] = []
+
+    patcher.setattr(pages, "auto_update_if_needed", lambda force_recheck=False: None)
+    patcher.setattr(pages, "_clear_fastf1_race_cache", lambda year, race_name: None)
+    patcher.setattr(pages, "is_sprint_weekend", lambda year, race_name: False)
+    patcher.setattr(
+        pages,
+        "auto_update_practice_characteristics_if_needed",
+        lambda year, race_name, is_sprint, force_recheck=False: {
+            "updated": False,
+            "completed_fp_sessions": [],
+        },
+    )
+
+    def _artifact_versions(year: int = 2026):
+        seen_years.append(year)
+        return {"k": (1, "ts")}
+
+    patcher.setattr(pages, "get_artifact_versions", _artifact_versions)
+    patcher.setattr(
+        pages,
+        "run_prediction",
+        lambda race_name, weather, _versions, is_sprint, year: {
+            "qualifying": {"grid": []},
+            "race": {"finish_order": []},
+        },
+    )
+
+    pages.execute_live_prediction_pipeline(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2027,
+        force_refresh=False,
+    )
+
+    assert seen_years == [2027]
+
+
 def test_execute_live_prediction_pipeline_with_force_refresh_clears_cache_and_rechecks(patcher):
     """Test that force_refresh=True clears FastF1 cache and forces session recheck."""
     call_order: list[str] = []
@@ -315,36 +391,7 @@ def test_execute_live_prediction_pipeline_with_force_refresh_clears_cache_and_re
     assert "clear_data" in call_order
 
 
-def test_run_prediction_cached_reuses_result_for_unchanged_inputs(patcher):
-    pages._run_prediction_cached.clear()
-    run_calls = {"count": 0}
-
-    def _run_prediction(
-        race_name: str,
-        weather: str,
-        versions: dict,
-        is_sprint: bool,
-        year: int,
-    ):
-        run_calls["count"] += 1
-        assert race_name == "Bahrain Grand Prix"
-        assert weather == "dry"
-        assert versions == {"k": (1, "ts")}
-        assert is_sprint is False
-        assert year == 2026
-        return {"qualifying": {"grid": []}, "race": {"finish_order": []}}
-
-    patcher.setattr(pages, "run_prediction", _run_prediction)
-
-    cache_key = (("k", (1, "ts")),)
-    pages._run_prediction_cached("Bahrain Grand Prix", "dry", cache_key, False, 2026)
-    pages._run_prediction_cached("Bahrain Grand Prix", "dry", cache_key, False, 2026)
-
-    assert run_calls["count"] == 1
-    pages._run_prediction_cached.clear()
-
-
-def test_execute_live_prediction_pipeline_uses_cached_prediction_wrapper_when_enabled(patcher):
+def test_execute_live_prediction_pipeline_executes_direct_prediction_path(patcher):
     call_order: list[str] = []
 
     patcher.setattr(pages, "auto_update_if_needed", lambda force_recheck=False: None)
@@ -360,14 +407,6 @@ def test_execute_live_prediction_pipeline_uses_cached_prediction_wrapper_when_en
     patcher.setattr(pages, "get_artifact_versions", lambda: {"k": (1, "ts")})
     patcher.setattr(
         pages,
-        "_run_prediction_cached",
-        lambda race_name, weather, artifact_versions_key, is_sprint, year: (
-            call_order.append("cached"),
-            {"qualifying": {"grid": []}, "race": {"finish_order": []}},
-        )[1],
-    )
-    patcher.setattr(
-        pages,
         "run_prediction",
         lambda race_name, weather, _versions, is_sprint, year: (
             call_order.append("direct"),
@@ -380,13 +419,12 @@ def test_execute_live_prediction_pipeline_uses_cached_prediction_wrapper_when_en
         weather="dry",
         year=2026,
         force_refresh=False,
-        use_cached_prediction=True,
     )
 
-    assert call_order == ["cached"]
+    assert call_order == ["direct"]
 
 
-def test_execute_live_prediction_pipeline_force_refresh_bypasses_prediction_cache(patcher):
+def test_execute_live_prediction_pipeline_force_refresh_uses_direct_prediction_path(patcher):
     call_order: list[str] = []
 
     patcher.setattr(pages, "auto_update_if_needed", lambda force_recheck=False: None)
@@ -413,14 +451,6 @@ def test_execute_live_prediction_pipeline_force_refresh_bypasses_prediction_cach
     )
     patcher.setattr(
         pages,
-        "_run_prediction_cached",
-        lambda race_name, weather, artifact_versions_key, is_sprint, year: (
-            call_order.append("cached"),
-            {"qualifying": {"grid": []}, "race": {"finish_order": []}},
-        )[1],
-    )
-    patcher.setattr(
-        pages,
         "run_prediction",
         lambda race_name, weather, _versions, is_sprint, year: (
             call_order.append("direct"),
@@ -433,7 +463,45 @@ def test_execute_live_prediction_pipeline_force_refresh_bypasses_prediction_cach
         weather="dry",
         year=2026,
         force_refresh=True,
-        use_cached_prediction=True,
     )
 
     assert call_order == ["direct"]
+
+
+def test_execute_live_prediction_pipeline_rechecks_live_sessions_on_repeated_runs(patcher):
+    run_calls = {"direct": 0}
+
+    patcher.setattr(pages, "auto_update_if_needed", lambda force_recheck=False: None)
+    patcher.setattr(pages, "is_sprint_weekend", lambda year, race_name: False)
+    patcher.setattr(
+        pages,
+        "auto_update_practice_characteristics_if_needed",
+        lambda year, race_name, is_sprint, force_recheck=False: {
+            "updated": False,
+            "completed_fp_sessions": [],
+        },
+    )
+    patcher.setattr(pages, "get_artifact_versions", lambda: {"k": (1, "ts")})
+    patcher.setattr(
+        pages,
+        "run_prediction",
+        lambda race_name, weather, _versions, is_sprint, year: (
+            run_calls.__setitem__("direct", run_calls["direct"] + 1),
+            {"qualifying": {"grid": []}, "race": {"finish_order": []}},
+        )[1],
+    )
+
+    pages.execute_live_prediction_pipeline(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+    )
+    pages.execute_live_prediction_pipeline(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+    )
+
+    assert run_calls == {"direct": 2}

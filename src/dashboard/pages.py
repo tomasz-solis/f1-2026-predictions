@@ -1,7 +1,10 @@
 """Dashboard pages and page-level orchestration."""
 
 import logging
+import unicodedata
 from collections.abc import Callable
+from datetime import UTC, datetime
+from pathlib import Path
 
 import fastf1
 import streamlit as st
@@ -36,6 +39,12 @@ from .update_flow import auto_update_if_needed, auto_update_practice_characteris
 
 logger = logging.getLogger(__name__)
 DEFAULT_SEASON = 2026
+_MIN_SELECTABLE_SEASON = 2024
+_FASTF1_CACHE_DIRS = (
+    Path("data/raw/.fastf1_cache"),
+    Path("data/raw/.fastf1_cache_testing"),
+)
+_NON_DISTINCT_RACE_TOKENS = {"grand", "prix", "gp"}
 
 # Backwards-compatible exports for tests and existing imports.
 _DEFAULT_TEAM_COLOR = _team_comparison._DEFAULT_TEAM_COLOR
@@ -50,6 +59,34 @@ _resolve_profile_metrics = _team_comparison._resolve_profile_metrics
 _team_brand_color = _team_comparison._team_brand_color
 
 
+def _available_seasons() -> list[int]:
+    """Return season choices shown in the dashboard UI."""
+    current_year = datetime.now(UTC).year
+    latest = max(DEFAULT_SEASON, current_year)
+    earliest = min(DEFAULT_SEASON, _MIN_SELECTABLE_SEASON)
+    return list(range(latest, earliest - 1, -1))
+
+
+def _get_selected_season(default: int = DEFAULT_SEASON) -> int:
+    """Read selected season from Streamlit session state with safe fallback."""
+    try:
+        raw_value = st.session_state.get("selected_season", default)
+    except Exception:
+        raw_value = default
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _set_selected_season(year: int) -> None:
+    """Persist selected season in Streamlit session state when available."""
+    try:
+        st.session_state["selected_season"] = int(year)
+    except Exception:
+        return
+
+
 def render_team_comparison_page() -> None:
     """Render standalone team comparison tab."""
     st.header("Team Comparison")
@@ -57,7 +94,7 @@ def render_team_comparison_page() -> None:
         "Compare team characteristic fingerprints from testing/practice inputs. "
         "Profile metrics and season-prior baseline are separate signals and can diverge."
     )
-    _render_team_comparison_section(year=DEFAULT_SEASON)
+    _render_team_comparison_section(year=_get_selected_season())
 
 
 def _clear_fastf1_race_cache(year: int, race_name: str) -> None:
@@ -68,32 +105,68 @@ def _clear_fastf1_race_cache(year: int, race_name: str) -> None:
     qualifying, and race results. The next FastF1 call will fetch fresh data from the API.
     """
     import shutil
-    from pathlib import Path
 
-    cache_dirs = [
-        Path("data/raw/.fastf1_cache"),
-        Path("data/raw/.fastf1_cache_testing"),
-    ]
-
-    for cache_dir in cache_dirs:
-        if not cache_dir.exists():
+    for cache_dir in _FASTF1_CACHE_DIRS:
+        year_dir = cache_dir / str(year)
+        if not year_dir.exists():
             continue
 
+        removed_paths: list[Path] = []
         try:
-            # FastF1 cache structure: {cache_dir}/{year}/{race_name}/...
-            race_cache_path = cache_dir / str(year) / race_name.replace(" ", "_")
-            if race_cache_path.exists():
-                shutil.rmtree(race_cache_path)
-                logger.info(f"Cleared FastF1 cache for {race_name} {year} at {race_cache_path}")
+            for event_cache_dir in year_dir.iterdir():
+                if not event_cache_dir.is_dir():
+                    continue
+                if not _cache_dir_matches_race(event_cache_dir.name, race_name):
+                    continue
+                try:
+                    shutil.rmtree(event_cache_dir)
+                    removed_paths.append(event_cache_dir)
+                except Exception as exc:  # pragma: no cover - defensive logging
+                    logger.warning(f"Could not clear FastF1 cache path {event_cache_dir}: {exc}")
+        except Exception as exc:
+            logger.warning(f"Could not inspect FastF1 cache at {year_dir}: {exc}")
+            continue
 
-            # Also try with spaces removed completely
-            race_cache_path_alt = cache_dir / str(year) / race_name.replace(" ", "")
-            if race_cache_path_alt.exists():
-                shutil.rmtree(race_cache_path_alt)
-                logger.info(f"Cleared alternate FastF1 cache at {race_cache_path_alt}")
+        if removed_paths:
+            removed_labels = ", ".join(path.name for path in removed_paths[:5])
+            if len(removed_paths) > 5:
+                removed_labels += ", ..."
+            logger.info(
+                f"Cleared FastF1 cache for {race_name} {year}: "
+                f"{len(removed_paths)} path(s) in {cache_dir} ({removed_labels})"
+            )
+        else:
+            logger.info(f"No FastF1 cache paths matched {race_name} {year} in {cache_dir}")
 
-        except Exception as e:
-            logger.warning(f"Could not clear FastF1 cache at {cache_dir}: {e}")
+
+def _normalize_cache_fragment(value: str) -> str:
+    """Normalize cache path fragments for robust race-name matching."""
+    normalized = unicodedata.normalize("NFKD", str(value))
+    folded = normalized.encode("ascii", "ignore").decode("ascii")
+    return "".join(ch.lower() for ch in folded if ch.isalnum())
+
+
+def _cache_dir_matches_race(cache_dir_name: str, race_name: str) -> bool:
+    """
+    Return True when a FastF1 event cache directory corresponds to race_name.
+
+    FastF1 event directories are often date-prefixed (for example
+    `2025-04-13_Bahrain_Grand_Prix`), so exact-path matching is insufficient.
+    """
+    normalized_dir = _normalize_cache_fragment(cache_dir_name)
+    normalized_race = _normalize_cache_fragment(race_name)
+    if not normalized_dir or not normalized_race:
+        return False
+
+    if normalized_race in normalized_dir:
+        return True
+
+    race_tokens = [
+        token
+        for token in (_normalize_cache_fragment(part) for part in race_name.split())
+        if token and token not in _NON_DISTINCT_RACE_TOKENS
+    ]
+    return bool(race_tokens) and all(token in normalized_dir for token in race_tokens)
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -130,11 +203,11 @@ def _load_race_options_cached(year: int) -> tuple[list[str], str | None]:
         )
 
 
-def _load_race_options() -> list[str]:
+def _load_race_options(year: int = DEFAULT_SEASON) -> list[str]:
     """Load race options from FastF1 schedule with sprint labels."""
-    race_options, error = _load_race_options_cached(DEFAULT_SEASON)
+    race_options, error = _load_race_options_cached(year)
     if error:
-        st.error(f"Failed to load {DEFAULT_SEASON} calendar: {error}")
+        st.error(f"Failed to load {year} calendar: {error}")
     return race_options
 
 
@@ -173,31 +246,11 @@ def _render_prediction_results(prediction_results: dict, is_sprint: bool) -> Non
     )
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
-def _run_prediction_cached(
-    race_name: str,
-    weather: str,
-    artifact_versions_key: tuple[tuple[str, tuple[int, str]], ...],
-    is_sprint: bool,
-    year: int,
-) -> dict:
-    """Run prediction with caching for unchanged inputs and artifact versions."""
-    artifact_versions = dict(artifact_versions_key)
-    return run_prediction(
-        race_name,
-        weather,
-        artifact_versions,
-        is_sprint=is_sprint,
-        year=year,
-    )
-
-
 def execute_live_prediction_pipeline(
     race_name: str,
     weather: str,
     year: int = DEFAULT_SEASON,
     force_refresh: bool = True,
-    use_cached_prediction: bool = False,
     progress_callback: Callable[[str], None] | None = None,
 ) -> dict:
     """
@@ -210,7 +263,6 @@ def execute_live_prediction_pipeline(
         weather: Weather forecast for the race
         year: Season year
         force_refresh: If True, clears FastF1 cache and forces re-check of session completion
-        use_cached_prediction: If True, reuses cached prediction results when inputs are unchanged
         progress_callback: Optional callback for progress updates
     """
     return _execute_live_prediction_pipeline_core(
@@ -218,7 +270,6 @@ def execute_live_prediction_pipeline(
         weather=weather,
         year=year,
         force_refresh=force_refresh,
-        use_cached_prediction=use_cached_prediction,
         progress_callback=progress_callback,
         clear_fastf1_race_cache_fn=_clear_fastf1_race_cache,
         auto_update_if_needed_fn=auto_update_if_needed,
@@ -228,7 +279,6 @@ def execute_live_prediction_pipeline(
         clear_data_cache_fn=st.cache_data.clear,
         get_artifact_versions_fn=get_artifact_versions,
         run_prediction_fn=run_prediction,
-        run_prediction_cached_fn=_run_prediction_cached,
     )
 
 
@@ -239,7 +289,22 @@ def render_live_prediction_page(enable_logging: bool) -> None:
         "Use forced refresh when new sessions have just completed."
     )
 
-    race_options = _load_race_options()
+    season_options = _available_seasons()
+    selected_season = _get_selected_season()
+    if selected_season not in season_options:
+        season_options = [selected_season, *season_options]
+    season_index = season_options.index(selected_season)
+    selected_season = int(
+        st.selectbox(
+            "Season",
+            options=season_options,
+            index=season_index,
+            help="Controls schedule lookup, update checks, artifacts, and prediction execution year.",
+        )
+    )
+    _set_selected_season(selected_season)
+
+    race_options = _load_race_options(selected_season)
 
     col1, col2 = st.columns(2, gap="large")
 
@@ -257,8 +322,8 @@ def render_live_prediction_page(enable_logging: bool) -> None:
             "Force Data Refresh",
             value=False,
             help=(
-                "When enabled, clears source caches and recomputes from fresh session data. "
-                "When disabled, unchanged inputs can reuse cached predictions."
+                "When enabled, clears FastF1 race cache before checking session completion. "
+                "When disabled, cache is preserved but live session checks still run."
             ),
         )
     with action_col:
@@ -269,9 +334,9 @@ def render_live_prediction_page(enable_logging: bool) -> None:
             width="stretch",
         )
 
-    use_cached_prediction = not force_refresh
-    mode_text = "Mode: Force refresh" if force_refresh else "Mode: Use cached prediction"
+    mode_text = "Mode: Force refresh" if force_refresh else "Mode: Standard refresh"
     st.markdown(f'<div class="run-options-note">{mode_text}</div>', unsafe_allow_html=True)
+    st.caption("FastF1 session completion checks run on every prediction.")
 
     if generate_prediction:
         status_placeholder = st.empty()
@@ -285,9 +350,8 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                 pipeline_output = execute_live_prediction_pipeline(
                     race_name=race_name,
                     weather=weather,
-                    year=DEFAULT_SEASON,
+                    year=selected_season,
                     force_refresh=force_refresh,
-                    use_cached_prediction=use_cached_prediction,
                     progress_callback=update_status,
                 )
                 prediction_results = pipeline_output["prediction_results"]
@@ -296,7 +360,15 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                 pipeline_timing = pipeline_output.get("pipeline_timing", {})
                 status_placeholder.empty()
 
-                st.warning("2026 regulation reset: predictions are uncertain until races complete.")
+                if selected_season == 2026:
+                    st.warning(
+                        "2026 regulation reset: predictions are uncertain until races complete."
+                    )
+                else:
+                    st.info(
+                        f"{selected_season} season selected: predictions use currently available "
+                        "session data and learned artifacts for this season."
+                    )
 
                 if is_sprint:
                     st.info(
@@ -334,7 +406,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                     is_sprint=is_sprint,
                     race_name=race_name,
                     weather=weather,
-                    year=DEFAULT_SEASON,
+                    year=selected_season,
                 )
 
                 _render_prediction_results(prediction_results, is_sprint)
@@ -371,7 +443,8 @@ def render_prediction_accuracy_page() -> None:
     logger_inst = PredictionLogger()
     metrics_calc = PredictionMetrics()
 
-    all_predictions = logger_inst.get_all_predictions(DEFAULT_SEASON)
+    selected_season = _get_selected_season()
+    all_predictions = logger_inst.get_all_predictions(selected_season)
 
     if not all_predictions:
         st.info(

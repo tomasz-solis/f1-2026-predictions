@@ -113,6 +113,53 @@ def test_auto_update_if_needed_raises_when_update_is_incomplete(patcher):
     assert cache_calls == []
 
 
+def test_auto_update_if_needed_force_recheck_passes_explicit_race_list(patcher):
+    _stub_streamlit(patcher)
+    seen_force_recheck: list[bool] = []
+    captured_races: list[str] = []
+
+    def _needs_update(force_recheck=False):
+        seen_force_recheck.append(force_recheck)
+        return True, ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"]
+
+    def _auto_update_from_races(progress_callback=None, races_to_update=None):
+        del progress_callback
+        captured_races.extend(races_to_update or [])
+        return len(races_to_update or [])
+
+    patcher.setattr("src.utils.auto_updater.needs_update", _needs_update)
+    patcher.setattr("src.utils.auto_updater.auto_update_from_races", _auto_update_from_races)
+
+    update_flow.auto_update_if_needed(force_recheck=True)
+
+    assert seen_force_recheck == [True]
+    assert captured_races == ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"]
+
+
+def test_auto_update_if_needed_passes_year_to_updater_dependencies(patcher):
+    _stub_streamlit(patcher)
+    seen_years: list[int] = []
+    seen_update_years: list[int] = []
+
+    def _needs_update(year=2026, force_recheck=False):
+        del force_recheck
+        seen_years.append(year)
+        return True, ["Bahrain Grand Prix"]
+
+    def _auto_update_from_races(progress_callback=None, races_to_update=None, year=2026):
+        del progress_callback, races_to_update
+        seen_update_years.append(year)
+        return 1
+
+    patcher.setattr("src.utils.auto_updater.needs_update", _needs_update)
+    patcher.setattr("src.utils.auto_updater.auto_update_from_races", _auto_update_from_races)
+
+    update_flow.auto_update_if_needed(year=2027)
+
+    assert seen_years == [2027]
+    assert seen_update_years == [2027]
+
+
 def test_load_practice_update_state_handles_invalid_json(patcher, tmp_path):
     state_file = tmp_path / "practice_state.json"
     state_file.write_text("{invalid json")

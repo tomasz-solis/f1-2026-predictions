@@ -69,7 +69,11 @@ def test_get_artifact_versions_combines_store_and_file_timestamps(patcher):
             raise RuntimeError("db error")
 
     patcher.setattr(cache, "ArtifactStore", _Store)
-    patcher.setattr(cache, "_get_file_timestamps", lambda: {"config/default.yaml": (9, "9.1")})
+    patcher.setattr(
+        cache,
+        "_get_file_timestamps",
+        lambda year=2026: {"config/default.yaml": (9, "9.1")},
+    )
 
     versions = cache.get_artifact_versions()
 
@@ -83,3 +87,56 @@ def test_get_artifact_versions_combines_store_and_file_timestamps(patcher):
     )
     assert versions["track_characteristics::2026::track_characteristics"] == (0, "")
     assert versions["config/default.yaml"] == (9, "9.1")
+
+
+def test_get_artifact_versions_supports_non_default_year(patcher):
+    class _Store:
+        def __init__(self, data_root: str):
+            assert data_root == "data"
+
+        def load_artifact(self, artifact_type: str, artifact_key: str):
+            if artifact_key == "2027::car_characteristics":
+                return {"version": 11, "last_updated": "2027-02-01T00:00:00"}
+            if artifact_key == "2027::driver_characteristics":
+                return {"version": 5, "updated_at": "2027-02-02T00:00:00"}
+            if artifact_key == "2027::track_characteristics":
+                return {"version": 2, "updated_at": "2027-02-03T00:00:00"}
+            return None
+
+    patcher.setattr(cache, "ArtifactStore", _Store)
+    patcher.setattr(cache, "_get_file_timestamps", lambda year=2027: {})
+
+    versions = cache.get_artifact_versions(year=2027)
+
+    assert versions["car_characteristics::2027::car_characteristics"] == (
+        11,
+        "2027-02-01T00:00:00",
+    )
+    assert versions["driver_characteristics::2027::driver_characteristics"] == (
+        5,
+        "2027-02-02T00:00:00",
+    )
+    assert versions["track_characteristics::2027::track_characteristics"] == (
+        2,
+        "2027-02-03T00:00:00",
+    )
+
+
+def test_get_predictor_passes_year_to_predictor_bootstrap(patcher):
+    import src.predictors.baseline_2026 as baseline_module
+    from src.utils.config_loader import Config
+
+    calls: list[int] = []
+
+    class _Predictor:
+        def __init__(self, season_year: int = 2026):
+            calls.append(season_year)
+
+    patcher.setattr(baseline_module, "Baseline2026Predictor", _Predictor)
+    patcher.setattr(Config, "reload", lambda self: None)
+
+    cache.get_predictor.clear()
+    cache.get_predictor({"artifact": (1, "ts")}, year=2027)
+    cache.get_predictor.clear()
+
+    assert calls == [2027]

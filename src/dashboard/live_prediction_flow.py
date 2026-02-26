@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import inspect
+import logging
 import time
 from collections.abc import Callable
 from typing import Any
@@ -9,10 +11,66 @@ from typing import Any
 PredictionResults = dict[str, Any]
 ArtifactVersion = tuple[int, str]
 ArtifactVersions = dict[str, ArtifactVersion]
-ArtifactVersionsKey = tuple[tuple[str, ArtifactVersion], ...]
 
 PredictionRunFn = Callable[[str, str, ArtifactVersions, bool, int], PredictionResults]
-PredictionRunCachedFn = Callable[[str, str, ArtifactVersionsKey, bool, int], PredictionResults]
+logger = logging.getLogger(__name__)
+
+
+def _invoke_auto_update_if_needed(
+    auto_update_if_needed_fn: Callable[..., None],
+    *,
+    year: int,
+    force_recheck: bool,
+) -> None:
+    """
+    Invoke auto-update callback while supporting legacy callable signatures.
+    """
+    try:
+        signature = inspect.signature(auto_update_if_needed_fn)
+        parameters = signature.parameters
+    except (TypeError, ValueError):
+        parameters = {}
+
+    supports_var_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
+    )
+    kwargs: dict[str, Any] = {}
+    if supports_var_kwargs or "year" in parameters:
+        kwargs["year"] = year
+    if supports_var_kwargs or "force_recheck" in parameters:
+        kwargs["force_recheck"] = force_recheck
+
+    if kwargs:
+        auto_update_if_needed_fn(**kwargs)
+        return
+
+    if parameters:
+        auto_update_if_needed_fn(force_recheck)
+        return
+
+    auto_update_if_needed_fn()
+
+
+def _invoke_get_artifact_versions(
+    get_artifact_versions_fn: Callable[..., ArtifactVersions],
+    *,
+    year: int,
+) -> ArtifactVersions:
+    """Invoke artifact-version callback with year when supported."""
+    try:
+        signature = inspect.signature(get_artifact_versions_fn)
+        parameters = signature.parameters
+    except (TypeError, ValueError):
+        parameters = {}
+
+    supports_var_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
+    )
+    if supports_var_kwargs or "year" in parameters:
+        return get_artifact_versions_fn(year=year)
+    if parameters:
+        return get_artifact_versions_fn(year)
+    return get_artifact_versions_fn()
 
 
 def save_prediction_if_enabled_core(
@@ -136,17 +194,15 @@ def execute_live_prediction_pipeline_core(
     weather: str,
     year: int,
     force_refresh: bool,
-    use_cached_prediction: bool,
     progress_callback: Callable[[str], None] | None,
     clear_fastf1_race_cache_fn: Callable[[int, str], None],
-    auto_update_if_needed_fn: Callable[[bool], None],
+    auto_update_if_needed_fn: Callable[..., None],
     is_sprint_weekend_fn: Callable[[int, str], bool],
     auto_update_practice_characteristics_if_needed_fn: Callable[..., dict[str, Any]],
     clear_resource_cache_fn: Callable[[], None],
     clear_data_cache_fn: Callable[[], None],
-    get_artifact_versions_fn: Callable[[], ArtifactVersions],
+    get_artifact_versions_fn: Callable[..., ArtifactVersions],
     run_prediction_fn: PredictionRunFn,
-    run_prediction_cached_fn: PredictionRunCachedFn,
 ) -> dict[str, Any]:
     """
     Refresh input data and execute a prediction run.
@@ -155,6 +211,12 @@ def execute_live_prediction_pipeline_core(
     """
     pipeline_timing: dict[str, float] = {}
     pipeline_start = time.time()
+    logger.info(
+        "Live prediction pipeline start: race=%s year=%s force_refresh=%s",
+        race_name,
+        year,
+        force_refresh,
+    )
 
     def _notify(message: str) -> None:
         if progress_callback is not None:
@@ -168,7 +230,11 @@ def execute_live_prediction_pipeline_core(
 
     update_start = time.time()
     _notify("Checking completed races and model updates...")
-    auto_update_if_needed_fn(force_refresh)
+    _invoke_auto_update_if_needed(
+        auto_update_if_needed_fn,
+        year=year,
+        force_recheck=force_refresh,
+    )
     pipeline_timing["race_update_check"] = time.time() - update_start
 
     weekend_start = time.time()
@@ -192,28 +258,23 @@ def execute_live_prediction_pipeline_core(
         clear_data_cache_fn()
 
     prediction_start = time.time()
-    artifact_versions = get_artifact_versions_fn()
-    if use_cached_prediction and not force_refresh:
-        _notify("Running qualifying and race simulations (cache enabled)...")
-        artifact_versions_key = tuple(sorted(artifact_versions.items()))
-        prediction_results = run_prediction_cached_fn(
-            race_name=race_name,
-            weather=weather,
-            artifact_versions_key=artifact_versions_key,
-            is_sprint=is_sprint,
-            year=year,
-        )
-    else:
-        _notify("Running qualifying and race simulations...")
-        prediction_results = run_prediction_fn(
-            race_name,
-            weather,
-            artifact_versions,
-            is_sprint=is_sprint,
-            year=year,
-        )
+    artifact_versions = _invoke_get_artifact_versions(get_artifact_versions_fn, year=year)
+    _notify("Running qualifying and race simulations...")
+    prediction_results = run_prediction_fn(
+        race_name,
+        weather,
+        artifact_versions,
+        is_sprint=is_sprint,
+        year=year,
+    )
     pipeline_timing["prediction_run"] = time.time() - prediction_start
     pipeline_timing["total"] = time.time() - pipeline_start
+    logger.info(
+        "Live prediction pipeline complete: race=%s year=%s total=%.2fs",
+        race_name,
+        year,
+        pipeline_timing["total"],
+    )
 
     return {
         "prediction_results": prediction_results,

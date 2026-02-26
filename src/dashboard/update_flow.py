@@ -9,24 +9,31 @@ import streamlit as st
 _PRACTICE_UPDATE_STATE_FILE = Path("data/systems/practice_characteristics_state.json")
 
 
-def auto_update_if_needed(force_recheck: bool = False) -> None:
+def auto_update_if_needed(force_recheck: bool = False, year: int = 2026) -> None:
     """
     Check for and apply updates from completed races.
     Also refreshes predictor if characteristic files were manually updated.
 
     Args:
         force_recheck: If True, clears learned races cache to force re-check
+        year: Season year to evaluate for newly completed races
     """
     from src.utils.auto_updater import auto_update_from_races, needs_update
 
     if force_recheck:
         try:
-            needs_update_flag, new_races = needs_update(force_recheck=True)
+            needs_update_flag, new_races = needs_update(year=year, force_recheck=True)
         except TypeError:
-            # Backward-compatible fallback for patched or older callables without kwargs.
-            needs_update_flag, new_races = needs_update()
+            try:
+                # Backward-compatible fallback for patched or older callables without year kwargs.
+                needs_update_flag, new_races = needs_update(force_recheck=True)
+            except TypeError:
+                needs_update_flag, new_races = needs_update()
     else:
-        needs_update_flag, new_races = needs_update()
+        try:
+            needs_update_flag, new_races = needs_update(year=year)
+        except TypeError:
+            needs_update_flag, new_races = needs_update()
 
     if needs_update_flag:
         st.info(f"Found {len(new_races)} new race(s) to learn from. Updating characteristics...")
@@ -38,7 +45,21 @@ def auto_update_if_needed(force_recheck: bool = False) -> None:
             progress_bar.progress(current / total)
             status_text.text(message)
 
-        updated_count = auto_update_from_races(progress_callback)
+        try:
+            updated_count = auto_update_from_races(
+                progress_callback=progress_callback,
+                races_to_update=new_races,
+                year=year,
+            )
+        except TypeError:
+            try:
+                # Backward-compatible fallback for patched callables without year kwargs.
+                updated_count = auto_update_from_races(
+                    progress_callback=progress_callback,
+                    races_to_update=new_races,
+                )
+            except TypeError:
+                updated_count = auto_update_from_races(progress_callback)
 
         progress_bar.empty()
         status_text.empty()

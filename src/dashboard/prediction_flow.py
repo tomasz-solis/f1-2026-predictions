@@ -21,15 +21,33 @@ def fetch_grid_if_available(
     )
     from src.utils.grid_validation import validate_qualifying_grid
 
-    logger.info(f"Checking grid for {session_name} at {race_name} ({year})")
+    logger.info(
+        "FastF1 session refresh check started: race=%s year=%s session=%s",
+        race_name,
+        year,
+        session_name,
+    )
 
-    if is_competitive_session_completed(year, race_name, session_name):
+    session_completed = is_competitive_session_completed(year, race_name, session_name)
+    logger.info(
+        "FastF1 session completion status: race=%s year=%s session=%s completed=%s",
+        race_name,
+        year,
+        session_name,
+        session_completed,
+    )
+
+    if session_completed:
         logger.info(f"{session_name} is completed, fetching actual grid from FastF1")
         actual_grid = fetch_actual_session_results(year, race_name, session_name)
         if actual_grid:
             validated_grid = validate_qualifying_grid(actual_grid)
             logger.info(
-                f"Using actual {session_name} grid from FastF1 ({len(validated_grid)} drivers)"
+                "Grid source resolved: ACTUAL race=%s year=%s session=%s drivers=%s",
+                race_name,
+                year,
+                session_name,
+                len(validated_grid),
             )
             return validated_grid, "ACTUAL"
         raise RuntimeError(
@@ -38,7 +56,13 @@ def fetch_grid_if_available(
         )
     else:
         validated_grid = validate_qualifying_grid(predicted_grid)
-        logger.info(f"{session_name} not completed yet, using predicted grid")
+        logger.info(
+            "Grid source resolved: PREDICTED race=%s year=%s session=%s drivers=%s",
+            race_name,
+            year,
+            session_name,
+            len(validated_grid),
+        )
         return validated_grid, "PREDICTED"
 
 
@@ -61,7 +85,10 @@ def run_prediction(
     timing: dict[str, float] = {}
     overall_start = time.time()
 
-    predictor = get_predictor(_artifact_versions)
+    try:
+        predictor = get_predictor(_artifact_versions, year=year)
+    except TypeError:
+        predictor = get_predictor(_artifact_versions)
     results = {}
 
     if is_sprint:
@@ -107,6 +134,7 @@ def run_prediction(
             weather=weather,
             race_name=race_name,
             n_simulations=50,
+            year=year,
         )
         timing["main_race"] = time.time() - mr_start
         results["main_race"] = main_race_result
@@ -134,6 +162,7 @@ def run_prediction(
             weather=weather,
             race_name=race_name,
             n_simulations=50,
+            year=year,
         )
         timing["race"] = time.time() - race_start
         results["race"] = race_result

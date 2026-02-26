@@ -45,6 +45,73 @@ def test_load_race_options_uses_fallback_when_schedule_fails(patcher):
     assert "Bahrain Grand Prix" in options
 
 
+def test_load_race_options_uses_requested_year(patcher):
+    pages._load_race_options_cached.clear()
+
+    years_seen: list[int] = []
+
+    def _get_schedule(year: int):
+        years_seen.append(year)
+        return pd.DataFrame(
+            {
+                "EventName": ["Bahrain Grand Prix"],
+                "EventFormat": ["conventional"],
+            }
+        )
+
+    patcher.setattr(pages.fastf1, "get_event_schedule", _get_schedule)
+    patcher.setattr(pages.st, "error", lambda _msg: (_ for _ in ()).throw(AssertionError))
+
+    options = pages._load_race_options(2027)
+
+    assert years_seen == [2027]
+    assert options == ["Bahrain Grand Prix"]
+
+
+def test_cache_dir_race_matching_handles_date_prefixed_event_dirs():
+    assert pages._cache_dir_matches_race(
+        "2025-04-13_Bahrain_Grand_Prix",
+        "Bahrain Grand Prix",
+    )
+    assert pages._cache_dir_matches_race(
+        "BahrainGrandPrix",
+        "Bahrain Grand Prix",
+    )
+    assert not pages._cache_dir_matches_race(
+        "2025-04-20_Saudi_Arabian_Grand_Prix",
+        "Bahrain Grand Prix",
+    )
+    assert pages._cache_dir_matches_race(
+        "2025-11-09_Sao_Paulo_Grand_Prix",
+        "São Paulo Grand Prix",
+    )
+
+
+def test_clear_fastf1_race_cache_removes_date_prefixed_race_dirs_only(patcher, tmp_path):
+    primary_cache = tmp_path / "fastf1_cache"
+    testing_cache = tmp_path / "fastf1_cache_testing"
+
+    target_primary = primary_cache / "2025" / "2025-04-13_Bahrain_Grand_Prix"
+    target_testing = testing_cache / "2025" / "2025-04-13_Bahrain_Grand_Prix"
+    untouched_other_race = primary_cache / "2025" / "2025-04-20_Saudi_Arabian_Grand_Prix"
+
+    target_primary.mkdir(parents=True, exist_ok=True)
+    target_testing.mkdir(parents=True, exist_ok=True)
+    untouched_other_race.mkdir(parents=True, exist_ok=True)
+
+    (target_primary / "marker.txt").write_text("stale")
+    (target_testing / "marker.txt").write_text("stale")
+    (untouched_other_race / "marker.txt").write_text("keep")
+
+    patcher.setattr(pages, "_FASTF1_CACHE_DIRS", (primary_cache, testing_cache))
+
+    pages._clear_fastf1_race_cache(2025, "Bahrain Grand Prix")
+
+    assert not target_primary.exists()
+    assert not target_testing.exists()
+    assert untouched_other_race.exists()
+
+
 def test_save_prediction_if_enabled_saves_new_session(patcher):
     saved_payload: dict = {}
     info_messages: list[str] = []
@@ -293,10 +360,22 @@ def test_render_team_comparison_page_executes(patcher):
     _stub_page_streamlit(patcher)
     calls: list[int] = []
     patcher.setattr(pages, "_render_team_comparison_section", lambda year: calls.append(year))
+    patcher.setattr(pages, "_get_selected_season", lambda default=pages.DEFAULT_SEASON: 2026)
 
     pages.render_team_comparison_page()
 
     assert calls == [pages.DEFAULT_SEASON]
+
+
+def test_render_team_comparison_page_uses_selected_season(patcher):
+    _stub_page_streamlit(patcher)
+    calls: list[int] = []
+    patcher.setattr(pages, "_render_team_comparison_section", lambda year: calls.append(year))
+    patcher.setattr(pages, "_get_selected_season", lambda default=pages.DEFAULT_SEASON: 2027)
+
+    pages.render_team_comparison_page()
+
+    assert calls == [2027]
 
 
 def test_render_contact_page_executes(patcher):
@@ -317,12 +396,32 @@ def test_render_prediction_accuracy_page_handles_no_predictions(patcher):
     class _Metrics:
         pass
 
+    patcher.setattr(pages, "_get_selected_season", lambda default=pages.DEFAULT_SEASON: 2026)
     patcher.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
     patcher.setattr("src.utils.prediction_metrics.PredictionMetrics", _Metrics)
 
     pages.render_prediction_accuracy_page()
 
     assert any("No predictions saved yet" in message for message in messages)
+
+
+def test_render_prediction_accuracy_page_uses_selected_season(patcher):
+    _stub_page_streamlit(patcher)
+
+    class _Logger:
+        def get_all_predictions(self, year: int):
+            assert year == 2027
+            return []
+
+    class _Metrics:
+        pass
+
+    patcher.setattr(pages, "_get_selected_season", lambda default=pages.DEFAULT_SEASON: 2027)
+    patcher.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
+    patcher.setattr("src.utils.prediction_metrics.PredictionMetrics", _Metrics)
+    patcher.setattr(pages.st, "info", lambda _message: None)
+
+    pages.render_prediction_accuracy_page()
 
 
 def test_render_prediction_accuracy_page_with_actuals(patcher):
@@ -375,12 +474,71 @@ def test_render_prediction_accuracy_page_with_actuals(patcher):
                 },
             }
 
+    patcher.setattr(pages, "_get_selected_season", lambda default=pages.DEFAULT_SEASON: 2026)
     patcher.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
     patcher.setattr("src.utils.prediction_metrics.PredictionMetrics", _Metrics)
 
     pages.render_prediction_accuracy_page()
 
     assert any("Bahrain Grand Prix" in message for message in writes)
+
+
+def test_render_live_prediction_page_passes_selected_season_to_pipeline_and_save(patcher):
+    _stub_page_streamlit(patcher)
+
+    selected_years: dict[str, int] = {}
+
+    def _selectbox(label, options, index=0, **_kwargs):
+        if label == "Season":
+            return 2027
+        if label == "Select Grand Prix":
+            return "Bahrain Grand Prix"
+        if label == "Weather Forecast":
+            return "dry"
+        return options[index] if options else None
+
+    patcher.setattr(pages.st, "selectbox", _selectbox)
+    patcher.setattr(pages.st, "toggle", lambda *_args, **_kwargs: False)
+    patcher.setattr(pages.st, "button", lambda *_args, **_kwargs: True)
+    patcher.setattr(pages.st, "spinner", lambda *_args, **_kwargs: _Ctx())
+    patcher.setattr(
+        pages.st,
+        "empty",
+        lambda: type(
+            "_Status",
+            (),
+            {"info": lambda self, _msg: None, "empty": lambda self: None},
+        )(),
+    )
+    patcher.setattr(
+        pages, "_load_race_options", lambda year=pages.DEFAULT_SEASON: ["Bahrain Grand Prix"]
+    )
+    patcher.setattr(
+        pages,
+        "execute_live_prediction_pipeline",
+        lambda race_name, weather, year, force_refresh, progress_callback=None: (
+            selected_years.__setitem__("pipeline", year),
+            {
+                "prediction_results": {
+                    "qualifying": {"grid": []},
+                    "race": {"finish_order": []},
+                },
+                "is_sprint": False,
+                "practice_update": {"updated": False, "completed_fp_sessions": []},
+                "pipeline_timing": {},
+            },
+        )[1],
+    )
+    patcher.setattr(
+        pages,
+        "_save_prediction_if_enabled",
+        lambda **kwargs: selected_years.__setitem__("save", kwargs["year"]),
+    )
+    patcher.setattr(pages, "_render_prediction_results", lambda *_args, **_kwargs: None)
+
+    pages.render_live_prediction_page(enable_logging=False)
+
+    assert selected_years == {"pipeline": 2027, "save": 2027}
 
 
 def test_build_team_comparison_dataframe_uses_profile_metrics():

@@ -85,7 +85,13 @@ def test_run_prediction_uses_explicit_year_for_fastf1_refresh(patcher):
         "finish_order": [{"driver": "VER", "team": "Red Bull Racing", "position": 1}]
     }
 
-    patcher.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
+    predictor_years: list[int] = []
+
+    def _get_predictor(_versions, year=2026):
+        predictor_years.append(year)
+        return mock_predictor
+
+    patcher.setattr(prediction_flow, "get_predictor", _get_predictor)
 
     years_seen: list[int] = []
 
@@ -105,7 +111,49 @@ def test_run_prediction_uses_explicit_year_for_fastf1_refresh(patcher):
     )
 
     assert years_seen == [2027]
+    assert predictor_years == [2027]
     assert mock_predictor.predict_qualifying.call_args.kwargs["year"] == 2027
+
+
+def test_run_prediction_accepts_real_baseline_predictor_signatures(patcher):
+    """Guard against signature drift between dashboard orchestration and predictor facade."""
+    from src.predictors.baseline_2026 import Baseline2026Predictor
+
+    predictor = Baseline2026Predictor.__new__(Baseline2026Predictor)
+    calls: dict[str, dict] = {}
+
+    class _QualifyingEngine:
+        def predict(self, **kwargs):
+            calls["qualifying"] = kwargs
+            return {"grid": [{"driver": "NOR", "team": "McLaren", "position": 1}]}
+
+    class _RaceEngine:
+        def predict(self, **kwargs):
+            calls["race"] = kwargs
+            return {"finish_order": [{"driver": "NOR", "team": "McLaren", "position": 1}]}
+
+    predictor.qualifying_engine = _QualifyingEngine()
+    predictor.race_engine = _RaceEngine()
+
+    patcher.setattr(prediction_flow, "get_predictor", lambda _versions, year=2026: predictor)
+    patcher.setattr(
+        prediction_flow,
+        "fetch_grid_if_available",
+        lambda year, race_name, session_name, predicted_grid: (predicted_grid, "PREDICTED"),
+    )
+
+    artifact_versions = {"car_characteristics::2027::car_characteristics": (1, "ts")}
+    result = prediction_flow.run_prediction(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        _artifact_versions=artifact_versions,
+        is_sprint=False,
+        year=2027,
+    )
+
+    assert result["race"]["finish_order"][0]["driver"] == "NOR"
+    assert calls["qualifying"]["year"] == 2027
+    assert calls["race"]["year"] == 2027
 
 
 def test_fetch_grid_if_available_uses_actual_grid_for_completed_session(patcher):

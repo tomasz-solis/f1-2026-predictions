@@ -11,6 +11,7 @@ from src.persistence.artifact_store import ArtifactStore
 
 logger = logging.getLogger(__name__)
 _FASTF1_CACHE_DIR = Path("data/raw/.fastf1_cache")
+_DEFAULT_SEASON = 2026
 
 
 def enable_fastf1_cache() -> None:
@@ -22,15 +23,16 @@ def enable_fastf1_cache() -> None:
         logger.warning(f"Could not enable FastF1 cache at {_FASTF1_CACHE_DIR}: {exc}")
 
 
-def get_artifact_versions() -> dict[str, tuple[int, str]]:
+def get_artifact_versions(year: int = _DEFAULT_SEASON) -> dict[str, tuple[int, str]]:
     """Get version and timestamp for artifacts (DB-backed and file-based)."""
     store = ArtifactStore(data_root="data")
     versions = {}
+    season_year = int(year)
 
     artifacts_to_track = [
-        ("car_characteristics", "2026::car_characteristics"),
-        ("driver_characteristics", "2026::driver_characteristics"),
-        ("track_characteristics", "2026::track_characteristics"),
+        ("car_characteristics", f"{season_year}::car_characteristics"),
+        ("driver_characteristics", f"{season_year}::driver_characteristics"),
+        ("track_characteristics", f"{season_year}::track_characteristics"),
     ]
 
     for artifact_type, artifact_key in artifacts_to_track:
@@ -49,21 +51,24 @@ def get_artifact_versions() -> dict[str, tuple[int, str]]:
             logger.warning(f"Failed to load version for {artifact_type}::{artifact_key}: {e}")
             versions[f"{artifact_type}::{artifact_key}"] = (0, "")
 
-    file_timestamps = _get_file_timestamps()
+    file_timestamps = _get_file_timestamps(year=season_year)
     versions.update(file_timestamps)
 
     return versions
 
 
-def _get_file_timestamps() -> dict[str, tuple[int, str]]:
+def _get_file_timestamps(year: int = _DEFAULT_SEASON) -> dict[str, tuple[int, str]]:
     """Get timestamps for non-DB artifacts (config, code, Pirelli info)."""
+    season_year = int(year)
+    previous_year = max(season_year - 1, 0)
     files = [
-        "data/processed/car_characteristics/2026_car_characteristics.json",
+        f"data/processed/car_characteristics/{season_year}_car_characteristics.json",
+        f"data/processed/driver_characteristics/{season_year}_driver_characteristics.json",
         "data/processed/driver_characteristics.json",
-        "data/processed/track_characteristics/2026_track_characteristics.json",
+        f"data/processed/track_characteristics/{season_year}_track_characteristics.json",
         "data/systems/practice_characteristics_state.json",
-        "data/2025_pirelli_info.json",
-        "data/2026_pirelli_info.json",
+        f"data/{previous_year}_pirelli_info.json",
+        f"data/{season_year}_pirelli_info.json",
         "config/default.yaml",
         "src/predictors/baseline_2026.py",
         "src/predictors/baseline/qualifying_mixin.py",
@@ -82,7 +87,7 @@ def _get_file_timestamps() -> dict[str, tuple[int, str]]:
 
 
 @st.cache_resource(show_spinner=False)
-def get_predictor(_artifact_versions: dict[str, tuple[int, str]]):
+def get_predictor(_artifact_versions: dict[str, tuple[int, str]], year: int = _DEFAULT_SEASON):
     """Load and cache predictor (invalidates when artifacts change)."""
     from src.predictors.baseline_2026 import Baseline2026Predictor
     from src.utils.config_loader import Config
@@ -97,7 +102,7 @@ def get_predictor(_artifact_versions: dict[str, tuple[int, str]]):
     except Exception as exc:
         logger.warning(f"Failed to reload config before predictor bootstrap: {exc}")
 
-    predictor = Baseline2026Predictor()
+    predictor = Baseline2026Predictor(season_year=year)
 
     logging.getLogger("src.utils.data_generator").setLevel(original_level)
 
