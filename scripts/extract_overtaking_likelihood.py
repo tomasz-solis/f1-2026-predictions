@@ -101,7 +101,7 @@ def calculate_overtaking_likelihood(years=None):
         try:
             schedule = ff1.get_event_schedule(year)
         except Exception:
-            print(f"  ⚠️  Could not get schedule for {year}")
+            print(f"  [WARN]  Could not get schedule for {year}")
             continue
 
         for _, event in schedule.iterrows():
@@ -119,9 +119,9 @@ def calculate_overtaking_likelihood(years=None):
                     overtaking_data[race_name] = []
 
                 overtaking_data[race_name].append(stats)
-                print(f"✓ {stats['avg_changes_per_lap']:.1f} changes/lap")
+                print(f"[OK] {stats['avg_changes_per_lap']:.1f} changes/lap")
             else:
-                print("✗")
+                print("[FAIL]")
 
     # Aggregate across years
     track_likelihood = {}
@@ -199,8 +199,8 @@ def add_overtaking_to_tracks(track_characteristics_path, overtaking_data, output
     with open(output_path, "w") as f:
         json.dump(data, f, indent=2)
 
-    print(f"\n✓ Added overtaking data to {len(data['tracks'])} tracks")
-    print(f"✓ Saved to {output_path}")
+    print(f"\n[OK] Added overtaking data to {len(data['tracks'])} tracks")
+    print(f"[OK] Saved to {output_path}")
 
 
 if __name__ == "__main__":

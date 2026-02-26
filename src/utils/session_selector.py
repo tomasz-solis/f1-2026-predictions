@@ -294,36 +294,3 @@ def get_prediction_workflow(weekend_type: str = "conventional") -> list[dict]:
                 "note": "Complete dataset available",
             },
         ]
-
-
-# Example usage
-if __name__ == "__main__":
-    # Example: Monaco (street circuit, hard to overtake)
-    monaco_chars = {
-        "is_street_circuit_z": 1.7,
-        "corner_density_z": 1.5,
-        "full_throttle_pct_z": -1.2,
-    }
-
-    overtaking_diff = calculate_overtaking_difficulty(monaco_chars)
-    print(f"Monaco overtaking difficulty: {overtaking_diff:.2f}")
-
-    # Normal weekend workflow
-    print("\nNormal Weekend Workflow:")
-    print("=" * 80)
-    for step in get_prediction_workflow("normal"):
-        print(f"\n{step['timing']}")
-        print(f"  Data: {step['data_available']}")
-        print(f"  Predict: {step['prediction']}")
-        print(f"  Confidence: {step['confidence']:.2f}")
-        print(f"  Note: {step['note']}")
-
-    # Sprint weekend workflow
-    print("\n\nSprint Weekend Workflow:")
-    print("=" * 80)
-    for step in get_prediction_workflow("sprint"):
-        print(f"\n{step['timing']}")
-        print(f"  Data: {step['data_available']}")
-        print(f"  Predict: {step['prediction']}")
-        print(f"  Confidence: {step['confidence']:.2f}")
-        print(f"  Note: {step['note']}")

@@ -46,7 +46,7 @@ def check_and_update_data(force_update=False):
     missing_data = not driver_chars_file.exists() or not track_chars_file.exists()
 
     if missing_data or force_update:
-        logger.info("🏭 DATA FACTORY: Updating Knowledge Bases (this may take a moment)...")
+        logger.info("DATA FACTORY: Updating knowledge bases (this may take a moment)...")
 
         # 1. Run Overtaking Extraction
         logger.info("   - Extracting Overtaking Likelihoods...")
@@ -61,16 +61,16 @@ def check_and_update_data(force_update=False):
             "   ! Simulator does not auto-generate driver data. Run extraction script manually."
         )
 
-        logger.info("✅ Data update complete.")
+        logger.info("[OK] Data update complete.")
     else:
-        logger.info("✅ Data Factory is up to date. Skipping extraction.")
+        logger.info("[OK] Data Factory is up to date. Skipping extraction.")
 
 
 def load_static_configs():
     """Loads the manual config files (Lineups, Debuts)."""
     import json
 
-    logger.info("📂 LOADING CONFIGURATION")
+    logger.info("LOADING CONFIGURATION")
 
     # 1. Load Lineups
     lineup_path = Path("data/current_lineups.json")
@@ -92,7 +92,7 @@ def load_static_configs():
 
 # --- SIMULATION ENGINE ---
 def run_simulation_loop(year=2026):
-    logger.info(f"🏎️  STARTING {year} SIMULATION ENGINE")
+    logger.info(f"  STARTING {year} SIMULATION ENGINE")
 
     # Imports inside function to avoid circular dependencies during setup
     from src.models.bayesian import BayesianDriverRanking
@@ -109,13 +109,13 @@ def run_simulation_loop(year=2026):
     learner = LearningSystem()  # Tracks Strategy (Blend vs Model)
 
     # 2. Build Priors (The Hierarchical Model)
-    logger.info("   🏗️  Building Priors from Car + Driver Data...")
+    logger.info("     Building Priors from Car + Driver Data...")
 
     factory = PriorsFactory()  # Connects to your JSON artifacts
     base_priors = factory.create_priors()
 
     # Apply 2026 Regulation Shocks (The "Uncertainty Injection")
-    logger.info("   ⚡ Applying 2026 Regulation Shocks...")
+    logger.info("   Applying 2026 regulation shocks...")
     current_priors = apply_2026_regulations(base_priors)
 
     # 3. Spin up the Predictors
@@ -129,7 +129,7 @@ def run_simulation_loop(year=2026):
         performance_tracker=tracker,
     )
 
-    # 4. Run the Season (Mock Calendar for Demo)
+    # 4. Run a short season sample calendar
     calendar = [
         "Bahrain Grand Prix",
         "Saudi Arabian Grand Prix",
@@ -139,14 +139,14 @@ def run_simulation_loop(year=2026):
     simulation_log = []
 
     for round_num, race_name in enumerate(calendar, 1):
-        logger.info(f"\n📍 ROUND {round_num}: {race_name}")
+        logger.info(f"\nROUND {round_num}: {race_name}")
 
         # A. Context & Strategy
         weekend_type = get_weekend_type(year, race_name)
         strategy = learner.get_recommended_method(weekend_type)
         lineups = get_lineups(year, race_name)
 
-        logger.info(f"   📅 Format: {weekend_type.upper()} | Strategy: {strategy['method']}")
+        logger.info(f"   Format: {weekend_type.upper()} | Strategy: {strategy['method']}")
 
         # B. PREDICTION Phase (Mocking the grid)
         # In real life: You'd run QualifyingPredictor here first
@@ -160,7 +160,7 @@ def run_simulation_loop(year=2026):
         predicted_winner = prediction["finish_order"][0]["driver"]
 
         logger.info(
-            f"   🔮 Predicted Winner: {predicted_winner} (Confidence: {prediction['finish_order'][0]['confidence']:.1f}%)"
+            f"   Predicted winner: {predicted_winner} (Confidence: {prediction['finish_order'][0]['confidence']:.1f}%)"
         )
 
         # C. REALITY Phase (Mocking results for the simulation)
@@ -172,7 +172,7 @@ def run_simulation_loop(year=2026):
             actual_winner = "LEC"
             podium = {"16": 1, "4": 2, "44": 3}
 
-        logger.info(f"   🏁 Actual Winner: {actual_winner}")
+        logger.info(f"   Actual winner: {actual_winner}")
 
         # D. LEARNING Phase
         # 1. Update Beliefs (Bayesian)
@@ -188,7 +188,7 @@ def run_simulation_loop(year=2026):
 
         if insights and insights.get("recommendations"):
             for rec in insights["recommendations"]:
-                logger.info(f"   💡 SYSTEM INSIGHT: {rec}")
+                logger.info(f"   System insight: {rec}")
 
         # E. Logging
         top_driver = ranker.get_current_ratings().iloc[0]
@@ -204,7 +204,7 @@ def run_simulation_loop(year=2026):
         )
 
     # 5. Output Results
-    logger.info("\n💾 SIMULATION COMPLETE")
+    logger.info("\n SIMULATION COMPLETE")
     df_results = pd.DataFrame(simulation_log)
     output_file = Path("data/processed/2026_season_simulation.csv")
     df_results.to_csv(output_file, index=False)
@@ -223,9 +223,9 @@ if __name__ == "__main__":
         # Step 3: Run Engine
         run_simulation_loop()
 
-        logger.info("\n✅ PIPELINE SUCCESS")
+        logger.info("\n[OK] PIPELINE SUCCESS")
 
     except KeyboardInterrupt:
-        logger.info("\n🛑 Pipeline stopped by user.")
+        logger.info("\nPipeline stopped by user.")
     except Exception as e:
-        logger.exception(f"\n❌ FATAL ERROR: {e}")
+        logger.exception(f"\n[ERROR] FATAL ERROR: {e}")

@@ -170,8 +170,8 @@ def main():
 
     logger.info("")
     logger.info("=" * 60)
-    logger.info(f"✅ Calculated {len(team_chars)} team ratings")
-    logger.info(f"📁 Saved to: {output_path}")
+    logger.info(f"[OK] Calculated {len(team_chars)} team ratings")
+    logger.info(f" Saved to: {output_path}")
     logger.info("=" * 60)
     logger.info("")
     logger.info("Top 5 teams:")

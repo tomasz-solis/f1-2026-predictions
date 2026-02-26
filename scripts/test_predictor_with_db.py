@@ -34,9 +34,9 @@ def main():
     print("\n1. Initializing predictor...")
     try:
         predictor = Baseline2026Predictor(data_dir=Path("data/processed"))
-        print("   ✅ Predictor initialized successfully")
+        print("   [OK] Predictor initialized successfully")
     except Exception as e:
-        print(f"   ❌ Failed to initialize predictor: {e}")
+        print(f"   [ERROR] Failed to initialize predictor: {e}")
         import traceback
 
         traceback.print_exc()
@@ -51,14 +51,14 @@ def main():
     print(f"   Year: {predictor.year}")
 
     if len(predictor.teams) == 0:
-        print("   ❌ No teams loaded!")
+        print("   [ERROR] No teams loaded!")
         return 1
 
     if len(predictor.drivers) == 0:
-        print("   ❌ No drivers loaded!")
+        print("   [ERROR] No drivers loaded!")
         return 1
 
-    print("\n   ✅ All data loaded correctly")
+    print("\n   [OK] All data loaded correctly")
 
     # Test a simple prediction (just grid anchoring, no actual race sim)
     print("\n3. Testing basic functionality...")
@@ -68,16 +68,16 @@ def main():
         team_strength = predictor.get_blended_team_strength(team_name, "Bahrain Grand Prix", 1)
         print(f"   Team: {team_name}")
         print(f"   Blended strength: {team_strength:.4f}")
-        print("   ✅ Basic functionality works")
+        print("   [OK] Basic functionality works")
     except Exception as e:
-        print(f"   ❌ Failed basic test: {e}")
+        print(f"   [ERROR] Failed basic test: {e}")
         import traceback
 
         traceback.print_exc()
         return 1
 
     print("\n" + "=" * 70)
-    print("✅ All tests passed! Predictor works with ArtifactStore.")
+    print("[OK] All tests passed! Predictor works with ArtifactStore.")
     print("=" * 70)
 
     return 0

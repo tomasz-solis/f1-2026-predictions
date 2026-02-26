@@ -73,7 +73,7 @@ def discover_artifacts(data_root: Path) -> list[dict[str, Any]]:
                 )
                 print(f"  Found: {file.relative_to(data_root)}")
             except Exception as e:
-                print(f"  ⚠️  Failed to load {file}: {e}")
+                print(f"  [WARN]  Failed to load {file}: {e}")
 
     # 2. Driver characteristics
     driver_file = data_root / "processed" / "driver_characteristics.json"
@@ -93,7 +93,7 @@ def discover_artifacts(data_root: Path) -> list[dict[str, Any]]:
             )
             print(f"  Found: {driver_file.relative_to(data_root)}")
         except Exception as e:
-            print(f"  ⚠️  Failed to load {driver_file}: {e}")
+            print(f"  [WARN]  Failed to load {driver_file}: {e}")
 
     # 3. Driver debut years (CSV -> JSON artifact)
     debut_file = data_root / "driver_debuts.csv"
@@ -117,7 +117,7 @@ def discover_artifacts(data_root: Path) -> list[dict[str, Any]]:
             )
             print(f"  Found: {debut_file.relative_to(data_root)}")
         except Exception as e:
-            print(f"  ⚠️  Failed to load {debut_file}: {e}")
+            print(f"  [WARN]  Failed to load {debut_file}: {e}")
 
     # 4. Track characteristics (multiple years)
     track_chars_dir = data_root / "processed" / "track_characteristics"
@@ -139,7 +139,7 @@ def discover_artifacts(data_root: Path) -> list[dict[str, Any]]:
                 )
                 print(f"  Found: {file.relative_to(data_root)}")
             except Exception as e:
-                print(f"  ⚠️  Failed to load {file}: {e}")
+                print(f"  [WARN]  Failed to load {file}: {e}")
 
     # 5. Learning state
     learning_file = data_root / "learning_state.json"
@@ -159,7 +159,7 @@ def discover_artifacts(data_root: Path) -> list[dict[str, Any]]:
             )
             print(f"  Found: {learning_file.relative_to(data_root)}")
         except Exception as e:
-            print(f"  ⚠️  Failed to load {learning_file}: {e}")
+            print(f"  [WARN]  Failed to load {learning_file}: {e}")
 
     # 6. Practice state
     practice_file = data_root / "systems" / "practice_characteristics_state.json"
@@ -179,7 +179,7 @@ def discover_artifacts(data_root: Path) -> list[dict[str, Any]]:
             )
             print(f"  Found: {practice_file.relative_to(data_root)}")
         except Exception as e:
-            print(f"  ⚠️  Failed to load {practice_file}: {e}")
+            print(f"  [WARN]  Failed to load {practice_file}: {e}")
 
     # 7. Predictions (scan all years/races)
     predictions_dir = data_root / "predictions"
@@ -221,7 +221,7 @@ def discover_artifacts(data_root: Path) -> list[dict[str, Any]]:
                     )
                     print(f"  Found: {pred_file.relative_to(data_root)}")
                 except Exception as e:
-                    print(f"  ⚠️  Failed to load {pred_file}: {e}")
+                    print(f"  [WARN]  Failed to load {pred_file}: {e}")
 
     return artifacts
 
@@ -269,15 +269,15 @@ def backfill_artifacts(
             saved_checksum = compute_checksum(result.get("data", artifact["data"]))
             if saved_checksum != artifact["checksum"]:
                 print(
-                    f"  ⚠️  Checksum mismatch! Expected {artifact['checksum']}, got {saved_checksum}"
+                    f"  [WARN]  Checksum mismatch! Expected {artifact['checksum']}, got {saved_checksum}"
                 )
             else:
-                print("  ✅ Saved successfully (checksum verified)")
+                print("  [OK] Saved successfully (checksum verified)")
 
             success += 1
 
         except Exception as e:
-            print(f"  ❌ Failed: {e}")
+            print(f"  [ERROR] Failed: {e}")
             failure += 1
 
     return success, failure
@@ -311,7 +311,7 @@ def main():
 
     # Check storage mode
     if not args.dry_run and USE_DB_STORAGE == "file_only":
-        print("\n❌ ERROR: USE_DB_STORAGE is set to 'file_only'")
+        print("\n[ERROR] ERROR: USE_DB_STORAGE is set to 'file_only'")
         print("   Set USE_DB_STORAGE=db_only or dual_write to enable DB writes")
         print("\n   Example:")
         print("   export USE_DB_STORAGE=db_only")
@@ -319,22 +319,22 @@ def main():
         return 1
 
     if args.dry_run:
-        print("\n🔍 DRY RUN MODE - No writes will be performed")
+        print("\n DRY RUN MODE - No writes will be performed")
     else:
-        print(f"\n💾 Storage mode: {USE_DB_STORAGE}")
+        print(f"\n Storage mode: {USE_DB_STORAGE}")
 
-    print(f"📁 Data root: {args.data_root.absolute()}")
-    print(f"📦 Batch size: {args.batch_size}")
+    print(f" Data root: {args.data_root.absolute()}")
+    print(f" Batch size: {args.batch_size}")
 
     # Discover artifacts
     print(f"\n1. Discovering artifacts in {args.data_root}/...")
     artifacts = discover_artifacts(args.data_root)
 
     if not artifacts:
-        print("\n⚠️  No artifacts found!")
+        print("\n[WARN]  No artifacts found!")
         return 0
 
-    print(f"\n✅ Found {len(artifacts)} artifact(s)")
+    print(f"\n[OK] Found {len(artifacts)} artifact(s)")
     print("\n   Breakdown:")
     type_counts = {}
     for a in artifacts:
@@ -358,14 +358,14 @@ def main():
     print("\n" + "=" * 70)
     print("Summary")
     print("=" * 70)
-    print(f"✅ Success: {success}/{len(artifacts)}")
-    print(f"❌ Failure: {failure}/{len(artifacts)}")
+    print(f"[OK] Success: {success}/{len(artifacts)}")
+    print(f"[ERROR] Failure: {failure}/{len(artifacts)}")
 
     if args.dry_run:
-        print("\n🔍 DRY RUN completed. No changes were made.")
+        print("\n DRY RUN completed. No changes were made.")
         print("   Run without --dry-run to perform actual migration.")
     else:
-        print("\n✅ Backfill completed!")
+        print("\n[OK] Backfill completed!")
         print("\nNext steps:")
         print("1. Verify data in Supabase Dashboard → Table Editor → artifacts")
         print("2. Test app with USE_DB_STORAGE=fallback")

@@ -10,8 +10,11 @@ Detects first F1 season, calculates experience, and assigns tiers:
 
 import csv
 import json
+import logging
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def load_driver_debuts_from_csv(csv_path: Path) -> dict[str, int]:
@@ -152,9 +155,9 @@ def enrich_driver_characteristics(
     driver_debuts = {}
     if debuts_csv_path and Path(debuts_csv_path).exists():
         driver_debuts = load_driver_debuts_from_csv(Path(debuts_csv_path))
-        print(f"Loaded {len(driver_debuts)} driver debuts from CSV")
+        logger.info("Loaded %s driver debuts from CSV", len(driver_debuts))
     else:
-        print("No debuts CSV provided - will auto-detect from data")
+        logger.info("No debuts CSV provided - auto-detecting debuts from data")
 
     enriched_drivers = {}
 
@@ -243,7 +246,7 @@ if __name__ == "__main__":
     debuts_csv = Path("../data/driver_debuts.csv")
 
     if not quali_path.exists() or not race_path.exists():
-        print("Error: Driver characteristics files not found")
+        logger.error("Driver characteristics files not found")
         sys.exit(1)
 
     with open(quali_path) as f:
@@ -261,28 +264,26 @@ if __name__ == "__main__":
     # Analyze distribution
     analysis = analyze_experience_distribution(enriched)
 
-    print("=== EXPERIENCE TIER DISTRIBUTION ===\n")
+    logger.info("=== EXPERIENCE TIER DISTRIBUTION ===")
     for tier, data in analysis["by_tier"].items():
-        print(f"{tier.upper()}: {data['count']} drivers")
-        print(f"  {', '.join(data['drivers'])}\n")
+        logger.info("%s: %s drivers", tier.upper(), data["count"])
+        logger.info("  %s", ", ".join(data["drivers"]))
 
-    print("=== CONFIDENCE DISTRIBUTION ===\n")
+    logger.info("=== CONFIDENCE DISTRIBUTION ===")
     for conf, count in analysis["confidence_distribution"].items():
-        print(f"{conf}: {count} drivers")
+        logger.info("%s: %s drivers", conf, count)
 
-    print("\n=== GATHERING INFO FLAGS (Unusual Patterns) ===\n")
+    logger.info("=== GATHERING INFO FLAGS (Unusual Patterns) ===")
     for driver_abbr, driver in enriched["drivers"].items():
         if driver["confidence"] == "gathering_info":
-            print(f"{driver_abbr}:")
-            print(f"  Tier: {driver['experience']['tier']}")
-            print(
-                f"  Pace delta: {driver['pace_delta']:.4f}"
-                if driver["pace_delta"]
-                else "  No race data"
-            )
-            print(f"  Teams: {', '.join(driver['teams'])}")
-            print(f"  Quali std: {driver['quali_std']:.4f}")
-            print()
+            logger.info("%s:", driver_abbr)
+            logger.info("  Tier: %s", driver["experience"]["tier"])
+            if driver["pace_delta"] is not None:
+                logger.info("  Pace delta: %.4f", driver["pace_delta"])
+            else:
+                logger.info("  No race data")
+            logger.info("  Teams: %s", ", ".join(driver["teams"]))
+            logger.info("  Quali std: %.4f", driver["quali_std"])
 
     # Save enriched data
     output_path = Path(
@@ -293,4 +294,4 @@ if __name__ == "__main__":
     with open(output_path, "w") as f:
         json.dump(enriched, f, indent=2)
 
-    print(f"\nSaved enriched data to {output_path}")
+    logger.info("Saved enriched data to %s", output_path)

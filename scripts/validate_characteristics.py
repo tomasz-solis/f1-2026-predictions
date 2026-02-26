@@ -253,9 +253,9 @@ def main():
     driver_valid, driver_errors = validate_driver_characteristics(driver_file)
 
     if driver_valid:
-        print("   ✅ Driver characteristics VALID")
+        print("   [OK] Driver characteristics VALID")
     else:
-        print(f"   ❌ Found {len(driver_errors)} errors:")
+        print(f"   [ERROR] Found {len(driver_errors)} errors:")
         for error in driver_errors[:10]:  # Show first 10
             print(f"      - {error}")
         if len(driver_errors) > 10:
@@ -271,9 +271,9 @@ def main():
     team_valid, team_errors = validate_team_characteristics(team_file)
 
     if team_valid:
-        print("   ✅ Team characteristics VALID")
+        print("   [OK] Team characteristics VALID")
     else:
-        print(f"   ❌ Found {len(team_errors)} errors:")
+        print(f"   [ERROR] Found {len(team_errors)} errors:")
         for error in team_errors:
             print(f"      - {error}")
         all_valid = False
@@ -287,9 +287,9 @@ def main():
     track_valid, track_errors = validate_track_characteristics(track_file)
 
     if track_valid:
-        print("   ✅ Track characteristics VALID")
+        print("   [OK] Track characteristics VALID")
     else:
-        print(f"   ❌ Found {len(track_errors)} errors:")
+        print(f"   [ERROR] Found {len(track_errors)} errors:")
         for error in track_errors:
             print(f"      - {error}")
         all_valid = False
@@ -299,14 +299,14 @@ def main():
     print("=" * 60)
 
     if all_valid:
-        print("✅ All characteristics files are VALID!")
+        print("[OK] All characteristics files are VALID!")
         print("=" * 60)
         return 0
     else:
-        print(f"❌ Validation FAILED with {len(all_errors)} total errors")
+        print(f"[ERROR] Validation FAILED with {len(all_errors)} total errors")
         print("=" * 60)
         print()
-        print("⚠️  DO NOT USE these characteristics for predictions!")
+        print("[WARN]  DO NOT USE these characteristics for predictions!")
         print("   Run extraction scripts with --fix flag to correct issues.")
         return 1
 

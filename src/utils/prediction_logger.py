@@ -117,7 +117,7 @@ class PredictionLogger:
                     for i, result in enumerate(race_prediction)
                 ]
             },
-            # Placeholder for actual results (to be filled later)
+            # Actual results are appended later by the post-session reconciliation flow.
             "actuals": {"qualifying": None, "race": None},
         }
 

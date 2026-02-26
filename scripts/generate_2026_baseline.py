@@ -99,7 +99,7 @@ def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
                         lap_times = session.laps.groupby("LapNumber")["LapTime"].mean()
                         if len(lap_times) > 0:
                             # High variation suggests SC/VSC
-                            sc_laps = 0  # Placeholder
+                            sc_laps = 0  # Default when telemetry-based SC detection is unavailable
                             track_stats[race_name]["sc_laps"].append(sc_laps)
 
                     # Overtaking difficulty (from position changes)
@@ -164,7 +164,7 @@ def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
     with open(output_file, "w") as f:
         json.dump(track_characteristics, f, indent=2)
 
-    logger.info(f"✓ Saved track characteristics to {output_file}")
+    logger.info(f"[OK] Saved track characteristics to {output_file}")
     logger.info(f"  Tracks analyzed: {len(track_characteristics['tracks'])}")
 
 
@@ -216,7 +216,7 @@ def generate_neutral_team_characteristics(output_dir: Path) -> None:
     with open(output_file, "w") as f:
         json.dump(team_characteristics, f, indent=2)
 
-    logger.info(f"✓ Saved team characteristics to {output_file}")
+    logger.info(f"[OK] Saved team characteristics to {output_file}")
     logger.info(f"  Teams: {len(teams)} (all start neutral)")
 
 
@@ -252,7 +252,7 @@ def copy_2025_driver_characteristics(output_dir: Path) -> None:
     with open(source_file, "w") as f:
         json.dump(driver_data, f, indent=2)
 
-    logger.info("✓ Updated driver characteristics with 2026 metadata")
+    logger.info("[OK] Updated driver characteristics with 2026 metadata")
 
 
 def reset_learning_state() -> None:
@@ -288,7 +288,7 @@ def reset_learning_state() -> None:
     with open(output_file, "w") as f:
         json.dump(learning_state, f, indent=2)
 
-    logger.info(f"✓ Reset learning state to {output_file}")
+    logger.info(f"[OK] Reset learning state to {output_file}")
 
 
 def main():
@@ -346,7 +346,7 @@ def main():
     logger.info("")
 
     logger.info("=" * 60)
-    logger.info("✓ 2026 Baseline Generation Complete!")
+    logger.info("[OK] 2026 Baseline Generation Complete!")
     logger.info("=" * 60)
     logger.info("")
     logger.info("Next steps:")

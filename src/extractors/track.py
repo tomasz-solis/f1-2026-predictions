@@ -20,7 +20,7 @@ Key characteristics extracted:
 Example:
     >>> from helpers.track_extraction import extract_track_profile
     >>> profile = extract_track_profile(2025, session)
-    >>> print(profile['corner_density'])
+    >>> profile["corner_density"]
 
 Author: Tomasz Solis
 Date: December 2025
@@ -132,7 +132,6 @@ def extract_corner_characteristics(session) -> dict[str, float] | None:
         logger.warning(
             f"Could not extract corner characteristics: {e}. Corner metrics will be unavailable for car-track matching."
         )
-        print(f"  Warning: Could not extract corner characteristics: {e}")
         return None
 
 

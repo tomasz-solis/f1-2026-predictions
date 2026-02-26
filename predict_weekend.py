@@ -49,7 +49,7 @@ def auto_catchup_history(year, learner):
     Scans the calendar for finished races that we haven't analyzed yet.
     If found, it auto-runs the analysis to update our weighting model.
     """
-    logger.info("🧠 Checking for missed lessons from past races...")
+    logger.info("Checking for missed lessons from past races...")
 
     try:
         schedule = ff1.get_event_schedule(year)
@@ -64,11 +64,11 @@ def auto_catchup_history(year, learner):
                 continue
 
             if not learner.is_race_analyzed(race_name):
-                logger.info(f"   📝 Analyzing past race: {race_name}...")
+                logger.info(f"   Analyzing past race: {race_name}...")
                 _run_post_race_analysis(year, race_name, learner)
 
     except Exception as e:
-        logger.warning(f"   ⚠️ Could not auto-catchup: {e}")
+        logger.warning(f"   [WARN] Could not auto-catchup: {e}")
 
 
 def _run_post_race_analysis(year, race_name, learner):
@@ -90,16 +90,16 @@ def _run_post_race_analysis(year, race_name, learner):
         learner.update_after_race(
             race_name, {}, {"qualifying": {"method": "blend_70_30", "mae": 2.0}}
         )
-        logger.info(f"      ✅ Learned from {race_name}")
+        logger.info(f"      [OK] Learned from {race_name}")
 
     except Exception as e:
-        logger.warning(f"      ❌ Failed to analyze {race_name}: {e}")
+        logger.warning(f"      [ERROR] Failed to analyze {race_name}: {e}")
 
 
 def get_available_data(year, race_name, weekend_type):
     """Detects available sessions."""
     data = {"fp1": None, "fp2": None, "fp3": None, "quali": None, "sprint_quali": None}
-    logger.info(f"📡 Scanning data for {race_name}...")
+    logger.info(f"Scanning data for {race_name}...")
 
     # Always check FP1
     data["fp1"] = extract_session_order_safe(year, race_name, "FP1")
@@ -113,9 +113,9 @@ def get_available_data(year, race_name, weekend_type):
 
     found = [k.upper() for k, v in data.items() if v is not None]
     if found:
-        logger.info(f"   ✅ Found: {', '.join(found)}")
+        logger.info(f"   [OK] Found: {', '.join(found)}")
     else:
-        logger.info("   ℹ️  No session data (Pre-Weekend)")
+        logger.info("   [INFO]  No session data (Pre-Weekend)")
     return data
 
 
@@ -148,14 +148,14 @@ def run_weekend_predictions(year, race_name, weather="dry"):
     # currently delegate to baseline logic with fixed internal blending.
     blend_weight = learner.get_optimal_blend_weight(default=0.7)
     logger.info(
-        "   🤖 Adaptive Blend Suggestion: "
+        "   Adaptive blend suggestion: "
         f"{blend_weight:.2f} (compatibility path currently uses baseline internal blend)"
     )
 
     # =========================================================
     # PART A: PREDICT QUALIFYING (ALWAYS RUNS)
     # =========================================================
-    logger.info("\n🔮 PREDICTING QUALIFYING...")
+    logger.info("\nPredicting qualifying...")
 
     # Decide confidence label based on what we have.
     # NOTE: method/blend args are kept for compatibility with older interfaces.
@@ -173,7 +173,7 @@ def run_weekend_predictions(year, race_name, weather="dry"):
     else:
         method, conf = "model", "Baseline"
         blend_weight = 0.0
-    logger.info(f"   📊 Qualifying confidence mode: {conf}")
+    logger.info(f"   Qualifying confidence mode: {conf}")
 
     q_result = quali_predictor.predict(
         year=year,
@@ -189,23 +189,23 @@ def run_weekend_predictions(year, race_name, weather="dry"):
     # =========================================================
     # PART B: PREDICT RACE (ALWAYS RUNS)
     # =========================================================
-    logger.info("\n🏁 PREDICTING RACE...")
+    logger.info("\nPredicting race...")
 
     # 1. Determine Grid Source
     if data["quali"]:
-        logger.info("   ✅ Using REAL Grid (Quali Completed)")
+        logger.info("   [OK] Using REAL Grid (Quali Completed)")
         grid = _convert_team_ranks_to_grid(data["quali"], year, race_name)
     else:
-        logger.info("   ⚠️  Using PREDICTED Grid (Quali not yet run)")
+        logger.info("   [WARN]  Using PREDICTED Grid (Quali not yet run)")
         # Convert Quali Prediction DF to Grid list format
         grid = q_df.rename(columns={"position": "position"}).to_dict("records")
 
     # 2. Get Pace Data
     fp2_pace = extract_fp2_pace(year, race_name, verbose=False)
     if fp2_pace:
-        logger.info("   ✅ Using Real FP2 Pace")
+        logger.info("   [OK] Using Real FP2 Pace")
     else:
-        logger.info("   ℹ️  Using Estimated Pace")
+        logger.info("   [INFO]  Using Estimated Pace")
 
     # 3. Predict
     r_result = race_predictor.predict(

@@ -84,7 +84,6 @@ def extract_overtakes_from_race(year, race_name):
         logger.error(
             f"Failed to extract overtaking data from {race_name} ({year}): {e}. Overtaking statistics will be unavailable."
         )
-        print(f"  Error extracting {race_name} {year}: {e}")
         return None
 
 
@@ -96,17 +95,16 @@ def calculate_overtaking_likelihood(years=None):
 
     overtaking_data = {}
 
-    print("Extracting overtaking data from races...")
-    print("=" * 70)
+    logger.info("Extracting overtaking data from races...")
 
     for year in years:
-        print(f"\nProcessing {year}...")
+        logger.info("Processing %s...", year)
 
         try:
             schedule = ff1.get_event_schedule(year)
         except (ValueError, KeyError, ConnectionError, Exception) as e:
             logger.error(f"Failed to get event schedule for {year}: {e}. Skipping this season.")
-            print(f"  Could not get schedule for {year}: {type(e).__name__}")
+            logger.warning("Could not get schedule for %s: %s", year, type(e).__name__)
             continue
 
         for _, event in schedule.iterrows():
@@ -115,8 +113,6 @@ def calculate_overtaking_likelihood(years=None):
             if "Testing" in str(race_name):
                 continue
 
-            print(f"  {race_name}...", end=" ")
-
             stats = extract_overtakes_from_race(year, race_name)
 
             if stats:
@@ -124,9 +120,14 @@ def calculate_overtaking_likelihood(years=None):
                     overtaking_data[race_name] = []
 
                 overtaking_data[race_name].append(stats)
-                print(f"ok: {stats['avg_changes_per_lap']:.1f} changes/lap")
+                logger.info(
+                    "%s %s: %.1f changes/lap",
+                    year,
+                    race_name,
+                    stats["avg_changes_per_lap"],
+                )
             else:
-                print("no data")
+                logger.info("%s %s: no overtaking data", year, race_name)
 
     # Aggregate across years
     track_likelihood = {}
@@ -212,8 +213,8 @@ def add_overtaking_to_tracks(track_characteristics_path, overtaking_data, output
     with open(output_path, "w") as f:
         json.dump(data, f, indent=2)
 
-    print(f"\nUpdated overtaking data for {len(data['tracks'])} tracks")
-    print(f"Saved to {output_path}")
+    logger.info("Updated overtaking data for %s tracks", len(data["tracks"]))
+    logger.info("Saved overtaking data to %s", output_path)
 
 
 if __name__ == "__main__":
@@ -221,15 +222,19 @@ if __name__ == "__main__":
     overtaking_data = calculate_overtaking_likelihood(years=[2024, 2025])
 
     # Show results
-    print("\n" + "=" * 70)
-    print("OVERTAKING LIKELIHOOD BY TRACK")
-    print("=" * 70)
+    logger.info("Overtaking likelihood by track:")
 
     sorted_tracks = sorted(overtaking_data.items(), key=lambda x: x[1]["avg_changes_per_lap"])
 
     for track, data in sorted_tracks:
         difficulty, score = classify_overtaking_difficulty(data["avg_changes_per_lap"])
-        print(f"{track:<30} {data['avg_changes_per_lap']:>5.1f} changes/lap  ({difficulty})")
+        logger.info(
+            "%s %.1f changes/lap (%s, %.1f)",
+            track,
+            data["avg_changes_per_lap"],
+            difficulty,
+            score,
+        )
 
     # Add to track characteristics
     track_file = Path("../data/processed/track_characteristics/2025_track_characteristics.json")

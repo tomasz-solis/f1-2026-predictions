@@ -112,7 +112,7 @@ def main():
 
     if success:
         logger.info(
-            f"✅ Successfully updated prediction for {args.race_name} (after {args.session_name}) with actual results"
+            f"[OK] Successfully updated prediction for {args.race_name} (after {args.session_name}) with actual results"
         )
         logger.info("View accuracy metrics in the 'Prediction Accuracy' tab in the dashboard")
         return 0

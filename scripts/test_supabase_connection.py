@@ -28,18 +28,18 @@ def main():
     print("\n1. Testing Supabase connection...")
     healthy, message = check_connection()
     if healthy:
-        print(f"   ✅ {message}")
+        print(f"   [OK] {message}")
     else:
-        print(f"   ❌ {message}")
+        print(f"   [ERROR] {message}")
         return 1
 
     # Test 2: Initialize artifact store
     print("\n2. Initializing ArtifactStore...")
     try:
         store = ArtifactStore()
-        print(f"   ✅ Artifact store initialized (mode: {store.storage_mode})")
+        print(f"   [OK] Artifact store initialized (mode: {store.storage_mode})")
     except Exception as e:
-        print(f"   ❌ Failed to initialize: {e}")
+        print(f"   [ERROR] Failed to initialize: {e}")
         return 1
 
     # Test 3: Save test artifact
@@ -56,9 +56,9 @@ def main():
             data=test_data,
             version=1,
         )
-        print(f"   ✅ Test artifact saved: {result.get('id', 'N/A')}")
+        print(f"   [OK] Test artifact saved: {result.get('id', 'N/A')}")
     except Exception as e:
-        print(f"   ❌ Failed to save: {e}")
+        print(f"   [ERROR] Failed to save: {e}")
         return 1
 
     # Test 4: Load test artifact
@@ -66,25 +66,25 @@ def main():
     try:
         loaded = store.load_artifact(artifact_type="test", artifact_key="connection_test")
         if loaded and loaded.get("test"):
-            print(f"   ✅ Test artifact loaded: {loaded.get('message')}")
+            print(f"   [OK] Test artifact loaded: {loaded.get('message')}")
         else:
-            print("   ❌ Failed to load artifact")
+            print("   [ERROR] Failed to load artifact")
             return 1
     except Exception as e:
-        print(f"   ❌ Failed to load: {e}")
+        print(f"   [ERROR] Failed to load: {e}")
         return 1
 
     # Test 5: List artifacts
     print("\n5. Testing artifact listing...")
     try:
         artifacts = store.list_artifacts(artifact_type="test", limit=5)
-        print(f"   ✅ Found {len(artifacts)} test artifact(s)")
+        print(f"   [OK] Found {len(artifacts)} test artifact(s)")
     except Exception as e:
-        print(f"   ❌ Failed to list: {e}")
+        print(f"   [ERROR] Failed to list: {e}")
         return 1
 
     print("\n" + "=" * 60)
-    print("✅ All tests passed! Supabase is ready to use.")
+    print("[OK] All tests passed! Supabase is ready to use.")
     print("=" * 60)
     return 0
 

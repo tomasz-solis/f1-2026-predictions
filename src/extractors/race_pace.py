@@ -24,13 +24,13 @@ def extract_fp2_pace(year: int, race_name: str, verbose: bool = False) -> dict |
 
         if not hasattr(session, "laps") or session.laps is None:
             if verbose:
-                print("   No FP2 lap data available")
+                logger.info("No FP2 lap data available")
             return None
 
         laps = session.laps
 
         if verbose:
-            print(f"   Analyzing FP2: {len(laps)} laps total")
+            logger.info("Analyzing FP2: %s laps total", len(laps))
 
         # Find long run stints for each team
         team_pace = {}
@@ -55,7 +55,7 @@ def extract_fp2_pace(year: int, race_name: str, verbose: bool = False) -> dict |
 
         if not team_pace:
             if verbose:
-                print("   No long runs detected")
+                logger.info("No long runs detected")
             return None
 
         # Calculate relative pace (vs median)
@@ -66,7 +66,7 @@ def extract_fp2_pace(year: int, race_name: str, verbose: bool = False) -> dict |
             team_pace[team]["relative_pace"] = team_pace[team]["avg_pace"] - median_pace
 
         if verbose:
-            print(f"   Extracted pace for {len(team_pace)} teams")
+            logger.info("Extracted pace for %s teams", len(team_pace))
 
         return team_pace
 
@@ -75,7 +75,7 @@ def extract_fp2_pace(year: int, race_name: str, verbose: bool = False) -> dict |
             f"Failed to extract FP2 pace for {race_name} ({year}): {e}. Race pace simulation will be unavailable."
         )
         if verbose:
-            print(f"   FP2 extraction failed: {e}")
+            logger.warning("FP2 extraction failed: %s", e)
         return None
 
 
@@ -163,31 +163,3 @@ def _select_best_stint(long_runs: list) -> dict | None:
         "compound": best["compound"],
         "consistency": best["std_pace"],
     }
-
-
-# Quick test
-if __name__ == "__main__":
-    # Test on Bahrain 2025
-    ff1.Cache.enable_cache("data/raw/.fastf1_cache")
-
-    print("Testing FP2 pace extraction...")
-    print("=" * 70)
-
-    pace = extract_fp2_pace(2025, "Bahrain Grand Prix", verbose=True)
-
-    if pace:
-        print(f"\nExtracted pace for {len(pace)} teams:")
-        print(f"\n{'Team':<20} {'Avg Pace':<12} {'Rel Pace':<12} {'Deg (s/lap)':<12}")
-        print("-" * 70)
-
-        # Sort by pace
-        sorted_teams = sorted(pace.items(), key=lambda x: x[1]["avg_pace"])
-
-        for team, metrics in sorted_teams[:5]:
-            print(
-                f"{team:<20} {metrics['avg_pace']:.3f}s     "
-                f"{metrics['relative_pace']:+.3f}s     "
-                f"{metrics['degradation']:.4f}"
-            )
-    else:
-        print("\nFailed to extract FP2 pace")

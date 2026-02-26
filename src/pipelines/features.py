@@ -1,9 +1,13 @@
 """Feature pipeline orchestration."""
 
+import logging
+
 import numpy as np
 import pandas as pd
 
 from ..features.telemetry import LapFeatureExtractor, SessionFeatureAggregator
+
+logger = logging.getLogger(__name__)
 
 
 class RelativePerformanceCalculator:
@@ -104,8 +108,12 @@ class F1FeaturePipeline:
 
         for i, session in enumerate(sessions):
             if verbose:
-                print(
-                    f"Processing {i + 1}/{len(sessions)}: {session.event['EventName']} - {session.name}"
+                logger.info(
+                    "Processing %s/%s: %s - %s",
+                    i + 1,
+                    len(sessions),
+                    session.event["EventName"],
+                    session.name,
                 )
 
             features = self.process_session(session)
@@ -118,7 +126,11 @@ class F1FeaturePipeline:
         combined = pd.concat(all_features, ignore_index=True)
 
         if verbose:
-            print(f"\n Processed {len(all_features)} sessions")
-            print(f"  {len(combined)} total rows, {combined['driver_number'].nunique()} drivers")
+            logger.info("Processed %s sessions", len(all_features))
+            logger.info(
+                "%s total rows, %s drivers",
+                len(combined),
+                combined["driver_number"].nunique(),
+            )
 
         return combined

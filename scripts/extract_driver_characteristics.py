@@ -602,8 +602,8 @@ def main():
 
     logger.info("")
     logger.info("=" * 60)
-    logger.info(f"✅ Extracted {len(final_ratings)} drivers")
-    logger.info(f"📁 Saved to: {output_path}")
+    logger.info(f"[OK] Extracted {len(final_ratings)} drivers")
+    logger.info(f" Saved to: {output_path}")
     logger.info("=" * 60)
     logger.info("")
     logger.info("Sample ratings:")

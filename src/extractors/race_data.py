@@ -98,8 +98,8 @@ def extract_season(year, verbose=True):
     ]
 
     if verbose:
-        print(f"Extracting {len(races)} races from {year}...")
-        print("=" * 70)
+        logger.info("Extracting %s races from %s", len(races), year)
+        logger.info("%s", "=" * 70)
 
     driver_data = defaultdict(list)
 
@@ -108,17 +108,17 @@ def extract_season(year, verbose=True):
 
         if results:
             if verbose:
-                print(f"  {race_name}: {len(results)} drivers")
+                logger.info("  %s: %s drivers", race_name, len(results))
 
             for driver, data in results.items():
                 driver_data[driver].append(data)
         else:
             if verbose:
-                print(f"  {race_name}: failed")
+                logger.info("  %s: failed", race_name)
 
     if verbose:
-        print(f"\nExtracted {len(races)} races")
-        print(f"Data for {len(driver_data)} drivers")
+        logger.info("Extracted %s races", len(races))
+        logger.info("Data for %s drivers", len(driver_data))
 
     return driver_data
 
@@ -155,16 +155,16 @@ if __name__ == "__main__":
     driver_data = extract_season(year)
 
     # Show summary
-    print("\nSUMMARY:")
-    print("=" * 70)
+    logger.info("SUMMARY:")
+    logger.info("%s", "=" * 70)
 
     for driver in sorted(driver_data.keys())[:5]:
         races = driver_data[driver]
         total_dnfs = count_total_dnfs(races)
         valid_races = get_valid_races(races)
 
-        print(f"{driver}:")
-        print(f"  Total races: {len(races)}")
-        print(f"  Valid races (with quali): {len(valid_races)}")
-        print(f"  Total DNFs: {total_dnfs}")
-        print(f"  Missing quali: {len(races) - len(valid_races)}")
+        logger.info("%s:", driver)
+        logger.info("  Total races: %s", len(races))
+        logger.info("  Valid races (with quali): %s", len(valid_races))
+        logger.info("  Total DNFs: %s", total_dnfs)
+        logger.info("  Missing quali: %s", len(races) - len(valid_races))

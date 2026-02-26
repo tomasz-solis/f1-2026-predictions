@@ -156,16 +156,3 @@ def analyze_by_stage(
         aggregated[stage]["count"] = len(metrics_list)
 
     return aggregated
-
-
-if __name__ == "__main__":
-    # Quick test
-    predicted = ["Mercedes", "Red Bull", "McLaren", "Ferrari", "Alpine"]
-    actual = ["Red Bull", "Mercedes", "Ferrari", "McLaren", "Aston Martin"]
-
-    metrics = compare_rankings(predicted, actual)
-
-    print("Validation Metrics Test:")
-    print("=" * 60)
-    for k, v in metrics.items():
-        print(f"{k}: {v:.3f}")

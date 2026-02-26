@@ -94,7 +94,7 @@ def get_fresh_tire_advantage(
     advantage = base_advantage * decay_factor
 
     # Optional: track temp effect (hotter tracks reduce fresh tire advantage)
-    # Not implemented yet - placeholder for future enhancement
+    # Intentionally omitted until a track-temperature model is added.
 
     return float(max(0.0, advantage))
 

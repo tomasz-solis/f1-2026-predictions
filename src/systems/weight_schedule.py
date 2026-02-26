@@ -182,38 +182,3 @@ def format_schedule_summary(schedule: ScheduleType) -> str:
         )
 
     return "\n".join(lines)
-
-
-if __name__ == "__main__":  # pragma: no cover
-    # Demo: Show progression of weights throughout season
-    print("\nRECOMMENDED SCHEDULE FOR 2026 (Regulation Change)")
-    print("=" * 70)
-
-    recommended = get_recommended_schedule(is_regulation_change=True)
-    print(format_schedule_summary(recommended))
-
-    print("\n\nEXAMPLE: McLaren Performance Prediction")
-    print("=" * 70)
-
-    baseline = 0.85  # 2025 P1
-    testing_mod = 0.02  # Slightly favored at this track
-
-    # Simulate progression through season
-    current_scores = [0.0, 0.80, 0.78, 0.75, 0.73]  # Declining performance
-
-    print(f"Baseline (2025): {baseline:.2f}")
-    print(f"Testing modifier: {testing_mod:+.2f}\n")
-
-    for race_num in range(1, 6):
-        current = current_scores[race_num - 1]
-        blended = calculate_blended_performance(
-            baseline, testing_mod, current, race_num, recommended
-        )
-        weights = get_schedule_weights(race_num, recommended)
-
-        print(f"Race {race_num}: Current={current:.2f} → Blended={blended:.3f}")
-        print(
-            f"  Weights: {weights['baseline'] * 100:.0f}% baseline, "
-            f"{weights['testing'] * 100:.0f}% testing, "
-            f"{weights['current'] * 100:.0f}% current"
-        )

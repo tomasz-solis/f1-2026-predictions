@@ -150,39 +150,3 @@ def _normalize_relative(raw_metrics: dict[str, dict]) -> dict[str, dict]:
 def _sigmoid(z: float) -> float:
     """Convert z-score to 0-1 probability."""
     return float(1.0 / (1.0 + np.exp(-z)))
-
-
-# Quick test
-if __name__ == "__main__":
-    test_data = {
-        "McLaren": {
-            "bahrain_grand_prix_fp1": {
-                "sector_times": {"s1": 29.546, "s2": 40.369, "s3": 23.289},
-                "speed_profile": {"top_speed": 315.0},
-                "consistency": {"std_lap_time": 16.08},
-            }
-        },
-        "Ferrari": {
-            "bahrain_grand_prix_fp1": {
-                "sector_times": {"s1": 29.695, "s2": 40.477, "s3": 23.628},
-                "speed_profile": {"top_speed": 320.0},
-                "consistency": {"std_lap_time": 16.54},
-            }
-        },
-        "Kick Sauber": {
-            "bahrain_grand_prix_fp1": {
-                "sector_times": {"s1": 29.724, "s2": 40.972, "s3": 23.566},
-                "speed_profile": {"top_speed": 326.0},
-                "consistency": {"std_lap_time": 18.33},
-            }
-        },
-    }
-
-    result = extract_all_teams_performance(test_data, "fp1")
-
-    print("Relative Performance:")
-    print("=" * 60)
-    for team, perf in result.items():
-        print(f"\n{team}:")
-        for k, v in perf.items():
-            print(f"  {k}: {v:.3f}")
