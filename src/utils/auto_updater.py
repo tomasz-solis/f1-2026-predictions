@@ -105,8 +105,8 @@ def get_completed_races(year: int = 2026) -> list[str]:
         return []
 
 
-def get_learned_races() -> list[str]:
-    """Get list of races we've already learned from."""
+def get_learned_races(year: int = 2026) -> list[str]:
+    """Get races already learned for a specific season year."""
     learning_file = Path("data/learning_state.json")
 
     if not learning_file.exists():
@@ -115,41 +115,73 @@ def get_learned_races() -> list[str]:
     try:
         with open(learning_file) as f:
             state = json.load(f)
-            # Check for races in history
             history = state.get("history", [])
-            return [record["race"] for record in history if "race" in record]
+            state_season = state.get("season")
+            learned: list[str] = []
+            for record in history:
+                if "race" not in record:
+                    continue
+                raw_record_year = record.get("year", state_season)
+                try:
+                    record_year = int(raw_record_year) if raw_record_year is not None else None
+                except (TypeError, ValueError):
+                    record_year = None
+                if record_year is None:
+                    # Backward compatibility for legacy records without year:
+                    # treat them as belonging to default season only.
+                    if year == 2026:
+                        learned.append(record["race"])
+                elif record_year == year:
+                    learned.append(record["race"])
+            return learned
     except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
         logger.debug(f"Could not load learning state: {e}")
         return []
 
 
-def needs_update(force_recheck: bool = False) -> tuple[bool, list[str]]:
+def needs_update(year: int = 2026, force_recheck: bool = False) -> tuple[bool, list[str]]:
     """
     Check if there are new races to learn from.
 
     Args:
         force_recheck: If True, re-check all completed races regardless of learned state
     """
-    completed = get_completed_races()
+    completed = get_completed_races(year=year)
 
     if force_recheck:
         # Force re-check: treat all completed races as potentially new
         logger.info(f"Force recheck enabled: found {len(completed)} completed race(s)")
         return len(completed) > 0, completed
 
-    learned = get_learned_races()
+    learned = get_learned_races(year=year)
     new_races = [race for race in completed if race not in learned]
 
     return len(new_races) > 0, new_races
 
 
-def auto_update_from_races(progress_callback=None) -> int:
-    """Automatically update characteristics from any new completed races."""
-    needs_update_flag, new_races = needs_update()
+def auto_update_from_races(
+    progress_callback=None,
+    races_to_update: list[str] | None = None,
+    year: int = 2026,
+) -> int:
+    """Automatically update characteristics from completed races.
 
-    if not needs_update_flag:
-        logger.info("All completed races have already been learned from.")
-        return 0
+    Args:
+        progress_callback: Optional callback receiving (current, total, message).
+        races_to_update: Explicit race list to update. When provided, this exact
+            list is used and `needs_update()` is not recomputed.
+    """
+    if races_to_update is None:
+        needs_update_flag, new_races = needs_update(year=year)
+        if not needs_update_flag:
+            logger.info("All completed races have already been learned from.")
+            return 0
+    else:
+        # Preserve caller order while removing duplicates.
+        new_races = list(dict.fromkeys(races_to_update))
+        if not new_races:
+            logger.info("No races provided for explicit update.")
+            return 0
 
     logger.info(f"Found {len(new_races)} new race(s) to learn from: {new_races}")
 
@@ -166,10 +198,10 @@ def auto_update_from_races(progress_callback=None) -> int:
             logger.info(f"Updating from {race_name} ({i + 1}/{len(new_races)})...")
 
             # Update from race (loads results, updates teams & drivers)
-            update_from_race(2026, race_name)
+            update_from_race(year, race_name)
 
             # Mark as learned
-            mark_race_as_learned(race_name)
+            mark_race_as_learned(race_name, year=year)
 
             updated_count += 1
             logger.info(f"  Learned from {race_name}")
@@ -184,13 +216,13 @@ def auto_update_from_races(progress_callback=None) -> int:
     return updated_count
 
 
-def mark_race_as_learned(race_name: str) -> None:
-    """Mark a race as learned in the learning state."""
+def mark_race_as_learned(race_name: str, year: int = 2026) -> None:
+    """Mark a race as learned in the learning state for a given season."""
     learning_file = Path("data/learning_state.json")
     learning_file.parent.mkdir(parents=True, exist_ok=True)
 
     default_state = {
-        "season": 2026,
+        "season": year,
         "races_completed": 0,
         "history": [],
         "method_performance": {},
@@ -210,21 +242,36 @@ def mark_race_as_learned(race_name: str) -> None:
     else:
         state = default_state
 
+    def _record_year_for_dedupe(record: dict) -> int | None:
+        raw_year = record.get("year")
+        if raw_year is not None:
+            try:
+                return int(raw_year)
+            except (TypeError, ValueError):
+                return None
+        # Legacy records without explicit year are treated as default-season history.
+        # This mirrors get_learned_races() behavior and avoids cross-season collisions.
+        return 2026
+
     # Add to history if not already there
     if "history" not in state:
         state["history"] = []
 
     # Check if already marked
-    if not any(r.get("race") == race_name for r in state["history"]):
+    if not any(
+        r.get("race") == race_name and _record_year_for_dedupe(r) == year for r in state["history"]
+    ):
         state["history"].append(
             {
                 "race": race_name,
+                "year": year,
                 "date": datetime.now().isoformat(),
                 "method": "auto_update",
             }
         )
         state["races_completed"] = state.get("races_completed", 0) + 1
 
+    state["season"] = year
     state["last_updated"] = datetime.now().isoformat()
 
     with open(learning_file, "w") as f:

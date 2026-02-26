@@ -9,6 +9,9 @@ from src.utils.validation_helpers import validate_position
 
 def validate_qualifying_grid(
     grid: Sequence[QualifyingGridEntry | Mapping[str, Any]],
+    *,
+    min_entries: int = 1,
+    require_sequential_positions: bool = False,
 ) -> list[QualifyingGridEntry]:
     """Validate and normalize a qualifying grid payload.
 
@@ -54,5 +57,19 @@ def validate_qualifying_grid(
             "position": int(position),
         }
         validated_grid.append(validated_entry)
+
+    if len(validated_grid) < min_entries:
+        raise ValueError(
+            f"Grid must include at least {min_entries} entries, got {len(validated_grid)}"
+        )
+
+    if require_sequential_positions:
+        sorted_positions = sorted(entry["position"] for entry in validated_grid)
+        expected_positions = list(range(1, len(validated_grid) + 1))
+        if sorted_positions != expected_positions:
+            raise ValueError(
+                "Grid positions must be sequential starting at 1 "
+                f"(got {sorted_positions}, expected {expected_positions})"
+            )
 
     return validated_grid

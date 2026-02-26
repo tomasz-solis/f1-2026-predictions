@@ -5,9 +5,28 @@ from typing import Any
 
 import fastf1
 
+from src.utils.grid_validation import validate_qualifying_grid
 from src.utils.team_mapping import map_team_to_characteristics
 
 logger = logging.getLogger(__name__)
+_MIN_COMPETITIVE_ENTRIES_BY_SESSION = {
+    "SQ": 10,
+    "Sprint": 10,
+    "Q": 10,
+    "R": 10,
+}
+
+
+def _coerce_position(raw_position: Any) -> int:
+    """Coerce FastF1 position payload to integer and fail closed for malformed values."""
+    if raw_position is None:
+        raise ValueError("missing position")
+    if str(raw_position).strip().lower() in {"", "nan", "none"}:
+        raise ValueError("missing position")
+    try:
+        return int(raw_position)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid result position value: {raw_position!r}") from exc
 
 
 def fetch_actual_session_results(
@@ -26,37 +45,67 @@ def fetch_actual_session_results(
             logger.warning(f"No results available for {race_name} {session_name}")
             return None
 
-        # Extract relevant data
+        # Extract relevant data and fail closed on malformed rows.
         grid: list[dict[str, int | str]] = []
-        for fallback_position, (_, row) in enumerate(results.iterrows(), start=1):
+        for row_index, (_, row) in enumerate(results.iterrows(), start=1):
             try:
-                driver = row.get("Abbreviation", row.get("DriverNumber", "UNK"))
-                team_raw = row.get("TeamName", "Unknown")
-                team = map_team_to_characteristics(team_raw) or str(team_raw)
-                position = row.get("Position", fallback_position)
+                driver_raw = row.get("Abbreviation", row.get("DriverNumber", ""))
+                driver = str(driver_raw).strip()
+                if not driver:
+                    raise ValueError("missing driver identifier")
 
-                # Handle DNFs/DSQs
-                if position is None or str(position) == "nan":
-                    position = fallback_position
+                team_raw = row.get("TeamName")
+                team_raw_str = str(team_raw).strip()
+                if not team_raw_str:
+                    raise ValueError("missing team name")
+                team = map_team_to_characteristics(team_raw_str) or team_raw_str
+
+                position_raw = row.get("Position")
+                position = _coerce_position(position_raw)
 
                 grid.append(
                     {
-                        "position": int(position),
-                        "driver": str(driver),
-                        "team": str(team),
+                        "position": position,
+                        "driver": driver,
+                        "team": str(team).strip(),
                     }
                 )
             except Exception as e:
-                logger.warning(
-                    f"Could not parse result for driver at fallback position {fallback_position}: {e}"
+                logger.error(
+                    "Malformed FastF1 results for %s %s at row %s: %s",
+                    race_name,
+                    session_name,
+                    row_index,
+                    e,
                 )
-                continue
+                return None
 
         # Sort by position
         grid.sort(key=lambda item: int(item["position"]))
 
-        logger.info(f"Fetched {len(grid)} results from {race_name} {session_name}")
-        return grid
+        min_entries = _MIN_COMPETITIVE_ENTRIES_BY_SESSION.get(str(session_name), 10)
+        try:
+            validated_grid = validate_qualifying_grid(
+                grid,
+                min_entries=min_entries,
+                require_sequential_positions=True,
+            )
+        except ValueError as exc:
+            logger.error(
+                "Invalid FastF1 competitive results for %s %s: %s",
+                race_name,
+                session_name,
+                exc,
+            )
+            return None
+
+        logger.info(
+            "Fetched %s results from %s %s",
+            len(validated_grid),
+            race_name,
+            session_name,
+        )
+        return validated_grid
 
     except Exception as e:
         logger.error(f"Failed to fetch {session_name} results for {race_name}: {e}")

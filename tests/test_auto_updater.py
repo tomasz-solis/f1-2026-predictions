@@ -99,6 +99,18 @@ class TestAutoUpdaterDetection:
         assert result is False
         assert new_races == []
 
+    def test_needs_update_passes_year_to_sources(self, temp_data_dir):
+        from src.utils.auto_updater import needs_update
+
+        with patch("src.utils.auto_updater.get_completed_races") as mock_completed:
+            mock_completed.return_value = []
+            with patch("src.utils.auto_updater.get_learned_races") as mock_learned:
+                mock_learned.return_value = []
+                needs_update(year=2027)
+
+        mock_completed.assert_called_once_with(year=2027)
+        mock_learned.assert_called_once_with(year=2027)
+
 
 class TestAutoUpdaterExecution:
     """Test automatic update execution."""
@@ -168,6 +180,41 @@ class TestAutoUpdaterExecution:
 
         # Should have updated 1 race (first one) before failure
         assert updated_count == 1
+
+    def test_auto_update_from_races_passes_year_to_update_calls(self, temp_data_dir):
+        from src.utils.auto_updater import auto_update_from_races
+
+        with patch("src.utils.auto_updater.needs_update") as mock_needs:
+            mock_needs.return_value = (True, ["Bahrain Grand Prix"])
+            with patch("src.systems.updater.update_from_race") as mock_update:
+                with patch("src.utils.auto_updater.mark_race_as_learned"):
+                    updated_count = auto_update_from_races(year=2027)
+
+        assert updated_count == 1
+        mock_update.assert_called_once_with(2027, "Bahrain Grand Prix")
+
+    def test_auto_update_from_races_uses_explicit_race_list(self, temp_data_dir):
+        """Explicit race lists should bypass needs_update recomputation."""
+        from src.utils.auto_updater import auto_update_from_races
+
+        with patch(
+            "src.utils.auto_updater.needs_update",
+            side_effect=AssertionError("needs_update should not be called"),
+        ):
+            with patch("src.systems.updater.update_from_race") as mock_update:
+                with patch("src.utils.auto_updater.mark_race_as_learned"):
+                    updated_count = auto_update_from_races(
+                        races_to_update=[
+                            "Bahrain Grand Prix",
+                            "Bahrain Grand Prix",
+                            "Saudi Arabian Grand Prix",
+                        ]
+                    )
+
+        assert updated_count == 2
+        assert mock_update.call_count == 2
+        assert mock_update.call_args_list[0].args == (2026, "Bahrain Grand Prix")
+        assert mock_update.call_args_list[1].args == (2026, "Saudi Arabian Grand Prix")
 
 
 class TestCompletedRacesDetection:
@@ -393,6 +440,74 @@ class TestLearnedRacesTracking:
             with open(learning_file) as f:
                 repaired = json.load(f)
             assert any(entry.get("race") == "Bahrain Grand Prix" for entry in repaired["history"])
+        finally:
+            if learning_file.exists():
+                learning_file.unlink()
+
+    def test_mark_race_as_learned_yearless_legacy_entry_does_not_block_new_year(
+        self, temp_data_dir
+    ):
+        """Legacy yearless entries should not be treated as duplicates for a different season."""
+        from src.utils.auto_updater import mark_race_as_learned
+
+        learning_file = Path("data/learning_state.json")
+        learning_file.parent.mkdir(parents=True, exist_ok=True)
+        learning_file.write_text(
+            json.dumps(
+                {
+                    "season": 2026,
+                    "history": [{"race": "Bahrain Grand Prix", "date": "2026-03-15T00:00:00"}],
+                    "races_completed": 1,
+                }
+            )
+        )
+
+        try:
+            mark_race_as_learned("Bahrain Grand Prix", year=2027)
+
+            with open(learning_file) as f:
+                state = json.load(f)
+
+            history = state.get("history", [])
+            assert len(history) == 2
+            assert any(
+                entry.get("race") == "Bahrain Grand Prix" and entry.get("year") == 2027
+                for entry in history
+            )
+        finally:
+            if learning_file.exists():
+                learning_file.unlink()
+
+    def test_mark_race_as_learned_yearless_entry_ignores_mutated_state_season(self, temp_data_dir):
+        """Yearless legacy rows must stay mapped to default season even after season rollover."""
+        from src.utils.auto_updater import mark_race_as_learned
+
+        learning_file = Path("data/learning_state.json")
+        learning_file.parent.mkdir(parents=True, exist_ok=True)
+        learning_file.write_text(
+            json.dumps(
+                {
+                    "season": 2027,
+                    "history": [
+                        {"race": "Saudi Arabian Grand Prix", "date": "2026-03-22T00:00:00"}
+                    ],
+                    "races_completed": 1,
+                }
+            )
+        )
+
+        try:
+            mark_race_as_learned("Saudi Arabian Grand Prix", year=2027)
+
+            with open(learning_file) as f:
+                state = json.load(f)
+
+            history = state.get("history", [])
+            assert len(history) == 2
+            assert any(
+                entry.get("race") == "Saudi Arabian Grand Prix" and entry.get("year") == 2027
+                for entry in history
+            )
         finally:
             if learning_file.exists():
                 learning_file.unlink()
