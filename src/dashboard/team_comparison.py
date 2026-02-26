@@ -83,9 +83,9 @@ def _default_team_selection(team_names: list[str], max_teams: int = 4) -> list[s
 
     selected: list[str] = []
     for canonical_id in _DEFAULT_BIG4_CANONICAL:
-        team_name = canonical_to_team.get(canonical_id)
-        if team_name and team_name not in selected:
-            selected.append(team_name)
+        preferred_team = canonical_to_team.get(canonical_id)
+        if preferred_team and preferred_team not in selected:
+            selected.append(preferred_team)
         if len(selected) >= max_teams:
             return selected
 

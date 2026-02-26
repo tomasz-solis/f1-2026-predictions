@@ -204,6 +204,7 @@ class BaselineQualifyingMixin:
         """Aggregate simulation results into final grid with confidence intervals."""
         cfg = getattr(self, "config", config_loader)
         grid: list[QualifyingGridEntry] = []
+        mean_positions: dict[str, float] = {}
         confidence_std_multiplier = cfg.get(
             "baseline_predictor.qualifying.confidence_std_multiplier", 5.0
         )
@@ -229,20 +230,25 @@ class BaselineQualifyingMixin:
                     "team": driver_info["team"],
                     "position": median_pos,
                     "median_position": median_pos,
-                    "_mean_position": mean_pos,
                     "p5": p5,
                     "p95": p95,
                     "confidence": float(round(confidence, 1)),
                 }
             )
+            mean_positions[driver_info["driver"]] = mean_pos
 
         # Resolve median ties with the underlying simulation mean so teammate order
         # does not collapse into insertion-order blocks when medians are equal.
-        grid.sort(key=lambda x: (x["median_position"], x["_mean_position"], x["driver"]))
+        grid.sort(
+            key=lambda x: (
+                x["median_position"],
+                mean_positions.get(x["driver"], float(x["median_position"])),
+                x["driver"],
+            )
+        )
 
         for i, item in enumerate(grid):
             item["position"] = i + 1
-            item.pop("_mean_position", None)
 
         return grid
 

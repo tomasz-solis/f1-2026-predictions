@@ -8,6 +8,7 @@ implementation now delegates to `Baseline2026Predictor`.
 from __future__ import annotations
 
 import inspect
+from collections.abc import Mapping
 from typing import Any
 
 from src.predictors.baseline_2026 import Baseline2026Predictor
@@ -44,7 +45,7 @@ class RacePredictor:
         predict_race = self._predictor.predict_race
         try:
             signature = inspect.signature(predict_race)
-            parameters = signature.parameters
+            parameters: Mapping[str, inspect.Parameter] = signature.parameters
         except (TypeError, ValueError):
             parameters = {}
 

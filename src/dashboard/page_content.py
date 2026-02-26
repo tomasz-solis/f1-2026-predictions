@@ -64,7 +64,6 @@ CONTACT_PAGE_HTML = """
         <span class="contact-link-row__value">/in/tomaszsolis</span>
       </a>
     </div>
-    <p class="contact-muted">Direct email is intentionally not published in the app.</p>
   </section>
   <section class="contact-card">
     <h3>Project Scope</h3>

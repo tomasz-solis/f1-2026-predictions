@@ -3,17 +3,36 @@
 from __future__ import annotations
 
 import inspect
+import json
 import logging
 import time
-from collections.abc import Callable
-from typing import Any
+from collections import OrderedDict
+from collections.abc import Callable, Mapping
+from hashlib import sha1
+from typing import Any, Protocol
 
 PredictionResults = dict[str, Any]
 ArtifactVersion = tuple[int, str]
 ArtifactVersions = dict[str, ArtifactVersion]
 
-PredictionRunFn = Callable[[str, str, ArtifactVersions, bool, int], PredictionResults]
+
+class PredictionRunFn(Protocol):
+    """Type contract for prediction orchestration callback."""
+
+    def __call__(
+        self,
+        race_name: str,
+        weather: str,
+        artifact_versions: ArtifactVersions,
+        /,
+        is_sprint: bool = False,
+        year: int = 2026,
+    ) -> PredictionResults: ...
+
+
 logger = logging.getLogger(__name__)
+_PREDICTION_RESULT_CACHE_MAX_ENTRIES = 24
+_prediction_result_cache: OrderedDict[str, PredictionResults] = OrderedDict()
 
 
 def _invoke_auto_update_if_needed(
@@ -27,7 +46,7 @@ def _invoke_auto_update_if_needed(
     """
     try:
         signature = inspect.signature(auto_update_if_needed_fn)
-        parameters = signature.parameters
+        parameters: Mapping[str, inspect.Parameter] = signature.parameters
     except (TypeError, ValueError):
         parameters = {}
 
@@ -59,7 +78,7 @@ def _invoke_get_artifact_versions(
     """Invoke artifact-version callback with year when supported."""
     try:
         signature = inspect.signature(get_artifact_versions_fn)
-        parameters = signature.parameters
+        parameters: Mapping[str, inspect.Parameter] = signature.parameters
     except (TypeError, ValueError):
         parameters = {}
 
@@ -71,6 +90,87 @@ def _invoke_get_artifact_versions(
     if parameters:
         return get_artifact_versions_fn(year)
     return get_artifact_versions_fn()
+
+
+def _invoke_detect_event_boundary_refresh(
+    detect_event_boundary_refresh_fn: Callable[..., dict[str, Any]],
+    *,
+    year: int,
+    race_name: str,
+    is_sprint: bool,
+) -> dict[str, Any]:
+    """Invoke boundary-refresh detector with compatibility for legacy signatures."""
+    try:
+        signature = inspect.signature(detect_event_boundary_refresh_fn)
+        parameters: Mapping[str, inspect.Parameter] = signature.parameters
+    except (TypeError, ValueError):
+        parameters = {}
+
+    supports_var_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
+    )
+    kwargs: dict[str, Any] = {}
+    if supports_var_kwargs or "year" in parameters:
+        kwargs["year"] = year
+    if supports_var_kwargs or "race_name" in parameters:
+        kwargs["race_name"] = race_name
+    if supports_var_kwargs or "is_sprint" in parameters:
+        kwargs["is_sprint"] = is_sprint
+
+    try:
+        if kwargs:
+            result = detect_event_boundary_refresh_fn(**kwargs)
+        elif parameters:
+            result = detect_event_boundary_refresh_fn(year, race_name, is_sprint)
+        else:
+            result = detect_event_boundary_refresh_fn()
+    except TypeError:
+        # Backward-compatible fallback for patched callables with partial signatures.
+        result = detect_event_boundary_refresh_fn(year, race_name, is_sprint)
+
+    if isinstance(result, dict):
+        return result
+    return {"refresh_needed": False, "reason": "invalid_detector_response", "new_sessions": []}
+
+
+def _prediction_cache_key(
+    *,
+    year: int,
+    race_name: str,
+    weather: str,
+    is_sprint: bool,
+    artifact_versions: ArtifactVersions,
+    boundary_signature: str,
+) -> str:
+    """Build stable cache key for prediction output reuse."""
+    payload = {
+        "year": year,
+        "race_name": race_name,
+        "weather": weather,
+        "is_sprint": is_sprint,
+        "artifact_versions": {key: list(value) for key, value in sorted(artifact_versions.items())},
+        "boundary_signature": boundary_signature,
+    }
+    return sha1(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _get_cached_prediction(cache_key: str) -> PredictionResults | None:
+    """Fetch cached prediction and mark key as recently used."""
+    cached = _prediction_result_cache.get(cache_key)
+    if cached is None:
+        return None
+    _prediction_result_cache.move_to_end(cache_key)
+    return cached
+
+
+def _store_cached_prediction(cache_key: str, prediction_results: PredictionResults) -> None:
+    """Store prediction output in bounded LRU cache."""
+    _prediction_result_cache[cache_key] = prediction_results
+    _prediction_result_cache.move_to_end(cache_key)
+    while len(_prediction_result_cache) > _PREDICTION_RESULT_CACHE_MAX_ENTRIES:
+        _prediction_result_cache.popitem(last=False)
 
 
 def save_prediction_if_enabled_core(
@@ -198,6 +298,7 @@ def execute_live_prediction_pipeline_core(
     clear_fastf1_race_cache_fn: Callable[[int, str], None],
     auto_update_if_needed_fn: Callable[..., None],
     is_sprint_weekend_fn: Callable[[int, str], bool],
+    detect_event_boundary_refresh_if_needed_fn: Callable[..., dict[str, Any]],
     auto_update_practice_characteristics_if_needed_fn: Callable[..., dict[str, Any]],
     clear_resource_cache_fn: Callable[[], None],
     clear_data_cache_fn: Callable[[], None],
@@ -217,6 +318,13 @@ def execute_live_prediction_pipeline_core(
         year,
         force_refresh,
     )
+    should_clear_runtime_caches = force_refresh
+    boundary_refresh: dict[str, Any] = {
+        "refresh_needed": False,
+        "reason": "not_checked",
+        "new_sessions": [],
+        "boundary_signature": "",
+    }
 
     def _notify(message: str) -> None:
         if progress_callback is not None:
@@ -242,6 +350,26 @@ def execute_live_prediction_pipeline_core(
     is_sprint = is_sprint_weekend_fn(year, race_name)
     pipeline_timing["weekend_lookup"] = time.time() - weekend_start
 
+    if not force_refresh:
+        boundary_refresh = _invoke_detect_event_boundary_refresh(
+            detect_event_boundary_refresh_if_needed_fn,
+            year=year,
+            race_name=race_name,
+            is_sprint=is_sprint,
+        )
+        if bool(boundary_refresh.get("refresh_needed")):
+            _notify("Event boundary advanced; clearing FastF1 cache and rechecking updates...")
+            clear_fastf1_race_cache_fn(year, race_name)
+            should_clear_runtime_caches = True
+
+            update_start = time.time()
+            _invoke_auto_update_if_needed(
+                auto_update_if_needed_fn,
+                year=year,
+                force_recheck=False,
+            )
+            pipeline_timing["race_update_check"] += time.time() - update_start
+
     practice_start = time.time()
     _notify("Checking completed practice sessions...")
     practice_update = auto_update_practice_characteristics_if_needed_fn(
@@ -252,21 +380,51 @@ def execute_live_prediction_pipeline_core(
     )
     pipeline_timing["practice_update_check"] = time.time() - practice_start
 
-    if practice_update.get("updated") or force_refresh:
+    if practice_update.get("updated") or should_clear_runtime_caches:
         _notify("Refreshing local caches after updates...")
         clear_resource_cache_fn()
         clear_data_cache_fn()
 
     prediction_start = time.time()
     artifact_versions = _invoke_get_artifact_versions(get_artifact_versions_fn, year=year)
-    _notify("Running qualifying and race simulations...")
-    prediction_results = run_prediction_fn(
-        race_name,
-        weather,
-        artifact_versions,
-        is_sprint=is_sprint,
+    boundary_signature = str(boundary_refresh.get("boundary_signature", ""))
+    prediction_cache_key = _prediction_cache_key(
         year=year,
+        race_name=race_name,
+        weather=weather,
+        is_sprint=is_sprint,
+        artifact_versions=artifact_versions,
+        boundary_signature=boundary_signature,
     )
+    prediction_cache_hit = False
+
+    can_use_cached_prediction = not bool(force_refresh)
+    if can_use_cached_prediction:
+        cached_prediction = _get_cached_prediction(prediction_cache_key)
+        if cached_prediction is not None:
+            prediction_results = cached_prediction
+            prediction_cache_hit = True
+            _notify("Reusing cached prediction (no new sessions or input changes)...")
+        else:
+            _notify("Running qualifying and race simulations...")
+            prediction_results = run_prediction_fn(
+                race_name,
+                weather,
+                artifact_versions,
+                is_sprint=is_sprint,
+                year=year,
+            )
+            _store_cached_prediction(prediction_cache_key, prediction_results)
+    else:
+        _notify("Running qualifying and race simulations...")
+        prediction_results = run_prediction_fn(
+            race_name,
+            weather,
+            artifact_versions,
+            is_sprint=is_sprint,
+            year=year,
+        )
+        _store_cached_prediction(prediction_cache_key, prediction_results)
     pipeline_timing["prediction_run"] = time.time() - prediction_start
     pipeline_timing["total"] = time.time() - pipeline_start
     logger.info(
@@ -280,6 +438,8 @@ def execute_live_prediction_pipeline_core(
         "prediction_results": prediction_results,
         "is_sprint": is_sprint,
         "practice_update": practice_update,
+        "boundary_refresh": boundary_refresh,
+        "prediction_cache_hit": prediction_cache_hit,
         "pipeline_timing": pipeline_timing,
         "practice_update_error": None,
     }

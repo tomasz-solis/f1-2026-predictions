@@ -2,6 +2,7 @@
 
 import logging
 import time
+from typing import Any
 
 from .cache import get_predictor
 
@@ -72,7 +73,7 @@ def run_prediction(
     _artifact_versions: dict[str, tuple[int, str]],
     is_sprint: bool = False,
     year: int = 2026,
-) -> dict:
+) -> dict[str, Any]:
     """
     Run full weekend cascade prediction.
 

@@ -5,15 +5,16 @@ from typing import Any
 
 import fastf1
 
+from src.types.prediction_types import QualifyingGridEntry
 from src.utils.grid_validation import validate_qualifying_grid
 from src.utils.team_mapping import map_team_to_characteristics
 
 logger = logging.getLogger(__name__)
 _MIN_COMPETITIVE_ENTRIES_BY_SESSION = {
-    "SQ": 10,
-    "Sprint": 10,
-    "Q": 10,
-    "R": 10,
+    "SQ": 18,
+    "Sprint": 18,
+    "Q": 18,
+    "R": 18,
 }
 
 
@@ -31,7 +32,7 @@ def _coerce_position(raw_position: Any) -> int:
 
 def fetch_actual_session_results(
     year: int, race_name: str, session_name: str
-) -> list[dict[str, Any]] | None:
+) -> list[QualifyingGridEntry] | None:
     """Fetch actual results from competitive session (SQ, Sprint, Q, R)."""
     try:
         # Load session
@@ -46,7 +47,7 @@ def fetch_actual_session_results(
             return None
 
         # Extract relevant data and fail closed on malformed rows.
-        grid: list[dict[str, int | str]] = []
+        grid: list[QualifyingGridEntry] = []
         for row_index, (_, row) in enumerate(results.iterrows(), start=1):
             try:
                 driver_raw = row.get("Abbreviation", row.get("DriverNumber", ""))

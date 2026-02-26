@@ -35,7 +35,11 @@ from .page_content import (
 )
 from .prediction_flow import run_prediction
 from .rendering import display_prediction_result
-from .update_flow import auto_update_if_needed, auto_update_practice_characteristics_if_needed
+from .update_flow import (
+    auto_update_if_needed,
+    auto_update_practice_characteristics_if_needed,
+    detect_event_boundary_refresh_if_needed,
+)
 
 logger = logging.getLogger(__name__)
 DEFAULT_SEASON = 2026
@@ -274,6 +278,7 @@ def execute_live_prediction_pipeline(
         clear_fastf1_race_cache_fn=_clear_fastf1_race_cache,
         auto_update_if_needed_fn=auto_update_if_needed,
         is_sprint_weekend_fn=is_sprint_weekend,
+        detect_event_boundary_refresh_if_needed_fn=detect_event_boundary_refresh_if_needed,
         auto_update_practice_characteristics_if_needed_fn=auto_update_practice_characteristics_if_needed,
         clear_resource_cache_fn=st.cache_resource.clear,
         clear_data_cache_fn=st.cache_data.clear,
@@ -357,6 +362,8 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                 prediction_results = pipeline_output["prediction_results"]
                 is_sprint = bool(pipeline_output["is_sprint"])
                 practice_update = pipeline_output["practice_update"]
+                boundary_refresh = pipeline_output.get("boundary_refresh", {})
+                prediction_cache_hit = bool(pipeline_output.get("prediction_cache_hit", False))
                 pipeline_timing = pipeline_output.get("pipeline_timing", {})
                 status_placeholder.empty()
 
@@ -388,6 +395,22 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                     st.info(
                         "Practice characteristics already up to date for sessions: "
                         f"{', '.join(practice_update['completed_fp_sessions'])}"
+                    )
+
+                if boundary_refresh.get("refresh_needed"):
+                    new_sessions = boundary_refresh.get("new_sessions", [])
+                    reason = boundary_refresh.get("reason", "session_boundary_delta")
+                    if new_sessions:
+                        st.info(
+                            "Auto-refresh triggered by event boundary change "
+                            f"({reason}): {', '.join(new_sessions)}"
+                        )
+                    else:
+                        st.info(f"Auto-refresh triggered by event boundary change ({reason}).")
+
+                if prediction_cache_hit:
+                    st.info(
+                        "Prediction reused from cache (inputs unchanged, no new boundary data)."
                     )
 
                 if pipeline_timing:

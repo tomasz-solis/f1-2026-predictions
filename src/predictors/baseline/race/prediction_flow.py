@@ -35,7 +35,11 @@ def predict_race_core(
     """Run the full race prediction flow with injectable dependencies."""
     _ = race_compound
 
-    track_params = load_track_specific_params(race_name)
+    try:
+        track_params = load_track_specific_params(race_name, year=year)
+    except TypeError:
+        # Backward compatibility for patched/legacy callables without year kwargs.
+        track_params = load_track_specific_params(race_name)
     base_params = load_race_params()
 
     race_params = {**base_params, **track_params}
@@ -162,7 +166,11 @@ def predict_race_core(
         is_sprint=is_sprint,
     )
 
-    tire_stress_score = get_tire_stress_score(race_name)
+    try:
+        tire_stress_score = get_tire_stress_score(race_name, year=year)
+    except TypeError:
+        # Backward compatibility for patched/legacy callables without year kwargs.
+        tire_stress_score = get_tire_stress_score(race_name)
     available_compounds = get_available_compounds(race_name, weather=weather)
     enforce_two_compound_rule = weather in {"dry", "mixed"}
 
@@ -425,19 +433,20 @@ def predict_race_core(
 
             for sample_idx in range(draw_count):
                 if resample_rng is None:
-                    ranked = sorted(
-                        blended_samples_by_driver.items(),
-                        key=lambda item: (item[1][sample_idx], item[0]),
-                    )
+                    ranked_scores = [
+                        (driver_code, samples[sample_idx])
+                        for driver_code, samples in blended_samples_by_driver.items()
+                    ]
                 else:
-                    ranked = sorted(
+                    ranked_scores = [
                         (
                             driver_code,
                             samples[int(resample_rng.integers(0, sample_count))],
                         )
                         for driver_code, samples in blended_samples_by_driver.items()
-                    )
-                    ranked = sorted(ranked, key=lambda item: (item[1], item[0]))
+                    ]
+
+                ranked = sorted(ranked_scores, key=lambda item: (item[1], item[0]))
                 for rank_index, (driver_code, _) in enumerate(ranked, start=1):
                     rank_samples_by_driver[driver_code].append(rank_index)
                 for driver_code, _ in ranked[:3]:

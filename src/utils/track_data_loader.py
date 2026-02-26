@@ -60,7 +60,46 @@ KNOWN_SPRINT_LAPS: dict[str, int] = {
 }
 
 
-def load_track_specific_params(race_name: str | None = None) -> dict:
+def _pirelli_candidate_years(year: int) -> list[int]:
+    """Return candidate Pirelli-data seasons in priority order."""
+    candidates = [int(year)]
+    if year > 0:
+        candidates.append(int(year) - 1)
+    if 2025 not in candidates:
+        candidates.append(2025)
+    return list(dict.fromkeys(candidates))
+
+
+def _resolve_track_characteristics_path(year: int) -> Path | None:
+    """Resolve season-aware track characteristics file with conservative fallback."""
+    processed_root = Path(config_loader.get("paths.processed", "data/processed"))
+    candidates = [int(year)]
+    if year > 0:
+        candidates.append(int(year) - 1)
+    if 2026 not in candidates:
+        candidates.append(2026)
+
+    for candidate_year in dict.fromkeys(candidates):
+        candidate_path = (
+            processed_root
+            / "track_characteristics"
+            / f"{int(candidate_year)}_track_characteristics.json"
+        )
+        if candidate_path.exists():
+            return candidate_path
+    return None
+
+
+def _resolve_pirelli_path(year: int) -> Path | None:
+    """Resolve season-aware Pirelli file with fallback ordering."""
+    for candidate_year in _pirelli_candidate_years(year):
+        candidate_path = Path("data") / f"{candidate_year}_pirelli_info.json"
+        if candidate_path.exists():
+            return candidate_path
+    return None
+
+
+def load_track_specific_params(race_name: str | None = None, year: int = 2026) -> dict:
     """Load track-specific parameters from track_characteristics.
 
     Returns dict with track-specific overrides for race simulation:
@@ -73,12 +112,14 @@ def load_track_specific_params(race_name: str | None = None) -> dict:
     track_params: dict[str, float | dict[str, float]] = {}
 
     if race_name:
-        # Load track characteristics
-        track_chars_path = (
-            Path(config_loader.get("paths.processed", "data/processed"))
-            / "track_characteristics"
-            / "2026_track_characteristics.json"
-        )
+        track_chars_path = _resolve_track_characteristics_path(year)
+        if track_chars_path is None:
+            logger.warning(
+                "Track characteristics file not found for year %s (or fallbacks). "
+                "Using config defaults.",
+                year,
+            )
+            return track_params
 
         try:
             with open(track_chars_path) as f:
@@ -110,11 +151,6 @@ def load_track_specific_params(race_name: str | None = None) -> dict:
                     "Using config defaults."
                 )
 
-        except FileNotFoundError:
-            logger.warning(
-                f"Track characteristics file not found at {track_chars_path}. "
-                "Using config defaults."
-            )
         except json.JSONDecodeError:
             logger.error(
                 f"Failed to parse track characteristics JSON at {track_chars_path}. "
@@ -128,7 +164,7 @@ def load_track_specific_params(race_name: str | None = None) -> dict:
     return track_params
 
 
-def get_tire_stress_score(race_name: str | None = None) -> float:
+def get_tire_stress_score(race_name: str | None = None, year: int = 2026) -> float:
     """Get tire stress score for race from Pirelli data.
 
     Returns average of traction + braking + lateral + abrasion.
@@ -139,8 +175,15 @@ def get_tire_stress_score(race_name: str | None = None) -> float:
             "baseline_predictor.compound_selection.default_stress_fallback", 3.0
         )
 
-    # Load Pirelli tire stress data
-    pirelli_path = Path("data") / "2025_pirelli_info.json"
+    pirelli_path = _resolve_pirelli_path(year)
+    if pirelli_path is None:
+        logger.warning(
+            "Pirelli data file not found for year %s (or fallbacks). Using default stress (3.0).",
+            year,
+        )
+        return config_loader.get(
+            "baseline_predictor.compound_selection.default_stress_fallback", 3.0
+        )
 
     try:
         with open(pirelli_path) as f:
@@ -165,10 +208,6 @@ def get_tire_stress_score(race_name: str | None = None) -> float:
         else:
             logger.warning(f"Tire stress data not found for {race_name}. Using default (3.0).")
 
-    except FileNotFoundError:
-        logger.warning(
-            f"Pirelli data file not found at {pirelli_path}. Using default stress (3.0)."
-        )
     except Exception as e:
         logger.error(f"Error loading Pirelli data: {e}. Using default stress (3.0).")
 

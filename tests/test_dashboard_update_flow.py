@@ -1,6 +1,7 @@
 """Tests for dashboard race/practice auto-update orchestration."""
 
 import json
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -274,3 +275,211 @@ def test_auto_update_practice_characteristics_updates_state(patcher, tmp_path):
     race_state = persisted["races"]["2026::Bahrain Grand Prix"]
     assert race_state["sessions"] == ["FP1", "FP2"]
     assert race_state["teams_updated"] == 3
+
+
+def test_auto_update_practice_characteristics_updates_only_new_sessions(patcher, tmp_path):
+    state_file = tmp_path / "practice_state.json"
+    state_file.write_text(
+        json.dumps({"races": {"2026::Bahrain Grand Prix": {"sessions": ["FP1"]}}})
+    )
+    patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
+
+    class _Detector:
+        def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool):
+            return ["FP1", "FP2"]
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+
+    captured_kwargs: dict = {}
+
+    def _update_from_testing_sessions(**kwargs):
+        captured_kwargs.update(kwargs)
+        return {"updated_teams": ["Ferrari"]}
+
+    patcher.setattr(
+        "src.systems.testing_updater.update_from_testing_sessions",
+        _update_from_testing_sessions,
+    )
+
+    result = update_flow.auto_update_practice_characteristics_if_needed(
+        year=2026,
+        race_name="Bahrain Grand Prix",
+        is_sprint=False,
+    )
+
+    assert result["updated"] is True
+    assert captured_kwargs["sessions"] == ["FP2"]
+    persisted = json.loads(state_file.read_text())
+    assert persisted["races"]["2026::Bahrain Grand Prix"]["sessions"] == ["FP1", "FP2"]
+
+
+def test_auto_update_practice_characteristics_force_recheck_processes_all_completed(
+    patcher, tmp_path
+):
+    state_file = tmp_path / "practice_state.json"
+    state_file.write_text(
+        json.dumps({"races": {"2026::Bahrain Grand Prix": {"sessions": ["FP1"]}}})
+    )
+    patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
+
+    class _Detector:
+        def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool):
+            return ["FP1", "FP2"]
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+
+    captured_kwargs: dict = {}
+
+    def _update_from_testing_sessions(**kwargs):
+        captured_kwargs.update(kwargs)
+        return {"updated_teams": ["Ferrari"]}
+
+    patcher.setattr(
+        "src.systems.testing_updater.update_from_testing_sessions",
+        _update_from_testing_sessions,
+    )
+
+    result = update_flow.auto_update_practice_characteristics_if_needed(
+        year=2026,
+        race_name="Bahrain Grand Prix",
+        is_sprint=False,
+        force_recheck=True,
+    )
+
+    assert result["updated"] is True
+    assert captured_kwargs["sessions"] == ["FP1", "FP2"]
+
+
+class _FakeEvent:
+    def __init__(self, session_dates: dict[str, datetime]):
+        self._session_dates = session_dates
+
+    def get_session_date(self, session_name: str):
+        return self._session_dates.get(session_name)
+
+
+def test_detect_event_boundary_refresh_first_seen_elapsed_session(patcher, tmp_path):
+    state_file = tmp_path / "event_boundary_state.json"
+    patcher.setattr(update_flow, "_EVENT_BOUNDARY_STATE_FILE", state_file)
+
+    now_utc = datetime(2026, 3, 14, 12, 0, tzinfo=UTC)
+    event = _FakeEvent(
+        {
+            "FP1": now_utc - timedelta(hours=5),
+            "FP2": now_utc + timedelta(hours=2),
+            "FP3": now_utc + timedelta(hours=24),
+            "Q": now_utc + timedelta(hours=30),
+            "R": now_utc + timedelta(hours=48),
+        }
+    )
+    patcher.setattr(update_flow.fastf1, "get_event", lambda _year, _race: event)
+
+    result = update_flow.detect_event_boundary_refresh_if_needed(
+        year=2026,
+        race_name="Bahrain Grand Prix",
+        is_sprint=False,
+        now_utc=now_utc,
+    )
+    assert result["refresh_needed"] is True
+    assert result["reason"] == "first_seen_after_boundary"
+    assert result["new_sessions"] == ["FP1"]
+    assert state_file.exists()
+
+    second_result = update_flow.detect_event_boundary_refresh_if_needed(
+        year=2026,
+        race_name="Bahrain Grand Prix",
+        is_sprint=False,
+        now_utc=now_utc,
+    )
+    assert second_result["refresh_needed"] is False
+    assert second_result["reason"] == "no_change"
+    assert second_result["new_sessions"] == []
+
+
+def test_detect_event_boundary_refresh_triggers_on_session_delta(patcher, tmp_path):
+    state_file = tmp_path / "event_boundary_state.json"
+    patcher.setattr(update_flow, "_EVENT_BOUNDARY_STATE_FILE", state_file)
+
+    reference = datetime(2026, 3, 14, 12, 0, tzinfo=UTC)
+    event = _FakeEvent(
+        {
+            "FP1": reference - timedelta(hours=8),
+            "FP2": reference - timedelta(hours=1),
+            "FP3": reference + timedelta(hours=24),
+            "Q": reference + timedelta(hours=30),
+            "R": reference + timedelta(hours=48),
+        }
+    )
+    patcher.setattr(update_flow.fastf1, "get_event", lambda _year, _race: event)
+
+    first_now = reference - timedelta(minutes=15)
+    first_result = update_flow.detect_event_boundary_refresh_if_needed(
+        year=2026,
+        race_name="Bahrain Grand Prix",
+        is_sprint=False,
+        now_utc=first_now,
+    )
+    assert first_result["new_sessions"] == ["FP1"]
+
+    second_now = reference + timedelta(hours=1)
+    second_result = update_flow.detect_event_boundary_refresh_if_needed(
+        year=2026,
+        race_name="Bahrain Grand Prix",
+        is_sprint=False,
+        now_utc=second_now,
+    )
+
+    assert second_result["refresh_needed"] is True
+    assert second_result["reason"] == "session_boundary_delta"
+    assert second_result["new_sessions"] == ["FP2"]
+    assert second_result["latest_elapsed_session"] == "FP2"
+    assert second_result["previous_latest_elapsed_session"] == "FP1"
+
+
+def test_detect_event_boundary_refresh_triggers_on_schedule_change(patcher, tmp_path):
+    state_file = tmp_path / "event_boundary_state.json"
+    patcher.setattr(update_flow, "_EVENT_BOUNDARY_STATE_FILE", state_file)
+
+    now_utc = datetime(2026, 3, 14, 8, 0, tzinfo=UTC)
+    initial_event = _FakeEvent(
+        {
+            "FP1": now_utc + timedelta(hours=2),
+            "FP2": now_utc + timedelta(hours=6),
+            "FP3": now_utc + timedelta(hours=24),
+            "Q": now_utc + timedelta(hours=30),
+            "R": now_utc + timedelta(hours=48),
+        }
+    )
+    updated_event = _FakeEvent(
+        {
+            "FP1": now_utc + timedelta(hours=2),
+            "FP2": now_utc + timedelta(hours=8),
+            "FP3": now_utc + timedelta(hours=24),
+            "Q": now_utc + timedelta(hours=30),
+            "R": now_utc + timedelta(hours=48),
+        }
+    )
+    calls = {"count": 0}
+
+    def _get_event(_year: int, _race_name: str):
+        calls["count"] += 1
+        return initial_event if calls["count"] == 1 else updated_event
+
+    patcher.setattr(update_flow.fastf1, "get_event", _get_event)
+
+    first_result = update_flow.detect_event_boundary_refresh_if_needed(
+        year=2026,
+        race_name="Bahrain Grand Prix",
+        is_sprint=False,
+        now_utc=now_utc,
+    )
+    assert first_result["refresh_needed"] is False
+
+    second_result = update_flow.detect_event_boundary_refresh_if_needed(
+        year=2026,
+        race_name="Bahrain Grand Prix",
+        is_sprint=False,
+        now_utc=now_utc,
+    )
+    assert second_result["refresh_needed"] is True
+    assert second_result["reason"] == "schedule_changed"

@@ -205,9 +205,9 @@ def collect_sessions_for_events(
 
             try:
                 normalized_compound_metrics = extract_session_compound_metrics(
-                    session=session,
-                    event_name=event_name,
-                    known_teams=known_teams,
+                    session,
+                    event_name,
+                    known_teams,
                 )
                 if normalized_compound_metrics:
                     result.compound_metrics_by_session[session_id] = (
@@ -286,7 +286,7 @@ def _collect_aggregated_metrics(
     """Aggregate one team's metric samples using configured strategy."""
     aggregated_metrics: dict[str, float] = {}
     for metric_name, values in samples.items():
-        aggregated = aggregate_metric_samples(values, session_aggregation=session_aggregation)
+        aggregated = aggregate_metric_samples(values, session_aggregation)
         if aggregated is not None:
             aggregated_metrics[metric_name] = aggregated
     return aggregated_metrics
@@ -331,7 +331,7 @@ def apply_team_updates(
 
         extracted_directionality = build_directionality_from_metrics(
             averaged_metrics,
-            directionality_scale=directionality_scale,
+            directionality_scale,
         )
 
         team_data = characteristics["teams"][team_name]
@@ -339,9 +339,9 @@ def apply_team_updates(
         if not isinstance(current_directionality, dict):
             current_directionality = {}
         blended_directionality = blend_directionality(
-            old_directionality=current_directionality,
-            new_directionality=extracted_directionality,
-            new_weight=new_weight,
+            current_directionality,
+            extracted_directionality,
+            new_weight,
         )
 
         team_data["directionality"] = blended_directionality

@@ -2,7 +2,22 @@
 
 import pytest
 
-from src.dashboard import pages
+from src.dashboard import live_prediction_flow, pages
+
+
+@pytest.fixture(autouse=True)
+def _default_boundary_refresh_stub(patcher):
+    live_prediction_flow._prediction_result_cache.clear()
+    patcher.setattr(
+        pages,
+        "detect_event_boundary_refresh_if_needed",
+        lambda year, race_name, is_sprint: {
+            "refresh_needed": False,
+            "reason": "no_change",
+            "new_sessions": [],
+            "boundary_signature": "",
+        },
+    )
 
 
 def test_execute_live_prediction_pipeline_refresh_call_order(patcher):
@@ -391,6 +406,146 @@ def test_execute_live_prediction_pipeline_with_force_refresh_clears_cache_and_re
     assert "clear_data" in call_order
 
 
+def test_execute_live_prediction_pipeline_auto_refreshes_on_event_boundary_delta(patcher):
+    call_order: list[str] = []
+    force_recheck_calls: list[bool] = []
+
+    def _race_update(force_recheck=False):
+        call_order.append("race_update")
+        force_recheck_calls.append(bool(force_recheck))
+
+    patcher.setattr(pages, "auto_update_if_needed", _race_update)
+    patcher.setattr(pages, "is_sprint_weekend", lambda year, race_name: False)
+    patcher.setattr(
+        pages,
+        "detect_event_boundary_refresh_if_needed",
+        lambda year, race_name, is_sprint: (
+            call_order.append("boundary_check"),
+            {
+                "refresh_needed": True,
+                "reason": "session_boundary_delta",
+                "new_sessions": ["FP2"],
+            },
+        )[1],
+    )
+    patcher.setattr(
+        pages,
+        "auto_update_practice_characteristics_if_needed",
+        lambda year, race_name, is_sprint, force_recheck=False: (
+            call_order.append(f"practice_update:{force_recheck}"),
+            {"updated": False, "completed_fp_sessions": ["FP1", "FP2"]},
+        )[1],
+    )
+    patcher.setattr(
+        pages, "_clear_fastf1_race_cache", lambda year, race_name: call_order.append("cache_clear")
+    )
+    patcher.setattr(
+        pages.st,
+        "cache_resource",
+        type(
+            "_CacheResource",
+            (),
+            {"clear": staticmethod(lambda: call_order.append("clear_resource"))},
+        ),
+    )
+    patcher.setattr(
+        pages.st,
+        "cache_data",
+        type("_CacheData", (), {"clear": staticmethod(lambda: call_order.append("clear_data"))}),
+    )
+    patcher.setattr(pages, "get_artifact_versions", lambda: {"k": (1, "ts")})
+    patcher.setattr(
+        pages,
+        "run_prediction",
+        lambda race_name, weather, _versions, is_sprint, year: (
+            call_order.append("run_prediction"),
+            {"qualifying": {"grid": []}, "race": {"finish_order": []}},
+        )[1],
+    )
+
+    output = pages.execute_live_prediction_pipeline(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+    )
+
+    assert force_recheck_calls == [False, False]
+    assert output["boundary_refresh"]["refresh_needed"] is True
+    assert output["boundary_refresh"]["new_sessions"] == ["FP2"]
+    assert call_order == [
+        "race_update",
+        "boundary_check",
+        "cache_clear",
+        "race_update",
+        "practice_update:False",
+        "clear_resource",
+        "clear_data",
+        "run_prediction",
+    ]
+
+
+def test_execute_live_prediction_pipeline_invalidates_prediction_cache_on_boundary_signature_change(
+    patcher,
+):
+    run_calls = {"direct": 0}
+    signatures = ["sig_a", "sig_a", "sig_b"]
+
+    patcher.setattr(pages, "auto_update_if_needed", lambda force_recheck=False: None)
+    patcher.setattr(pages, "is_sprint_weekend", lambda year, race_name: False)
+    patcher.setattr(
+        pages,
+        "detect_event_boundary_refresh_if_needed",
+        lambda year, race_name, is_sprint: {
+            "refresh_needed": False,
+            "reason": "no_change",
+            "new_sessions": [],
+            "boundary_signature": signatures.pop(0),
+        },
+    )
+    patcher.setattr(
+        pages,
+        "auto_update_practice_characteristics_if_needed",
+        lambda year, race_name, is_sprint, force_recheck=False: {
+            "updated": False,
+            "completed_fp_sessions": [],
+        },
+    )
+    patcher.setattr(pages, "get_artifact_versions", lambda: {"k": (1, "ts")})
+    patcher.setattr(
+        pages,
+        "run_prediction",
+        lambda race_name, weather, _versions, is_sprint, year: (
+            run_calls.__setitem__("direct", run_calls["direct"] + 1),
+            {"qualifying": {"grid": []}, "race": {"finish_order": []}},
+        )[1],
+    )
+
+    first = pages.execute_live_prediction_pipeline(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+    )
+    second = pages.execute_live_prediction_pipeline(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+    )
+    third = pages.execute_live_prediction_pipeline(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+    )
+
+    assert first["prediction_cache_hit"] is False
+    assert second["prediction_cache_hit"] is True
+    assert third["prediction_cache_hit"] is False
+    assert run_calls == {"direct": 2}
+
+
 def test_execute_live_prediction_pipeline_executes_direct_prediction_path(patcher):
     call_order: list[str] = []
 
@@ -504,4 +659,4 @@ def test_execute_live_prediction_pipeline_rechecks_live_sessions_on_repeated_run
         force_refresh=False,
     )
 
-    assert run_calls == {"direct": 2}
+    assert run_calls == {"direct": 1}

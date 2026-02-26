@@ -62,7 +62,7 @@ def _build_position_fallback_race_pace(
     canonical_results = race_results.copy()
     if "TeamName" in canonical_results.columns:
         canonical_results["_canonical_team"] = canonical_results["TeamName"].apply(
-            lambda raw: map_team_to_characteristics_fn(raw, known_teams=known_teams)
+            lambda raw: map_team_to_characteristics_fn(raw, known_teams)
         )
     else:
         canonical_results["_canonical_team"] = None
@@ -137,7 +137,7 @@ def _extract_normalized_compound_metrics(
     raw_teams = laps["Team"].dropna().unique()
 
     for raw_team in raw_teams:
-        canonical_team = map_team_to_characteristics_fn(str(raw_team), known_teams=known_teams)
+        canonical_team = map_team_to_characteristics_fn(str(raw_team), known_teams)
         if not canonical_team:
             continue
 

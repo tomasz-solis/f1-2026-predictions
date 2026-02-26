@@ -132,6 +132,8 @@ def build_testing_short_run_fallback(
         if short_score is None and balanced_score is None:
             continue
         if short_score is None:
+            if balanced_score is None:
+                continue
             team_scores[team] = float(balanced_score)
             continue
         if balanced_score is None:
@@ -281,10 +283,7 @@ def build_driver_list_with_strengths_core(
                     driver_data = {}
             skill = driver_data.get("racecraft", {}).get("skill_score", default_skill)
             quali_pace = driver_data.get("pace", {}).get("quali_pace", 0.5)
-            experience_tier = resolve_effective_experience_tier_fn(
-                driver_data=driver_data,
-                prediction_year=prediction_year,
-            )
+            experience_tier = resolve_effective_experience_tier_fn(driver_data, prediction_year)
             experience_total_races = extract_experience_total_races_fn(driver_data)
             learned_position_adjustment = get_learned_position_adjustment_fn(
                 team=team,
