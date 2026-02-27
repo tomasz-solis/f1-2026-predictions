@@ -26,11 +26,11 @@ def main():
 
     # Test 1: Health check
     print("\n1. Testing Supabase connection...")
-    healthy, message = check_connection()
-    if healthy:
+    try:
+        message = check_connection()
         print(f"   [OK] {message}")
-    else:
-        print(f"   [ERROR] {message}")
+    except Exception as e:
+        print(f"   [ERROR] {e}")
         return 1
 
     # Test 2: Initialize artifact store
