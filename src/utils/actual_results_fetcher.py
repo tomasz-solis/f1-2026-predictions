@@ -1,15 +1,18 @@
 """Fetches actual results from competitive F1 sessions."""
 
 import logging
-from typing import Any
+from typing import Any, Literal
 
 import fastf1
 
 from src.types.prediction_types import QualifyingGridEntry
+from src.utils.fastf1_resilience import call_with_resilience
 from src.utils.grid_validation import validate_qualifying_grid
+from src.utils.operational_observability import record_counter
 from src.utils.team_mapping import map_team_to_characteristics
 
 logger = logging.getLogger(__name__)
+SessionCompletionState = Literal["completed", "incomplete", "unknown"]
 _MIN_COMPETITIVE_ENTRIES_BY_SESSION = {
     "SQ": 18,
     "Sprint": 18,
@@ -35,15 +38,24 @@ def fetch_actual_session_results(
 ) -> list[QualifyingGridEntry] | None:
     """Fetch actual results from competitive session (SQ, Sprint, Q, R)."""
     try:
-        # Load session
-        session = fastf1.get_session(year, race_name, session_name)
-        session.load()
+        labels = {"year": year, "race_name": race_name, "session_name": session_name}
+        session = call_with_resilience(
+            "fastf1_get_session",
+            lambda: fastf1.get_session(year, race_name, session_name),
+            labels=labels,
+        )
+        call_with_resilience(
+            "fastf1_session_load_results",
+            lambda: session.load(),
+            labels=labels,
+        )
 
         # Get results
         results = session.results
 
         if results is None or len(results) == 0:
             logger.warning(f"No results available for {race_name} {session_name}")
+            record_counter("fastf1_results_empty_total", labels=labels)
             return None
 
         # Extract relevant data and fail closed on malformed rows.
@@ -79,6 +91,10 @@ def fetch_actual_session_results(
                     row_index,
                     e,
                 )
+                record_counter(
+                    "fastf1_results_malformed_total",
+                    labels={**labels, "row_index": row_index},
+                )
                 return None
 
         # Sort by position
@@ -98,6 +114,7 @@ def fetch_actual_session_results(
                 session_name,
                 exc,
             )
+            record_counter("fastf1_results_invalid_total", labels=labels)
             return None
 
         logger.info(
@@ -110,16 +127,29 @@ def fetch_actual_session_results(
 
     except Exception as e:
         logger.error(f"Failed to fetch {session_name} results for {race_name}: {e}")
+        record_counter(
+            "fastf1_results_fetch_failure_total",
+            labels={"year": year, "race_name": race_name, "session_name": session_name},
+        )
         return None
 
 
-def is_competitive_session_completed(year: int, race_name: str, session_name: str) -> bool:
+def get_competitive_session_completion_state(
+    year: int,
+    race_name: str,
+    session_name: str,
+) -> SessionCompletionState:
     """
-    Check if a competitive session has completed and results are available.
+    Get competitive-session completion state.
 
     Only checks COMPETITIVE sessions (SQ, Sprint, Quali, Race).
     """
     from src.utils.session_detector import SessionDetector
 
     detector = SessionDetector()
-    return detector.is_session_completed(year, race_name, session_name)
+    return detector.get_session_completion_state(year, race_name, session_name)
+
+
+def is_competitive_session_completed(year: int, race_name: str, session_name: str) -> bool:
+    """Backward-compatible boolean completion check for competitive sessions."""
+    return get_competitive_session_completion_state(year, race_name, session_name) == "completed"

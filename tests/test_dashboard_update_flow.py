@@ -4,6 +4,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
+import pandas as pd
 import pytest
 
 from src.dashboard import update_flow
@@ -56,6 +57,15 @@ def _stub_streamlit(patcher):
     )
 
     return calls, progress_bar, status_text, cache_calls
+
+
+@pytest.fixture(autouse=True)
+def _default_schedule_fetch(patcher):
+    patcher.setattr(
+        update_flow.fastf1,
+        "get_event_schedule",
+        lambda _year: (_ for _ in ()).throw(RuntimeError("offline")),
+    )
 
 
 def test_auto_update_if_needed_skips_when_no_new_races(patcher):
@@ -167,6 +177,40 @@ def test_load_practice_update_state_handles_invalid_json(patcher, tmp_path):
     patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
 
     assert update_flow._load_practice_update_state() == {"races": {}}
+
+
+def test_practice_state_loads_from_supabase_when_db_reads_enabled(patcher):
+    class _Store:
+        def load_namespace(self, namespace: str):
+            assert namespace == "practice_characteristics"
+            return {"2026::Bahrain Grand Prix": {"sessions": ["FP1"]}}
+
+    patcher.setattr(update_flow, "should_read_db_first", lambda: True)
+    patcher.setattr(update_flow, "should_write_to_db", lambda: True)
+    patcher.setattr(update_flow, "_get_runtime_state_store", lambda: _Store())
+
+    loaded = update_flow._load_practice_update_state()
+    assert loaded["races"]["2026::Bahrain Grand Prix"]["sessions"] == ["FP1"]
+
+
+def test_practice_state_saves_to_supabase_when_db_writes_enabled(patcher):
+    observed: dict[str, dict] = {}
+
+    class _Store:
+        def upsert_many(self, namespace: str, records: dict[str, dict]):
+            observed["namespace"] = {"value": namespace}
+            observed["records"] = records
+
+    patcher.setattr(update_flow, "should_write_to_db", lambda: True)
+    patcher.setattr(update_flow, "should_write_to_file", lambda: False)
+    patcher.setattr(update_flow, "_get_runtime_state_store", lambda: _Store())
+
+    update_flow._save_practice_update_state(
+        {"races": {"2026::Bahrain Grand Prix": {"sessions": ["FP1", "FP2"]}}}
+    )
+
+    assert observed["namespace"]["value"] == "practice_characteristics"
+    assert observed["records"]["2026::Bahrain Grand Prix"]["sessions"] == ["FP1", "FP2"]
 
 
 def test_auto_update_practice_characteristics_no_completed_fp(patcher, tmp_path):
@@ -350,6 +394,165 @@ def test_auto_update_practice_characteristics_force_recheck_processes_all_comple
     assert captured_kwargs["sessions"] == ["FP1", "FP2"]
 
 
+def test_auto_update_practice_characteristics_processes_backlog_across_raceweekends(
+    patcher, tmp_path
+):
+    state_file = tmp_path / "practice_state.json"
+    state_file.write_text(
+        json.dumps({"races": {"2026::Bahrain Grand Prix": {"sessions": ["FP1"]}}})
+    )
+    patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
+
+    now_utc = datetime.now(UTC)
+    schedule = pd.DataFrame(
+        {
+            "EventName": ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"],
+            "EventFormat": ["conventional", "sprint"],
+            "EventDate": [now_utc - timedelta(days=10), now_utc - timedelta(days=3)],
+        }
+    )
+    patcher.setattr(update_flow.fastf1, "get_event_schedule", lambda _year: schedule)
+
+    class _Detector:
+        def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool):
+            if race_name == "Bahrain Grand Prix":
+                assert is_sprint is False
+                return ["FP1", "FP2"]
+            if race_name == "Saudi Arabian Grand Prix":
+                assert is_sprint is True
+                return ["FP1"]
+            return []
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+
+    update_calls: list[tuple[list[str], list[str]]] = []
+
+    def _update_from_testing_sessions(**kwargs):
+        update_calls.append((list(kwargs.get("events", [])), list(kwargs.get("sessions", []))))
+        return {"updated_teams": ["Ferrari", "McLaren"]}
+
+    patcher.setattr(
+        "src.systems.testing_updater.update_from_testing_sessions",
+        _update_from_testing_sessions,
+    )
+
+    result = update_flow.auto_update_practice_characteristics_if_needed(
+        year=2026,
+        race_name="Saudi Arabian Grand Prix",
+        is_sprint=True,
+    )
+
+    assert result["updated"] is True
+    assert result["updated_events"] == ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"]
+    assert update_calls == [
+        (["Bahrain Grand Prix"], ["FP2"]),
+        (["Saudi Arabian Grand Prix"], ["FP1"]),
+    ]
+
+
+def test_auto_update_practice_characteristics_persists_progress_during_backlog_failures(
+    patcher, tmp_path
+):
+    state_file = tmp_path / "practice_state.json"
+    patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
+
+    now_utc = datetime.now(UTC)
+    schedule = pd.DataFrame(
+        {
+            "EventName": ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"],
+            "EventFormat": ["conventional", "sprint"],
+            "EventDate": [now_utc - timedelta(days=8), now_utc - timedelta(days=3)],
+        }
+    )
+    patcher.setattr(update_flow.fastf1, "get_event_schedule", lambda _year: schedule)
+
+    class _Detector:
+        def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool):
+            del year, is_sprint
+            if race_name == "Bahrain Grand Prix":
+                return ["FP1"]
+            if race_name == "Saudi Arabian Grand Prix":
+                return ["FP1"]
+            return []
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+
+    def _failing_update_from_testing_sessions(**kwargs):
+        event_name = kwargs["events"][0]
+        if event_name == "Saudi Arabian Grand Prix":
+            raise RuntimeError("practice refresh failed")
+        return {"updated_teams": ["Ferrari"]}
+
+    patcher.setattr(
+        "src.systems.testing_updater.update_from_testing_sessions",
+        _failing_update_from_testing_sessions,
+    )
+
+    with pytest.raises(RuntimeError, match="practice refresh failed"):
+        update_flow.auto_update_practice_characteristics_if_needed(
+            year=2026,
+            race_name="Saudi Arabian Grand Prix",
+            is_sprint=True,
+        )
+
+    persisted_after_failure = json.loads(state_file.read_text())
+    assert "2026::Bahrain Grand Prix" in persisted_after_failure["races"]
+    assert "2026::Saudi Arabian Grand Prix" not in persisted_after_failure["races"]
+
+    resumed_updates: list[str] = []
+
+    def _resume_update_from_testing_sessions(**kwargs):
+        resumed_updates.extend(kwargs["events"])
+        return {"updated_teams": ["Ferrari"]}
+
+    patcher.setattr(
+        "src.systems.testing_updater.update_from_testing_sessions",
+        _resume_update_from_testing_sessions,
+    )
+
+    result = update_flow.auto_update_practice_characteristics_if_needed(
+        year=2026,
+        race_name="Saudi Arabian Grand Prix",
+        is_sprint=True,
+    )
+
+    assert result["updated"] is True
+    assert result["updated_events"] == ["Saudi Arabian Grand Prix"]
+    assert resumed_updates == ["Saudi Arabian Grand Prix"]
+
+
+def test_auto_update_practice_characteristics_retries_when_supabase_lock_busy(patcher, tmp_path):
+    state_file = tmp_path / "practice_state.json"
+    patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
+    patcher.setattr(update_flow, "should_write_to_db", lambda: True)
+
+    class _Detector:
+        def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool):
+            del year, race_name, is_sprint
+            return ["FP1"]
+
+    class _Store:
+        def acquire_lock(self, lock_key: str, owner_id: str, ttl_seconds: int = 900) -> bool:
+            del lock_key, owner_id, ttl_seconds
+            return False
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+    patcher.setattr(update_flow, "_get_runtime_state_store", lambda: _Store())
+    patcher.setattr(
+        "src.systems.testing_updater.update_from_testing_sessions",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("should not run when lock busy")),
+    )
+
+    result = update_flow.auto_update_practice_characteristics_if_needed(
+        year=2026,
+        race_name="Bahrain Grand Prix",
+        is_sprint=False,
+    )
+
+    assert result["updated"] is False
+    assert result["retried_events"] == ["Bahrain Grand Prix"]
+
+
 class _FakeEvent:
     def __init__(self, session_dates: dict[str, datetime]):
         self._session_dates = session_dates
@@ -373,6 +576,13 @@ def test_detect_event_boundary_refresh_first_seen_elapsed_session(patcher, tmp_p
         }
     )
     patcher.setattr(update_flow.fastf1, "get_event", lambda _year, _race: event)
+
+    class _Detector:
+        def is_session_completed(self, year: int, race_name: str, session_name: str):
+            del year, race_name
+            return session_name == "FP1"
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
 
     result = update_flow.detect_event_boundary_refresh_if_needed(
         year=2026,
@@ -411,6 +621,14 @@ def test_detect_event_boundary_refresh_triggers_on_session_delta(patcher, tmp_pa
         }
     )
     patcher.setattr(update_flow.fastf1, "get_event", lambda _year, _race: event)
+    completed_sessions = {"FP1"}
+
+    class _Detector:
+        def is_session_completed(self, year: int, race_name: str, session_name: str):
+            del year, race_name
+            return session_name in completed_sessions
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
 
     first_now = reference - timedelta(minutes=15)
     first_result = update_flow.detect_event_boundary_refresh_if_needed(
@@ -421,6 +639,7 @@ def test_detect_event_boundary_refresh_triggers_on_session_delta(patcher, tmp_pa
     )
     assert first_result["new_sessions"] == ["FP1"]
 
+    completed_sessions.add("FP2")
     second_now = reference + timedelta(hours=1)
     second_result = update_flow.detect_event_boundary_refresh_if_needed(
         year=2026,
@@ -430,7 +649,7 @@ def test_detect_event_boundary_refresh_triggers_on_session_delta(patcher, tmp_pa
     )
 
     assert second_result["refresh_needed"] is True
-    assert second_result["reason"] == "session_boundary_delta"
+    assert second_result["reason"] == "session_data_changed"
     assert second_result["new_sessions"] == ["FP2"]
     assert second_result["latest_elapsed_session"] == "FP2"
     assert second_result["previous_latest_elapsed_session"] == "FP1"
@@ -467,6 +686,13 @@ def test_detect_event_boundary_refresh_triggers_on_schedule_change(patcher, tmp_
 
     patcher.setattr(update_flow.fastf1, "get_event", _get_event)
 
+    class _Detector:
+        def is_session_completed(self, year: int, race_name: str, session_name: str):
+            del year, race_name, session_name
+            return False
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+
     first_result = update_flow.detect_event_boundary_refresh_if_needed(
         year=2026,
         race_name="Bahrain Grand Prix",
@@ -483,3 +709,47 @@ def test_detect_event_boundary_refresh_triggers_on_schedule_change(patcher, tmp_
     )
     assert second_result["refresh_needed"] is True
     assert second_result["reason"] == "schedule_changed"
+
+
+def test_detect_event_boundary_refresh_sprint_session_delta(patcher, tmp_path):
+    state_file = tmp_path / "event_boundary_state.json"
+    patcher.setattr(update_flow, "_EVENT_BOUNDARY_STATE_FILE", state_file)
+
+    base_time = datetime(2026, 4, 25, 10, 0, tzinfo=UTC)
+    event = _FakeEvent(
+        {
+            "FP1": base_time - timedelta(hours=12),
+            "SQ": base_time - timedelta(hours=6),
+            "Sprint": base_time + timedelta(hours=18),
+            "Q": base_time + timedelta(hours=24),
+            "R": base_time + timedelta(hours=48),
+        }
+    )
+    patcher.setattr(update_flow.fastf1, "get_event", lambda _year, _race: event)
+    completed_sessions = {"FP1"}
+
+    class _Detector:
+        def is_session_completed(self, year: int, race_name: str, session_name: str):
+            del year, race_name
+            return session_name in completed_sessions
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+
+    first_result = update_flow.detect_event_boundary_refresh_if_needed(
+        year=2026,
+        race_name="Chinese Grand Prix",
+        is_sprint=True,
+        now_utc=base_time,
+    )
+    assert first_result["new_sessions"] == ["FP1"]
+
+    completed_sessions.add("SQ")
+    second_result = update_flow.detect_event_boundary_refresh_if_needed(
+        year=2026,
+        race_name="Chinese Grand Prix",
+        is_sprint=True,
+        now_utc=base_time,
+    )
+    assert second_result["refresh_needed"] is True
+    assert second_result["new_sessions"] == ["SQ"]
+    assert second_result["latest_elapsed_session"] == "SQ"

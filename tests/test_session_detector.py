@@ -41,11 +41,11 @@ def test_is_session_completed_practice_requires_non_empty_laps():
 
 
 def test_is_session_completed_competitive_requires_results():
-    detector = SessionDetector()
     past_start = datetime.now(UTC) - timedelta(hours=4)
 
     empty_results_session = MagicMock()
     empty_results_session.results = pd.DataFrame()
+    detector = SessionDetector()
     with patch("src.utils.session_detector.fastf1.get_event", return_value=_FakeEvent(past_start)):
         with patch(
             "src.utils.session_detector.fastf1.get_session", return_value=empty_results_session
@@ -54,6 +54,7 @@ def test_is_session_completed_competitive_requires_results():
 
     populated_results_session = MagicMock()
     populated_results_session.results = pd.DataFrame([{"Position": 1}])
+    detector = SessionDetector()
     with patch("src.utils.session_detector.fastf1.get_event", return_value=_FakeEvent(past_start)):
         with patch(
             "src.utils.session_detector.fastf1.get_session", return_value=populated_results_session
@@ -64,10 +65,10 @@ def test_is_session_completed_competitive_requires_results():
 def test_get_completed_sessions_uses_per_session_validation(patcher):
     detector = SessionDetector()
 
-    def _mock_completed(year: int, race_name: str, session_name: str) -> bool:
-        return session_name in {"FP1", "FP3"}
+    def _mock_completion_state(year: int, race_name: str, session_name: str) -> str:
+        return "completed" if session_name in {"FP1", "FP3"} else "incomplete"
 
-    patcher.setattr(detector, "is_session_completed", _mock_completed)
+    patcher.setattr(detector, "get_session_completion_state", _mock_completion_state)
     completed = detector.get_completed_sessions(2026, "Bahrain Grand Prix", is_sprint=False)
 
     assert completed == ["FP1", "FP3"]
@@ -112,3 +113,37 @@ def test_is_session_completed_competitive_blocks_active_status_even_with_results
     with patch("src.utils.session_detector.fastf1.get_event", return_value=_FakeEvent(past_start)):
         with patch("src.utils.session_detector.fastf1.get_session", return_value=session):
             assert detector.is_session_completed(2026, "Bahrain Grand Prix", "Q") is False
+
+
+def test_get_session_completion_state_returns_unknown_on_fastf1_error():
+    detector = SessionDetector()
+    past_start = datetime.now(UTC) - timedelta(hours=3)
+
+    broken_session = MagicMock()
+    broken_session.load.side_effect = RuntimeError("api timeout")
+
+    with patch("src.utils.session_detector.fastf1.get_event", return_value=_FakeEvent(past_start)):
+        with patch("src.utils.session_detector.fastf1.get_session", return_value=broken_session):
+            assert (
+                detector.get_session_completion_state(2026, "Bahrain Grand Prix", "Q") == "unknown"
+            )
+            assert detector.is_session_completed(2026, "Bahrain Grand Prix", "Q") is False
+
+
+def test_get_completed_sessions_uses_single_event_lookup_per_race():
+    detector = SessionDetector()
+    past_start = datetime.now(UTC) - timedelta(hours=4)
+
+    mock_session = MagicMock()
+    mock_session.laps = pd.DataFrame([{"LapTime": pd.Timedelta(seconds=90)}])
+    mock_session.session_status = pd.DataFrame({"Status": ["Finished"]})
+
+    with patch(
+        "src.utils.session_detector.fastf1.get_event",
+        return_value=_FakeEvent(past_start),
+    ) as mock_get_event:
+        with patch("src.utils.session_detector.fastf1.get_session", return_value=mock_session):
+            completed = detector.get_completed_sessions(2026, "Bahrain Grand Prix", is_sprint=False)
+
+    assert completed == ["FP1", "FP2", "FP3"]
+    assert mock_get_event.call_count == 1

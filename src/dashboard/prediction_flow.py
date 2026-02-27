@@ -9,6 +9,10 @@ from .cache import get_predictor
 logger = logging.getLogger(__name__)
 
 
+class CompetitiveSessionStatusUnavailableError(RuntimeError):
+    """Raised when competitive-session status cannot be verified from FastF1."""
+
+
 def fetch_grid_if_available(
     year: int,
     race_name: str,
@@ -18,7 +22,7 @@ def fetch_grid_if_available(
     """Fetch actual grid if session completed, otherwise use predicted grid."""
     from src.utils.actual_results_fetcher import (
         fetch_actual_session_results,
-        is_competitive_session_completed,
+        get_competitive_session_completion_state,
     )
     from src.utils.grid_validation import validate_qualifying_grid
 
@@ -29,16 +33,16 @@ def fetch_grid_if_available(
         session_name,
     )
 
-    session_completed = is_competitive_session_completed(year, race_name, session_name)
+    completion_state = get_competitive_session_completion_state(year, race_name, session_name)
     logger.info(
-        "FastF1 session completion status: race=%s year=%s session=%s completed=%s",
+        "FastF1 session completion status: race=%s year=%s session=%s state=%s",
         race_name,
         year,
         session_name,
-        session_completed,
+        completion_state,
     )
 
-    if session_completed:
+    if completion_state == "completed":
         logger.info(f"{session_name} is completed, fetching actual grid from FastF1")
         actual_grid = fetch_actual_session_results(year, race_name, session_name)
         if actual_grid:
@@ -55,7 +59,7 @@ def fetch_grid_if_available(
             f"FastF1 returned no {session_name} results for completed session at "
             f"{race_name} {year}; refusing to fall back to predicted grid."
         )
-    else:
+    if completion_state == "incomplete":
         validated_grid = validate_qualifying_grid(predicted_grid)
         logger.info(
             "Grid source resolved: PREDICTED race=%s year=%s session=%s drivers=%s",
@@ -65,6 +69,11 @@ def fetch_grid_if_available(
             len(validated_grid),
         )
         return validated_grid, "PREDICTED"
+
+    raise CompetitiveSessionStatusUnavailableError(
+        f"Could not verify completion state for {race_name} {year} {session_name}; "
+        "refusing to fall back to predicted grid."
+    )
 
 
 def run_prediction(

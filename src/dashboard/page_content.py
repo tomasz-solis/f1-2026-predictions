@@ -53,15 +53,15 @@ RACE_HYPERPARAMETERS_MARKDOWN = """
 CONTACT_PAGE_HTML = """
 <div class="contact-grid">
   <section class="contact-card">
-    <h3>Links</h3>
+    <h3>Project Links</h3>
     <div class="contact-link-stack">
-      <a class="contact-link-row" href="https://github.com/tomasz-solis" target="_blank" rel="noopener noreferrer">
+      <a class="contact-link-row" href="https://github.com/" target="_blank" rel="noopener noreferrer">
         <span class="contact-link-row__label">GitHub</span>
-        <span class="contact-link-row__value">@tomasz-solis</span>
+        <span class="contact-link-row__value">Repository Host</span>
       </a>
-      <a class="contact-link-row" href="https://linkedin.com/in/tomaszsolis" target="_blank" rel="noopener noreferrer">
-        <span class="contact-link-row__label">LinkedIn</span>
-        <span class="contact-link-row__value">/in/tomaszsolis</span>
+      <a class="contact-link-row" href="https://streamlit.io/" target="_blank" rel="noopener noreferrer">
+        <span class="contact-link-row__label">Deployment</span>
+        <span class="contact-link-row__value">Streamlit Platform</span>
       </a>
     </div>
   </section>

@@ -161,8 +161,8 @@ def test_fetch_grid_if_available_uses_actual_grid_for_completed_session(patcher)
 
     patcher.setattr(
         actual_results_fetcher,
-        "is_competitive_session_completed",
-        lambda year, race_name, session_name: True,
+        "get_competitive_session_completion_state",
+        lambda year, race_name, session_name: "completed",
     )
     patcher.setattr(
         actual_results_fetcher,
@@ -188,8 +188,8 @@ def test_fetch_grid_if_available_fails_closed_when_completed_results_missing(pat
 
     patcher.setattr(
         actual_results_fetcher,
-        "is_competitive_session_completed",
-        lambda year, race_name, session_name: True,
+        "get_competitive_session_completion_state",
+        lambda year, race_name, session_name: "completed",
     )
     patcher.setattr(
         actual_results_fetcher,
@@ -198,6 +198,27 @@ def test_fetch_grid_if_available_fails_closed_when_completed_results_missing(pat
     )
 
     with pytest.raises(RuntimeError, match="refusing to fall back"):
+        prediction_flow.fetch_grid_if_available(
+            year=2026,
+            race_name="Bahrain Grand Prix",
+            session_name="Q",
+            predicted_grid=[{"driver": "NOR", "team": "McLaren", "position": 1}],
+        )
+
+
+def test_fetch_grid_if_available_raises_when_completion_state_is_unknown(patcher):
+    from src.utils import actual_results_fetcher
+
+    patcher.setattr(
+        actual_results_fetcher,
+        "get_competitive_session_completion_state",
+        lambda year, race_name, session_name: "unknown",
+    )
+
+    with pytest.raises(
+        prediction_flow.CompetitiveSessionStatusUnavailableError,
+        match="Could not verify completion state",
+    ):
         prediction_flow.fetch_grid_if_available(
             year=2026,
             race_name="Bahrain Grand Prix",

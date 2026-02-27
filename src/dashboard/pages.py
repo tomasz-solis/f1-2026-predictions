@@ -5,6 +5,7 @@ import unicodedata
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 import fastf1
 import streamlit as st
@@ -269,6 +270,16 @@ def execute_live_prediction_pipeline(
         force_refresh: If True, clears FastF1 cache and forces re-check of session completion
         progress_callback: Optional callback for progress updates
     """
+    cache_scope_id = "global"
+    try:
+        raw_scope_id = st.session_state.get("_prediction_cache_scope_id")
+        if raw_scope_id is None:
+            raw_scope_id = uuid4().hex
+            st.session_state["_prediction_cache_scope_id"] = raw_scope_id
+        cache_scope_id = str(raw_scope_id)
+    except Exception:
+        cache_scope_id = "global"
+
     return _execute_live_prediction_pipeline_core(
         race_name=race_name,
         weather=weather,
@@ -284,6 +295,7 @@ def execute_live_prediction_pipeline(
         clear_data_cache_fn=st.cache_data.clear,
         get_artifact_versions_fn=get_artifact_versions,
         run_prediction_fn=run_prediction,
+        cache_scope_id=cache_scope_id,
     )
 
 
@@ -365,6 +377,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                 boundary_refresh = pipeline_output.get("boundary_refresh", {})
                 prediction_cache_hit = bool(pipeline_output.get("prediction_cache_hit", False))
                 pipeline_timing = pipeline_output.get("pipeline_timing", {})
+                observability = pipeline_output.get("observability", {})
                 status_placeholder.empty()
 
                 if selected_season == 2026:
@@ -397,6 +410,13 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                         f"{', '.join(practice_update['completed_fp_sessions'])}"
                     )
 
+                retried_events = practice_update.get("retried_events", [])
+                if retried_events:
+                    st.warning(
+                        "Practice backlog updates deferred due active processing lock: "
+                        f"{', '.join(str(event) for event in retried_events)}"
+                    )
+
                 if boundary_refresh.get("refresh_needed"):
                     new_sessions = boundary_refresh.get("new_sessions", [])
                     reason = boundary_refresh.get("reason", "session_boundary_delta")
@@ -422,6 +442,37 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                         f"total {pipeline_timing.get('total', 0.0):.1f}s",
                     ]
                     st.caption("Pipeline timing: " + " | ".join(timing_parts))
+
+                alerts = observability.get("alerts", [])
+                for alert in alerts:
+                    if not isinstance(alert, dict):
+                        continue
+                    severity = str(alert.get("severity", "warning")).lower()
+                    name = str(alert.get("name", "runtime_alert")).strip()
+                    message = str(alert.get("message", "")).strip()
+                    if not message:
+                        continue
+                    formatted = f"[{name}] {message}"
+                    if severity == "error":
+                        st.error(formatted)
+                    else:
+                        st.warning(formatted)
+
+                counters = observability.get("counters", {})
+                if isinstance(counters, dict):
+                    watched = [
+                        "fastf1_completion_unknown_total",
+                        "fastf1_downgrade_prevented_total",
+                        "practice_backlog_retry_total",
+                        "fastf1_circuit_trip_total",
+                    ]
+                    active = [
+                        f"{key}={int(counters[key])}"
+                        for key in watched
+                        if key in counters and int(counters[key]) > 0
+                    ]
+                    if active:
+                        st.caption("Runtime health counters: " + " | ".join(active))
 
                 _save_prediction_if_enabled(
                     enable_logging=enable_logging,

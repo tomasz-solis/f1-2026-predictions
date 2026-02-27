@@ -7,7 +7,7 @@ from src.dashboard import live_prediction_flow, pages
 
 @pytest.fixture(autouse=True)
 def _default_boundary_refresh_stub(patcher):
-    live_prediction_flow._prediction_result_cache.clear()
+    live_prediction_flow.clear_prediction_result_cache()
     patcher.setattr(
         pages,
         "detect_event_boundary_refresh_if_needed",
@@ -485,6 +485,74 @@ def test_execute_live_prediction_pipeline_auto_refreshes_on_event_boundary_delta
     ]
 
 
+def test_execute_live_prediction_pipeline_auto_refreshes_on_sprint_boundary_delta(patcher):
+    call_order: list[str] = []
+
+    patcher.setattr(pages, "auto_update_if_needed", lambda force_recheck=False: None)
+    patcher.setattr(pages, "is_sprint_weekend", lambda year, race_name: True)
+    patcher.setattr(
+        pages,
+        "detect_event_boundary_refresh_if_needed",
+        lambda year, race_name, is_sprint: (
+            call_order.append("boundary_check"),
+            {
+                "refresh_needed": True,
+                "reason": "session_data_changed",
+                "new_sessions": ["SQ"],
+                "boundary_signature": "sq_ready",
+            },
+        )[1],
+    )
+    patcher.setattr(
+        pages,
+        "auto_update_practice_characteristics_if_needed",
+        lambda year, race_name, is_sprint, force_recheck=False: (
+            call_order.append("practice_update"),
+            {"updated": False, "completed_fp_sessions": ["FP1"]},
+        )[1],
+    )
+    patcher.setattr(
+        pages, "_clear_fastf1_race_cache", lambda year, race_name: call_order.append("cache_clear")
+    )
+    patcher.setattr(
+        pages.st,
+        "cache_resource",
+        type("_CacheResource", (), {"clear": staticmethod(lambda: call_order.append("clear_r"))}),
+    )
+    patcher.setattr(
+        pages.st,
+        "cache_data",
+        type("_CacheData", (), {"clear": staticmethod(lambda: call_order.append("clear_d"))}),
+    )
+    patcher.setattr(pages, "get_artifact_versions", lambda: {"k": (1, "ts")})
+    patcher.setattr(
+        pages,
+        "run_prediction",
+        lambda race_name, weather, _versions, is_sprint, year: (
+            call_order.append(f"run_prediction:{is_sprint}"),
+            {"sprint_quali": {"grid": []}, "sprint_race": {"finish_order": []}},
+        )[1],
+    )
+
+    output = pages.execute_live_prediction_pipeline(
+        race_name="Chinese Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+    )
+
+    assert output["is_sprint"] is True
+    assert output["boundary_refresh"]["new_sessions"] == ["SQ"]
+    assert call_order == [
+        "boundary_check",
+        "cache_clear",
+        "practice_update",
+        "clear_r",
+        "clear_d",
+        "run_prediction:True",
+    ]
+
+
 def test_execute_live_prediction_pipeline_invalidates_prediction_cache_on_boundary_signature_change(
     patcher,
 ):
@@ -544,6 +612,257 @@ def test_execute_live_prediction_pipeline_invalidates_prediction_cache_on_bounda
     assert second["prediction_cache_hit"] is True
     assert third["prediction_cache_hit"] is False
     assert run_calls == {"direct": 2}
+
+
+def test_execute_live_prediction_pipeline_cache_hit_recomputes_when_competitive_results_change(
+    patcher,
+):
+    run_calls = {"direct": 0}
+    fastf1_refresh_calls = {"completion": 0, "results": 0}
+
+    patcher.setattr(pages, "auto_update_if_needed", lambda force_recheck=False: None)
+    patcher.setattr(pages, "is_sprint_weekend", lambda year, race_name: False)
+    patcher.setattr(
+        pages,
+        "detect_event_boundary_refresh_if_needed",
+        lambda year, race_name, is_sprint: {
+            "refresh_needed": False,
+            "reason": "no_change",
+            "new_sessions": [],
+            "boundary_signature": "stable_sig",
+        },
+    )
+    patcher.setattr(
+        pages,
+        "auto_update_practice_characteristics_if_needed",
+        lambda year, race_name, is_sprint, force_recheck=False: {
+            "updated": False,
+            "completed_fp_sessions": [],
+        },
+    )
+    patcher.setattr(pages, "get_artifact_versions", lambda: {"k": (1, "ts")})
+    patcher.setattr(
+        pages,
+        "run_prediction",
+        lambda race_name, weather, _versions, is_sprint, year: (
+            run_calls.__setitem__("direct", run_calls["direct"] + 1),
+            {
+                "qualifying": {
+                    "grid_source": "PREDICTED",
+                    "grid": [
+                        {"position": 1, "driver": "VER", "team": "Red Bull"},
+                        {"position": 2, "driver": "LEC", "team": "Ferrari"},
+                    ],
+                },
+                "race": {"finish_order": []},
+            },
+        )[1],
+    )
+
+    patcher.setattr(
+        "src.utils.actual_results_fetcher.get_competitive_session_completion_state",
+        lambda year, race_name, session_name: (
+            fastf1_refresh_calls.__setitem__("completion", fastf1_refresh_calls["completion"] + 1),
+            "completed",
+        )[1],
+    )
+    patcher.setattr(
+        "src.utils.actual_results_fetcher.fetch_actual_session_results",
+        lambda year, race_name, session_name: (
+            fastf1_refresh_calls.__setitem__("results", fastf1_refresh_calls["results"] + 1),
+            [
+                {"position": 1, "driver": "NOR", "team": "McLaren"},
+                {"position": 2, "driver": "VER", "team": "Red Bull"},
+            ],
+        )[1],
+    )
+
+    first = pages.execute_live_prediction_pipeline(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+    )
+    second = pages.execute_live_prediction_pipeline(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+    )
+
+    assert first["prediction_cache_hit"] is False
+    assert second["prediction_cache_hit"] is False
+    assert run_calls == {"direct": 2}
+    assert fastf1_refresh_calls == {"completion": 1, "results": 1}
+
+
+def test_execute_live_prediction_pipeline_preserves_actual_cache_when_fastf1_status_unknown(
+    patcher,
+):
+    run_calls = {"direct": 0}
+
+    patcher.setattr(pages, "auto_update_if_needed", lambda force_recheck=False: None)
+    patcher.setattr(pages, "is_sprint_weekend", lambda year, race_name: False)
+    patcher.setattr(
+        pages,
+        "detect_event_boundary_refresh_if_needed",
+        lambda year, race_name, is_sprint: {
+            "refresh_needed": False,
+            "reason": "no_change",
+            "new_sessions": [],
+            "boundary_signature": "stable_sig",
+        },
+    )
+    patcher.setattr(
+        pages,
+        "auto_update_practice_characteristics_if_needed",
+        lambda year, race_name, is_sprint, force_recheck=False: {
+            "updated": False,
+            "completed_fp_sessions": [],
+        },
+    )
+    patcher.setattr(pages, "get_artifact_versions", lambda: {"k": (1, "ts")})
+    patcher.setattr(
+        pages,
+        "run_prediction",
+        lambda race_name, weather, _versions, is_sprint, year: (
+            run_calls.__setitem__("direct", run_calls["direct"] + 1),
+            {
+                "qualifying": {
+                    "grid_source": "ACTUAL",
+                    "grid": [
+                        {"position": 1, "driver": "VER", "team": "Red Bull"},
+                        {"position": 2, "driver": "LEC", "team": "Ferrari"},
+                    ],
+                },
+                "race": {"finish_order": []},
+            },
+        )[1],
+    )
+
+    patcher.setattr(
+        "src.utils.actual_results_fetcher.get_competitive_session_completion_state",
+        lambda year, race_name, session_name: "unknown",
+    )
+
+    first = pages.execute_live_prediction_pipeline(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+    )
+    second = pages.execute_live_prediction_pipeline(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+    )
+
+    assert first["prediction_cache_hit"] is False
+    assert second["prediction_cache_hit"] is True
+    assert run_calls == {"direct": 1}
+
+
+def test_execute_live_prediction_pipeline_cache_is_scoped_per_session():
+    run_calls = {"direct": 0}
+
+    def _run_prediction(
+        race_name: str,
+        weather: str,
+        versions: dict,
+        is_sprint: bool,
+        year: int,
+    ):
+        del race_name, weather, versions, is_sprint, year
+        run_calls["direct"] += 1
+        return {"qualifying": {"grid": []}, "race": {"finish_order": []}}
+
+    common_kwargs = {
+        "race_name": "Bahrain Grand Prix",
+        "weather": "dry",
+        "year": 2026,
+        "force_refresh": False,
+        "progress_callback": None,
+        "clear_fastf1_race_cache_fn": lambda year, race_name: None,
+        "auto_update_if_needed_fn": lambda force_recheck=False: None,
+        "is_sprint_weekend_fn": lambda year, race_name: False,
+        "detect_event_boundary_refresh_if_needed_fn": lambda year, race_name, is_sprint: {
+            "refresh_needed": False,
+            "reason": "no_change",
+            "new_sessions": [],
+            "boundary_signature": "stable",
+        },
+        "auto_update_practice_characteristics_if_needed_fn": (
+            lambda year, race_name, is_sprint, force_recheck=False: {
+                "updated": False,
+                "completed_fp_sessions": [],
+            }
+        ),
+        "clear_resource_cache_fn": lambda: None,
+        "clear_data_cache_fn": lambda: None,
+        "get_artifact_versions_fn": lambda year=2026: {"k": (1, "ts")},
+        "run_prediction_fn": _run_prediction,
+    }
+
+    live_prediction_flow.execute_live_prediction_pipeline_core(
+        **common_kwargs,
+        cache_scope_id="session_a",
+    )
+    live_prediction_flow.execute_live_prediction_pipeline_core(
+        **common_kwargs,
+        cache_scope_id="session_b",
+    )
+
+    assert run_calls == {"direct": 2}
+
+
+def test_execute_live_prediction_pipeline_reuses_detector_between_boundary_and_practice_checks(
+    patcher,
+):
+    detector_ids: list[int] = []
+
+    patcher.setattr(pages, "auto_update_if_needed", lambda force_recheck=False: None)
+    patcher.setattr(pages, "is_sprint_weekend", lambda year, race_name: False)
+    patcher.setattr(
+        pages,
+        "detect_event_boundary_refresh_if_needed",
+        lambda year, race_name, is_sprint, session_detector=None: (
+            detector_ids.append(id(session_detector)),
+            {
+                "refresh_needed": False,
+                "reason": "no_change",
+                "new_sessions": [],
+                "boundary_signature": "stable_sig",
+            },
+        )[1],
+    )
+    patcher.setattr(
+        pages,
+        "auto_update_practice_characteristics_if_needed",
+        lambda year, race_name, is_sprint, force_recheck=False, session_detector=None: (
+            detector_ids.append(id(session_detector)),
+            {"updated": False, "completed_fp_sessions": []},
+        )[1],
+    )
+    patcher.setattr(pages, "get_artifact_versions", lambda: {"k": (1, "ts")})
+    patcher.setattr(
+        pages,
+        "run_prediction",
+        lambda race_name, weather, _versions, is_sprint, year: {
+            "qualifying": {"grid": []},
+            "race": {"finish_order": []},
+        },
+    )
+
+    pages.execute_live_prediction_pipeline(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+    )
+
+    assert len(detector_ids) == 2
+    assert detector_ids[0] == detector_ids[1]
 
 
 def test_execute_live_prediction_pipeline_executes_direct_prediction_path(patcher):

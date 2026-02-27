@@ -3,10 +3,20 @@
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, Literal
 
 import fastf1
 
+from src.utils.fastf1_resilience import call_with_resilience
+from src.utils.operational_observability import record_alert, record_counter
+
 logger = logging.getLogger(__name__)
+
+SessionCompletionState = Literal["completed", "incomplete", "unknown"]
+
+
+class SessionCompletionCheckError(RuntimeError):
+    """Raised when FastF1 session completion cannot be determined reliably."""
 
 
 class SessionDetector:
@@ -40,6 +50,8 @@ class SessionDetector:
             fastf1.Cache.enable_cache(str(cache_dir))
         except Exception as exc:
             logger.debug(f"Could not enable FastF1 cache in SessionDetector: {exc}")
+        self._event_cache: dict[tuple[int, str], Any] = {}
+        self._completion_cache: dict[tuple[int, str, str], SessionCompletionState] = {}
 
     def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool) -> list[str]:
         """Get completed sessions for a race weekend."""
@@ -49,13 +61,16 @@ class SessionDetector:
                 self.SPRINT_WEEKEND_SESSIONS if is_sprint else self.NORMAL_WEEKEND_SESSIONS
             )
 
-            completed = []
+            completed: list[str] = []
             for session_name in sessions_to_check:
                 try:
-                    if self.is_session_completed(year, race_name, session_name):
+                    completion_state = self.get_session_completion_state(
+                        year, race_name, session_name
+                    )
+                    if completion_state == "completed":
                         completed.append(session_name)
-                except Exception as e:
-                    logger.debug(f"Could not check session {session_name} for {race_name}: {e}")
+                except Exception as exc:
+                    logger.debug(f"Could not check session {session_name} for {race_name}: {exc}")
                     continue
 
             if not completed:
@@ -66,8 +81,8 @@ class SessionDetector:
 
             return completed
 
-        except Exception as e:
-            error_msg = str(e)
+        except Exception as exc:
+            error_msg = str(exc)
             if "not found" in error_msg.lower():
                 logger.error(f"Race not found: {race_name} {year}. Check race name spelling.")
             elif "connect" in error_msg.lower() or "network" in error_msg.lower():
@@ -84,59 +99,154 @@ class SessionDetector:
         return completed[-1] if completed else None
 
     def is_session_completed(self, year: int, race_name: str, session_name: str) -> bool:
-        """Check if a specific session has completed."""
+        """Backward-compatible completion check used by existing callers."""
+        return self.get_session_completion_state(year, race_name, session_name) == "completed"
+
+    def get_session_completion_state(
+        self, year: int, race_name: str, session_name: str
+    ) -> SessionCompletionState:
+        """Check if a specific session is completed, incomplete, or unknown."""
+        cache_key = (int(year), str(race_name), str(session_name))
+        cached_state = self._completion_cache.get(cache_key)
+        if cached_state is not None:
+            return cached_state
+
         try:
-            event = fastf1.get_event(year, race_name)
+            state = self._compute_session_completion_state(year, race_name, session_name)
+        except SessionCompletionCheckError as exc:
+            logger.warning(
+                "Could not determine completion state for %s %s %s: %s",
+                year,
+                race_name,
+                session_name,
+                exc,
+            )
+            state = "unknown"
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning(
+                "Unexpected error while checking completion state for %s %s %s: %s",
+                year,
+                race_name,
+                session_name,
+                exc,
+            )
+            state = "unknown"
+
+        if state == "unknown":
+            labels = {"year": year, "race_name": race_name, "session_name": session_name}
+            record_counter("fastf1_completion_unknown_total", labels=labels)
+            record_alert(
+                "fastf1_completion_unknown",
+                (
+                    "FastF1 completion status unknown; refusing lower-fidelity fallback "
+                    f"for {race_name} {year} {session_name}."
+                ),
+                labels=labels,
+            )
+
+        self._completion_cache[cache_key] = state
+        return state
+
+    def _get_event_cached(self, year: int, race_name: str):
+        cache_key = (int(year), str(race_name))
+        cached_event = self._event_cache.get(cache_key)
+        if cached_event is not None:
+            return cached_event
+        event = call_with_resilience(
+            "fastf1_get_event",
+            lambda: fastf1.get_event(year, race_name),
+            labels={"year": year, "race_name": race_name},
+        )
+        self._event_cache[cache_key] = event
+        return event
+
+    def _compute_session_completion_state(
+        self, year: int, race_name: str, session_name: str
+    ) -> SessionCompletionState:
+        """Internal completion check with strict error semantics."""
+        event = self._get_event_cached(year, race_name)
+        try:
             session_date = event.get_session_date(session_name)
+        except Exception as exc:  # pragma: no cover - fastf1 edge behavior
+            raise SessionCompletionCheckError(f"could not load session schedule: {exc}") from exc
 
-            if session_date is None:
-                return False
+        if session_date is None:
+            return "incomplete"
 
-            now = datetime.now(UTC)
-            if now < session_date:
-                return False
+        if session_date.tzinfo is None:
+            session_date_utc = session_date.replace(tzinfo=UTC)
+        else:
+            session_date_utc = session_date.astimezone(UTC)
 
-            session = fastf1.get_session(year, race_name, session_name)
-            if session is None:
-                return False
+        now = datetime.now(UTC)
+        if now < session_date_utc:
+            return "incomplete"
 
-            # Practice sessions require non-empty lap data; competitive sessions require results.
-            is_practice = str(session_name).upper().startswith("FP")
-            if is_practice:
-                session.load(laps=True, telemetry=False, weather=False, messages=False)
-                laps = getattr(session, "laps", None)
-                has_laps = laps is not None and not laps.empty
-                if not has_laps:
-                    return False
+        try:
+            session = call_with_resilience(
+                "fastf1_get_session",
+                lambda: fastf1.get_session(year, race_name, session_name),
+                labels={"year": year, "race_name": race_name, "session_name": session_name},
+            )
+        except Exception as exc:  # pragma: no cover - fastf1 edge behavior
+            raise SessionCompletionCheckError(f"could not create FastF1 session: {exc}") from exc
 
-                status_complete = self._session_status_completed(session)
-                if status_complete is not None:
-                    return status_complete
+        if session is None:
+            raise SessionCompletionCheckError("FastF1 returned no session object")
 
-                return self._fallback_elapsed_completion(session_date, session_name, now)
-
-            session.load(laps=False, telemetry=False, weather=False, messages=False)
-            results = getattr(session, "results", None)
-            if results is None:
-                return False
-
+        # Practice sessions require non-empty lap data; competitive sessions require results.
+        is_practice = str(session_name).upper().startswith("FP")
+        if is_practice:
             try:
-                has_results = len(results) > 0
-            except TypeError:
-                has_results = True
+                call_with_resilience(
+                    "fastf1_session_load_practice",
+                    lambda: session.load(laps=True, telemetry=False, weather=False, messages=False),
+                    labels={"year": year, "race_name": race_name, "session_name": session_name},
+                )
+            except Exception as exc:
+                raise SessionCompletionCheckError(f"practice session load failed: {exc}") from exc
 
-            if not has_results:
-                return False
+            laps = getattr(session, "laps", None)
+            has_laps = laps is not None and not laps.empty
+            if not has_laps:
+                return "incomplete"
 
             status_complete = self._session_status_completed(session)
-            if status_complete is False:
-                return False
+            if status_complete is not None:
+                return "completed" if status_complete else "incomplete"
 
-            return True
+            return (
+                "completed"
+                if self._fallback_elapsed_completion(session_date_utc, session_name, now)
+                else "incomplete"
+            )
 
-        except Exception as e:
-            logger.warning(f"Could not check if {session_name} completed: {e}")
-            return False
+        try:
+            call_with_resilience(
+                "fastf1_session_load_competitive",
+                lambda: session.load(laps=False, telemetry=False, weather=False, messages=False),
+                labels={"year": year, "race_name": race_name, "session_name": session_name},
+            )
+        except Exception as exc:
+            raise SessionCompletionCheckError(f"competitive session load failed: {exc}") from exc
+
+        results = getattr(session, "results", None)
+        if results is None:
+            return "incomplete"
+
+        try:
+            has_results = len(results) > 0
+        except TypeError:
+            has_results = True
+
+        if not has_results:
+            return "incomplete"
+
+        status_complete = self._session_status_completed(session)
+        if status_complete is False:
+            return "incomplete"
+
+        return "completed"
 
     def _session_status_completed(self, session) -> bool | None:
         """
