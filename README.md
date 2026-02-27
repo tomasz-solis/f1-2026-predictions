@@ -38,6 +38,8 @@ Current dashboard tabs:
 
 ## Quick Start
 
+Runtime target: Python `3.11.x` (repository metadata/lockfile currently excludes `3.14`).
+
 ```bash
 pip install -r requirements.txt
 streamlit run app.py

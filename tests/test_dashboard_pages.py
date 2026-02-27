@@ -30,18 +30,42 @@ def test_load_race_options_filters_testing_and_tags_sprint(patcher):
 def test_load_race_options_uses_fallback_when_schedule_fails(patcher):
     pages._load_race_options_cached.clear()
 
-    errors: list[str] = []
+    warnings: list[str] = []
     patcher.setattr(
         pages.fastf1,
         "get_event_schedule",
         lambda _year: (_ for _ in ()).throw(RuntimeError("offline")),
     )
-    patcher.setattr(pages.st, "error", lambda message: errors.append(str(message)))
+    patcher.setattr(
+        pages,
+        "_get_schedule_rows",
+        lambda _year: (("Bahrain Grand Prix", "conventional"), ("Chinese Grand Prix", "sprint")),
+    )
+    patcher.setattr(pages.st, "warning", lambda message: warnings.append(str(message)))
+    patcher.setattr(pages.st, "error", lambda _message: (_ for _ in ()).throw(AssertionError))
 
     options = pages._load_race_options()
 
-    assert errors
-    assert "Failed to load 2026 calendar" in errors[0]
+    assert warnings == []
+    assert options == ["Bahrain Grand Prix", "Chinese Grand Prix (Sprint)"]
+
+
+def test_load_race_options_warns_when_fastf1_and_fallback_unavailable(patcher):
+    pages._load_race_options_cached.clear()
+
+    warnings: list[str] = []
+    patcher.setattr(
+        pages.fastf1,
+        "get_event_schedule",
+        lambda _year: (_ for _ in ()).throw(RuntimeError("offline")),
+    )
+    patcher.setattr(pages, "_get_schedule_rows", lambda _year: tuple())
+    patcher.setattr(pages.st, "warning", lambda message: warnings.append(str(message)))
+
+    options = pages._load_race_options()
+
+    assert warnings
+    assert "Failed to load 2026 calendar" in warnings[0]
     assert "Bahrain Grand Prix" in options
 
 

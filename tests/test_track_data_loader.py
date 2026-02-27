@@ -114,6 +114,35 @@ def test_load_track_specific_params_falls_back_to_previous_available_year(tmp_pa
     assert params["track_overtaking"] == 0.44
 
 
+def test_load_track_specific_params_normalizes_underscaled_overtaking_values(tmp_path):
+    processed_root = tmp_path / "processed"
+    track_path = processed_root / "track_characteristics" / "2026_track_characteristics.json"
+    track_path.parent.mkdir(parents=True, exist_ok=True)
+    track_path.write_text(
+        json.dumps(
+            {
+                "tracks": {
+                    "Monaco Grand Prix": {
+                        "pit_stop_loss": 19.0,
+                        "safety_car_prob": 0.7,
+                        "overtaking_difficulty": 0.03,
+                    }
+                }
+            }
+        )
+    )
+
+    with patch(
+        "src.utils.track_data_loader.config_loader.get",
+        side_effect=lambda key, default=None: (
+            str(processed_root) if key == "paths.processed" else default
+        ),
+    ):
+        params = load_track_specific_params("Monaco Grand Prix", year=2026)
+
+    assert params["track_overtaking"] == 0.95
+
+
 def test_get_tire_stress_score_uses_resolved_year_file(tmp_path):
     pirelli_path = tmp_path / "2027_pirelli_info.json"
     pirelli_path.write_text(

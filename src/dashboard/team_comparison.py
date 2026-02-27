@@ -205,8 +205,8 @@ def _build_team_comparison_dataframe(
     if not rows:
         return pd.DataFrame(), neutral_fallback_count
 
+    rows.sort(key=lambda row: float(row.get("Overall Pace", 0.0)), reverse=True)
     frame = pd.DataFrame(rows)
-    frame = frame.sort_values("Overall Pace", ascending=False).reset_index(drop=True)
     return frame, neutral_fallback_count
 
 

@@ -491,6 +491,20 @@ def predict_race_core(
         movement_quantile = float(
             cfg.get("baseline_predictor.race.main_race_movement_quantile", 20.0)
         )
+        movement_ceiling_base = float(
+            cfg.get("baseline_predictor.race.main_race_movement_ceiling_base", 2.5)
+        )
+        movement_ceiling_track_scale = float(
+            cfg.get("baseline_predictor.race.main_race_movement_ceiling_track_scale", 0.70)
+        )
+        movement_ceiling_min = float(
+            cfg.get("baseline_predictor.race.main_race_movement_ceiling_min", movement_floor)
+        )
+        movement_ceiling = max(
+            movement_ceiling_min,
+            movement_ceiling_base
+            - (float(np.clip(track_overtaking, 0.0, 1.0)) * movement_ceiling_track_scale),
+        )
 
         def _avg_grid_change(rows: list[dict[str, Any]]) -> float:
             total_grid_change = 0.0
@@ -503,41 +517,40 @@ def predict_race_core(
                 total_drivers += 1
             return (total_grid_change / total_drivers) if total_drivers else 0.0
 
+        def _apply_score_ranking(scores: dict[str, float]) -> None:
+            finish_order.sort(
+                key=lambda row: (
+                    scores.get(row["driver"], float(row["position_blend_score"])),
+                    float(row["position_blend_score"]),
+                    row["driver"],
+                )
+            )
+            for idx, row in enumerate(finish_order, start=1):
+                row["position"] = idx
+                if row["driver"] in scores:
+                    row["position_blend_score"] = round(scores[row["driver"]], 4)
+
+        def _avg_grid_change_for_scores(scores: dict[str, float]) -> float:
+            total_grid_change = 0.0
+            total_drivers = 0
+            ranked_rows = sorted(
+                finish_order,
+                key=lambda row: (
+                    scores.get(row["driver"], float(row["position_blend_score"])),
+                    float(row["position_blend_score"]),
+                    row["driver"],
+                ),
+            )
+            for idx, row in enumerate(ranked_rows, start=1):
+                info = driver_info_map.get(row["driver"])
+                if info is None:
+                    continue
+                total_grid_change += abs(float(idx) - float(info["grid_pos"]))
+                total_drivers += 1
+            return (total_grid_change / total_drivers) if total_drivers else 0.0
+
         avg_grid_change = _avg_grid_change(finish_order)
         if avg_grid_change < movement_floor:
-
-            def _apply_score_ranking(scores: dict[str, float]) -> None:
-                finish_order.sort(
-                    key=lambda row: (
-                        scores.get(row["driver"], float(row["position_blend_score"])),
-                        float(row["position_blend_score"]),
-                        row["driver"],
-                    )
-                )
-                for idx, row in enumerate(finish_order, start=1):
-                    row["position"] = idx
-                    if row["driver"] in scores:
-                        row["position_blend_score"] = round(scores[row["driver"]], 4)
-
-            def _avg_grid_change_for_scores(scores: dict[str, float]) -> float:
-                total_grid_change = 0.0
-                total_drivers = 0
-                ranked_rows = sorted(
-                    finish_order,
-                    key=lambda row: (
-                        scores.get(row["driver"], float(row["position_blend_score"])),
-                        float(row["position_blend_score"]),
-                        row["driver"],
-                    ),
-                )
-                for idx, row in enumerate(ranked_rows, start=1):
-                    info = driver_info_map.get(row["driver"])
-                    if info is None:
-                        continue
-                    total_grid_change += abs(float(idx) - float(info["grid_pos"]))
-                    total_drivers += 1
-                return (total_grid_change / total_drivers) if total_drivers else 0.0
-
             quantile_candidates = [movement_quantile, 20.0, 10.0, 0.0]
             used_quantiles: set[float] = set()
             for quantile_candidate in quantile_candidates:
@@ -586,6 +599,42 @@ def predict_race_core(
                     final_scores = selected_scores or strongest_scores
                     if final_scores:
                         _apply_score_ranking(final_scores)
+
+        avg_grid_change = _avg_grid_change(finish_order)
+        if avg_grid_change > movement_ceiling:
+            base_scores = {
+                row["driver"]: float(row["position_blend_score"]) for row in finish_order
+            }
+            selected_ceiling_scores: dict[str, float] | None = None
+            closest_scores: dict[str, float] | None = None
+            closest_delta = float("inf")
+            keep_factors = [0.95, 0.90, 0.85, 0.80, 0.75, 0.70, 0.60, 0.50, 0.40, 0.30]
+
+            for keep_factor in keep_factors:
+                candidate_ceiling_scores: dict[str, float] = {}
+                for row in finish_order:
+                    driver_code = row["driver"]
+                    info = driver_info_map.get(driver_code)
+                    if info is None:
+                        continue
+                    candidate_ceiling_scores[driver_code] = (
+                        keep_factor
+                        * base_scores.get(driver_code, float(row["position_blend_score"]))
+                    ) + ((1.0 - keep_factor) * float(info["grid_pos"]))
+
+                candidate_avg = _avg_grid_change_for_scores(candidate_ceiling_scores)
+                if movement_floor <= candidate_avg <= movement_ceiling:
+                    selected_ceiling_scores = candidate_ceiling_scores
+                    break
+                if movement_floor <= candidate_avg < avg_grid_change:
+                    candidate_delta = abs(candidate_avg - movement_ceiling)
+                    if candidate_delta < closest_delta:
+                        closest_delta = candidate_delta
+                        closest_scores = candidate_ceiling_scores
+
+            final_scores = selected_ceiling_scores or closest_scores
+            if final_scores:
+                _apply_score_ranking(final_scores)
 
     if cfg.get("baseline_predictor.race.podium_probability.enforce_monotonic", True):
         raw_podium_values = [float(row.get("podium_probability", 0.0)) for row in finish_order]

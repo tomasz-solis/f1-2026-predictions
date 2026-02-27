@@ -59,6 +59,35 @@ KNOWN_SPRINT_LAPS: dict[str, int] = {
     "Abu Dhabi Grand Prix": 20,
 }
 
+# Conservative overtaking-difficulty priors used when extracted files are clearly
+# under-scaled (e.g., all tracks compressed around 0.00-0.05).
+_TRACK_OVERTAKING_BASELINES: dict[str, float] = {
+    "Bahrain Grand Prix": 0.40,
+    "Saudi Arabian Grand Prix": 0.60,
+    "Australian Grand Prix": 0.50,
+    "Japanese Grand Prix": 0.50,
+    "Chinese Grand Prix": 0.30,
+    "Miami Grand Prix": 0.50,
+    "Monaco Grand Prix": 0.95,
+    "Spanish Grand Prix": 0.40,
+    "Canadian Grand Prix": 0.50,
+    "Austrian Grand Prix": 0.40,
+    "British Grand Prix": 0.40,
+    "Hungarian Grand Prix": 0.80,
+    "Belgian Grand Prix": 0.30,
+    "Dutch Grand Prix": 0.50,
+    "Italian Grand Prix": 0.20,
+    "Singapore Grand Prix": 0.80,
+    "United States Grand Prix": 0.40,
+    "Mexico City Grand Prix": 0.40,
+    "Brazilian Grand Prix": 0.40,
+    "Las Vegas Grand Prix": 0.30,
+    "Qatar Grand Prix": 0.40,
+    "Abu Dhabi Grand Prix": 0.50,
+}
+
+_UNDERSCALED_OVERTAKING_THRESHOLD = 0.10
+
 
 def _pirelli_candidate_years(year: int) -> list[int]:
     """Return candidate Pirelli-data seasons in priority order."""
@@ -97,6 +126,34 @@ def _resolve_pirelli_path(year: int) -> Path | None:
         if candidate_path.exists():
             return candidate_path
     return None
+
+
+def _normalize_overtaking_difficulty(race_name: str, raw_value: object) -> float | None:
+    """Normalize overtaking difficulty to a robust 0..1 scale."""
+    if raw_value is None:
+        return None
+    if not isinstance(raw_value, (int | float | str)):
+        return None
+    try:
+        overtaking = float(raw_value)
+    except (TypeError, ValueError):
+        return None
+
+    overtaking = float(max(0.0, min(1.0, overtaking)))
+
+    # Some generated files compress values to ~0.00-0.05 for most tracks, which
+    # unrealistically treats nearly every circuit as easy to overtake.
+    if overtaking <= _UNDERSCALED_OVERTAKING_THRESHOLD and race_name in _TRACK_OVERTAKING_BASELINES:
+        baseline = _TRACK_OVERTAKING_BASELINES[race_name]
+        logger.info(
+            "Overtaking difficulty for %s appears under-scaled (%.3f); using baseline %.2f",
+            race_name,
+            overtaking,
+            baseline,
+        )
+        return baseline
+
+    return overtaking
 
 
 def load_track_specific_params(race_name: str | None = None, year: int = 2026) -> dict:
@@ -141,9 +198,12 @@ def load_track_specific_params(race_name: str | None = None, year: int = 2026) -
                     track_params["sc_probability"] = float(sc_prob)
 
                 # Extract overtaking difficulty
-                overtaking = track_info.get("overtaking_difficulty")
+                overtaking = _normalize_overtaking_difficulty(
+                    race_name,
+                    track_info.get("overtaking_difficulty"),
+                )
                 if overtaking is not None:
-                    track_params["track_overtaking"] = float(overtaking)
+                    track_params["track_overtaking"] = overtaking
 
             else:
                 logger.warning(

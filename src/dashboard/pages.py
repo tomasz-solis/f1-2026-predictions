@@ -10,7 +10,7 @@ from uuid import uuid4
 import fastf1
 import streamlit as st
 
-from src.utils.weekend import is_sprint_weekend
+from src.utils.weekend import _get_schedule_rows, is_sprint_weekend
 
 from . import team_comparison as _team_comparison
 from .accuracy_view import (
@@ -177,42 +177,64 @@ def _cache_dir_matches_race(cache_dir_name: str, race_name: str) -> bool:
 @st.cache_data(ttl=3600, show_spinner=False)
 def _load_race_options_cached(year: int) -> tuple[list[str], str | None]:
     """Load race options and cache schedule fetches for responsiveness."""
+
+    def _options_from_schedule_rows(rows: list[tuple[str, str]]) -> list[str]:
+        options: list[str] = []
+        for race_name, event_format in rows:
+            if not race_name or "testing" in race_name.lower():
+                continue
+            if "sprint" in str(event_format).lower():
+                options.append(f"{race_name} (Sprint)")
+            else:
+                options.append(race_name)
+        return options
+
     try:
         schedule = fastf1.get_event_schedule(year)
-        race_events = schedule[
-            (schedule["EventFormat"].notna())
-            & (~schedule["EventName"].str.contains("Testing", case=False, na=False))
-        ].copy()
-
-        race_options = []
-        for _, event in race_events.iterrows():
-            race_name = event["EventName"]
-            event_format = str(event["EventFormat"]).lower()
-            if "sprint" in event_format:
-                race_options.append(f"{race_name} (Sprint)")
-            else:
-                race_options.append(race_name)
-
-        return race_options, None
+        race_rows: list[tuple[str, str]] = []
+        if "EventName" in schedule.columns and "EventFormat" in schedule.columns:
+            for _, event in schedule.iterrows():
+                race_rows.append(
+                    (
+                        str(event.get("EventName", "")).strip(),
+                        str(event.get("EventFormat", "")).strip(),
+                    )
+                )
+        race_options = _options_from_schedule_rows(race_rows)
+        if race_options:
+            return race_options, None
+        fastf1_error = f"FastF1 returned no race events for {year}"
     except Exception as exc:
-        return (
-            [
-                "Bahrain Grand Prix",
-                "Saudi Arabian Grand Prix",
-                "Australian Grand Prix",
-                "Japanese Grand Prix",
-                "Chinese Grand Prix",
-                "Miami Grand Prix",
-            ],
-            str(exc),
+        fastf1_error = str(exc)
+
+    fallback_rows = list(_get_schedule_rows(year))
+    fallback_options = _options_from_schedule_rows(fallback_rows)
+    if fallback_options:
+        logger.warning(
+            "Using local fallback race options for %s because FastF1 schedule load failed: %s",
+            year,
+            fastf1_error,
         )
+        return fallback_options, None
+
+    return (
+        [
+            "Bahrain Grand Prix",
+            "Saudi Arabian Grand Prix",
+            "Australian Grand Prix",
+            "Japanese Grand Prix",
+            "Chinese Grand Prix",
+            "Miami Grand Prix",
+        ],
+        fastf1_error,
+    )
 
 
 def _load_race_options(year: int = DEFAULT_SEASON) -> list[str]:
     """Load race options from FastF1 schedule with sprint labels."""
     race_options, error = _load_race_options_cached(year)
     if error:
-        st.error(f"Failed to load {year} calendar: {error}")
+        st.warning(f"Failed to load {year} calendar: {error}. Using minimal fallback list.")
     return race_options
 
 
