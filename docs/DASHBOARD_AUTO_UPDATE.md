@@ -59,6 +59,8 @@ python scripts/update_from_testing.py "Testing 1" --year 2026 --sessions "Day 1"
 
 This updater is manual.
 By default it runs as dry-run; pass `--apply` to write updates.
+In DB-enabled modes (`db_only`, `fallback`, `dual_write`), `--apply` writes through
+`ArtifactStore` so Supabase stays in sync with file artifacts.
 
 Clarification: dashboard FP auto-capture uses the same underlying testing updater logic for
 completed race-weekend FP sessions, but explicit testing-event runs (for example pre-season testing)

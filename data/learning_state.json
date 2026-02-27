@@ -1,0 +1,34 @@
+{
+  "season": 2026,
+  "races_completed": 0,
+  "last_checkpoint": 0,
+  "last_updated": "2026-02-27T15:34:51.530048",
+  "method_performance": {
+    "blend_50_50": {
+      "maes": [],
+      "avg": null
+    },
+    "blend_70_30": {
+      "maes": [],
+      "avg": null
+    },
+    "blend_90_10": {
+      "maes": [],
+      "avg": null
+    },
+    "session_order": {
+      "maes": [],
+      "avg": null
+    }
+  },
+  "recommended_method": "blend",
+  "recommended_split": "70/30",
+  "overtaking_factors": {},
+  "pace_model_weights": {
+    "pace_weight": 0.4,
+    "grid_weight": 0.3,
+    "overtaking_weight": 0.2,
+    "tire_deg_weight": 0.1
+  },
+  "insights": []
+}

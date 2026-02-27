@@ -425,6 +425,7 @@ def write_characteristics_if_needed(
     now_iso: str,
     dry_run: bool,
     atomic_json_write: Callable[..., Any],
+    latest_known_version: int = 0,
 ) -> None:
     """Persist characteristics payload unless dry-run mode is enabled."""
     if dry_run:
@@ -437,5 +438,5 @@ def write_characteristics_if_needed(
         current_version = 0
 
     characteristics["last_updated"] = now_iso
-    characteristics["version"] = current_version + 1
+    characteristics["version"] = max(current_version, int(latest_known_version)) + 1
     atomic_json_write(characteristics_file, characteristics, create_backup=True)

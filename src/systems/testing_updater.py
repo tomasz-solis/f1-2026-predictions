@@ -15,6 +15,8 @@ from pathlib import Path
 import fastf1
 
 from src.extractors.performance import extract_all_teams_performance
+from src.persistence.artifact_store import ArtifactStore
+from src.persistence.config import should_write_to_db
 from src.systems.compound_analyzer import (
     aggregate_compound_samples,
     extract_compound_metrics,
@@ -498,13 +500,44 @@ def update_from_testing_sessions(
         "profiles_captured": list(_PROFILES_FOR_STORAGE),
     }
 
+    artifact_key = f"{target_year}::car_characteristics"
+    latest_known_version = 0
+    artifact_store = ArtifactStore(data_root="data")
+    if should_write_to_db():
+        try:
+            latest_known_version = int(
+                artifact_store.get_latest_version("car_characteristics", artifact_key)
+            )
+        except Exception as exc:
+            logger.warning(
+                "Could not resolve latest DB version for %s before write: %s",
+                artifact_key,
+                exc,
+            )
+
     _write_characteristics_if_needed(
         characteristics_file=characteristics_file,
         characteristics=characteristics,
         now_iso=now_iso,
         dry_run=dry_run,
         atomic_json_write=atomic_json_write,
+        latest_known_version=latest_known_version,
     )
+
+    if should_write_to_db() and not dry_run:
+        try:
+            artifact_store.save_artifact(
+                artifact_type="car_characteristics",
+                artifact_key=artifact_key,
+                data=characteristics,
+                version=int(characteristics.get("version", 1)),
+            )
+        except Exception as exc:
+            logger.warning(
+                "Could not persist testing/practice characteristics to ArtifactStore (%s): %s",
+                artifact_key,
+                exc,
+            )
 
     return {
         "year": year,

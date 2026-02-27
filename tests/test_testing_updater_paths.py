@@ -427,3 +427,66 @@ def test_update_from_testing_sessions_writes_file_when_not_dry_run(tmp_path, pat
     written_payload = atomic_write.call_args.args[1]
     assert written_payload["version"] == 3
     assert written_payload["last_updated"] != original_last_updated
+
+
+def test_update_from_testing_sessions_persists_to_artifact_store_when_db_enabled(tmp_path, patcher):
+    _write_characteristics(
+        tmp_path,
+        {
+            "version": 2,
+            "teams": {
+                "Ferrari": {
+                    "directionality": {
+                        "max_speed": 0.0,
+                        "slow_corner_speed": 0.0,
+                        "medium_corner_speed": 0.0,
+                        "high_corner_speed": 0.0,
+                    },
+                    "testing_characteristics": {},
+                }
+            },
+        },
+    )
+
+    session = SimpleNamespace(
+        laps=pd.DataFrame({"Team": ["Ferrari"], "LapTime": [pd.to_timedelta("0:01:30")]})
+    )
+    patcher.setattr(tu, "_load_sessions_for_event", lambda **kwargs: [("FP1", session)])
+    patcher.setattr(
+        tu, "_collect_session_metrics", lambda **kwargs: ({"Ferrari": {"overall_pace": 0.7}}, {})
+    )
+    patcher.setattr(
+        tu, "_count_team_selected_laps", lambda session, known_teams, run_profile: {"Ferrari": 10.0}
+    )
+    patcher.setattr(tu, "extract_compound_metrics", lambda team_laps, canonical_team, race_name: {})
+    patcher.setattr(tu.fastf1.Cache, "enable_cache", lambda path, force_renew=False: None)
+    patcher.setattr(tu, "should_write_to_db", lambda: True)
+
+    atomic_write = MagicMock()
+    patcher.setattr(tu, "atomic_json_write", atomic_write)
+
+    store_instance = MagicMock()
+    store_instance.get_latest_version.return_value = 5
+    store_instance.save_artifact.return_value = {"version": 6}
+    artifact_store_ctor = MagicMock(return_value=store_instance)
+    patcher.setattr(tu, "ArtifactStore", artifact_store_ctor)
+
+    summary = tu.update_from_testing_sessions(
+        year=2026,
+        events=["Bahrain Grand Prix"],
+        data_dir=str(tmp_path / "processed"),
+        dry_run=False,
+    )
+
+    assert summary["updated_teams"] == ["Ferrari"]
+    atomic_write.assert_called_once()
+    written_payload = atomic_write.call_args.args[1]
+    assert written_payload["version"] == 6
+    store_instance.get_latest_version.assert_called_once_with(
+        "car_characteristics", "2026::car_characteristics"
+    )
+    store_instance.save_artifact.assert_called_once()
+    kwargs = store_instance.save_artifact.call_args.kwargs
+    assert kwargs["artifact_type"] == "car_characteristics"
+    assert kwargs["artifact_key"] == "2026::car_characteristics"
+    assert kwargs["version"] == 6

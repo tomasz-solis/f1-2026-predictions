@@ -1,71 +1,1085 @@
 {
   "year": 2026,
   "note": "2026 REGULATION RESET - Initialized from 2025 constructor ranking with high uncertainty (\u00b10.3). Team strengths are updated as 2026 data arrives.",
-  "generated_at": "2026-02-27T13:27:15.730132",
+  "generated_at": "2026-02-27T15:34:51.528956",
   "data_freshness": "BASELINE_PRESEASON",
   "teams": {
     "McLaren": {
       "overall_performance": 0.85,
       "uncertainty": 0.3,
       "note": "2025 P1 seed with high uncertainty for 2026 regulation reset",
-      "last_updated": null,
-      "races_completed": 0
+      "last_updated": "2026-02-27T16:06:43.100161",
+      "races_completed": 0,
+      "directionality": {
+        "max_speed": -0.0171,
+        "slow_corner_speed": -0.009,
+        "medium_corner_speed": 0.0113,
+        "high_corner_speed": 0.0001
+      },
+      "testing_characteristics": {
+        "slow_corner_performance": 0.4063,
+        "medium_corner_performance": 0.6317,
+        "fast_corner_performance": 0.4826,
+        "braking_performance": 0.4063,
+        "top_speed": 0.2796,
+        "overall_pace": 0.5431,
+        "consistency": 0.2638,
+        "tire_deg_slope": 0.119,
+        "tire_deg_performance": 0.7746,
+        "last_updated": "2026-02-27T16:06:43.100161",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced"
+      },
+      "testing_characteristics_profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.4063,
+          "medium_corner_performance": 0.6317,
+          "fast_corner_performance": 0.4826,
+          "braking_performance": 0.4063,
+          "top_speed": 0.2796,
+          "overall_pace": 0.5431,
+          "consistency": 0.2638,
+          "tire_deg_slope": 0.119,
+          "tire_deg_performance": 0.7746,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced"
+        },
+        "short_run": {
+          "slow_corner_performance": 0.1435,
+          "medium_corner_performance": 0.2331,
+          "fast_corner_performance": 0.2542,
+          "braking_performance": 0.1435,
+          "top_speed": 0.2943,
+          "overall_pace": 0.1158,
+          "consistency": 0.3518,
+          "tire_deg_slope": 0.087,
+          "tire_deg_performance": 0.9492,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run"
+        },
+        "long_run": {
+          "slow_corner_performance": 0.4693,
+          "medium_corner_performance": 0.6632,
+          "fast_corner_performance": 0.5107,
+          "braking_performance": 0.4693,
+          "top_speed": 0.3172,
+          "overall_pace": 0.6368,
+          "consistency": 0.2822,
+          "tire_deg_slope": 0.1153,
+          "tire_deg_performance": 0.7404,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run"
+        }
+      },
+      "compound_characteristics": {
+        "TEST_UNKNOWN": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.5024961499224181,
+          "tire_deg_slope": 0.08858052289815677,
+          "tire_deg_performance": 0.905201913382459,
+          "consistency": 3.933652411324193,
+          "median_lap_time": 99.79128,
+          "laps_sampled": 48.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "SOFT": {
+          "track_name": "Testing 1",
+          "pace_performance": 0.6224408744638172,
+          "tire_deg_slope": 0.021056352272725294,
+          "tire_deg_performance": 0.9750290875505349,
+          "consistency": 9.000330368863734,
+          "median_lap_time": 100.552355,
+          "laps_sampled": 71.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "HARD": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.8952734159024758,
+          "tire_deg_slope": 0.125894772727274,
+          "tire_deg_performance": 0.6315580152470252,
+          "consistency": 4.71056790306232,
+          "median_lap_time": 98.65079,
+          "laps_sampled": 110.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "MEDIUM": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.49472754506450967,
+          "tire_deg_slope": 0.04784185664336024,
+          "tire_deg_performance": 0.9598802062398735,
+          "consistency": 9.934769741798776,
+          "median_lap_time": 99.69508,
+          "laps_sampled": 122.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        }
+      }
     },
     "Mercedes": {
       "overall_performance": 0.75,
       "uncertainty": 0.3,
       "note": "2025 P2 seed with high uncertainty for 2026 regulation reset",
-      "last_updated": null,
-      "races_completed": 0
+      "last_updated": "2026-02-27T16:06:43.100161",
+      "races_completed": 0,
+      "directionality": {
+        "max_speed": 0.014,
+        "slow_corner_speed": 0.0239,
+        "medium_corner_speed": 0.0225,
+        "high_corner_speed": 0.0194
+      },
+      "testing_characteristics": {
+        "slow_corner_performance": 0.7949,
+        "medium_corner_performance": 0.7763,
+        "fast_corner_performance": 0.7421,
+        "braking_performance": 0.7949,
+        "top_speed": 0.6764,
+        "overall_pace": 0.9251,
+        "consistency": 0.399,
+        "tire_deg_slope": 0.1155,
+        "tire_deg_performance": 0.5778,
+        "last_updated": "2026-02-27T16:06:43.100161",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced"
+      },
+      "testing_characteristics_profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.7949,
+          "medium_corner_performance": 0.7763,
+          "fast_corner_performance": 0.7421,
+          "braking_performance": 0.7949,
+          "top_speed": 0.6764,
+          "overall_pace": 0.9251,
+          "consistency": 0.399,
+          "tire_deg_slope": 0.1155,
+          "tire_deg_performance": 0.5778,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced"
+        },
+        "short_run": {
+          "slow_corner_performance": 0.4632,
+          "medium_corner_performance": 0.4853,
+          "fast_corner_performance": 0.5893,
+          "braking_performance": 0.4632,
+          "top_speed": 0.5913,
+          "overall_pace": 0.61,
+          "consistency": 0.2815,
+          "tire_deg_slope": 0.1022,
+          "tire_deg_performance": 0.8978,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run"
+        },
+        "long_run": {
+          "slow_corner_performance": 0.8544,
+          "medium_corner_performance": 0.8138,
+          "fast_corner_performance": 0.7533,
+          "braking_performance": 0.8544,
+          "top_speed": 0.7343,
+          "overall_pace": 1.0,
+          "consistency": 0.5769,
+          "tire_deg_slope": 0.1067,
+          "tire_deg_performance": 0.6338,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run"
+        }
+      },
+      "compound_characteristics": {
+        "TEST_UNKNOWN": {
+          "track_name": "Testing 2",
+          "median_lap_time": 96.035,
+          "tire_deg_slope": 0.40784999999999666,
+          "consistency": 1.8920292339766362,
+          "pace_performance": 1.0,
+          "tire_deg_performance": 0.0,
+          "consistency_performance": 0.0,
+          "laps_sampled": 10.0,
+          "sessions_used": 1,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "UNKNOWN": {
+          "track_name": "Testing 2",
+          "median_lap_time": 98.275,
+          "tire_deg_slope": 0.15935454545454808,
+          "consistency": 0.6421536916006686,
+          "pace_performance": null,
+          "tire_deg_performance": null,
+          "consistency_performance": null,
+          "laps_sampled": 11.0,
+          "sessions_used": 1,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "SOFT": {
+          "track_name": "Testing 1",
+          "pace_performance": 0.7199853898948553,
+          "tire_deg_slope": 0.09989597349709094,
+          "tire_deg_performance": 0.7536130827329931,
+          "consistency": 7.952393867949905,
+          "median_lap_time": 99.978765,
+          "laps_sampled": 88.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "HARD": {
+          "track_name": "Testing 2",
+          "pace_performance": 1.0,
+          "tire_deg_slope": 0.05285090909090964,
+          "tire_deg_performance": 0.8525554432129155,
+          "consistency": 0.7637643247242828,
+          "median_lap_time": 97.96819999999998,
+          "laps_sampled": 23.0,
+          "sessions_used": 2.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "MEDIUM": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.9955155019685039,
+          "tire_deg_slope": 0.07959066666666877,
+          "tire_deg_performance": 0.8961651906791519,
+          "consistency": 3.7492585729292864,
+          "median_lap_time": 97.28922500000002,
+          "laps_sampled": 220.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        }
+      }
     },
     "Red Bull Racing": {
       "overall_performance": 0.74,
       "uncertainty": 0.3,
       "note": "2025 P3 seed with high uncertainty for 2026 regulation reset",
-      "last_updated": null,
-      "races_completed": 0
+      "last_updated": "2026-02-27T16:06:43.100161",
+      "races_completed": 0,
+      "directionality": {
+        "max_speed": -0.0071,
+        "slow_corner_speed": 0.0056,
+        "medium_corner_speed": 0.0085,
+        "high_corner_speed": 0.0176
+      },
+      "testing_characteristics": {
+        "slow_corner_performance": 0.5105,
+        "medium_corner_performance": 0.5768,
+        "fast_corner_performance": 0.6782,
+        "braking_performance": 0.5105,
+        "top_speed": 0.2981,
+        "overall_pace": 0.6972,
+        "consistency": 0.4196,
+        "tire_deg_slope": 0.1549,
+        "tire_deg_performance": 0.5522,
+        "last_updated": "2026-02-27T16:06:43.100161",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced"
+      },
+      "testing_characteristics_profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.5105,
+          "medium_corner_performance": 0.5768,
+          "fast_corner_performance": 0.6782,
+          "braking_performance": 0.5105,
+          "top_speed": 0.2981,
+          "overall_pace": 0.6972,
+          "consistency": 0.4196,
+          "tire_deg_slope": 0.1549,
+          "tire_deg_performance": 0.5522,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced"
+        },
+        "short_run": {
+          "slow_corner_performance": 0.3611,
+          "medium_corner_performance": 0.3211,
+          "fast_corner_performance": 0.4936,
+          "braking_performance": 0.3611,
+          "top_speed": 0.2911,
+          "overall_pace": 0.3835,
+          "consistency": 0.3987,
+          "tire_deg_slope": 0.1772,
+          "tire_deg_performance": 0.5613,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run"
+        },
+        "long_run": {
+          "slow_corner_performance": 0.6198,
+          "medium_corner_performance": 0.6127,
+          "fast_corner_performance": 0.6881,
+          "braking_performance": 0.6198,
+          "top_speed": 0.6314,
+          "overall_pace": 0.7012,
+          "consistency": 0.6732,
+          "tire_deg_slope": 0.1264,
+          "tire_deg_performance": 0.6446,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run"
+        }
+      },
+      "compound_characteristics": {
+        "HARD": {
+          "track_name": "Testing 2",
+          "median_lap_time": 98.5435,
+          "tire_deg_slope": 0.06148711802902951,
+          "consistency": 0.647306565294748,
+          "pace_performance": 0.9074807480748069,
+          "tire_deg_performance": 0.9521276635233366,
+          "consistency_performance": 0.9892693792179893,
+          "laps_sampled": 38.0,
+          "sessions_used": 1,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "SOFT": {
+          "track_name": "Testing 1",
+          "pace_performance": 0.962320819112628,
+          "tire_deg_slope": 0.23941881818181313,
+          "tire_deg_performance": 0.3898691522504608,
+          "consistency": 8.104115632910226,
+          "median_lap_time": 98.62549000000001,
+          "laps_sampled": 110.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "MEDIUM": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.583091445472601,
+          "tire_deg_slope": 0.17894388444888654,
+          "tire_deg_performance": 0.4965296531072187,
+          "consistency": 12.123084050666835,
+          "median_lap_time": 99.29526000000001,
+          "laps_sampled": 150.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        }
+      }
     },
     "Ferrari": {
       "overall_performance": 0.7,
       "uncertainty": 0.3,
       "note": "2025 P4 seed with high uncertainty for 2026 regulation reset",
-      "last_updated": null,
-      "races_completed": 0
+      "last_updated": "2026-02-27T16:06:43.100161",
+      "races_completed": 0,
+      "directionality": {
+        "max_speed": 0.0211,
+        "slow_corner_speed": 0.0195,
+        "medium_corner_speed": 0.0152,
+        "high_corner_speed": 0.0159
+      },
+      "testing_characteristics": {
+        "slow_corner_performance": 0.6991,
+        "medium_corner_performance": 0.6356,
+        "fast_corner_performance": 0.6494,
+        "braking_performance": 0.6991,
+        "top_speed": 0.7705,
+        "overall_pace": 0.7496,
+        "consistency": 0.4423,
+        "tire_deg_slope": 0.0885,
+        "tire_deg_performance": 0.8755,
+        "last_updated": "2026-02-27T16:06:43.100161",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced"
+      },
+      "testing_characteristics_profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.6991,
+          "medium_corner_performance": 0.6356,
+          "fast_corner_performance": 0.6494,
+          "braking_performance": 0.6991,
+          "top_speed": 0.7705,
+          "overall_pace": 0.7496,
+          "consistency": 0.4423,
+          "tire_deg_slope": 0.0885,
+          "tire_deg_performance": 0.8755,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced"
+        },
+        "short_run": {
+          "slow_corner_performance": 0.6745,
+          "medium_corner_performance": 0.5654,
+          "fast_corner_performance": 0.633,
+          "braking_performance": 0.6745,
+          "top_speed": 0.7856,
+          "overall_pace": 0.7762,
+          "consistency": 0.5023,
+          "tire_deg_slope": 0.1206,
+          "tire_deg_performance": 0.854,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run"
+        },
+        "long_run": {
+          "slow_corner_performance": 0.7,
+          "medium_corner_performance": 0.6646,
+          "fast_corner_performance": 0.6967,
+          "braking_performance": 0.7,
+          "top_speed": 0.6575,
+          "overall_pace": 0.7963,
+          "consistency": 0.5203,
+          "tire_deg_slope": 0.0979,
+          "tire_deg_performance": 0.813,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run"
+        }
+      },
+      "compound_characteristics": {
+        "TEST_UNKNOWN": {
+          "track_name": "Testing 2",
+          "median_lap_time": 98.255,
+          "tire_deg_slope": 0.003446428571425928,
+          "consistency": 7.388830717266506,
+          "pace_performance": 0.88549618320611,
+          "tire_deg_performance": 0.7981330379336274,
+          "consistency_performance": 0.6970837877375547,
+          "laps_sampled": 19.0,
+          "sessions_used": 1,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "SOFT": {
+          "track_name": "Testing 1",
+          "pace_performance": 0.8883014633225172,
+          "tire_deg_slope": 0.3426279999999929,
+          "tire_deg_performance": 0.08180288523614096,
+          "consistency": 7.705332993031525,
+          "median_lap_time": 99.05656,
+          "laps_sampled": 189.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "HARD": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.9720536985498462,
+          "tire_deg_slope": 0.031040659340661927,
+          "tire_deg_performance": 1.0,
+          "consistency": 1.048654895416417,
+          "median_lap_time": 98.35230000000001,
+          "laps_sampled": 62.0,
+          "sessions_used": 2.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "MEDIUM": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.8303272011269626,
+          "tire_deg_slope": 0.13519127272727388,
+          "tire_deg_performance": 0.700989398577496,
+          "consistency": 6.89480128804267,
+          "median_lap_time": 98.08104,
+          "laps_sampled": 110.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        }
+      }
     },
     "Williams": {
       "overall_performance": 0.55,
       "uncertainty": 0.3,
       "note": "2025 P5 seed with high uncertainty for 2026 regulation reset",
-      "last_updated": null,
-      "races_completed": 0
+      "last_updated": "2026-02-27T16:06:43.100161",
+      "races_completed": 0,
+      "directionality": {
+        "max_speed": -0.0052,
+        "slow_corner_speed": 0.0093,
+        "medium_corner_speed": -0.0084,
+        "high_corner_speed": -0.0062
+      },
+      "testing_characteristics": {
+        "slow_corner_performance": 0.6659,
+        "medium_corner_performance": 0.4051,
+        "fast_corner_performance": 0.4475,
+        "braking_performance": 0.6659,
+        "top_speed": 0.4982,
+        "overall_pace": 0.5222,
+        "consistency": 0.4082,
+        "tire_deg_slope": 0.1492,
+        "tire_deg_performance": 0.6055,
+        "last_updated": "2026-02-27T16:06:43.100161",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced"
+      },
+      "testing_characteristics_profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.6659,
+          "medium_corner_performance": 0.4051,
+          "fast_corner_performance": 0.4475,
+          "braking_performance": 0.6659,
+          "top_speed": 0.4982,
+          "overall_pace": 0.5222,
+          "consistency": 0.4082,
+          "tire_deg_slope": 0.1492,
+          "tire_deg_performance": 0.6055,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced"
+        },
+        "short_run": {
+          "slow_corner_performance": 0.681,
+          "medium_corner_performance": 0.6589,
+          "fast_corner_performance": 0.6045,
+          "braking_performance": 0.681,
+          "top_speed": 0.4799,
+          "overall_pace": 0.8984,
+          "consistency": 0.4246,
+          "tire_deg_slope": 0.1701,
+          "tire_deg_performance": 0.7731,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run"
+        },
+        "long_run": {
+          "slow_corner_performance": 0.2102,
+          "medium_corner_performance": 0.2526,
+          "fast_corner_performance": 0.3652,
+          "braking_performance": 0.2102,
+          "top_speed": 0.46,
+          "overall_pace": 0.2995,
+          "consistency": 0.5652,
+          "tire_deg_slope": 0.1524,
+          "tire_deg_performance": 0.5412,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run"
+        }
+      },
+      "compound_characteristics": {
+        "TEST_UNKNOWN": {
+          "track_name": "Testing 2",
+          "median_lap_time": 99.995,
+          "tire_deg_slope": -0.08550000000001298,
+          "consistency": 18.46062008333174,
+          "pace_performance": 0.0,
+          "tire_deg_performance": 1.0,
+          "consistency_performance": 0.0,
+          "laps_sampled": 9.0,
+          "sessions_used": 1,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "SOFT": {
+          "track_name": "Testing 1",
+          "pace_performance": 0.43131419070149585,
+          "tire_deg_slope": 0.19363642857143382,
+          "tire_deg_performance": 0.48309577400181236,
+          "consistency": 14.223383906159984,
+          "median_lap_time": 101.55821499999999,
+          "laps_sampled": 155.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "HARD": {
+          "track_name": "Testing 2",
+          "median_lap_time": 101.2955,
+          "tire_deg_slope": 0.16618461538461207,
+          "consistency": 0.7831449418849619,
+          "pace_performance": 0.1964428991709003,
+          "tire_deg_performance": 0.518480362821232,
+          "consistency_performance": 0.9789166780534941,
+          "laps_sampled": 14.0,
+          "sessions_used": 1,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "MEDIUM": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.013275385223232242,
+          "tire_deg_slope": 0.18035261538461844,
+          "tire_deg_performance": 0.5497344511865292,
+          "consistency": 8.922499773308026,
+          "median_lap_time": 101.99607999999999,
+          "laps_sampled": 195.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        }
+      }
     },
     "RB": {
       "overall_performance": 0.48,
       "uncertainty": 0.3,
       "note": "2025 P6 seed with high uncertainty for 2026 regulation reset",
-      "last_updated": null,
-      "races_completed": 0
+      "last_updated": "2026-02-27T16:06:43.100161",
+      "races_completed": 0,
+      "directionality": {
+        "max_speed": 0.0009,
+        "slow_corner_speed": -0.0066,
+        "medium_corner_speed": -0.0107,
+        "high_corner_speed": -0.0004
+      },
+      "testing_characteristics": {
+        "slow_corner_performance": 0.4152,
+        "medium_corner_performance": 0.3889,
+        "fast_corner_performance": 0.5247,
+        "braking_performance": 0.4152,
+        "top_speed": 0.4765,
+        "overall_pace": 0.5315,
+        "consistency": 0.6071,
+        "tire_deg_slope": 0.1021,
+        "tire_deg_performance": 0.7433,
+        "last_updated": "2026-02-27T16:06:43.100161",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced"
+      },
+      "testing_characteristics_profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.4152,
+          "medium_corner_performance": 0.3889,
+          "fast_corner_performance": 0.5247,
+          "braking_performance": 0.4152,
+          "top_speed": 0.4765,
+          "overall_pace": 0.5315,
+          "consistency": 0.6071,
+          "tire_deg_slope": 0.1021,
+          "tire_deg_performance": 0.7433,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced"
+        },
+        "short_run": {
+          "slow_corner_performance": 0.4996,
+          "medium_corner_performance": 0.4074,
+          "fast_corner_performance": 0.4261,
+          "braking_performance": 0.4996,
+          "top_speed": 0.5158,
+          "overall_pace": 0.6067,
+          "consistency": 0.5808,
+          "tire_deg_slope": 0.1037,
+          "tire_deg_performance": 0.8832,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run"
+        },
+        "long_run": {
+          "slow_corner_performance": 0.4223,
+          "medium_corner_performance": 0.3947,
+          "fast_corner_performance": 0.4985,
+          "braking_performance": 0.4223,
+          "top_speed": 0.5312,
+          "overall_pace": 0.5185,
+          "consistency": 0.6233,
+          "tire_deg_slope": 0.1021,
+          "tire_deg_performance": 0.7433,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run"
+        }
+      },
+      "compound_characteristics": {
+        "SOFT": {
+          "track_name": "Testing 1",
+          "pace_performance": 0.5661683574697104,
+          "tire_deg_slope": 0.25751021978021654,
+          "tire_deg_performance": 0.32689470426977474,
+          "consistency": 3.2057496463494846,
+          "median_lap_time": 100.86855,
+          "laps_sampled": 122.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "HARD": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.4473285156812029,
+          "tire_deg_slope": 0.08550318295739441,
+          "tire_deg_performance": 0.7285357723997379,
+          "consistency": 5.863340846972502,
+          "median_lap_time": 100.40859999999999,
+          "laps_sampled": 142.0,
+          "sessions_used": 2.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "MEDIUM": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.2589982925386741,
+          "tire_deg_slope": 0.18353636363636583,
+          "tire_deg_performance": 0.5420969188275797,
+          "consistency": 5.017986066008641,
+          "median_lap_time": 100.83386999999999,
+          "laps_sampled": 104.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        }
+      }
     },
     "Aston Martin": {
       "overall_performance": 0.47,
       "uncertainty": 0.3,
       "note": "2025 P7 seed with high uncertainty for 2026 regulation reset",
-      "last_updated": null,
-      "races_completed": 0
+      "last_updated": "2026-02-27T16:06:43.100161",
+      "races_completed": 0,
+      "directionality": {
+        "max_speed": -0.0095,
+        "slow_corner_speed": -0.0228,
+        "medium_corner_speed": -0.0153,
+        "high_corner_speed": -0.0236
+      },
+      "testing_characteristics": {
+        "slow_corner_performance": 0.2443,
+        "medium_corner_performance": 0.35,
+        "fast_corner_performance": 0.2394,
+        "braking_performance": 0.2443,
+        "top_speed": 0.4171,
+        "overall_pace": 0.1923,
+        "consistency": 0.491,
+        "tire_deg_slope": 0.4892,
+        "tire_deg_performance": 0.099,
+        "last_updated": "2026-02-27T16:06:43.100161",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced"
+      },
+      "testing_characteristics_profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.2443,
+          "medium_corner_performance": 0.35,
+          "fast_corner_performance": 0.2394,
+          "braking_performance": 0.2443,
+          "top_speed": 0.4171,
+          "overall_pace": 0.1923,
+          "consistency": 0.491,
+          "tire_deg_slope": 0.4892,
+          "tire_deg_performance": 0.099,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced"
+        },
+        "short_run": {
+          "slow_corner_performance": 0.5481,
+          "medium_corner_performance": 0.6192,
+          "fast_corner_performance": 0.5365,
+          "braking_performance": 0.5481,
+          "top_speed": 0.4412,
+          "overall_pace": 0.7952,
+          "consistency": 0.5044,
+          "tire_deg_slope": 0.5377,
+          "tire_deg_performance": 0.3473,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run"
+        },
+        "long_run": {
+          "slow_corner_performance": 0.5439,
+          "medium_corner_performance": 0.4807,
+          "fast_corner_performance": 0.4214,
+          "braking_performance": 0.5439,
+          "top_speed": 0.1901,
+          "overall_pace": 0.514,
+          "consistency": 0.1565,
+          "tire_deg_slope": 0.7366,
+          "tire_deg_performance": 0.0309,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run"
+        }
+      },
+      "compound_characteristics": {
+        "HARD": {
+          "track_name": "Testing 2",
+          "median_lap_time": 102.668,
+          "tire_deg_slope": 0.17446446886446806,
+          "consistency": 1.2391889847480686,
+          "pace_performance": 0.0,
+          "tire_deg_performance": 0.17006684564015684,
+          "consistency_performance": 0.9445062320400377,
+          "laps_sampled": 23.0,
+          "sessions_used": 1,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "SOFT": {
+          "track_name": "Testing 1",
+          "median_lap_time": 103.7835,
+          "tire_deg_slope": 0.24984848484848204,
+          "consistency": 12.800740791063614,
+          "pace_performance": 0.0,
+          "tire_deg_performance": 0.3558556937630484,
+          "consistency_performance": 0.1463444860675106,
+          "laps_sampled": 20.0,
+          "sessions_used": 1,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "MEDIUM": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.17901082677165264,
+          "tire_deg_slope": 0.4598000000000021,
+          "tire_deg_performance": 0.3774604725144542,
+          "consistency": 12.097587441684349,
+          "median_lap_time": 101.40060000000001,
+          "laps_sampled": 48.0,
+          "sessions_used": 2.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        }
+      }
     },
     "Haas F1 Team": {
       "overall_performance": 0.43,
       "uncertainty": 0.3,
       "note": "2025 P8 seed with high uncertainty for 2026 regulation reset",
-      "last_updated": null,
-      "races_completed": 0
+      "last_updated": "2026-02-27T16:06:43.100161",
+      "races_completed": 0,
+      "directionality": {
+        "max_speed": -0.0095,
+        "slow_corner_speed": -0.0004,
+        "medium_corner_speed": -0.0012,
+        "high_corner_speed": -0.0049
+      },
+      "testing_characteristics": {
+        "slow_corner_performance": 0.49,
+        "medium_corner_performance": 0.4868,
+        "fast_corner_performance": 0.4291,
+        "braking_performance": 0.49,
+        "top_speed": 0.3829,
+        "overall_pace": 0.5058,
+        "consistency": 0.5394,
+        "tire_deg_slope": 0.1323,
+        "tire_deg_performance": 0.8743,
+        "last_updated": "2026-02-27T16:06:43.100161",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced"
+      },
+      "testing_characteristics_profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.49,
+          "medium_corner_performance": 0.4868,
+          "fast_corner_performance": 0.4291,
+          "braking_performance": 0.49,
+          "top_speed": 0.3829,
+          "overall_pace": 0.5058,
+          "consistency": 0.5394,
+          "tire_deg_slope": 0.1323,
+          "tire_deg_performance": 0.8743,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced"
+        },
+        "short_run": {
+          "slow_corner_performance": 0.5885,
+          "medium_corner_performance": 0.6181,
+          "fast_corner_performance": 0.5252,
+          "braking_performance": 0.5885,
+          "top_speed": 0.3787,
+          "overall_pace": 0.8047,
+          "consistency": 0.5491,
+          "tire_deg_slope": 0.199,
+          "tire_deg_performance": 0.8128,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run"
+        },
+        "long_run": {
+          "slow_corner_performance": 0.5903,
+          "medium_corner_performance": 0.5526,
+          "fast_corner_performance": 0.5604,
+          "braking_performance": 0.5903,
+          "top_speed": 0.3091,
+          "overall_pace": 0.6284,
+          "consistency": 0.3158,
+          "tire_deg_slope": 0.165,
+          "tire_deg_performance": 0.8396,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run"
+        }
+      },
+      "compound_characteristics": {
+        "TEST_UNKNOWN": {
+          "track_name": "Testing 2",
+          "median_lap_time": 99.6695,
+          "tire_deg_slope": 0.10891666666666137,
+          "consistency": 1.5815202988123673,
+          "pace_performance": 0.49242424242424143,
+          "tire_deg_performance": 1.0,
+          "consistency_performance": 0.974698085043921,
+          "laps_sampled": 10.0,
+          "sessions_used": 1,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "SOFT": {
+          "track_name": "Testing 1",
+          "pace_performance": 0.481651553597355,
+          "tire_deg_slope": 0.2956972727272794,
+          "tire_deg_performance": 0.21880902446094735,
+          "consistency": 10.544178075637785,
+          "median_lap_time": 101.275635,
+          "laps_sampled": 135.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "HARD": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.6014996297788013,
+          "tire_deg_slope": 0.07713886944896708,
+          "tire_deg_performance": 0.7515911052724711,
+          "consistency": 1.5112123277481546,
+          "median_lap_time": 99.712375,
+          "laps_sampled": 111.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "MEDIUM": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.3503831954865053,
+          "tire_deg_slope": 0.09839345104894956,
+          "tire_deg_performance": 0.8130315290867243,
+          "consistency": 5.096477623263896,
+          "median_lap_time": 100.38694000000001,
+          "laps_sampled": 108.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        }
+      }
     },
     "Alpine": {
       "overall_performance": 0.4,
       "uncertainty": 0.3,
       "note": "2025 P9 seed with high uncertainty for 2026 regulation reset",
-      "last_updated": null,
-      "races_completed": 0
+      "last_updated": "2026-02-27T16:06:43.100161",
+      "races_completed": 0,
+      "directionality": {
+        "max_speed": 0.0151,
+        "slow_corner_speed": 0.0044,
+        "medium_corner_speed": 0.015,
+        "high_corner_speed": 0.0098
+      },
+      "testing_characteristics": {
+        "slow_corner_performance": 0.5879,
+        "medium_corner_performance": 0.6948,
+        "fast_corner_performance": 0.6318,
+        "braking_performance": 0.5879,
+        "top_speed": 0.6937,
+        "overall_pace": 0.7493,
+        "consistency": 0.6128,
+        "tire_deg_slope": 0.3007,
+        "tire_deg_performance": 0.2682,
+        "last_updated": "2026-02-27T16:06:43.100161",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced"
+      },
+      "testing_characteristics_profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.5879,
+          "medium_corner_performance": 0.6948,
+          "fast_corner_performance": 0.6318,
+          "braking_performance": 0.5879,
+          "top_speed": 0.6937,
+          "overall_pace": 0.7493,
+          "consistency": 0.6128,
+          "tire_deg_slope": 0.3007,
+          "tire_deg_performance": 0.2682,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced"
+        },
+        "short_run": {
+          "slow_corner_performance": 0.6756,
+          "medium_corner_performance": 0.7194,
+          "fast_corner_performance": 0.7259,
+          "braking_performance": 0.6756,
+          "top_speed": 0.6914,
+          "overall_pace": 0.9796,
+          "consistency": 0.603,
+          "tire_deg_slope": 0.325,
+          "tire_deg_performance": 0.308,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run"
+        },
+        "long_run": {
+          "slow_corner_performance": 0.5167,
+          "medium_corner_performance": 0.6016,
+          "fast_corner_performance": 0.5464,
+          "braking_performance": 0.5167,
+          "top_speed": 0.4944,
+          "overall_pace": 0.6398,
+          "consistency": 0.6494,
+          "tire_deg_slope": 0.2945,
+          "tire_deg_performance": 0.2895,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run"
+        }
+      },
+      "compound_characteristics": {
+        "TEST_UNKNOWN": {
+          "track_name": "Testing 2",
+          "median_lap_time": 98.03,
+          "tire_deg_slope": null,
+          "consistency": 7.20039805970349,
+          "pace_performance": 1.0,
+          "tire_deg_performance": null,
+          "consistency_performance": 0.7089475747302947,
+          "laps_sampled": 11.0,
+          "sessions_used": 1,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "SOFT": {
+          "track_name": "Testing 1",
+          "pace_performance": 0.46256453787601937,
+          "tire_deg_slope": 0.32773499999998756,
+          "tire_deg_performance": 0.09698727624424675,
+          "consistency": 10.885763821665012,
+          "median_lap_time": 101.700695,
+          "laps_sampled": 113.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "HARD": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.5249476175218482,
+          "tire_deg_slope": 0.285502252747256,
+          "tire_deg_performance": 0.0,
+          "consistency": 0.9770309150035899,
+          "median_lap_time": 100.1112,
+          "laps_sampled": 37.0,
+          "sessions_used": 2.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "MEDIUM": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.6872344354860644,
+          "tire_deg_slope": 0.36308200000000646,
+          "tire_deg_performance": 0.06069104947306766,
+          "consistency": 12.7277980285833,
+          "median_lap_time": 98.76693,
+          "laps_sampled": 135.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        }
+      }
     },
     "Sauber": {
       "overall_performance": 0.38,
@@ -78,8 +1092,151 @@
       "overall_performance": 0.35,
       "uncertainty": 0.3,
       "note": "2025 P11 seed with high uncertainty for 2026 regulation reset",
-      "last_updated": null,
-      "races_completed": 0
+      "last_updated": "2026-02-27T16:06:43.100161",
+      "races_completed": 0,
+      "directionality": {
+        "max_speed": -0.0115,
+        "slow_corner_speed": -0.0202,
+        "medium_corner_speed": -0.0243,
+        "high_corner_speed": -0.0183
+      },
+      "testing_characteristics": {
+        "slow_corner_performance": 0.238,
+        "medium_corner_performance": 0.1856,
+        "fast_corner_performance": 0.2698,
+        "braking_performance": 0.238,
+        "top_speed": 0.368,
+        "overall_pace": 0.193,
+        "consistency": 0.5673,
+        "tire_deg_slope": 0.1287,
+        "tire_deg_performance": 0.616,
+        "last_updated": "2026-02-27T16:06:43.100161",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced"
+      },
+      "testing_characteristics_profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.238,
+          "medium_corner_performance": 0.1856,
+          "fast_corner_performance": 0.2698,
+          "braking_performance": 0.238,
+          "top_speed": 0.368,
+          "overall_pace": 0.193,
+          "consistency": 0.5673,
+          "tire_deg_slope": 0.1287,
+          "tire_deg_performance": 0.616,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced"
+        },
+        "short_run": {
+          "slow_corner_performance": 0.4995,
+          "medium_corner_performance": 0.6137,
+          "fast_corner_performance": 0.6207,
+          "braking_performance": 0.4995,
+          "top_speed": 0.367,
+          "overall_pace": 0.8105,
+          "consistency": 0.3816,
+          "tire_deg_slope": 0.1484,
+          "tire_deg_performance": 0.823,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run"
+        },
+        "long_run": {
+          "slow_corner_performance": 0.2616,
+          "medium_corner_performance": 0.1925,
+          "fast_corner_performance": 0.3326,
+          "braking_performance": 0.2616,
+          "top_speed": 0.5713,
+          "overall_pace": 0.2336,
+          "consistency": 0.5298,
+          "tire_deg_slope": 0.1284,
+          "tire_deg_performance": 0.5932,
+          "last_updated": "2026-02-27T16:06:43.100161",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run"
+        }
+      },
+      "compound_characteristics": {
+        "TEST_UNKNOWN": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.0,
+          "tire_deg_slope": 0.212085274725275,
+          "tire_deg_performance": 0.493130025869109,
+          "consistency": 0.8765876728814035,
+          "median_lap_time": 102.66025,
+          "laps_sampled": 26.0,
+          "sessions_used": 2.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "SOFT": {
+          "track_name": "Testing 1",
+          "pace_performance": 0.06195831313621016,
+          "tire_deg_slope": 0.05337227272727572,
+          "tire_deg_performance": 0.8252248537575038,
+          "consistency": 3.132437946510964,
+          "median_lap_time": 103.29265,
+          "laps_sampled": 41.0,
+          "sessions_used": 2.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "HARD": {
+          "track_name": "Testing 2",
+          "pace_performance": 0.03814191419141925,
+          "tire_deg_slope": 0.10181279434046349,
+          "tire_deg_performance": 0.6785500286919356,
+          "consistency": 6.7623560999879935,
+          "median_lap_time": 101.958405,
+          "laps_sampled": 114.0,
+          "sessions_used": 3.0,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        },
+        "MEDIUM": {
+          "track_name": "Testing 2",
+          "median_lap_time": 102.01150000000001,
+          "tire_deg_slope": 0.08910714285714244,
+          "consistency": 7.156630103188402,
+          "pace_performance": 0.09492295535361361,
+          "tire_deg_performance": 0.9093698942764058,
+          "consistency_performance": 0.45778662801253345,
+          "laps_sampled": 28.0,
+          "sessions_used": 1,
+          "last_updated": "2026-02-27T16:06:43.100161"
+        }
+      }
     }
-  }
+  },
+  "directionality_source": "SESSION_EXTRACTION",
+  "directionality_last_updated": "2026-02-27T16:06:43.100161",
+  "directionality_meta": {
+    "year": 2026,
+    "characteristics_year": 2026,
+    "events": [
+      "Testing 2"
+    ],
+    "sessions_loaded": [
+      "Testing 2::Testing 2 Day 1",
+      "Testing 2::Testing 2 Day 2",
+      "Testing 2::Testing 2 Day 3"
+    ],
+    "testing_backend": "auto",
+    "cache_dir": "data/raw/.fastf1_cache_testing",
+    "force_renew_cache": false,
+    "new_weight": 0.7,
+    "directionality_scale": 0.1,
+    "session_aggregation": "laps_weighted",
+    "run_profile": "balanced",
+    "profiles_captured": [
+      "balanced",
+      "short_run",
+      "long_run"
+    ]
+  },
+  "last_updated": "2026-02-27T16:06:43.100161",
+  "version": 3
 }

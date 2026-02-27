@@ -122,6 +122,11 @@ python scripts/update_from_testing.py "Testing 1" \
 ```
 
 Note: this script now defaults to dry-run mode; use `--apply` to persist changes.
+In DB-enabled modes (`db_only`, `fallback`, `dual_write`), `--apply` also persists
+`car_characteristics` to Supabase via `ArtifactStore`.
+
+If testing/practice profiles are missing, Team Comparison will show an availability message
+instead of neutral placeholder radar values.
 
 Testing cache defaults to `data/raw/.fastf1_cache_testing`.
 

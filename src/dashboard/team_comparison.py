@@ -100,7 +100,7 @@ def _default_team_selection(team_names: list[str], max_teams: int = 4) -> list[s
 
 def _collect_profile_names(teams_payload: dict[str, Any]) -> list[str]:
     """Collect available testing profile names from team characteristics payload."""
-    profile_names: set[str] = {"balanced"}
+    profile_names: set[str] = set()
     for team_data in teams_payload.values():
         if not isinstance(team_data, dict):
             continue
@@ -112,6 +112,14 @@ def _collect_profile_names(teams_payload: dict[str, Any]) -> list[str]:
             run_profile = testing_characteristics.get("run_profile")
             if isinstance(run_profile, str) and run_profile.strip():
                 profile_names.add(run_profile.strip())
+            elif (
+                any(
+                    metric_name in testing_characteristics
+                    for metric_name, _label in _TEAM_RADAR_METRICS
+                )
+                or "overall_pace" in testing_characteristics
+            ):
+                profile_names.add("balanced")
 
     ordered = ["balanced", "short_run", "long_run"]
     remaining = sorted(profile for profile in profile_names if profile not in ordered)
@@ -135,6 +143,23 @@ def _resolve_profile_metrics(team_data: dict[str, Any], profile: str) -> dict[st
             return testing_payload
 
     return {}
+
+
+def _has_profile_metrics(team_data: dict[str, Any], profile: str) -> bool:
+    """Return True when at least one profile metric is available for the selected profile."""
+    metrics_payload = _resolve_profile_metrics(team_data, profile)
+    if not isinstance(metrics_payload, dict):
+        return False
+
+    overall_pace = _coerce_unit_metric(metrics_payload.get("overall_pace"))
+    if overall_pace is not None:
+        return True
+
+    for payload_key, _label in _TEAM_RADAR_METRICS:
+        metric_value = _coerce_unit_metric(metrics_payload.get(payload_key))
+        if metric_value is not None:
+            return True
+    return False
 
 
 def _build_team_comparison_dataframe(
@@ -221,6 +246,14 @@ def _render_team_comparison_section(year: int = 2026) -> None:
         return
 
     profile_names = _collect_profile_names(teams_payload)
+    if not profile_names:
+        st.info(
+            "No testing/practice profile metrics are available yet for this season. "
+            f'Run `python scripts/update_from_testing.py "Testing 1" --year {year} --apply` '
+            "to populate comparison profiles."
+        )
+        return
+
     profile = st.selectbox(
         "Comparison profile",
         options=profile_names,
@@ -250,6 +283,20 @@ def _render_team_comparison_section(year: int = 2026) -> None:
 
     if not selected_teams:
         st.info("Select at least one team to view comparison metrics.")
+        return
+
+    teams_with_signal = [
+        team_name
+        for team_name in selected_teams
+        if isinstance(teams_payload.get(team_name), dict)
+        and _has_profile_metrics(teams_payload[team_name], profile)
+    ]
+    if not teams_with_signal:
+        st.info(
+            "Selected teams do not have testing/practice profile metrics for this profile yet. "
+            "Choose another profile or refresh telemetry with "
+            "`scripts/update_from_testing.py --apply`."
+        )
         return
 
     comparison_df, neutral_fallbacks = _build_team_comparison_dataframe(

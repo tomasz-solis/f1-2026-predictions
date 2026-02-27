@@ -64,6 +64,15 @@ def test_collect_profile_names_and_resolve_profile_metrics():
     }
 
 
+def test_collect_profile_names_empty_when_no_testing_profiles():
+    payload = {
+        "McLaren": {"overall_performance": 0.8},
+        "Ferrari": {"overall_performance": 0.75},
+    }
+
+    assert team_comparison._collect_profile_names(payload) == []
+
+
 def test_load_team_characteristics_payload_handles_missing_and_invalid(tmp_path, patcher):
     patcher.setattr(team_comparison.config_loader, "get", lambda key, default=None: str(tmp_path))
 
@@ -155,3 +164,28 @@ def test_render_team_comparison_section_renders_chart_and_table(patcher, tmp_pat
     assert calls["plotly"] == 1
     assert calls["dataframe"] == 1
     assert any("profile=`balanced`" in caption for caption in calls["captions"])
+
+
+def test_render_team_comparison_section_handles_missing_profile_metrics(patcher, tmp_path):
+    calls = _stub_streamlit_team(patcher)
+    patcher.setattr(team_comparison.config_loader, "get", lambda key, default=None: str(tmp_path))
+
+    data_path = tmp_path / "car_characteristics" / "2027_car_characteristics.json"
+    data_path.parent.mkdir(parents=True, exist_ok=True)
+    data_path.write_text(
+        json.dumps(
+            {
+                "teams": {
+                    "McLaren": {"overall_performance": 0.82},
+                    "Ferrari": {"overall_performance": 0.8},
+                }
+            }
+        )
+    )
+
+    team_comparison._load_team_characteristics_payload.clear()
+    team_comparison._render_team_comparison_section(year=2027)
+
+    assert calls["plotly"] == 0
+    assert calls["dataframe"] == 0
+    assert any("No testing/practice profile metrics" in message for message in calls["info"])

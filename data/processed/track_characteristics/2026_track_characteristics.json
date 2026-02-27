@@ -1,17 +1,17 @@
 {
   "year": 2026,
   "generated_from": "Historical averages from 2023-2025",
-  "generated_at": "2026-02-27T13:37:19.782177",
+  "generated_at": "2026-02-27T15:34:51.525539",
   "data_freshness": "BASELINE_PRESEASON",
   "tracks": {
     "Pre-Season Testing": {
-      "pit_stop_loss": 28.0,
+      "pit_stop_loss": 27.5,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent"
     },
     "Bahrain Grand Prix": {
-      "pit_stop_loss": 24.9,
+      "pit_stop_loss": 24.8,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent"
@@ -23,7 +23,7 @@
       "type": "permanent"
     },
     "Australian Grand Prix": {
-      "pit_stop_loss": 17.4,
+      "pit_stop_loss": 18.2,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent"
@@ -36,13 +36,13 @@
       "has_sprint": true
     },
     "Miami Grand Prix": {
-      "pit_stop_loss": 22.6,
+      "pit_stop_loss": 22.5,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent"
     },
     "Monaco Grand Prix": {
-      "pit_stop_loss": 24.7,
+      "pit_stop_loss": 24.6,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.03,
       "type": "street"
@@ -54,7 +54,7 @@
       "type": "permanent"
     },
     "Canadian Grand Prix": {
-      "pit_stop_loss": 22.6,
+      "pit_stop_loss": 22.5,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent"
@@ -67,7 +67,7 @@
       "has_sprint": true
     },
     "British Grand Prix": {
-      "pit_stop_loss": 29.1,
+      "pit_stop_loss": 29.0,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent"
@@ -86,7 +86,7 @@
       "has_sprint": true
     },
     "Dutch Grand Prix": {
-      "pit_stop_loss": 20.1,
+      "pit_stop_loss": 20.0,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent"
@@ -98,19 +98,19 @@
       "type": "permanent"
     },
     "Singapore Grand Prix": {
-      "pit_stop_loss": 28.7,
+      "pit_stop_loss": 27.4,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent"
     },
     "Japanese Grand Prix": {
-      "pit_stop_loss": 23.6,
+      "pit_stop_loss": 23.5,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.05,
       "type": "permanent"
     },
     "Qatar Grand Prix": {
-      "pit_stop_loss": 28.7,
+      "pit_stop_loss": 28.6,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent",
@@ -124,7 +124,7 @@
       "has_sprint": true
     },
     "Mexico City Grand Prix": {
-      "pit_stop_loss": 22.8,
+      "pit_stop_loss": 22.7,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent"
@@ -156,7 +156,7 @@
       "has_sprint": true
     },
     "Emilia Romagna Grand Prix": {
-      "pit_stop_loss": 30.0,
+      "pit_stop_loss": 29.8,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent"
