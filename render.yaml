@@ -5,4 +5,13 @@ services:
     plan: free
     buildCommand: "pip install -r requirements.txt"
     startCommand: "streamlit run app.py --server.port ${PORT:-10000} --server.address 0.0.0.0 --server.headless true"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.14"
+      - key: USE_DB_STORAGE
+        value: dual_write
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
     autoDeploy: true

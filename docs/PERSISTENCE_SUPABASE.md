@@ -27,17 +27,21 @@ Storage mode comes from `USE_DB_STORAGE` (default: `file_only`):
 - `file_only`: read/write local JSON only
 - `db_only`: read/write Supabase only
 - `fallback`: read DB first, then file fallback; writes DB only
-- `dual_write`: write both DB and file; reads file path first in current implementation
+- `dual_write`: write both DB and file; reads DB first, then file fallback
 
 If mode is not `file_only`, these env vars are required:
 
 - `SUPABASE_URL`
 - `SUPABASE_KEY` (`service_role` key for backend writes)
 
+`SUPABASE_URL` is validated at startup and must be an `https://` URL. Common typos
+like `ttps://...` now fail fast with an explicit error.
+
 ## Supabase Assets In Repo
 
 - SQL migration: `migrations/001_create_artifacts_table.sql`
 - SQL migration: `migrations/002_create_runtime_state_and_operational_tables.sql`
+- SQL migration: `migrations/003_harden_rls_policies.sql`
 - Connection test: `scripts/test_supabase_connection.py`
 - Backfill utility: `scripts/backfill_to_db.py` (migrates `driver_debuts.csv` too)
 - Predictor + storage smoke test: `scripts/test_predictor_with_db.py`
@@ -67,6 +71,7 @@ These keys are relevant for the baseline predictor stack:
 1. Run migrations in Supabase SQL Editor:
    - `migrations/001_create_artifacts_table.sql`
    - `migrations/002_create_runtime_state_and_operational_tables.sql`
+   - `migrations/003_harden_rls_policies.sql`
 2. Validate credentials and table access:
    - `uv run --active python scripts/test_supabase_connection.py`
 3. Dry-run data migration:
@@ -83,15 +88,19 @@ These keys are relevant for the baseline predictor stack:
    - prediction click writes/updates `runtime_state` rows
    - concurrent practice runs create lock contention in `runtime_processing_locks`
    - runtime alerts/counters appear in `operational_events`
+8. Verify race-learning dedupe state:
+   - namespace `race_learning` has per-season records in `runtime_state`
+   - `auto_update_from_races()` does not re-learn already processed races after restart
 
-If your tables already existed before these secure defaults, run a one-time hardening SQL step
-to enable RLS and revoke `anon`/`authenticated` table access.
+If your tables already existed before these secure defaults, run
+`migrations/003_harden_rls_policies.sql` as a one-time hardening step to enforce RLS,
+add explicit `service_role` policies, and revoke `anon`/`authenticated` access.
 
 ## Current Caveats
 
 - Prediction tracking UI currently loads historical predictions from local files (`PredictionLogger.get_all_predictions()` scans `data/predictions/`).
 - In pure `db_only` or `fallback`, prediction writes can succeed while the dashboard accuracy history appears empty if no local files exist.
-- For dashboard usage during migration, `dual_write` is the safest mode.
+- For dashboard usage during migration, `dual_write` remains the safest mode.
 - File-based `list_artifacts()` fallback is intentionally minimal outside mapped artifact types.
 - Runtime-state writes and external updater side effects are not a single distributed transaction.
 

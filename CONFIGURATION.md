@@ -56,11 +56,14 @@ When `USE_DB_STORAGE` is not `file_only`, both are required:
 - `SUPABASE_URL`
 - `SUPABASE_KEY` (`service_role` key for backend writes)
 
+`SUPABASE_URL` must be an `https://` URL (for example, `https://<project>.supabase.co`).
+
 Related docs/scripts:
 
 - `docs/PERSISTENCE_SUPABASE.md`
 - `migrations/001_create_artifacts_table.sql`
 - `migrations/002_create_runtime_state_and_operational_tables.sql`
+- `migrations/003_harden_rls_policies.sql`
 - `scripts/test_supabase_connection.py`
 - `scripts/backfill_to_db.py`
 
@@ -207,6 +210,6 @@ pace_weight = config_loader.get("baseline_predictor.race.pace_weight_base", 0.40
 
 ## Notes
 
-- The baseline predictor currently uses a fixed 70/30 practice blend inside predictor logic for qualifying.
+- Qualifying FP blending is configuration-driven and confidence-adjusted (`baseline_predictor.qualifying.fp_blend_weight*` and `data_confidence.*`), not fixed 70/30.
 - `src/predictors/qualifying.py` and `src/predictors/race.py` preserve legacy method signatures and delegate to baseline logic.
 - For Supabase rollouts, start with `dual_write`, then move to `fallback` or `db_only` after validating migrations and runtime-state writes.

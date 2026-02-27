@@ -543,6 +543,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastf1" },
+    { name = "h2" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "plotly" },
@@ -573,6 +574,7 @@ dev = [
 requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=24,<26" },
     { name = "fastf1", specifier = ">=3.3,<4" },
+    { name = "h2", specifier = ">=4.1,<5" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.120,<7" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.18,<2" },
     { name = "numpy", specifier = ">=1.26,<3" },

@@ -144,7 +144,8 @@ Artifact persistence is wired through `ArtifactStore` in active runtime code pat
 Prediction accuracy updates also write adaptive calibration state through:
 
 - `src/systems/systematic_learning.py`
-- `data/learning_state.json`
+- `runtime_state` namespace `race_learning` (DB-backed modes)
+- `data/learning_state.json` (file-backed fallback / local mode)
 
 Storage mode is controlled by `USE_DB_STORAGE`:
 
@@ -155,6 +156,7 @@ Storage mode is controlled by `USE_DB_STORAGE`:
 
 When mode is not `file_only`, both `SUPABASE_URL` and `SUPABASE_KEY` are required.
 Use a backend `service_role` key for `SUPABASE_KEY` (not anon).
+`SUPABASE_URL` must be an `https://` URL.
 
 Runtime state and operational telemetry are also persisted when DB mode is enabled:
 
@@ -175,6 +177,7 @@ Supabase assets in the repo:
 
 - Migration: `migrations/001_create_artifacts_table.sql`
 - Migration: `migrations/002_create_runtime_state_and_operational_tables.sql`
+- Migration: `migrations/003_harden_rls_policies.sql`
 - Connectivity check: `scripts/test_supabase_connection.py`
 - Backfill utility: `scripts/backfill_to_db.py` (includes `driver_debuts.csv` migration)
 - Predictor/storage smoke test: `scripts/test_predictor_with_db.py`
