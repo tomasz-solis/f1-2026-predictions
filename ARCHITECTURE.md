@@ -9,7 +9,11 @@ Streamlit UI (app.py)
   -> src/dashboard/layout.py
   -> src/dashboard/pages.py
        -> src/dashboard/update_flow.py
+       -> src/dashboard/live_prediction_flow.py
        -> src/dashboard/prediction_flow.py
+            -> src/utils/session_detector.py
+            -> src/utils/actual_results_fetcher.py
+            -> src/utils/fastf1_resilience.py
        -> Baseline2026Predictor
             -> baseline/data_mixin.py
             -> baseline/qualifying_mixin.py
@@ -18,6 +22,8 @@ Streamlit UI (app.py)
             -> fp_blending.py (qualifying only)
             -> systematic_learning.py (calibration state read/apply)
        -> ArtifactStore (file/db mode by USE_DB_STORAGE)
+       -> RuntimeStateStore (Supabase runtime_state + runtime_processing_locks)
+       -> operational_observability (counters/alerts -> operational_events)
        -> PredictionLogger.update_actuals() -> systematic_learning.py (calibration state update)
        -> src/dashboard/rendering.py
   -> qualifying + race outputs
@@ -29,7 +35,8 @@ Streamlit UI (app.py)
 
 - `src/dashboard/cache.py`: FastF1 cache setup, artifact version tracking, cached predictor loading.
 - `src/dashboard/layout.py`: page config, CSS/theme injection, header, sidebar controls.
-- `src/dashboard/pages.py`: per-page orchestration (`Live Prediction`, `Model & Learning`, `Prediction Accuracy`, `About`).
+- `src/dashboard/pages.py`: per-page orchestration (`Live Prediction`, `Model & Learning`, `Prediction Accuracy`, `Contact`).
+- `src/dashboard/live_prediction_flow.py`: refresh orchestration, boundary checks, cache-keying, cache-hit FastF1 rechecks.
 - `src/dashboard/prediction_flow.py`: cached weekend prediction cascade + ACTUAL/PREDICTED grid switching.
 - `src/dashboard/rendering.py`: qualifying/race result tables and race-specific visual sections.
 - `src/dashboard/update_flow.py`: auto-update hooks for completed races and FP practice capture.
@@ -116,11 +123,16 @@ Files:
 - `src/persistence/artifact_store.py`
 - `src/persistence/config.py`
 - `src/persistence/db.py`
+- `src/persistence/runtime_state_store.py`
+- `src/utils/operational_observability.py`
 - `migrations/001_create_artifacts_table.sql`
+- `migrations/002_create_runtime_state_and_operational_tables.sql`
 
 Responsibilities:
 
 - Provide unified artifact load/save interface.
+- Persist runtime state and processing locks for idempotent practice backlog updates.
+- Emit runtime counters and alerts to `operational_events`.
 - Support storage modes controlled by `USE_DB_STORAGE`:
   - `file_only` (default),
   - `db_only`,
@@ -201,6 +213,7 @@ File: `src/utils/weekend.py`
 - Primary FastF1 cache: `data/raw/.fastf1_cache`
 - Testing updater cache (default): `data/raw/.fastf1_cache_testing`
 - Streamlit cache is invalidated when tracked artifact versions or key file timestamps change.
+- Live prediction cache is invalidated on event-boundary signature changes and competitive-session refresh deltas.
 
 ## Notes On Legacy Components
 

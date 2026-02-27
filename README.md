@@ -25,7 +25,7 @@ Current dashboard tabs:
 - `Live Prediction`
 - `Model & Learning`
 - `Prediction Accuracy`
-- `About`
+- `Contact`
 
 ## Predictor Structure (Current)
 
@@ -83,10 +83,12 @@ Outputs: Finish order + compound strategy distribution + pit window histogram.
 
 When you click **Generate Prediction**, the app:
 
-- optionally clears FastF1 race cache first (`Force Data Refresh`, default ON),
+- optionally clears FastF1 race cache first (`Force Data Refresh`, default OFF),
 - checks for race-result learning updates,
 - checks completed FP sessions (FP1/FP2/FP3) for practice-based characteristic updates,
-- clears Streamlit caches when refresh/update steps run so the same click uses fresh artifacts.
+- clears Streamlit caches when refresh/update steps run so the same click uses fresh artifacts,
+- always runs FastF1 completion checks for competitive sessions on each click,
+- blocks silent ACTUAL -> PREDICTED downgrades when transient FastF1 failures occur.
 
 ### 2. Manual race update
 
@@ -152,6 +154,15 @@ Storage mode is controlled by `USE_DB_STORAGE`:
 - `dual_write`
 
 When mode is not `file_only`, both `SUPABASE_URL` and `SUPABASE_KEY` are required.
+Use a backend `service_role` key for `SUPABASE_KEY` (not anon).
+
+Runtime state and operational telemetry are also persisted when DB mode is enabled:
+
+- `src/persistence/runtime_state_store.py`
+- `src/utils/operational_observability.py`
+- `runtime_state` table (event-boundary + practice progress state)
+- `runtime_processing_locks` table (practice backlog lock leases)
+- `operational_events` table (counters + alerts stream)
 
 Artifacts used in the baseline path include:
 
@@ -163,6 +174,7 @@ Artifacts used in the baseline path include:
 Supabase assets in the repo:
 
 - Migration: `migrations/001_create_artifacts_table.sql`
+- Migration: `migrations/002_create_runtime_state_and_operational_tables.sql`
 - Connectivity check: `scripts/test_supabase_connection.py`
 - Backfill utility: `scripts/backfill_to_db.py` (includes `driver_debuts.csv` migration)
 - Predictor/storage smoke test: `scripts/test_predictor_with_db.py`
@@ -198,6 +210,12 @@ These remain useful for experiments and extensions, but the app runtime path is 
 
 ```bash
 pytest tests/
+```
+
+Nightly live-network FastF1 checks (CI):
+
+```bash
+FASTF1_LIVE_TESTS=1 pytest tests/test_fastf1_live_refresh.py -m live_fastf1
 ```
 
 Targeted examples:

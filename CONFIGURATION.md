@@ -54,14 +54,22 @@ Artifact storage mode is controlled by environment variables in `src/persistence
 When `USE_DB_STORAGE` is not `file_only`, both are required:
 
 - `SUPABASE_URL`
-- `SUPABASE_KEY`
+- `SUPABASE_KEY` (`service_role` key for backend writes)
 
 Related docs/scripts:
 
 - `docs/PERSISTENCE_SUPABASE.md`
 - `migrations/001_create_artifacts_table.sql`
+- `migrations/002_create_runtime_state_and_operational_tables.sql`
 - `scripts/test_supabase_connection.py`
 - `scripts/backfill_to_db.py`
+
+In DB-backed modes, the same Supabase credentials are used for:
+
+- artifact persistence (`artifacts`),
+- runtime state persistence (`runtime_state`),
+- practice backlog lock leases (`runtime_processing_locks`),
+- operational counters/alerts stream (`operational_events`).
 
 ## Common Changes
 
@@ -161,6 +169,13 @@ Edit:
   - `F1_DATA_DIR` (baseline predictor data root),
   - `F1_CACHE_DIR` (auto-updater FastF1 cache path)
 
+### Run live FastF1 integration checks
+
+```bash
+export FASTF1_LIVE_TESTS=1
+pytest tests/test_fastf1_live_refresh.py -m live_fastf1
+```
+
 ## Validation Rules
 
 `src/utils/config_loader.py` validates:
@@ -194,4 +209,4 @@ pace_weight = config_loader.get("baseline_predictor.race.pace_weight_base", 0.40
 
 - The baseline predictor currently uses a fixed 70/30 practice blend inside predictor logic for qualifying.
 - `src/predictors/qualifying.py` and `src/predictors/race.py` preserve legacy method signatures and delegate to baseline logic.
-- Supabase connection hardening is still in progress; prefer `file_only` or `dual_write` for dashboard runs unless you are explicitly validating `db_only`.
+- For Supabase rollouts, start with `dual_write`, then move to `fallback` or `db_only` after validating migrations and runtime-state writes.

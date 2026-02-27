@@ -45,7 +45,9 @@ Process:
 Grid source is resolved in `fetch_grid_if_available()` in `src/dashboard/prediction_flow.py`.
 
 - `ACTUAL`: completed competitive session results were fetched.
-- `PREDICTED`: no completed results available (or fetch failed), so model output is used.
+- `PREDICTED`: session is not yet complete, so model output is used.
+
+If completion state is `unknown`, the flow fails closed for that session instead of silently falling back.
 
 Competitive sessions checked for grid replacement:
 
@@ -99,5 +101,5 @@ See `docs/PREDICTION_TRACKING.md` for file structure and update workflow.
 ## Known Limits
 
 1. ACTUAL grid replacement depends on FastF1 data availability.
-2. If session metadata is late or missing, the app falls back to PREDICTED grids.
+2. If completion status is unknown, prediction generation for that session is blocked until status can be resolved.
 3. Weekend format detection depends on FastF1 event schedule (with local fallback in utilities).

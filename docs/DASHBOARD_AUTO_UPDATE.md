@@ -6,11 +6,12 @@ This guide explains what the app updates automatically and what still requires a
 
 When the user clicks **Generate Prediction** in `src/dashboard/pages.py` (called by `app.py`):
 
-1. If **Force Data Refresh** is enabled (default), the app clears FastF1 cache entries for the selected race.
+1. If **Force Data Refresh** is enabled (default OFF), the app clears FastF1 cache entries for the selected race.
 2. `auto_update_if_needed(force_recheck=...)` checks for race-result learning updates.
 3. If new races are found, it runs `auto_update_from_races()`.
 4. `auto_update_practice_characteristics_if_needed(force_recheck=...)` checks/update FP-derived characteristics.
 5. Streamlit caches are cleared so the prediction run in the same click uses fresh artifacts.
+6. Competitive-session completion checks are re-run before using cached outputs.
 
 This block is race-result ingestion.
 
@@ -19,9 +20,17 @@ This block is race-result ingestion.
 During weekend predictions, the app also checks completed FP sessions and can update
 car characteristics from FP telemetry (FP1/FP2/FP3). By default, the update step
 uses cached session-state checks. With **Force Data Refresh** enabled, it re-checks
-session completion even when the race was already processed. Update state is stored in:
+session completion even when the race was already processed.
 
-- `data/systems/practice_characteristics_state.json`
+State persistence:
+
+- `runtime_state` table (`practice_characteristics` namespace) when DB read/write is enabled
+- `data/systems/practice_characteristics_state.json` when file writes are enabled
+
+Backlog coordination:
+
+- `runtime_processing_locks` table lock leases prevent duplicate concurrent application
+- lock contention is surfaced as deferred/retried backlog events
 
 Behavior can be tuned in `config/default.yaml` under:
 
@@ -76,6 +85,11 @@ python scripts/update_from_testing.py "Testing 1" \
 - Historical notebook validation runs.
 - Manual backfill decisions for special analysis workflows.
 
-## Operational Note
+## Operational Notes
 
 The dashboard auto-update depends on FastF1 schedule/session availability. If session data is delayed, updates may appear later even when race date has passed.
+
+Competitive-session refresh uses fail-closed handling:
+
+- unknown completion status does not silently downgrade ACTUAL grid source to PREDICTED
+- transient FastF1 failures emit runtime alerts/counters for visibility
