@@ -108,6 +108,7 @@ class BaselineRaceEngine:
         is_sprint: bool = False,
         race_compound: str = "MEDIUM",
         year: int | None = None,
+        input_confidence: float | None = None,
     ) -> dict[str, Any]:
         """Predict race finishing order and uncertainty metrics."""
         return BaselineRaceMixin.predict_race(
@@ -119,4 +120,5 @@ class BaselineRaceEngine:
             is_sprint=is_sprint,
             race_compound=race_compound,
             year=year,
+            input_confidence=input_confidence,
         )

@@ -17,6 +17,7 @@ def predict_race_core(
     n_simulations: int,
     is_sprint: bool,
     race_compound: str,
+    input_confidence: float | None,
     year: int,
     cfg: Any,
     base_seed: int,
@@ -251,17 +252,19 @@ def predict_race_core(
 
     track_overtaking = race_params.get("track_overtaking", 0.5)
     grid_anchor_weight = np.clip(
-        cfg.get("baseline_predictor.race.grid_anchor.base", 0.30)
-        + (track_overtaking * cfg.get("baseline_predictor.race.grid_anchor.track_scale", 0.35)),
-        0.20,
-        0.85,
+        cfg.get("baseline_predictor.race.grid_anchor.base", 0.25)
+        + (track_overtaking * cfg.get("baseline_predictor.race.grid_anchor.track_scale", 0.30)),
+        0.10,
+        0.80,
     )
-    grid_anchor_min = cfg.get("baseline_predictor.race.grid_anchor.min", 0.62)
+    grid_anchor_min = cfg.get("baseline_predictor.race.grid_anchor.min", 0.35)
+    main_grid_anchor_max = cfg.get("baseline_predictor.race.grid_anchor.main_max", 0.58)
     sprint_grid_anchor_min = cfg.get("baseline_predictor.race.grid_anchor.sprint_min", 0.78)
-    grid_anchor_weight = max(
-        grid_anchor_weight,
-        sprint_grid_anchor_min if is_sprint else grid_anchor_min,
-    )
+    if is_sprint:
+        grid_anchor_weight = max(grid_anchor_weight, sprint_grid_anchor_min)
+    else:
+        grid_anchor_weight = max(grid_anchor_weight, grid_anchor_min)
+        grid_anchor_weight = min(grid_anchor_weight, main_grid_anchor_max)
     overtake_blend_scale = cfg.get(
         "baseline_predictor.race.final_blend.overtaking_skill_scale", 1.6
     )
@@ -293,6 +296,13 @@ def predict_race_core(
     max_gain_ceiling = cfg.get("baseline_predictor.race.final_blend.max_gain_ceiling", 11.0)
     confidence_floor = cfg.get("baseline_predictor.race.confidence.min", 40.0)
     confidence_cap = cfg.get("baseline_predictor.race.confidence.max", 60.0)
+    context_confidence_scale = float(
+        cfg.get("baseline_predictor.race.confidence.context_scale", 8.0)
+    )
+    context_confidence = (
+        0.5 if input_confidence is None else float(np.clip(input_confidence, 0.0, 1.0))
+    )
+    context_confidence_adjustment = (context_confidence - 0.5) * context_confidence_scale
     weather_penalty = (
         cfg.get("baseline_predictor.race.confidence.weather_penalty_wet", 4.0)
         if weather in ("rain", "mixed")
@@ -315,7 +325,13 @@ def predict_race_core(
         position_std = np.std(positions)
         confidence = max(
             confidence_floor,
-            min(confidence_cap, confidence_cap - (position_std * 3.0) - weather_penalty),
+            min(
+                confidence_cap,
+                confidence_cap
+                - (position_std * 3.0)
+                - weather_penalty
+                + context_confidence_adjustment,
+            ),
         )
 
         overtake_ease = 1.0 - track_overtaking
@@ -469,6 +485,107 @@ def predict_race_core(
 
     for i, item in enumerate(finish_order):
         item["position"] = i + 1
+
+    if not is_sprint and blended_samples_by_driver:
+        movement_floor = float(cfg.get("baseline_predictor.race.main_race_movement_floor", 1.0))
+        movement_quantile = float(
+            cfg.get("baseline_predictor.race.main_race_movement_quantile", 20.0)
+        )
+
+        def _avg_grid_change(rows: list[dict[str, Any]]) -> float:
+            total_grid_change = 0.0
+            total_drivers = 0
+            for row in rows:
+                info = driver_info_map.get(row["driver"])
+                if info is None:
+                    continue
+                total_grid_change += abs(float(row["position"]) - float(info["grid_pos"]))
+                total_drivers += 1
+            return (total_grid_change / total_drivers) if total_drivers else 0.0
+
+        avg_grid_change = _avg_grid_change(finish_order)
+        if avg_grid_change < movement_floor:
+
+            def _apply_score_ranking(scores: dict[str, float]) -> None:
+                finish_order.sort(
+                    key=lambda row: (
+                        scores.get(row["driver"], float(row["position_blend_score"])),
+                        float(row["position_blend_score"]),
+                        row["driver"],
+                    )
+                )
+                for idx, row in enumerate(finish_order, start=1):
+                    row["position"] = idx
+                    if row["driver"] in scores:
+                        row["position_blend_score"] = round(scores[row["driver"]], 4)
+
+            def _avg_grid_change_for_scores(scores: dict[str, float]) -> float:
+                total_grid_change = 0.0
+                total_drivers = 0
+                ranked_rows = sorted(
+                    finish_order,
+                    key=lambda row: (
+                        scores.get(row["driver"], float(row["position_blend_score"])),
+                        float(row["position_blend_score"]),
+                        row["driver"],
+                    ),
+                )
+                for idx, row in enumerate(ranked_rows, start=1):
+                    info = driver_info_map.get(row["driver"])
+                    if info is None:
+                        continue
+                    total_grid_change += abs(float(idx) - float(info["grid_pos"]))
+                    total_drivers += 1
+                return (total_grid_change / total_drivers) if total_drivers else 0.0
+
+            quantile_candidates = [movement_quantile, 20.0, 10.0, 0.0]
+            used_quantiles: set[float] = set()
+            for quantile_candidate in quantile_candidates:
+                quantile = float(np.clip(quantile_candidate, 0.0, 50.0))
+                if quantile in used_quantiles:
+                    continue
+                used_quantiles.add(quantile)
+
+                quantile_scores = {
+                    driver: float(np.percentile(samples, quantile))
+                    for driver, samples in blended_samples_by_driver.items()
+                    if samples
+                }
+                _apply_score_ranking(quantile_scores)
+                avg_grid_change = _avg_grid_change(finish_order)
+                if avg_grid_change >= movement_floor:
+                    break
+
+            if avg_grid_change < movement_floor:
+                sample_lengths = [
+                    len(samples) for samples in blended_samples_by_driver.values() if samples
+                ]
+                sample_count = min(sample_lengths) if sample_lengths else 0
+                if sample_count > 0:
+                    selected_scores: dict[str, float] | None = None
+                    selected_avg: float | None = None
+                    strongest_scores: dict[str, float] | None = None
+                    strongest_avg = -1.0
+
+                    for sample_idx in range(sample_count):
+                        candidate_scores = {
+                            driver: float(samples[sample_idx])
+                            for driver, samples in blended_samples_by_driver.items()
+                            if len(samples) > sample_idx
+                        }
+                        candidate_avg = _avg_grid_change_for_scores(candidate_scores)
+                        if candidate_avg > strongest_avg:
+                            strongest_avg = candidate_avg
+                            strongest_scores = candidate_scores
+                        if candidate_avg >= movement_floor and (
+                            selected_avg is None or candidate_avg < selected_avg
+                        ):
+                            selected_avg = candidate_avg
+                            selected_scores = candidate_scores
+
+                    final_scores = selected_scores or strongest_scores
+                    if final_scores:
+                        _apply_score_ranking(final_scores)
 
     if cfg.get("baseline_predictor.race.podium_probability.enforce_monotonic", True):
         raw_podium_values = [float(row.get("podium_probability", 0.0)) for row in finish_order]

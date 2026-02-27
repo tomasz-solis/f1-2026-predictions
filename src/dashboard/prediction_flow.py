@@ -13,6 +13,51 @@ class CompetitiveSessionStatusUnavailableError(RuntimeError):
     """Raised when competitive-session status cannot be verified from FastF1."""
 
 
+def _derive_race_input_confidence(
+    qualifying_result: dict[str, Any],
+    *,
+    grid_source: str,
+) -> float:
+    """Estimate race input confidence from qualifying data quality and grid source."""
+    base_confidence = float(qualifying_result.get("data_confidence_score", 0.5))
+    base_confidence = float(max(0.0, min(base_confidence, 1.0)))
+
+    data_source = str(qualifying_result.get("data_source", "")).lower()
+    source_adjustment = 0.0
+    if "model-only" in data_source:
+        source_adjustment = -0.10
+    elif "testing short-run profile blend" in data_source:
+        source_adjustment = -0.05
+
+    grid_adjustment = 0.20 if str(grid_source).upper() == "ACTUAL" else 0.0
+    return float(max(0.0, min(base_confidence + source_adjustment + grid_adjustment, 1.0)))
+
+
+def _predict_race_with_optional_confidence(
+    predictor: Any,
+    *,
+    qualifying_grid: list[dict[str, Any]],
+    weather: str,
+    race_name: str,
+    year: int,
+    input_confidence: float,
+) -> dict[str, Any]:
+    """Call predictor.predict_race with graceful fallback for legacy signatures."""
+    kwargs = {
+        "qualifying_grid": qualifying_grid,
+        "weather": weather,
+        "race_name": race_name,
+        "n_simulations": 50,
+        "year": year,
+        "input_confidence": input_confidence,
+    }
+    try:
+        return predictor.predict_race(**kwargs)
+    except TypeError:
+        kwargs.pop("input_confidence", None)
+        return predictor.predict_race(**kwargs)
+
+
 def fetch_grid_if_available(
     year: int,
     race_name: str,
@@ -116,6 +161,10 @@ def run_prediction(
         sprint_start = time.time()
         sq_grid, grid_source = fetch_grid_if_available(year, race_name, "SQ", sq_result["grid"])
         results["sprint_quali"]["grid_source"] = grid_source
+        sprint_input_confidence = _derive_race_input_confidence(
+            sq_result,
+            grid_source=grid_source,
+        )
 
         sprint_result = predictor.predict_sprint_race(
             sprint_quali_grid=sq_grid,
@@ -123,6 +172,7 @@ def run_prediction(
             race_name=race_name,
             n_simulations=50,
         )
+        sprint_result["input_confidence"] = round(float(sprint_input_confidence), 3)
         timing["sprint_race"] = time.time() - sprint_start
         results["sprint_race"] = sprint_result
 
@@ -138,14 +188,20 @@ def run_prediction(
         mr_start = time.time()
         quali_grid, grid_source = fetch_grid_if_available(year, race_name, "Q", mq_result["grid"])
         results["main_quali"]["grid_source"] = grid_source
+        main_race_input_confidence = _derive_race_input_confidence(
+            mq_result,
+            grid_source=grid_source,
+        )
 
-        main_race_result = predictor.predict_race(
+        main_race_result = _predict_race_with_optional_confidence(
+            predictor,
             qualifying_grid=quali_grid,
             weather=weather,
             race_name=race_name,
-            n_simulations=50,
             year=year,
+            input_confidence=main_race_input_confidence,
         )
+        main_race_result["input_confidence"] = round(float(main_race_input_confidence), 3)
         timing["main_race"] = time.time() - mr_start
         results["main_race"] = main_race_result
 
@@ -166,14 +222,20 @@ def run_prediction(
             year, race_name, "Q", quali_result["grid"]
         )
         results["qualifying"]["grid_source"] = grid_source
+        race_input_confidence = _derive_race_input_confidence(
+            quali_result,
+            grid_source=grid_source,
+        )
 
-        race_result = predictor.predict_race(
+        race_result = _predict_race_with_optional_confidence(
+            predictor,
             qualifying_grid=quali_grid,
             weather=weather,
             race_name=race_name,
-            n_simulations=50,
             year=year,
+            input_confidence=race_input_confidence,
         )
+        race_result["input_confidence"] = round(float(race_input_confidence), 3)
         timing["race"] = time.time() - race_start
         results["race"] = race_result
 

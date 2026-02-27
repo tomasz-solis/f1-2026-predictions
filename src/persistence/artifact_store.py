@@ -201,6 +201,14 @@ class ArtifactStore:
 
     # Private methods: File operations
 
+    @staticmethod
+    def _extract_year_from_artifact_key(artifact_key: str) -> str | None:
+        """Extract season-year token from `YYYY::...` artifact keys."""
+        if "::" not in artifact_key:
+            return None
+        year_token = artifact_key.split("::", 1)[0].strip()
+        return year_token if year_token.isdigit() else None
+
     def _get_file_path(self, artifact_type: str, artifact_key: str) -> Path:
         """Map artifact type/key to file path."""
         # Map to existing file paths
@@ -213,6 +221,14 @@ class ArtifactStore:
                 / f"{year}_car_characteristics.json"
             )
         elif artifact_type == "driver_characteristics":
+            season_year = self._extract_year_from_artifact_key(artifact_key)
+            if season_year:
+                return (
+                    self.data_root
+                    / "processed"
+                    / "driver_characteristics"
+                    / f"{season_year}_driver_characteristics.json"
+                )
             return self.data_root / "processed" / "driver_characteristics.json"
         elif artifact_type == "driver_debuts":
             return self.data_root / "driver_debuts.json"
@@ -225,6 +241,9 @@ class ArtifactStore:
                 / f"{year}_track_characteristics.json"
             )
         elif artifact_type == "learning_state":
+            learning_year = self._extract_year_from_artifact_key(artifact_key)
+            if learning_year:
+                return self.data_root / "learning_state" / f"{learning_year}_learning_state.json"
             return self.data_root / "learning_state.json"
         elif artifact_type == "practice_state":
             return self.data_root / "systems" / "practice_characteristics_state.json"
@@ -325,11 +344,21 @@ class ArtifactStore:
     def _iter_candidate_files(self, artifact_type: str, base_path: Path) -> list[Path]:
         """Return candidate files for fallback listing."""
         if artifact_type == "driver_characteristics":
-            return [base_path / "driver_characteristics.json"]
+            season_root = base_path / "driver_characteristics"
+            season_files: list[Path] = (
+                list(season_root.glob("*_driver_characteristics.json"))
+                if season_root.exists()
+                else []
+            )
+            return [*season_files, base_path / "driver_characteristics.json"]
         if artifact_type == "driver_debuts":
             return [base_path / "driver_debuts.json"]
         if artifact_type == "learning_state":
-            return [base_path / "learning_state.json"]
+            season_root = base_path / "learning_state"
+            learning_season_files: list[Path] = (
+                list(season_root.glob("*_learning_state.json")) if season_root.exists() else []
+            )
+            return [*learning_season_files, base_path / "learning_state.json"]
         if artifact_type == "practice_state":
             return [base_path / "practice_characteristics_state.json"]
 
@@ -353,6 +382,11 @@ class ArtifactStore:
             return f"{year}::car_characteristics"
 
         if artifact_type == "driver_characteristics":
+            stem = file_path.stem
+            if stem.endswith("_driver_characteristics"):
+                year = stem.split("_", 1)[0]
+                if year.isdigit():
+                    return f"{year}::driver_characteristics"
             return "driver_characteristics"
 
         if artifact_type == "driver_debuts":
@@ -363,6 +397,11 @@ class ArtifactStore:
             return f"{year}::track_characteristics"
 
         if artifact_type == "learning_state":
+            stem = file_path.stem
+            if stem.endswith("_learning_state"):
+                year = stem.split("_", 1)[0]
+                if year.isdigit():
+                    return f"{year}::learning_state"
             return "learning_state"
 
         if artifact_type == "practice_state":

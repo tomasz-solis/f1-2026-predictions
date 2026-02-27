@@ -256,9 +256,17 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
     if not is_race:
         data_source = result.get("data_source", "Unknown")
         blend_used = result.get("blend_used", False)
+        fp_blend_weight_used = result.get("fp_blend_weight_used")
 
         if blend_used:
-            st.success(f"Using {data_source} (70% practice data + 30% model)")
+            if isinstance(fp_blend_weight_used, (int | float)):
+                practice_share = int(round(float(fp_blend_weight_used) * 100))
+                model_share = max(0, 100 - practice_share)
+                st.success(
+                    f"Using {data_source} ({practice_share}% practice data + {model_share}% model)"
+                )
+            else:
+                st.success(f"Using {data_source} (70% practice data + 30% model)")
         else:
             st.info(data_source)
 

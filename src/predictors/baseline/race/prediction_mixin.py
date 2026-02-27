@@ -101,6 +101,7 @@ class BaselineRacePredictionMixin:
         is_sprint: bool = False,
         race_compound: str = "MEDIUM",
         year: int | None = None,
+        input_confidence: float | None = None,
     ) -> dict[str, Any]:
         """Predict race result using lap-by-lap Monte Carlo simulation with tire deg and pit stops."""
         validate_enum(weather, "weather", ["dry", "rain", "mixed"])
@@ -114,6 +115,7 @@ class BaselineRacePredictionMixin:
             n_simulations=n_simulations,
             is_sprint=is_sprint,
             race_compound=race_compound,
+            input_confidence=input_confidence,
             year=year
             if year is not None
             else int(getattr(self, "season_year", getattr(self, "year", 2026))),

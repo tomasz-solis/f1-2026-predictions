@@ -223,6 +223,7 @@ def build_driver_list_with_strengths_core(
     drivers: dict[str, dict[str, Any]],
     cfg: Any,
     short_profile_weights: dict[str, float],
+    fp_blend_weight: float,
     get_blended_team_strength_fn: Callable[[str, str], float],
     compute_testing_profile_modifier_fn: Callable[..., tuple[float, bool]],
     blend_team_strength_fn: Callable[..., dict[str, float]],
@@ -240,7 +241,6 @@ def build_driver_list_with_strengths_core(
     short_profile_scale = cfg.get(
         "baseline_predictor.qualifying.testing_short_run_modifier_scale", 0.04
     )
-    fp_blend_weight = cfg.get("baseline_predictor.qualifying.fp_blend_weight", 0.7)
     default_skill = cfg.get("baseline_predictor.qualifying.default_skill", 0.5)
     default_team_strength = cfg.get("baseline_predictor.qualifying.default_team_strength", 0.5)
 

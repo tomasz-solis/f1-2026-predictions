@@ -19,6 +19,8 @@ import argparse
 import csv
 import json
 import logging
+import sys
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -26,8 +28,50 @@ import fastf1 as ff1
 import numpy as np
 import pandas as pd
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.utils.fastf1_resilience import FastF1ResiliencePolicy, call_with_resilience  # noqa: E402
+
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
+for _logger_name in (
+    "fastf1",
+    "fastf1.api",
+    "fastf1.core",
+    "fastf1.ergast",
+    "requests_cache",
+    "_api",
+    "core",
+    "req",
+):
+    logging.getLogger(_logger_name).setLevel(logging.ERROR)
+
+_REQUEST_DELAY_SECONDS = 0.80
+_FASTF1_POLICY = FastF1ResiliencePolicy(
+    max_attempts=8,
+    timeout_budget_seconds=180.0,
+    initial_backoff_seconds=1.5,
+    max_backoff_seconds=20.0,
+    backoff_multiplier=2.0,
+    circuit_breaker_failure_threshold=5,
+    circuit_breaker_cooldown_seconds=60.0,
+)
+_RACE_NAME_CACHE: dict[int, list[str]] = {}
+
+
+def _fastf1_call(operation_name: str, fn, *, labels: dict | None = None):
+    """Run FastF1 network calls with retry/backoff plus small pacing delay."""
+    result = call_with_resilience(
+        operation_name,
+        fn,
+        labels=labels,
+        policy=_FASTF1_POLICY,
+    )
+    if _REQUEST_DELAY_SECONDS > 0:
+        time.sleep(_REQUEST_DELAY_SECONDS)
+    return result
 
 
 def load_driver_debuts(csv_path: str = "data/driver_debuts.csv") -> dict[str, int]:
@@ -87,19 +131,32 @@ def load_driver_debuts(csv_path: str = "data/driver_debuts.csv") -> dict[str, in
 
 def _iter_non_testing_race_names(year: int) -> list[str]:
     """Return race names for a season, excluding testing events."""
-    schedule = ff1.get_event_schedule(year)
+    cached = _RACE_NAME_CACHE.get(year)
+    if cached is not None:
+        return cached
+
+    schedule = _fastf1_call(
+        "extract_driver_characteristics_get_event_schedule",
+        lambda: ff1.get_event_schedule(year),
+        labels={"year": year},
+    )
     races = schedule[schedule["EventFormat"] != "testing"]
     race_names = []
     for _, event in races.iterrows():
         race_name = event["EventName"]
         if race_name:
             race_names.append(race_name)
+    _RACE_NAME_CACHE[year] = race_names
     return race_names
 
 
 def _load_completed_race_session(year: int, race_name: str):
     """Load race session only when race is completed (not future scheduled)."""
-    session = ff1.get_session(year, race_name, "R")
+    session = _fastf1_call(
+        "extract_driver_characteristics_get_session",
+        lambda: ff1.get_session(year, race_name, "R"),
+        labels={"year": year, "race_name": race_name, "session_name": "R"},
+    )
 
     race_date = session.date
     if pd.isna(race_date):
@@ -168,7 +225,16 @@ def extract_teammate_comparisons(years: list[int]) -> list[dict]:
                     continue
 
                 logger.info(f"  {race_name}...")
-                session.load(laps=True, telemetry=False)
+                _fastf1_call(
+                    "extract_driver_characteristics_load_laps",
+                    lambda session=session: session.load(
+                        laps=True,
+                        telemetry=False,
+                        weather=False,
+                        messages=False,
+                    ),
+                    labels={"year": year, "race_name": race_name},
+                )
 
                 laps = session.laps
                 results = session.results
@@ -316,7 +382,16 @@ def calculate_racecraft_scores(years: list[int], ratings: dict[str, float]) -> d
                 if session is None:
                     continue
 
-                session.load(laps=False, telemetry=False)
+                _fastf1_call(
+                    "extract_driver_characteristics_load_results",
+                    lambda session=session: session.load(
+                        laps=False,
+                        telemetry=False,
+                        weather=False,
+                        messages=False,
+                    ),
+                    labels={"year": year, "race_name": race_name},
+                )
                 results = session.results
 
                 # Sort by driver rating (pace-based expected position)
@@ -376,7 +451,16 @@ def calculate_experience_and_consistency(years: list[int], driver_debuts: dict[s
                 if session is None:
                     continue
 
-                session.load(laps=False, telemetry=False)
+                _fastf1_call(
+                    "extract_driver_characteristics_load_results",
+                    lambda session=session: session.load(
+                        laps=False,
+                        telemetry=False,
+                        weather=False,
+                        messages=False,
+                    ),
+                    labels={"year": year, "race_name": race_name},
+                )
                 results = session.results
 
                 for _, row in results.iterrows():
@@ -448,13 +532,46 @@ def calculate_experience_and_consistency(years: list[int], driver_debuts: dict[s
 
 
 def main():
+    global _REQUEST_DELAY_SECONDS
+    global _FASTF1_POLICY
+
     parser = argparse.ArgumentParser(description="Extract driver characteristics (fixed)")
     parser.add_argument("--years", type=str, default="2024,2025", help="Comma-separated years")
     parser.add_argument("--output", type=str, default="data/processed/driver_characteristics.json")
+    parser.add_argument(
+        "--request-delay",
+        type=float,
+        default=0.80,
+        help="Seconds to sleep after each FastF1 network call",
+    )
+    parser.add_argument(
+        "--max-attempts",
+        type=int,
+        default=8,
+        help="Max retries per FastF1 request",
+    )
+    parser.add_argument(
+        "--timeout-budget-seconds",
+        type=float,
+        default=180.0,
+        help="Total retry timeout budget per FastF1 request",
+    )
 
     args = parser.parse_args()
 
     years = [int(y) for y in args.years.split(",")]
+    _REQUEST_DELAY_SECONDS = max(0.0, float(args.request_delay))
+    max_attempts = max(1, int(args.max_attempts))
+    timeout_budget_seconds = max(5.0, float(args.timeout_budget_seconds))
+    _FASTF1_POLICY = FastF1ResiliencePolicy(
+        max_attempts=max_attempts,
+        timeout_budget_seconds=timeout_budget_seconds,
+        initial_backoff_seconds=max(1.0, _REQUEST_DELAY_SECONDS * 1.5),
+        max_backoff_seconds=20.0,
+        backoff_multiplier=2.0,
+        circuit_breaker_failure_threshold=max(3, min(max_attempts, 5)),
+        circuit_breaker_cooldown_seconds=60.0,
+    )
 
     # Setup cache
     cache_dir = Path("data/raw/.fastf1_cache")
@@ -496,7 +613,16 @@ def main():
             if session is None:
                 continue
 
-            session.load(laps=False, telemetry=False)
+            _fastf1_call(
+                "extract_driver_characteristics_load_results",
+                lambda session=session: session.load(
+                    laps=False,
+                    telemetry=False,
+                    weather=False,
+                    messages=False,
+                ),
+                labels={"year": year, "race_name": race_names[-1]},
+            )
             results = session.results
 
             # Get team championship order (average of drivers)

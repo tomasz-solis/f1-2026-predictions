@@ -3,7 +3,8 @@ Generate 2026 Baseline Data from Historical Averages (2023-2025)
 
 This script creates proper baseline characteristics for the 2026 season:
 - Track characteristics: 3-year averages of pit times, SC probability, overtaking difficulty
-- Car/Team characteristics: Neutral starting point (0.5 ± 0.3) for ALL teams
+- Car/Team characteristics: 2025-seeded preseason starting point (high uncertainty);
+  optional neutral mode when explicitly requested
 - Driver characteristics: Carried over from 2025 end-of-season
 
 WHY THIS MATTERS:
@@ -25,8 +26,141 @@ import fastf1
 import numpy as np
 import pandas as pd
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
+logging.getLogger("fastf1").setLevel(logging.ERROR)
+
+
+def _timedelta_to_seconds(value: object) -> float | None:
+    """Convert timedelta-like value to seconds; return None if conversion fails."""
+    if value is None or pd.isna(value):
+        return None
+    if hasattr(value, "total_seconds"):
+        try:
+            return float(value.total_seconds())
+        except Exception:
+            return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _estimate_pit_losses_from_laps(laps: pd.DataFrame | None) -> list[float]:
+    """
+    Estimate pit lane loss in seconds from FastF1 lap-level data.
+
+    Priority:
+    1) Pair PitInTime/PitOutTime timestamps per driver (best signal).
+    2) Fallback to lap-time delta vs driver clean-lap median if timestamp pairing unavailable.
+    """
+    if laps is None or laps.empty:
+        return []
+    if "Driver" not in laps.columns:
+        return []
+
+    losses: list[float] = []
+
+    # First pass: pair pit in/out timestamps per driver.
+    has_pit_timestamps = {"PitInTime", "PitOutTime"}.issubset(laps.columns)
+    if has_pit_timestamps:
+        for _driver, driver_laps in laps.groupby("Driver"):
+            pit_ins = (
+                driver_laps.loc[driver_laps["PitInTime"].notna(), "PitInTime"]
+                .dropna()
+                .sort_values()
+                .tolist()
+            )
+            pit_outs = (
+                driver_laps.loc[driver_laps["PitOutTime"].notna(), "PitOutTime"]
+                .dropna()
+                .sort_values()
+                .tolist()
+            )
+            if not pit_ins or not pit_outs:
+                continue
+
+            out_idx = 0
+            for pit_in in pit_ins:
+                while out_idx < len(pit_outs) and pit_outs[out_idx] <= pit_in:
+                    out_idx += 1
+                if out_idx >= len(pit_outs):
+                    break
+
+                pit_out = pit_outs[out_idx]
+                out_idx += 1
+                seconds = _timedelta_to_seconds(pit_out - pit_in)
+                if seconds is None:
+                    continue
+                # Track pit lane losses are typically around 15-30s; allow buffer for anomalies.
+                if 10.0 <= seconds <= 60.0:
+                    losses.append(seconds)
+
+    if losses:
+        return losses
+
+    # Fallback: estimate pit cost from pit-lap excess vs driver's clean-lap median.
+    if "LapTime" not in laps.columns:
+        return []
+    has_pit_markers = {"PitInTime", "PitOutTime"}.issubset(laps.columns)
+    if not has_pit_markers:
+        return []
+
+    for _driver, driver_laps in laps.groupby("Driver"):
+        clean_mask = driver_laps["PitInTime"].isna() & driver_laps["PitOutTime"].isna()
+        clean_laps = driver_laps.loc[clean_mask, "LapTime"].dropna()
+        if clean_laps.empty:
+            continue
+
+        clean_seconds = [
+            seconds
+            for lap_time in clean_laps
+            for seconds in [_timedelta_to_seconds(lap_time)]
+            if seconds is not None
+        ]
+        if not clean_seconds:
+            continue
+
+        baseline = float(np.median(clean_seconds))
+        if not np.isfinite(baseline) or baseline <= 0:
+            continue
+
+        pit_mask = driver_laps["PitInTime"].notna() | driver_laps["PitOutTime"].notna()
+        pit_laps = driver_laps.loc[pit_mask, "LapTime"].dropna()
+        for lap_time in pit_laps:
+            lap_seconds = _timedelta_to_seconds(lap_time)
+            if lap_seconds is None:
+                continue
+            loss = lap_seconds - baseline
+            if 10.0 <= loss <= 60.0:
+                losses.append(loss)
+
+    return losses
+
+
+def _filter_outlier_pit_losses(losses: list[float]) -> list[float]:
+    """
+    Remove extreme pit-loss outliers caused by incidents/penalties/data artifacts.
+
+    Strategy:
+    - keep only finite values in a broad plausible range
+    - apply IQR filtering when enough samples exist
+    """
+    # Keep values within the same operational range enforced by validation script.
+    clean = [float(v) for v in losses if np.isfinite(v) and 15.0 <= float(v) <= 30.0]
+    if len(clean) < 6:
+        return clean
+
+    q1 = float(np.percentile(clean, 25))
+    q3 = float(np.percentile(clean, 75))
+    iqr = q3 - q1
+    if iqr <= 0:
+        return clean
+
+    lower = max(15.0, q1 - 1.5 * iqr)
+    upper = min(30.0, q3 + 1.5 * iqr)
+    filtered = [v for v in clean if lower <= v <= upper]
+    return filtered if filtered else clean
 
 
 def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
@@ -71,23 +205,11 @@ def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
                             "event_format": str(event.get("EventFormat", "")).lower(),
                         }
 
-                    # Calculate pit stop loss (median across all stops)
+                    # Calculate pit stop loss from lap timing data.
                     if hasattr(session, "laps") and session.laps is not None:
-                        pit_laps = session.laps[session.laps["PitInTime"].notna()]
-                        if len(pit_laps) > 0:
-                            # Estimate pit loss from lap time difference
-                            pit_times = []
-                            for driver in pit_laps["Driver"].unique():
-                                driver_laps = session.laps[session.laps["Driver"] == driver]
-                                pit_lap_idx = driver_laps[driver_laps["PitInTime"].notna()].index
-                                for _idx in pit_lap_idx:
-                                    # Compare to average lap time
-                                    avg_lap = driver_laps["LapTime"].mean()
-                                    if pd.notna(avg_lap):
-                                        pit_loss = 20.0  # Reasonable estimate if we can't calculate
-                                        pit_times.append(pit_loss)
-                            if pit_times:
-                                track_stats[race_name]["pit_times"].extend(pit_times)
+                        pit_times = _estimate_pit_losses_from_laps(session.laps)
+                        if pit_times:
+                            track_stats[race_name]["pit_times"].extend(pit_times)
 
                     # Safety car laps
                     if hasattr(session, "laps") and session.laps is not None:
@@ -131,7 +253,9 @@ def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
     }
 
     for track_name, stats in track_stats.items():
-        pit_time = np.mean(stats["pit_times"]) if stats["pit_times"] else 22.0  # Default 22s
+        pit_samples = _filter_outlier_pit_losses(stats["pit_times"])
+        pit_time = np.mean(pit_samples) if pit_samples else 22.0  # Default 22s
+        pit_time = float(np.clip(pit_time, 15.0, 30.0))
         sc_prob = 0.3  # Default - would need better telemetry to calculate
 
         # Overtaking difficulty: normalize position changes
@@ -168,48 +292,78 @@ def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
     logger.info(f"  Tracks analyzed: {len(track_characteristics['tracks'])}")
 
 
-def generate_neutral_team_characteristics(output_dir: Path) -> None:
+def generate_team_characteristics(output_dir: Path, *, neutral_start: bool = False) -> None:
     """
-    Generate neutral team characteristics for 2026.
+    Generate preseason team characteristics for 2026.
 
-    Since 2026 has new regulations, we DON'T KNOW team performance yet.
-    All teams start at 0.5 ± 0.3 (high uncertainty).
+    Default behavior seeds rankings from 2025 constructor order while keeping high uncertainty.
+    Use neutral_start=True only when you explicitly want all teams initialized equally.
     """
-    logger.info("Generating neutral team characteristics for 2026...")
-
-    # Get 2026 team lineup
-    teams = [
-        "McLaren",
-        "Mercedes",
-        "Red Bull Racing",
-        "Ferrari",
-        "Williams",
-        "RB",
-        "Aston Martin",
-        "Haas F1 Team",
-        "Alpine",
-        "Sauber",
-        "Cadillac F1",  # New team
-    ]
+    if neutral_start:
+        logger.info("Generating neutral team characteristics for 2026...")
+        team_2026_seed = {
+            "McLaren": {"position": 1, "performance": 0.50},
+            "Mercedes": {"position": 2, "performance": 0.50},
+            "Red Bull Racing": {"position": 3, "performance": 0.50},
+            "Ferrari": {"position": 4, "performance": 0.50},
+            "Williams": {"position": 5, "performance": 0.50},
+            "RB": {"position": 6, "performance": 0.50},
+            "Aston Martin": {"position": 7, "performance": 0.50},
+            "Haas F1 Team": {"position": 8, "performance": 0.50},
+            "Alpine": {"position": 9, "performance": 0.50},
+            "Sauber": {"position": 10, "performance": 0.50},
+            "Cadillac F1": {"position": 11, "performance": 0.50},
+        }
+        note = (
+            "2026 REGULATION RESET - All teams start with neutral baseline "
+            "(0.5 ± 0.3 uncertainty). Performance unknown until testing/races."
+        )
+    else:
+        logger.info("Generating 2025-seeded team characteristics for 2026...")
+        # Preserve relative ordering from 2025, but keep large uncertainty for the regulation reset.
+        team_2026_seed = {
+            "McLaren": {"position": 1, "performance": 0.85},
+            "Mercedes": {"position": 2, "performance": 0.75},
+            "Red Bull Racing": {"position": 3, "performance": 0.74},
+            "Ferrari": {"position": 4, "performance": 0.70},
+            "Williams": {"position": 5, "performance": 0.55},
+            "RB": {"position": 6, "performance": 0.48},
+            "Aston Martin": {"position": 7, "performance": 0.47},
+            "Haas F1 Team": {"position": 8, "performance": 0.43},
+            "Alpine": {"position": 9, "performance": 0.40},
+            "Sauber": {"position": 10, "performance": 0.38},
+            "Cadillac F1": {"position": 11, "performance": 0.35},
+        }
+        note = (
+            "2026 REGULATION RESET - Initialized from 2025 constructor ranking with high "
+            "uncertainty (±0.3). Team strengths are updated as 2026 data arrives."
+        )
 
     team_characteristics = {
         "year": 2026,
-        "note": "2026 REGULATION RESET - All teams start with neutral baseline (0.5 ± 0.3 uncertainty). Performance unknown until testing/races.",
+        "note": note,
         "generated_at": datetime.now().isoformat(),
         "data_freshness": "BASELINE_PRESEASON",
         "teams": {},
     }
 
-    for team in teams:
+    for team, team_seed in team_2026_seed.items():
+        if neutral_start:
+            team_note = "Pre-season neutral baseline - no 2026 data yet"
+        else:
+            team_note = (
+                f"2025 P{team_seed['position']} seed with high uncertainty "
+                "for 2026 regulation reset"
+            )
+
         team_characteristics["teams"][team] = {
-            "overall_performance": 0.5,  # Neutral - nobody knows yet!
-            "uncertainty": 0.30,  # High uncertainty
-            "note": "Pre-season baseline - no 2026 data yet",
+            "overall_performance": float(team_seed["performance"]),
+            "uncertainty": 0.30,
+            "note": team_note,
             "last_updated": None,
             "races_completed": 0,
         }
 
-    # Save to file
     output_file = output_dir / "car_characteristics" / "2026_car_characteristics.json"
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -217,7 +371,7 @@ def generate_neutral_team_characteristics(output_dir: Path) -> None:
         json.dump(team_characteristics, f, indent=2)
 
     logger.info(f"[OK] Saved team characteristics to {output_file}")
-    logger.info(f"  Teams: {len(teams)} (all start neutral)")
+    logger.info(f"  Teams: {len(team_2026_seed)}")
 
 
 def copy_2025_driver_characteristics(output_dir: Path) -> None:
@@ -313,6 +467,11 @@ def main():
     parser.add_argument(
         "--skip-drivers", action="store_true", help="Skip driver characteristic update"
     )
+    parser.add_argument(
+        "--neutral-teams",
+        action="store_true",
+        help="Initialize all teams at 0.5 (use only for explicitly neutral preseason experiments).",
+    )
 
     args = parser.parse_args()
 
@@ -333,7 +492,7 @@ def main():
 
     # Step 2: Neutral team characteristics (nobody knows 2026 performance yet!)
     if not args.skip_teams:
-        generate_neutral_team_characteristics(output_dir)
+        generate_team_characteristics(output_dir, neutral_start=args.neutral_teams)
         logger.info("")
 
     # Step 3: Copy 2025 driver characteristics (skills persist)

@@ -115,6 +115,10 @@ logging:
 
 # Baseline 2026 Predictor Parameters (used before real season data)
 baseline_predictor:
+  # Team-strength blending schedule across early season races.
+  # rapid_adaptive reaches ~70-90% current-season influence by races 2-3.
+  team_strength_schedule: rapid_adaptive
+
   # Qualifying simulation parameters
   qualifying:
     # Qualifying noise standard deviation (random variation)
@@ -187,7 +191,17 @@ baseline_predictor:
 
     # FP blend controls
     fp_blend_weight: 0.70
+    fp_blend_weight_min: 0.45
+    fp_blend_weight_max: 0.85
+    fp_blend_confidence_scale: 0.30
     fp_blend_weight_testing: true
+
+    # Data-quality confidence progression (used when no direct FP session confidence exists)
+    data_confidence:
+      model_only: 0.25
+      testing_fallback: 0.45
+      sprint_race: 0.70
+    session_confidence_scale: 10.0
 
     # Confidence / fallback defaults
     confidence_cap: 60
@@ -410,12 +424,18 @@ baseline_predictor:
     race_advantage_lap_impact: 0.20
 
     # Final ranking blend after lap-by-lap simulation
-    # Increased grid anchor to better preserve qualifying order and reduce tail variance
+    # Keep sprint races grid-stable, but allow main races to evolve from qualifying.
     grid_anchor:
-      base: 0.40                        # Up from 0.32 - stronger grid influence
-      track_scale: 0.35                 # Unchanged - track difficulty still matters
-      min: 0.70                         # New - minimum anchor for normal races
-      sprint_min: 0.78                  # Kept - sprint races preserve grid more
+      base: 0.25
+      track_scale: 0.30
+      min: 0.35
+      main_max: 0.58
+      sprint_min: 0.78
+
+    # Guardrail to prevent over-anchoring in full-distance races.
+    # If movement is too low, re-rank with an upside quantile from simulation samples.
+    main_race_movement_floor: 1.0
+    main_race_movement_quantile: 20.0
 
     final_blend:
       overtaking_skill_scale: 1.0       # Down from 1.3 - reduce driver adjustment magnitude

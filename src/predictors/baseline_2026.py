@@ -149,6 +149,7 @@ class Baseline2026Predictor(
         is_sprint: bool = False,
         race_compound: str = "MEDIUM",
         year: int | None = None,
+        input_confidence: float | None = None,
     ) -> dict[str, Any]:
         """Delegate race prediction to the race engine."""
         return self.race_engine.predict(
@@ -159,4 +160,5 @@ class Baseline2026Predictor(
             is_sprint=is_sprint,
             race_compound=race_compound,
             year=year,
+            input_confidence=input_confidence,
         )

@@ -15,17 +15,25 @@ def test_get_file_path_mappings(tmp_path):
 
     car_path = store._get_file_path("car_characteristics", "2026::car_characteristics")
     driver_path = store._get_file_path("driver_characteristics", "2026::driver_characteristics")
+    legacy_driver_path = store._get_file_path("driver_characteristics", "driver_characteristics")
     debuts_path = store._get_file_path("driver_debuts", "driver_debuts")
     track_path = store._get_file_path("track_characteristics", "2026::track_characteristics")
     prediction_path = store._get_file_path("prediction", "2026::Bahrain Grand Prix::qualifying")
     default_path = store._get_file_path("custom", "a::b")
+    learning_state_path = store._get_file_path("learning_state", "2026::learning_state")
+    legacy_learning_state_path = store._get_file_path("learning_state", "learning_state")
 
     assert str(car_path).endswith("processed/car_characteristics/2026_car_characteristics.json")
-    assert str(driver_path).endswith("processed/driver_characteristics.json")
+    assert str(driver_path).endswith(
+        "processed/driver_characteristics/2026_driver_characteristics.json"
+    )
+    assert str(legacy_driver_path).endswith("processed/driver_characteristics.json")
     assert str(debuts_path).endswith("driver_debuts.json")
     assert str(track_path).endswith(
         "processed/track_characteristics/2026_track_characteristics.json"
     )
+    assert str(learning_state_path).endswith("learning_state/2026_learning_state.json")
+    assert str(legacy_learning_state_path).endswith("learning_state.json")
     assert str(prediction_path).endswith(
         "predictions/2026/bahrain_grand_prix/bahrain_grand_prix_qualifying.json"
     )

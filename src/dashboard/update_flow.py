@@ -362,9 +362,29 @@ def auto_update_if_needed(force_recheck: bool = False, year: int = 2026) -> None
             st.success(f"Learned from {updated_count} race(s). Predictions now use updated data.")
             st.cache_resource.clear()
             st.cache_data.clear()
+        elif updated_count > 0:
+            st.warning(
+                "Race refresh partially completed: "
+                f"updated {updated_count} of {len(new_races)} race(s). "
+                "Continuing with available updates; remaining races will retry automatically."
+            )
+            logger.warning(
+                "Race refresh incomplete for %s: updated %s/%s race(s).",
+                year,
+                updated_count,
+                len(new_races),
+            )
+            st.cache_resource.clear()
+            st.cache_data.clear()
         else:
-            raise RuntimeError(
-                f"Race refresh incomplete: updated {updated_count} of {len(new_races)} new races."
+            st.warning(
+                "Race refresh did not apply any new updates. "
+                "Continuing with existing model state; failed races will retry automatically."
+            )
+            logger.warning(
+                "Race refresh skipped all pending races for %s (0/%s updated).",
+                year,
+                len(new_races),
             )
 
 

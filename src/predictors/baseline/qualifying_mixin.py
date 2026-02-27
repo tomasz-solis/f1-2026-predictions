@@ -49,6 +49,73 @@ _DEFAULT_TESTING_SHORT_RUN_WEIGHTS = {
 class BaselineQualifyingMixin:
     """Shared qualifying and sprint-race methods for Baseline2026Predictor."""
 
+    def _resolve_data_confidence_score(
+        self,
+        session_name: str | None,
+        *,
+        testing_fallback_used: bool,
+    ) -> float:
+        """
+        Estimate information quality for the current qualifying context.
+
+        The score intentionally increases as the weekend progresses from FP1 to FP3
+        (or sprint sessions), and is lowest for model-only runs.
+        """
+        cfg = getattr(self, "config", config_loader)
+        model_only_confidence = float(
+            cfg.get("baseline_predictor.qualifying.data_confidence.model_only", 0.25)
+        )
+        testing_fallback_confidence = float(
+            cfg.get("baseline_predictor.qualifying.data_confidence.testing_fallback", 0.45)
+        )
+        fp1_confidence = float(cfg.get("qualifying.session_confidence.fp1", 0.2))
+        fp2_confidence = float(cfg.get("qualifying.session_confidence.fp2", 0.5))
+        fp3_confidence = float(cfg.get("qualifying.session_confidence.fp3", 0.9))
+        sprint_quali_confidence = float(cfg.get("qualifying.session_confidence.sprint_quali", 0.85))
+        sprint_race_confidence = float(
+            cfg.get("baseline_predictor.qualifying.data_confidence.sprint_race", 0.70)
+        )
+
+        if session_name is None:
+            return float(
+                np.clip(
+                    testing_fallback_confidence if testing_fallback_used else model_only_confidence,
+                    0.0,
+                    1.0,
+                )
+            )
+
+        normalized_name = session_name.lower()
+        # Priority-based matching avoids overlapping token double-counting
+        # (e.g., "Sprint Qualifying" containing both "sprint qualifying" and "sprint").
+        if "sprint qualifying" in normalized_name:
+            return float(np.clip(sprint_quali_confidence, 0.0, 1.0))
+        if "fp3" in normalized_name:
+            return float(np.clip(fp3_confidence, 0.0, 1.0))
+        if "fp2" in normalized_name:
+            return float(np.clip(fp2_confidence, 0.0, 1.0))
+        if "fp1" in normalized_name:
+            return float(np.clip(fp1_confidence, 0.0, 1.0))
+        if "sprint pace signal" in normalized_name or "sprint" in normalized_name:
+            return float(np.clip(sprint_race_confidence, 0.0, 1.0))
+
+        return float(np.clip(testing_fallback_confidence, 0.0, 1.0))
+
+    def _resolve_fp_blend_weight(self, data_confidence_score: float) -> float:
+        """Scale FP blend weight by weekend data confidence."""
+        cfg = getattr(self, "config", config_loader)
+        base_weight = float(cfg.get("baseline_predictor.qualifying.fp_blend_weight", 0.70))
+        blend_scale = float(
+            cfg.get("baseline_predictor.qualifying.fp_blend_confidence_scale", 0.30)
+        )
+        min_weight = float(cfg.get("baseline_predictor.qualifying.fp_blend_weight_min", 0.45))
+        max_weight = float(cfg.get("baseline_predictor.qualifying.fp_blend_weight_max", 0.85))
+        lower = min(min_weight, max_weight)
+        upper = max(min_weight, max_weight)
+
+        adjusted_weight = base_weight + ((float(data_confidence_score) - 0.5) * blend_scale)
+        return float(np.clip(adjusted_weight, lower, upper))
+
     def _get_testing_profile_weights(
         self, profile: str, defaults: dict[str, float]
     ) -> dict[str, float]:
@@ -149,6 +216,7 @@ class BaselineQualifyingMixin:
         testing_fallback_performance: dict[str, float] | None,
         race_name: str,
         is_sprint: bool,
+        fp_blend_weight: float,
         prediction_year: int | None = None,
     ) -> tuple[list[dict], int]:
         """Build driver list with blended team/driver strengths and testing modifiers."""
@@ -168,6 +236,7 @@ class BaselineQualifyingMixin:
             drivers=self.drivers,
             cfg=cfg,
             short_profile_weights=short_profile_weights,
+            fp_blend_weight=fp_blend_weight,
             get_blended_team_strength_fn=self.get_blended_team_strength,
             compute_testing_profile_modifier_fn=self._compute_testing_profile_modifier,
             blend_team_strength_fn=blend_team_strength,
@@ -199,7 +268,11 @@ class BaselineQualifyingMixin:
         )
 
     def _aggregate_grid_results(
-        self, position_records: dict[str, list[int]], all_drivers: list[dict]
+        self,
+        position_records: dict[str, list[int]],
+        all_drivers: list[dict],
+        *,
+        data_confidence_score: float | None = None,
     ) -> list[QualifyingGridEntry]:
         """Aggregate simulation results into final grid with confidence intervals."""
         cfg = getattr(self, "config", config_loader)
@@ -207,6 +280,9 @@ class BaselineQualifyingMixin:
         mean_positions: dict[str, float] = {}
         confidence_std_multiplier = cfg.get(
             "baseline_predictor.qualifying.confidence_std_multiplier", 5.0
+        )
+        session_confidence_scale = float(
+            cfg.get("baseline_predictor.qualifying.session_confidence_scale", 10.0)
         )
         confidence_cap = cfg.get("baseline_predictor.qualifying.confidence_cap", 60)
         confidence_min = cfg.get("baseline_predictor.qualifying.confidence_min", 40)
@@ -223,6 +299,11 @@ class BaselineQualifyingMixin:
                 confidence_min,
                 min(confidence_cap, confidence_cap - (position_std * confidence_std_multiplier)),
             )
+            if data_confidence_score is not None:
+                confidence += (float(np.clip(data_confidence_score, 0.0, 1.0)) - 0.5) * (
+                    session_confidence_scale
+                )
+                confidence = max(confidence_min, min(confidence_cap, confidence))
 
             grid.append(
                 {
@@ -301,6 +382,11 @@ class BaselineQualifyingMixin:
                 metric_weights=short_profile_weights,
             )
         testing_fallback_used = testing_fallback_performance is not None
+        data_confidence_score = self._resolve_data_confidence_score(
+            session_name,
+            testing_fallback_used=testing_fallback_used,
+        )
+        effective_fp_blend_weight = self._resolve_fp_blend_weight(data_confidence_score)
 
         all_drivers, teams_with_short_profile = self._build_driver_list_with_strengths(
             lineups,
@@ -308,6 +394,7 @@ class BaselineQualifyingMixin:
             testing_fallback_performance,
             race_name,
             is_sprint,
+            effective_fp_blend_weight,
             prediction_year=year,
         )
         if cfg.get("baseline_predictor.qualifying.enable_driver_fp_adjustment", True):
@@ -337,7 +424,16 @@ class BaselineQualifyingMixin:
             all_drivers, n_simulations, is_sprint, session_name is not None, rng
         )
 
-        grid = self._aggregate_grid_results(position_records, all_drivers)
+        try:
+            grid = self._aggregate_grid_results(
+                position_records,
+                all_drivers,
+                data_confidence_score=data_confidence_score,
+            )
+        except TypeError:
+            # Backward-compatible fallback for patched tests/helpers overriding the
+            # method with the older two-argument signature.
+            grid = self._aggregate_grid_results(position_records, all_drivers)
 
         if session_name is not None:
             data_source = session_name
@@ -351,6 +447,8 @@ class BaselineQualifyingMixin:
             "data_source": data_source,
             "blend_used": session_name is not None,
             "testing_fallback_used": testing_fallback_used,
+            "data_confidence_score": round(float(data_confidence_score), 3),
+            "fp_blend_weight_used": round(float(effective_fp_blend_weight), 3),
             "qualifying_stage": qualifying_stage,
             "characteristics_profile_used": "short_run",
             "teams_with_characteristics_profile": teams_with_short_profile,

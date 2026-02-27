@@ -252,6 +252,65 @@ def test_get_blended_team_strength_uses_current_fallback(tmp_path, patcher):
     assert captured["race_number"] == 5
 
 
+def test_get_blended_team_strength_converts_track_modifier_to_absolute_testing_score(
+    tmp_path, patcher
+):
+    predictor = DummyPredictor(data_dir=tmp_path)
+    predictor.teams = {"McLaren": {"overall_performance": 0.80, "current_season_performance": []}}
+    predictor.races_completed = 1
+
+    patcher.setattr(predictor, "calculate_track_suitability", lambda team, race_name: 0.05)
+
+    captured = {}
+
+    def _fake_blend(**kwargs):
+        captured.update(kwargs)
+        return 0.79
+
+    patcher.setattr(data_mixin_module, "calculate_blended_performance", _fake_blend)
+    patcher.setattr(
+        data_mixin_module, "get_recommended_schedule", lambda is_regulation_change: "extreme"
+    )
+
+    predictor.get_blended_team_strength("McLaren", "Bahrain Grand Prix")
+
+    assert captured["baseline_score"] == 0.80
+    assert captured["testing_modifier"] == pytest.approx(0.85)
+
+
+def test_get_blended_team_strength_prefers_configured_schedule(tmp_path, patcher):
+    predictor = DummyPredictor(data_dir=tmp_path)
+    predictor.teams = {
+        "McLaren": {"overall_performance": 0.80, "current_season_performance": [0.74]}
+    }
+    predictor.races_completed = 2
+
+    class _ConfigStub:
+        @staticmethod
+        def get(key: str, default):
+            if key == "baseline_predictor.team_strength_schedule":
+                return "rapid_adaptive"
+            return default
+
+    predictor.config = _ConfigStub()
+
+    captured = {}
+
+    def _fake_blend(**kwargs):
+        captured.update(kwargs)
+        return 0.77
+
+    patcher.setattr(data_mixin_module, "calculate_blended_performance", _fake_blend)
+    patcher.setattr(
+        data_mixin_module, "get_recommended_schedule", lambda is_regulation_change: "extreme"
+    )
+    patcher.setattr(predictor, "calculate_track_suitability", lambda team, race_name: 0.0)
+
+    predictor.get_blended_team_strength("McLaren", "Bahrain Grand Prix")
+
+    assert captured["schedule"] == "rapid_adaptive"
+
+
 @pytest.mark.parametrize(
     ("stress", "expected"),
     [

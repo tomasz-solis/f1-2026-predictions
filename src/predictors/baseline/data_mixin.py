@@ -5,12 +5,18 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pandas as pd
 
 from src.persistence.artifact_store import ArtifactStore
-from src.systems.weight_schedule import calculate_blended_performance, get_recommended_schedule
+from src.systems.weight_schedule import (
+    SCHEDULES,
+    ScheduleType,
+    calculate_blended_performance,
+    get_recommended_schedule,
+)
 from src.utils import config_loader
 from src.utils.compound_performance import (
     get_compound_performance_modifier,
@@ -214,8 +220,9 @@ class BaselineDataMixin:
         # 1. Baseline from 2025 standings
         baseline = team_data.get("overall_performance", 0.5)
 
-        # 2. Testing modifier (track suitability)
+        # 2. Testing/practice-informed track suitability signal (relative modifier)
         testing_modifier = self.calculate_track_suitability(team, race_name)
+        testing_score = float(np.clip(baseline + testing_modifier, 0.0, 1.0))
 
         # 3. Current season running average
         current_season_performance = team_data.get("current_season_performance", [])
@@ -228,12 +235,18 @@ class BaselineDataMixin:
         # 4. Apply weight schedule
         race_number = self.races_completed + 1  # Next race
 
-        # Use "extreme" schedule for 2026 (regulation change)
-        schedule = get_recommended_schedule(is_regulation_change=True)
+        # Use configured schedule when provided; default to regulation-change recommendation.
+        cfg = getattr(self, "config", config_loader)
+        configured_schedule = cfg.get("baseline_predictor.team_strength_schedule", None)
+        schedule: ScheduleType
+        if isinstance(configured_schedule, str) and configured_schedule in SCHEDULES:
+            schedule = cast(ScheduleType, configured_schedule)
+        else:
+            schedule = get_recommended_schedule(is_regulation_change=True)
 
         blended = calculate_blended_performance(
             baseline_score=baseline,
-            testing_modifier=testing_modifier,
+            testing_modifier=testing_score,
             current_score=current,
             race_number=race_number,
             schedule=schedule,

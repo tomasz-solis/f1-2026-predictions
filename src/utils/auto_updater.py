@@ -13,7 +13,12 @@ from pathlib import Path
 import fastf1
 import pandas as pd
 
+from src.persistence.config import should_read_db_first, should_write_to_db, should_write_to_file
+from src.persistence.runtime_state_store import RuntimeStateStore
+
 logger = logging.getLogger(__name__)
+_LEARNING_STATE_FILE = Path("data/learning_state.json")
+_LEARNING_STATE_NAMESPACE = "race_learning"
 
 
 def _is_competitive_race_event(event: pd.Series) -> bool:
@@ -41,6 +46,82 @@ def _is_competitive_race_event(event: pd.Series) -> bool:
             pass
 
     return True
+
+
+def _default_learning_state(year: int) -> dict:
+    return {
+        "season": year,
+        "races_completed": 0,
+        "history": [],
+        "method_performance": {},
+        "last_updated": None,
+    }
+
+
+def _get_runtime_state_store() -> RuntimeStateStore:
+    return RuntimeStateStore()
+
+
+def _load_learning_state(year: int) -> dict:
+    """Load learning state with DB-first semantics when configured."""
+    if should_read_db_first():
+        try:
+            db_record = _get_runtime_state_store().get_record(
+                _LEARNING_STATE_NAMESPACE,
+                str(year),
+            )
+            if isinstance(db_record, dict):
+                return db_record
+            if should_write_to_db():
+                # In write-capable DB modes, treat missing DB state as empty season state.
+                return _default_learning_state(year)
+        except Exception as exc:
+            logger.warning(
+                "Could not load race-learning state from DB for season %s: %s",
+                year,
+                exc,
+            )
+            if should_write_to_db():
+                # Fail-open to empty state; do not trust ephemeral local files in stateless mode.
+                return _default_learning_state(year)
+
+    if not _LEARNING_STATE_FILE.exists():
+        return _default_learning_state(year)
+
+    try:
+        with open(_LEARNING_STATE_FILE) as f:
+            loaded = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning(
+            "Learning state at %s is invalid (%s). Rebuilding state.",
+            _LEARNING_STATE_FILE,
+            exc,
+        )
+        return _default_learning_state(year)
+
+    if not isinstance(loaded, dict):
+        logger.warning(
+            "Learning state at %s is not an object. Rebuilding state.",
+            _LEARNING_STATE_FILE,
+        )
+        return _default_learning_state(year)
+
+    return loaded
+
+
+def _save_learning_state(year: int, state: dict) -> None:
+    """Persist learning state to configured backends."""
+    if should_write_to_db():
+        _get_runtime_state_store().upsert_record(_LEARNING_STATE_NAMESPACE, str(year), state)
+
+    if not should_write_to_file():
+        return
+
+    _LEARNING_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = _LEARNING_STATE_FILE.with_suffix(".tmp")
+    with open(tmp_path, "w") as f:
+        json.dump(state, f, indent=2)
+    tmp_path.replace(_LEARNING_STATE_FILE)
 
 
 def get_completed_races(year: int = 2026) -> list[str]:
@@ -107,36 +188,29 @@ def get_completed_races(year: int = 2026) -> list[str]:
 
 def get_learned_races(year: int = 2026) -> list[str]:
     """Get races already learned for a specific season year."""
-    learning_file = Path("data/learning_state.json")
-
-    if not learning_file.exists():
+    state = _load_learning_state(year)
+    history = state.get("history", [])
+    if not isinstance(history, list):
         return []
+    state_season = state.get("season")
 
-    try:
-        with open(learning_file) as f:
-            state = json.load(f)
-            history = state.get("history", [])
-            state_season = state.get("season")
-            learned: list[str] = []
-            for record in history:
-                if "race" not in record:
-                    continue
-                raw_record_year = record.get("year", state_season)
-                try:
-                    record_year = int(raw_record_year) if raw_record_year is not None else None
-                except (TypeError, ValueError):
-                    record_year = None
-                if record_year is None:
-                    # Backward compatibility for legacy records without year:
-                    # treat them as belonging to default season only.
-                    if year == 2026:
-                        learned.append(record["race"])
-                elif record_year == year:
-                    learned.append(record["race"])
-            return learned
-    except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
-        logger.debug(f"Could not load learning state: {e}")
-        return []
+    learned: list[str] = []
+    for record in history:
+        if not isinstance(record, dict) or "race" not in record:
+            continue
+        raw_record_year = record.get("year", state_season)
+        try:
+            record_year = int(raw_record_year) if raw_record_year is not None else None
+        except (TypeError, ValueError):
+            record_year = None
+        if record_year is None:
+            # Backward compatibility for legacy records without year:
+            # treat them as belonging to default season only.
+            if year == 2026:
+                learned.append(record["race"])
+        elif record_year == year:
+            learned.append(record["race"])
+    return learned
 
 
 def needs_update(year: int = 2026, force_recheck: bool = False) -> tuple[bool, list[str]]:
@@ -218,29 +292,9 @@ def auto_update_from_races(
 
 def mark_race_as_learned(race_name: str, year: int = 2026) -> None:
     """Mark a race as learned in the learning state for a given season."""
-    learning_file = Path("data/learning_state.json")
-    learning_file.parent.mkdir(parents=True, exist_ok=True)
-
-    default_state = {
-        "season": year,
-        "races_completed": 0,
-        "history": [],
-        "method_performance": {},
-    }
-
-    if learning_file.exists():
-        try:
-            with open(learning_file) as f:
-                state = json.load(f)
-            if not isinstance(state, dict):
-                raise ValueError("Learning state root must be an object")
-        except (OSError, json.JSONDecodeError, ValueError) as exc:
-            logger.warning(
-                f"Learning state at {learning_file} is invalid ({exc}). Rebuilding state file."
-            )
-            state = default_state
-    else:
-        state = default_state
+    state = _load_learning_state(year)
+    if not isinstance(state, dict):
+        state = _default_learning_state(year)
 
     def _record_year_for_dedupe(record: dict) -> int | None:
         raw_year = record.get("year")
@@ -273,6 +327,4 @@ def mark_race_as_learned(race_name: str, year: int = 2026) -> None:
 
     state["season"] = year
     state["last_updated"] = datetime.now().isoformat()
-
-    with open(learning_file, "w") as f:
-        json.dump(state, f, indent=2)
+    _save_learning_state(year, state)

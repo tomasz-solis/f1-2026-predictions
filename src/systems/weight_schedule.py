@@ -78,6 +78,13 @@ SCHEDULES = {
         3: (0.05, 0.00, 0.95),
         4: (0.00, 0.00, 1.00),
     },
+    "rapid_adaptive": {
+        # Keeps early-season learning fast while avoiding an immediate jump to 95% current.
+        1: (0.35, 0.20, 0.45),
+        2: (0.20, 0.10, 0.70),
+        3: (0.08, 0.05, 0.87),
+        4: (0.05, 0.00, 0.95),
+    },
 }
 
 ScheduleType = Literal[
@@ -88,6 +95,7 @@ ScheduleType = Literal[
     "ultra_aggressive",
     "extreme",
     "insane",
+    "rapid_adaptive",
 ]
 
 

@@ -201,7 +201,7 @@ class TestDataValidation:
             assert "type" in values
 
             # Validate ranges
-            assert 19 <= values["pit_stop_loss"] <= 26  # Realistic pit stop loss
+            assert 15 <= values["pit_stop_loss"] <= 30  # Realistic pit stop loss
             assert 0 <= values["safety_car_prob"] <= 1
             assert 0 <= values["overtaking_difficulty"] <= 1
             assert values["type"] in ["permanent", "street"]

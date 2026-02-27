@@ -111,16 +111,19 @@ def test_auto_update_if_needed_runs_update_and_clears_cache(patcher):
     assert cache_calls == ["resource", "data"]
 
 
-def test_auto_update_if_needed_raises_when_update_is_incomplete(patcher):
+def test_auto_update_if_needed_warns_when_update_is_incomplete(patcher):
     calls, _progress_bar, _status_text, cache_calls = _stub_streamlit(patcher)
 
     patcher.setattr("src.utils.auto_updater.needs_update", lambda: (True, ["Bahrain Grand Prix"]))
     patcher.setattr("src.utils.auto_updater.auto_update_from_races", lambda _callback: 0)
 
-    with pytest.raises(RuntimeError, match="Race refresh incomplete"):
-        update_flow.auto_update_if_needed()
+    update_flow.auto_update_if_needed()
 
     assert ("info", "Found 1 new race(s) to learn from. Updating characteristics...") in calls
+    assert any(
+        level == "warning" and "did not apply any new updates" in message
+        for level, message in calls
+    )
     assert cache_calls == []
 
 

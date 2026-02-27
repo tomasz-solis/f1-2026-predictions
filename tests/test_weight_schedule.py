@@ -28,6 +28,14 @@ def test_get_schedule_weights_clamps_after_last_checkpoint():
     assert weights == {"baseline": 0.0, "testing": 0.0, "current": 1.0}
 
 
+def test_get_schedule_weights_supports_rapid_adaptive_profile():
+    weights_r2 = get_schedule_weights(race_number=2, schedule="rapid_adaptive")
+    weights_r3 = get_schedule_weights(race_number=3, schedule="rapid_adaptive")
+
+    assert weights_r2 == pytest.approx({"baseline": 0.20, "testing": 0.10, "current": 0.70})
+    assert weights_r3 == pytest.approx({"baseline": 0.08, "testing": 0.05, "current": 0.87})
+
+
 def test_calculate_blended_performance_uses_schedule_weights():
     blended = calculate_blended_performance(
         baseline_score=0.8,

@@ -511,3 +511,53 @@ class TestLearnedRacesTracking:
         finally:
             if learning_file.exists():
                 learning_file.unlink()
+
+    def test_get_learned_races_prefers_runtime_state_store_when_db_reads_enabled(self):
+        from src.utils.auto_updater import get_learned_races
+
+        class _Store:
+            def get_record(self, namespace: str, state_key: str):
+                assert namespace == "race_learning"
+                assert state_key == "2027"
+                return {
+                    "season": 2027,
+                    "history": [
+                        {"race": "Bahrain Grand Prix", "year": 2027},
+                        {"race": "Saudi Arabian Grand Prix", "year": 2026},
+                    ],
+                }
+
+        with patch("src.utils.auto_updater.should_read_db_first", lambda: True):
+            with patch("src.utils.auto_updater.should_write_to_db", lambda: True):
+                with patch("src.utils.auto_updater._get_runtime_state_store", lambda: _Store()):
+                    learned = get_learned_races(year=2027)
+
+        assert learned == ["Bahrain Grand Prix"]
+
+    def test_mark_race_as_learned_writes_runtime_state_store_when_db_writes_enabled(self):
+        from src.utils.auto_updater import mark_race_as_learned
+
+        captured: dict[str, dict] = {}
+
+        class _Store:
+            def get_record(self, namespace: str, state_key: str):
+                assert namespace == "race_learning"
+                assert state_key == "2027"
+                return {"season": 2027, "history": [], "races_completed": 0}
+
+            def upsert_record(self, namespace: str, state_key: str, payload: dict):
+                captured["namespace"] = {"value": namespace}
+                captured["state_key"] = {"value": state_key}
+                captured["payload"] = payload
+
+        with patch("src.utils.auto_updater.should_read_db_first", lambda: True):
+            with patch("src.utils.auto_updater.should_write_to_db", lambda: True):
+                with patch("src.utils.auto_updater.should_write_to_file", lambda: False):
+                    with patch("src.utils.auto_updater._get_runtime_state_store", lambda: _Store()):
+                        mark_race_as_learned("Bahrain Grand Prix", year=2027)
+
+        assert captured["namespace"]["value"] == "race_learning"
+        assert captured["state_key"]["value"] == "2027"
+        assert captured["payload"]["season"] == 2027
+        assert captured["payload"]["races_completed"] == 1
+        assert captured["payload"]["history"][0]["race"] == "Bahrain Grand Prix"

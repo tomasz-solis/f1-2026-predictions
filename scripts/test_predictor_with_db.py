@@ -65,7 +65,7 @@ def main():
     try:
         # Get a team name
         team_name = list(predictor.teams.keys())[0]
-        team_strength = predictor.get_blended_team_strength(team_name, "Bahrain Grand Prix", 1)
+        team_strength = predictor.get_blended_team_strength(team_name, "Bahrain Grand Prix")
         print(f"   Team: {team_name}")
         print(f"   Blended strength: {team_strength:.4f}")
         print("   [OK] Basic functionality works")

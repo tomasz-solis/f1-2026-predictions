@@ -1,5 +1,5 @@
 {
-  "extraction_date": "2026-02-01T00:17:08.341852",
+  "extraction_date": "2026-02-27T13:20:52.493987",
   "years": [
     2023,
     2024,
@@ -7,124 +7,24 @@
   ],
   "method": "global_teammate_network_ranking",
   "drivers": {
-    "LEC": {
-      "name": "Driver LEC",
+    "VER": {
+      "name": "Driver VER",
       "pace": {
-        "quali_pace": 0.707,
-        "race_pace": 0.852
+        "quali_pace": 0.95,
+        "race_pace": 0.99
       },
       "racecraft": {
-        "skill_score": 0.852,
-        "overtaking_skill": 0.852
+        "skill_score": 0.99,
+        "overtaking_skill": 0.99
       },
       "experience": {
-        "years_of_experience": 7,
-        "debut_year": 2018,
-        "total_races": 70,
-        "tier": "established"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.02,
-        "confidence": 0.872
-      }
-    },
-    "HUL": {
-      "name": "Driver HUL",
-      "pace": {
-        "quali_pace": 0.671,
-        "race_pace": 0.702
-      },
-      "racecraft": {
-        "skill_score": 0.702,
-        "overtaking_skill": 0.702
-      },
-      "experience": {
-        "years_of_experience": 15,
-        "debut_year": 2010,
+        "years_of_experience": 10,
+        "debut_year": 2015,
         "total_races": 70,
         "tier": "veteran"
       },
       "dnf_risk": {
         "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.0,
-        "confidence": 0.702
-      }
-    },
-    "RIC": {
-      "name": "Driver RIC",
-      "pace": {
-        "quali_pace": 0.656,
-        "race_pace": 0.569
-      },
-      "racecraft": {
-        "skill_score": 0.569,
-        "overtaking_skill": 0.569
-      },
-      "experience": {
-        "years_of_experience": 14,
-        "debut_year": 2011,
-        "total_races": 25,
-        "tier": "veteran"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.02,
-        "confidence": 0.589
-      }
-    },
-    "BEA": {
-      "name": "Driver BEA",
-      "pace": {
-        "quali_pace": 0.585,
-        "race_pace": 0.532
-      },
-      "racecraft": {
-        "skill_score": 0.532,
-        "overtaking_skill": 0.532
-      },
-      "experience": {
-        "years_of_experience": 1,
-        "debut_year": 2024,
-        "total_races": 27,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.0,
-        "confidence": 0.532
-      }
-    },
-    "MAG": {
-      "name": "Driver MAG",
-      "pace": {
-        "quali_pace": 0.605,
-        "race_pace": 0.516
-      },
-      "racecraft": {
-        "skill_score": 0.516,
-        "overtaking_skill": 0.516
-      },
-      "experience": {
-        "years_of_experience": 11,
-        "debut_year": 2014,
-        "total_races": 44,
-        "tier": "veteran"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.023
-      },
-      "wet_weather": {
-        "modifier": -0.01,
-        "confidence": 0.506
       }
     },
     "STR": {
@@ -145,82 +45,6 @@
       },
       "dnf_risk": {
         "dnf_rate": 0.014
-      },
-      "wet_weather": {
-        "modifier": -0.01,
-        "confidence": 0.583
-      }
-    },
-    "COL": {
-      "name": "Driver COL",
-      "pace": {
-        "quali_pace": 0.655,
-        "race_pace": 0.537
-      },
-      "racecraft": {
-        "skill_score": 0.537,
-        "overtaking_skill": 0.537
-      },
-      "experience": {
-        "years_of_experience": 1,
-        "debut_year": 2024,
-        "total_races": 27,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.0,
-        "confidence": 0.537
-      }
-    },
-    "DOO": {
-      "name": "Driver DOO",
-      "pace": {
-        "quali_pace": 0.465,
-        "race_pace": 0.415
-      },
-      "racecraft": {
-        "skill_score": 0.415,
-        "overtaking_skill": 0.415
-      },
-      "experience": {
-        "years_of_experience": 0,
-        "debut_year": 2025,
-        "total_races": 7,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.0,
-        "confidence": 0.5
-      }
-    },
-    "OCO": {
-      "name": "Driver OCO",
-      "pace": {
-        "quali_pace": 0.647,
-        "race_pace": 0.687
-      },
-      "racecraft": {
-        "skill_score": 0.687,
-        "overtaking_skill": 0.687
-      },
-      "experience": {
-        "years_of_experience": 9,
-        "debut_year": 2016,
-        "total_races": 69,
-        "tier": "established"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.0,
-        "confidence": 0.687
       }
     },
     "NOR": {
@@ -241,370 +65,6 @@
       },
       "dnf_risk": {
         "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.03,
-        "confidence": 0.807
-      }
-    },
-    "HAD": {
-      "name": "Driver HAD",
-      "pace": {
-        "quali_pace": 0.705,
-        "race_pace": 0.67
-      },
-      "racecraft": {
-        "skill_score": 0.67,
-        "overtaking_skill": 0.67
-      },
-      "experience": {
-        "years_of_experience": 0,
-        "debut_year": 2025,
-        "total_races": 24,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.0,
-        "confidence": 0.67
-      }
-    },
-    "RUS": {
-      "name": "Driver RUS",
-      "pace": {
-        "quali_pace": 0.795,
-        "race_pace": 0.82
-      },
-      "racecraft": {
-        "skill_score": 0.82,
-        "overtaking_skill": 0.82
-      },
-      "experience": {
-        "years_of_experience": 6,
-        "debut_year": 2019,
-        "total_races": 70,
-        "tier": "established"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.02,
-        "confidence": 0.84
-      }
-    },
-    "DEV": {
-      "name": "Driver DEV",
-      "pace": {
-        "quali_pace": 0.416,
-        "race_pace": 0.466
-      },
-      "racecraft": {
-        "skill_score": 0.466,
-        "overtaking_skill": 0.466
-      },
-      "experience": {
-        "years_of_experience": 3,
-        "debut_year": 2022,
-        "total_races": 10,
-        "tier": "developing"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.0,
-        "confidence": 0.5
-      }
-    },
-    "PIA": {
-      "name": "Driver PIA",
-      "pace": {
-        "quali_pace": 0.584,
-        "race_pace": 0.589
-      },
-      "racecraft": {
-        "skill_score": 0.589,
-        "overtaking_skill": 0.589
-      },
-      "experience": {
-        "years_of_experience": 2,
-        "debut_year": 2023,
-        "total_races": 70,
-        "tier": "developing"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.02,
-        "confidence": 0.609
-      }
-    },
-    "VER": {
-      "name": "Driver VER",
-      "pace": {
-        "quali_pace": 0.95,
-        "race_pace": 0.99
-      },
-      "racecraft": {
-        "skill_score": 0.99,
-        "overtaking_skill": 0.99
-      },
-      "experience": {
-        "years_of_experience": 10,
-        "debut_year": 2015,
-        "total_races": 70,
-        "tier": "veteran"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.05,
-        "confidence": 1.0
-      }
-    },
-    "LAW": {
-      "name": "Driver LAW",
-      "pace": {
-        "quali_pace": 0.643,
-        "race_pace": 0.622
-      },
-      "racecraft": {
-        "skill_score": 0.622,
-        "overtaking_skill": 0.622
-      },
-      "experience": {
-        "years_of_experience": 3,
-        "debut_year": 2022,
-        "total_races": 35,
-        "tier": "developing"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.0,
-        "confidence": 0.622
-      }
-    },
-    "TSU": {
-      "name": "Driver TSU",
-      "pace": {
-        "quali_pace": 0.522,
-        "race_pace": 0.547
-      },
-      "racecraft": {
-        "skill_score": 0.547,
-        "overtaking_skill": 0.547
-      },
-      "experience": {
-        "years_of_experience": 4,
-        "debut_year": 2021,
-        "total_races": 70,
-        "tier": "developing"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.01,
-        "confidence": 0.557
-      }
-    },
-    "BOR": {
-      "name": "Driver BOR",
-      "pace": {
-        "quali_pace": 0.708,
-        "race_pace": 0.628
-      },
-      "racecraft": {
-        "skill_score": 0.628,
-        "overtaking_skill": 0.628
-      },
-      "experience": {
-        "years_of_experience": 0,
-        "debut_year": 2025,
-        "total_races": 24,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.0,
-        "confidence": 0.628
-      }
-    },
-    "ZHO": {
-      "name": "Driver ZHO",
-      "pace": {
-        "quali_pace": 0.714,
-        "race_pace": 0.717
-      },
-      "racecraft": {
-        "skill_score": 0.717,
-        "overtaking_skill": 0.717
-      },
-      "experience": {
-        "years_of_experience": 3,
-        "debut_year": 2022,
-        "total_races": 46,
-        "tier": "developing"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.022
-      },
-      "wet_weather": {
-        "modifier": -0.02,
-        "confidence": 0.697
-      }
-    },
-    "PER": {
-      "name": "Driver PER",
-      "pace": {
-        "quali_pace": 0.467,
-        "race_pace": 0.417
-      },
-      "racecraft": {
-        "skill_score": 0.417,
-        "overtaking_skill": 0.417
-      },
-      "experience": {
-        "years_of_experience": 14,
-        "debut_year": 2011,
-        "total_races": 46,
-        "tier": "veteran"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.022
-      },
-      "wet_weather": {
-        "modifier": -0.01,
-        "confidence": 0.5
-      }
-    },
-    "SAI": {
-      "name": "Driver SAI",
-      "pace": {
-        "quali_pace": 0.716,
-        "race_pace": 0.648
-      },
-      "racecraft": {
-        "skill_score": 0.648,
-        "overtaking_skill": 0.648
-      },
-      "experience": {
-        "years_of_experience": 10,
-        "debut_year": 2015,
-        "total_races": 69,
-        "tier": "veteran"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.01,
-        "confidence": 0.658
-      }
-    },
-    "SAR": {
-      "name": "Driver SAR",
-      "pace": {
-        "quali_pace": 0.45,
-        "race_pace": 0.47
-      },
-      "racecraft": {
-        "skill_score": 0.47,
-        "overtaking_skill": 0.47
-      },
-      "experience": {
-        "years_of_experience": 2,
-        "debut_year": 2023,
-        "total_races": 36,
-        "tier": "developing"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.028
-      },
-      "wet_weather": {
-        "modifier": -0.02,
-        "confidence": 0.5
-      }
-    },
-    "ANT": {
-      "name": "Driver ANT",
-      "pace": {
-        "quali_pace": 0.315,
-        "race_pace": 0.265
-      },
-      "racecraft": {
-        "skill_score": 0.265,
-        "overtaking_skill": 0.265
-      },
-      "experience": {
-        "years_of_experience": 0,
-        "debut_year": 2025,
-        "total_races": 24,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.0,
-        "confidence": 0.5
-      }
-    },
-    "ALO": {
-      "name": "Driver ALO",
-      "pace": {
-        "quali_pace": 0.748,
-        "race_pace": 0.758
-      },
-      "racecraft": {
-        "skill_score": 0.758,
-        "overtaking_skill": 0.758
-      },
-      "experience": {
-        "years_of_experience": 24,
-        "debut_year": 2001,
-        "total_races": 70,
-        "tier": "veteran"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.03,
-        "confidence": 0.788
-      }
-    },
-    "BOT": {
-      "name": "Driver BOT",
-      "pace": {
-        "quali_pace": 0.637,
-        "race_pace": 0.546
-      },
-      "racecraft": {
-        "skill_score": 0.546,
-        "overtaking_skill": 0.546
-      },
-      "experience": {
-        "years_of_experience": 12,
-        "debut_year": 2013,
-        "total_races": 46,
-        "tier": "veteran"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.0,
-        "confidence": 0.546
       }
     },
     "HAM": {
@@ -625,34 +85,226 @@
       },
       "dnf_risk": {
         "dnf_rate": 0.0
-      },
-      "wet_weather": {
-        "modifier": 0.04,
-        "confidence": 0.675
       }
     },
-    "ALB": {
-      "name": "Driver ALB",
+    "DEV": {
+      "name": "Driver DEV",
       "pace": {
-        "quali_pace": 0.765,
-        "race_pace": 0.75
+        "quali_pace": 0.416,
+        "race_pace": 0.466
       },
       "racecraft": {
-        "skill_score": 0.75,
-        "overtaking_skill": 0.75
+        "skill_score": 0.466,
+        "overtaking_skill": 0.466
       },
       "experience": {
-        "years_of_experience": 6,
-        "debut_year": 2019,
-        "total_races": 70,
+        "years_of_experience": 3,
+        "debut_year": 2022,
+        "total_races": 10,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "OCO": {
+      "name": "Driver OCO",
+      "pace": {
+        "quali_pace": 0.647,
+        "race_pace": 0.687
+      },
+      "racecraft": {
+        "skill_score": 0.687,
+        "overtaking_skill": 0.687
+      },
+      "experience": {
+        "years_of_experience": 9,
+        "debut_year": 2016,
+        "total_races": 69,
         "tier": "established"
       },
       "dnf_risk": {
         "dnf_rate": 0.0
+      }
+    },
+    "DOO": {
+      "name": "Driver DOO",
+      "pace": {
+        "quali_pace": 0.465,
+        "race_pace": 0.415
       },
-      "wet_weather": {
-        "modifier": 0.01,
-        "confidence": 0.76
+      "racecraft": {
+        "skill_score": 0.415,
+        "overtaking_skill": 0.415
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 7,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "PIA": {
+      "name": "Driver PIA",
+      "pace": {
+        "quali_pace": 0.584,
+        "race_pace": 0.589
+      },
+      "racecraft": {
+        "skill_score": 0.589,
+        "overtaking_skill": 0.589
+      },
+      "experience": {
+        "years_of_experience": 2,
+        "debut_year": 2023,
+        "total_races": 70,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "SAI": {
+      "name": "Driver SAI",
+      "pace": {
+        "quali_pace": 0.716,
+        "race_pace": 0.648
+      },
+      "racecraft": {
+        "skill_score": 0.648,
+        "overtaking_skill": 0.648
+      },
+      "experience": {
+        "years_of_experience": 10,
+        "debut_year": 2015,
+        "total_races": 69,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "ZHO": {
+      "name": "Driver ZHO",
+      "pace": {
+        "quali_pace": 0.714,
+        "race_pace": 0.717
+      },
+      "racecraft": {
+        "skill_score": 0.717,
+        "overtaking_skill": 0.717
+      },
+      "experience": {
+        "years_of_experience": 3,
+        "debut_year": 2022,
+        "total_races": 46,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.022
+      }
+    },
+    "COL": {
+      "name": "Driver COL",
+      "pace": {
+        "quali_pace": 0.655,
+        "race_pace": 0.537
+      },
+      "racecraft": {
+        "skill_score": 0.537,
+        "overtaking_skill": 0.537
+      },
+      "experience": {
+        "years_of_experience": 1,
+        "debut_year": 2024,
+        "total_races": 27,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "TSU": {
+      "name": "Driver TSU",
+      "pace": {
+        "quali_pace": 0.522,
+        "race_pace": 0.547
+      },
+      "racecraft": {
+        "skill_score": 0.547,
+        "overtaking_skill": 0.547
+      },
+      "experience": {
+        "years_of_experience": 4,
+        "debut_year": 2021,
+        "total_races": 70,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "ANT": {
+      "name": "Driver ANT",
+      "pace": {
+        "quali_pace": 0.315,
+        "race_pace": 0.265
+      },
+      "racecraft": {
+        "skill_score": 0.265,
+        "overtaking_skill": 0.265
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 24,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "BOR": {
+      "name": "Driver BOR",
+      "pace": {
+        "quali_pace": 0.708,
+        "race_pace": 0.628
+      },
+      "racecraft": {
+        "skill_score": 0.628,
+        "overtaking_skill": 0.628
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 24,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "MAG": {
+      "name": "Driver MAG",
+      "pace": {
+        "quali_pace": 0.605,
+        "race_pace": 0.516
+      },
+      "racecraft": {
+        "skill_score": 0.516,
+        "overtaking_skill": 0.516
+      },
+      "experience": {
+        "years_of_experience": 11,
+        "debut_year": 2014,
+        "total_races": 44,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.023
       }
     },
     "GAS": {
@@ -673,11 +325,250 @@
       },
       "dnf_risk": {
         "dnf_rate": 0.0
+      }
+    },
+    "SAR": {
+      "name": "Driver SAR",
+      "pace": {
+        "quali_pace": 0.45,
+        "race_pace": 0.47
       },
-      "wet_weather": {
-        "modifier": 0.01,
-        "confidence": 0.722
+      "racecraft": {
+        "skill_score": 0.47,
+        "overtaking_skill": 0.47
+      },
+      "experience": {
+        "years_of_experience": 2,
+        "debut_year": 2023,
+        "total_races": 36,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.028
+      }
+    },
+    "RUS": {
+      "name": "Driver RUS",
+      "pace": {
+        "quali_pace": 0.795,
+        "race_pace": 0.82
+      },
+      "racecraft": {
+        "skill_score": 0.82,
+        "overtaking_skill": 0.82
+      },
+      "experience": {
+        "years_of_experience": 6,
+        "debut_year": 2019,
+        "total_races": 70,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "ALB": {
+      "name": "Driver ALB",
+      "pace": {
+        "quali_pace": 0.765,
+        "race_pace": 0.75
+      },
+      "racecraft": {
+        "skill_score": 0.75,
+        "overtaking_skill": 0.75
+      },
+      "experience": {
+        "years_of_experience": 6,
+        "debut_year": 2019,
+        "total_races": 70,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "RIC": {
+      "name": "Driver RIC",
+      "pace": {
+        "quali_pace": 0.656,
+        "race_pace": 0.569
+      },
+      "racecraft": {
+        "skill_score": 0.569,
+        "overtaking_skill": 0.569
+      },
+      "experience": {
+        "years_of_experience": 14,
+        "debut_year": 2011,
+        "total_races": 25,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "LAW": {
+      "name": "Driver LAW",
+      "pace": {
+        "quali_pace": 0.643,
+        "race_pace": 0.622
+      },
+      "racecraft": {
+        "skill_score": 0.622,
+        "overtaking_skill": 0.622
+      },
+      "experience": {
+        "years_of_experience": 3,
+        "debut_year": 2022,
+        "total_races": 35,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "PER": {
+      "name": "Driver PER",
+      "pace": {
+        "quali_pace": 0.467,
+        "race_pace": 0.417
+      },
+      "racecraft": {
+        "skill_score": 0.417,
+        "overtaking_skill": 0.417
+      },
+      "experience": {
+        "years_of_experience": 14,
+        "debut_year": 2011,
+        "total_races": 46,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.022
+      }
+    },
+    "BOT": {
+      "name": "Driver BOT",
+      "pace": {
+        "quali_pace": 0.637,
+        "race_pace": 0.546
+      },
+      "racecraft": {
+        "skill_score": 0.546,
+        "overtaking_skill": 0.546
+      },
+      "experience": {
+        "years_of_experience": 12,
+        "debut_year": 2013,
+        "total_races": 46,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "BEA": {
+      "name": "Driver BEA",
+      "pace": {
+        "quali_pace": 0.585,
+        "race_pace": 0.532
+      },
+      "racecraft": {
+        "skill_score": 0.532,
+        "overtaking_skill": 0.532
+      },
+      "experience": {
+        "years_of_experience": 1,
+        "debut_year": 2024,
+        "total_races": 27,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "HAD": {
+      "name": "Driver HAD",
+      "pace": {
+        "quali_pace": 0.705,
+        "race_pace": 0.67
+      },
+      "racecraft": {
+        "skill_score": 0.67,
+        "overtaking_skill": 0.67
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 24,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "HUL": {
+      "name": "Driver HUL",
+      "pace": {
+        "quali_pace": 0.671,
+        "race_pace": 0.702
+      },
+      "racecraft": {
+        "skill_score": 0.702,
+        "overtaking_skill": 0.702
+      },
+      "experience": {
+        "years_of_experience": 15,
+        "debut_year": 2010,
+        "total_races": 70,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "LEC": {
+      "name": "Driver LEC",
+      "pace": {
+        "quali_pace": 0.707,
+        "race_pace": 0.852
+      },
+      "racecraft": {
+        "skill_score": 0.852,
+        "overtaking_skill": 0.852
+      },
+      "experience": {
+        "years_of_experience": 7,
+        "debut_year": 2018,
+        "total_races": 70,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "ALO": {
+      "name": "Driver ALO",
+      "pace": {
+        "quali_pace": 0.748,
+        "race_pace": 0.758
+      },
+      "racecraft": {
+        "skill_score": 0.758,
+        "overtaking_skill": 0.758
+      },
+      "experience": {
+        "years_of_experience": 24,
+        "debut_year": 2001,
+        "total_races": 70,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
       }
     }
-  }
+  },
+  "carried_over_from": 2025,
+  "last_updated": "2026-02-27T13:27:15.730529",
+  "note": "Driver characteristics carried over from 2025. Skills persist across regulation changes."
 }
