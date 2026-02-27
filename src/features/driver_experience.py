@@ -9,7 +9,6 @@ Detects first F1 season, calculates experience, and assigns tiers:
 """
 
 import csv
-import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -235,63 +234,3 @@ def analyze_experience_distribution(enriched_data: dict) -> dict:
             "low": sum(1 for d in enriched_data["drivers"].values() if d["confidence"] == "low"),
         },
     }
-
-
-if __name__ == "__main__":
-    # Test with the extracted data
-    import sys
-
-    quali_path = Path("../data/processed/driver_characteristics/driver_quali_characteristics.json")
-    race_path = Path("../data/processed/driver_characteristics/driver_race_characteristics.json")
-    debuts_csv = Path("../data/driver_debuts.csv")
-
-    if not quali_path.exists() or not race_path.exists():
-        logger.error("Driver characteristics files not found")
-        sys.exit(1)
-
-    with open(quali_path) as f:
-        quali_data = json.load(f)
-
-    with open(race_path) as f:
-        race_data = json.load(f)
-
-    # Enrich data (with CSV if available)
-    debuts_csv_str = str(debuts_csv) if debuts_csv.exists() else None
-    enriched = enrich_driver_characteristics(
-        quali_data, race_data, current_year=2025, debuts_csv_path=debuts_csv_str
-    )
-
-    # Analyze distribution
-    analysis = analyze_experience_distribution(enriched)
-
-    logger.info("=== EXPERIENCE TIER DISTRIBUTION ===")
-    for tier, data in analysis["by_tier"].items():
-        logger.info("%s: %s drivers", tier.upper(), data["count"])
-        logger.info("  %s", ", ".join(data["drivers"]))
-
-    logger.info("=== CONFIDENCE DISTRIBUTION ===")
-    for conf, count in analysis["confidence_distribution"].items():
-        logger.info("%s: %s drivers", conf, count)
-
-    logger.info("=== GATHERING INFO FLAGS (Unusual Patterns) ===")
-    for driver_abbr, driver in enriched["drivers"].items():
-        if driver["confidence"] == "gathering_info":
-            logger.info("%s:", driver_abbr)
-            logger.info("  Tier: %s", driver["experience"]["tier"])
-            if driver["pace_delta"] is not None:
-                logger.info("  Pace delta: %.4f", driver["pace_delta"])
-            else:
-                logger.info("  No race data")
-            logger.info("  Teams: %s", ", ".join(driver["teams"]))
-            logger.info("  Quali std: %.4f", driver["quali_std"])
-
-    # Save enriched data
-    output_path = Path(
-        "../data/processed/driver_characteristics/driver_characteristics_enriched.json"
-    )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(output_path, "w") as f:
-        json.dump(enriched, f, indent=2)
-
-    logger.info("Saved enriched data to %s", output_path)

@@ -7,7 +7,6 @@ Monaco is processional (low overtakes), Bahrain/Monza have high overtakes.
 
 import json
 import logging
-from pathlib import Path
 
 import fastf1 as ff1
 import numpy as np
@@ -215,28 +214,3 @@ def add_overtaking_to_tracks(track_characteristics_path, overtaking_data, output
 
     logger.info("Updated overtaking data for %s tracks", len(data["tracks"]))
     logger.info("Saved overtaking data to %s", output_path)
-
-
-if __name__ == "__main__":
-    # Extract overtaking data
-    overtaking_data = calculate_overtaking_likelihood(years=[2024, 2025])
-
-    # Show results
-    logger.info("Overtaking likelihood by track:")
-
-    sorted_tracks = sorted(overtaking_data.items(), key=lambda x: x[1]["avg_changes_per_lap"])
-
-    for track, data in sorted_tracks:
-        difficulty, score = classify_overtaking_difficulty(data["avg_changes_per_lap"])
-        logger.info(
-            "%s %.1f changes/lap (%s, %.1f)",
-            track,
-            data["avg_changes_per_lap"],
-            difficulty,
-            score,
-        )
-
-    # Add to track characteristics
-    track_file = Path("../data/processed/track_characteristics/2025_track_characteristics.json")
-    if track_file.exists():
-        add_overtaking_to_tracks(track_file, overtaking_data)

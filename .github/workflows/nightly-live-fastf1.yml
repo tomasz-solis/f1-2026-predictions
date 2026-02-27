@@ -1,0 +1,33 @@
+name: Nightly Live FastF1
+
+on:
+  schedule:
+    - cron: "30 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  live-fastf1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      FASTF1_LIVE_TESTS: "1"
+      USE_DB_STORAGE: "file_only"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-mock
+
+      - name: Run live FastF1 integration tests
+        run: |
+          pytest tests/test_fastf1_live_refresh.py -v -m "live_fastf1"

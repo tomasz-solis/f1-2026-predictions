@@ -359,7 +359,3 @@ class TestEdgeCases:
         }
         # Should not raise
         validate_driver_characteristics(data)
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

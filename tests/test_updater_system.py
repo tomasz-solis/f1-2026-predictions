@@ -402,7 +402,3 @@ class TestUpdaterEdgeCases:
         assert kwargs["observations"] == {"VER": 1, "NOR": 2}
         assert kwargs["session_name"] == "Bahrain Grand Prix"
         assert kwargs["confidence"] == 1.0
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

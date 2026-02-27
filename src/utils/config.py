@@ -122,39 +122,3 @@ def get_best_method(weekend_type: Literal["sprint", "conventional"]) -> dict:
     """Get best method for the given weekend type."""
     config = load_production_config()
     return config.get_qualifying_strategy(weekend_type)
-
-
-# Example usage
-if __name__ == "__main__":
-    config = load_production_config()
-
-    logger.info(str(config))
-
-    logger.info("=" * 70)
-    logger.info("EXAMPLES")
-    logger.info("=" * 70)
-
-    # Sprint weekend
-    sprint_strategy = config.get_qualifying_strategy("sprint")
-    logger.info("Sprint weekend strategy:")
-    logger.info(f"  Method: {sprint_strategy['method']}")
-    logger.info(f"  Session: {sprint_strategy['session']}")
-    logger.info(f"  Expected MAE: {sprint_strategy['expected_mae']:.2f}")
-
-    # Conventional weekend
-    conv_strategy = config.get_qualifying_strategy("conventional")
-    logger.info("Conventional weekend strategy:")
-    logger.info(f"  Method: {conv_strategy['method']}")
-    logger.info(f"  Blend weight: {conv_strategy['blend_weight']}")
-    logger.info(f"  Expected MAE: {conv_strategy['expected_mae']:.2f}")
-
-    # Expected MAEs
-    logger.info("Expected MAEs:")
-    logger.info(
-        f"  Sprint quali: {config.get_expected_mae('qualifying', weekend_type='sprint'):.2f}"
-    )
-    logger.info(
-        f"  Conv quali: {config.get_expected_mae('qualifying', weekend_type='conventional'):.2f}"
-    )
-    logger.info(f"  Overall quali: {config.get_expected_mae('qualifying'):.2f}")
-    logger.info(f"  Race: {config.get_expected_mae('race'):.2f}")

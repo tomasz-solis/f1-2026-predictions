@@ -1,7 +1,6 @@
 """
 
-Originally from: https://github.com/tomasz-solis/formula1
-Adapted for 2026 Bayesian prediction system.
+Adapted from earlier internal team-mapping utilities for the 2026 prediction system.
 
 ==============================================================================
 
@@ -22,8 +21,6 @@ Example:
     'RB'
     >>> df = normalize_team_column(df, col='team')
 
-Author: Tomasz Solis
-Date: November 2025
 """
 
 import logging

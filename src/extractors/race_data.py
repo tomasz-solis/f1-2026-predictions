@@ -141,30 +141,3 @@ def get_dnf_races(driver_races):
 def get_clean_races(driver_races):
     """Get finished races (not DNF). Returns races where dnf=False."""
     return [race for race in driver_races if not race.get("dnf", race.get("dn", False))]
-
-
-if __name__ == "__main__":
-    """Test the extraction."""
-    import sys
-
-    ff1.Cache.enable_cache("../data/raw/.fastf1_cache")
-
-    year = int(sys.argv[1]) if len(sys.argv) > 1 else 2025
-
-    # Test extraction
-    driver_data = extract_season(year)
-
-    # Show summary
-    logger.info("SUMMARY:")
-    logger.info("%s", "=" * 70)
-
-    for driver in sorted(driver_data.keys())[:5]:
-        races = driver_data[driver]
-        total_dnfs = count_total_dnfs(races)
-        valid_races = get_valid_races(races)
-
-        logger.info("%s:", driver)
-        logger.info("  Total races: %s", len(races))
-        logger.info("  Valid races (with quali): %s", len(valid_races))
-        logger.info("  Total DNFs: %s", total_dnfs)
-        logger.info("  Missing quali: %s", len(races) - len(valid_races))

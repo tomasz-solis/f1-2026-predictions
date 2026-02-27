@@ -31,3 +31,12 @@ jobs:
       - name: Check formatting (ruff-format)
         run: |
           ruff format --check src tests scripts app.py predict_weekend.py
+
+      - name: Install mypy dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install mypy types-PyYAML
+
+      - name: Run mypy (dashboard/utils)
+        run: |
+          mypy src/dashboard src/utils

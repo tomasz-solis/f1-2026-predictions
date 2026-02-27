@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import fastf1
-import yaml  # type: ignore[import-untyped]
+import yaml  # type: ignore[import-untyped,unused-ignore]
 
 from src.utils.actual_results_fetcher import fetch_actual_session_results
 from src.utils.prediction_metrics import PredictionMetrics
