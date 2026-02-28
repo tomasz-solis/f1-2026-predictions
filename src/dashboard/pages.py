@@ -435,7 +435,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                 retried_events = practice_update.get("retried_events", [])
                 if retried_events:
                     st.warning(
-                        "Practice backlog updates deferred due active processing lock: "
+                        "Practice backlog updates deferred due to active processing lock: "
                         f"{', '.join(str(event) for event in retried_events)}"
                     )
 
