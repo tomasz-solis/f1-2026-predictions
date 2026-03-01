@@ -1,7 +1,7 @@
 """Lap-by-lap race simulation engine with tire degradation and pit stops."""
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -77,7 +77,7 @@ def _expand_overtake_cfg(compact: dict) -> dict:
         "pass_threshold_track_scale": tf * c["pass_threshold_track_ratio"],
         "pass_probability_base": pcb,
         "pass_probability_scale": c["pass_probability_sensitivity"],
-        "pass_time_bonus_range": list(c["pass_time_bonus_range"]),
+        "pass_time_bonus_range": list(cast(list[float], c["pass_time_bonus_range"])),
         # Forward any zone-level overrides the caller may have set.
         **{k: v for k, v in compact.items() if k.startswith("zone_")},
     }
