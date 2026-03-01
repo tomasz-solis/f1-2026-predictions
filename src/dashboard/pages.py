@@ -145,7 +145,7 @@ def _clear_fastf1_race_cache(year: int, race_name: str) -> None:
 
 
 def _normalize_cache_fragment(value: str) -> str:
-    """Normalize cache path fragments for robust race-name matching."""
+    """Normalize cache path fragments for case-insensitive race-name matching."""
     normalized = unicodedata.normalize("NFKD", str(value))
     folded = normalized.encode("ascii", "ignore").decode("ascii")
     return "".join(ch.lower() for ch in folded if ch.isalnum())

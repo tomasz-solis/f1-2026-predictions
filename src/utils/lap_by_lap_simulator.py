@@ -156,6 +156,7 @@ def simulate_race_lap_by_lap(
                 laps_on_tire=laps_on_tire,
                 fuel_load_kg=fuel_load,
                 initial_fuel_kg=race_params["fuel"]["initial_load_kg"],
+                compound=compound,
             )
 
             # 5. Apply fresh tire advantage (negative delta = faster)

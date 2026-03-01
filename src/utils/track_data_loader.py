@@ -129,7 +129,7 @@ def _resolve_pirelli_path(year: int) -> Path | None:
 
 
 def _normalize_overtaking_difficulty(race_name: str, raw_value: object) -> float | None:
-    """Normalize overtaking difficulty to a robust 0..1 scale."""
+    """Normalize overtaking difficulty to a bounded 0..1 scale."""
     if raw_value is None:
         return None
     if not isinstance(raw_value, (int | float | str)):

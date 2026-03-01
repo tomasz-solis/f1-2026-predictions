@@ -37,36 +37,13 @@ def _resolve_experience_tier_from_years(years_experience: int) -> str:
 
 
 def resolve_effective_experience_tier_for_race(driver_data: dict, current_year: int) -> str:
-    """Resolve experience tier for the current prediction year."""
-    experience = driver_data.get("experience", {}) if isinstance(driver_data, dict) else {}
-    stored_tier = str(experience.get("tier", "unknown"))
-    if stored_tier == "sophomore":
-        stored_tier = "second_year"
+    """Resolve experience tier for the current prediction year.
 
-    stored_years = experience.get("years_of_experience", 0)
-    debut_year = experience.get("debut_year")
+    Delegates to the canonical qualifying-side implementation to avoid duplication.
+    """
+    from src.predictors.baseline.qualifying_preparation import resolve_effective_experience_tier
 
-    try:
-        effective_years = int(stored_years)
-    except (TypeError, ValueError):
-        effective_years = None
-
-    try:
-        debut_year_int = int(debut_year) if debut_year is not None else None
-    except (TypeError, ValueError):
-        debut_year_int = None
-
-    if debut_year_int is not None and current_year >= debut_year_int:
-        computed_years = current_year - debut_year_int
-        if effective_years is None:
-            effective_years = computed_years
-        else:
-            effective_years = max(effective_years, computed_years)
-
-    if effective_years is None:
-        return stored_tier
-
-    return _resolve_experience_tier_from_years(effective_years)
+    return resolve_effective_experience_tier(driver_data, current_year)
 
 
 def infer_missing_driver_experience_tier(

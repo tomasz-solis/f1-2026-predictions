@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_name(value: str) -> str:
-    """Normalize names for robust matching."""
+    """Normalize names for fuzzy matching."""
     return "".join(char for char in value.lower() if char.isalnum())
 
 

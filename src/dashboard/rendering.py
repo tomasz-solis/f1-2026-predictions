@@ -150,7 +150,7 @@ def _style_race_table(df_display: pd.DataFrame):
 
     try:
         styled_df = styled_df.hide(axis="index")
-    except Exception:
+    except (AttributeError, TypeError):
         pass
 
     return styled_df

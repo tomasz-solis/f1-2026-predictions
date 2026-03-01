@@ -15,7 +15,7 @@ class RelativePerformanceCalculator:
 
     def __init__(self, use_median=True):
         """
-        use_median: If True, normalize to median (robust to outliers).
+        use_median: If True, normalize to median (resistant to outliers).
                    If False, normalize to mean.
         """
         self.use_median = use_median

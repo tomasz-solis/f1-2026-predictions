@@ -69,7 +69,7 @@ def extract_fp_order_from_laps(year, race_name, session_type):
                         driver_best_times.append(best_time.total_seconds())
 
                 if driver_best_times:
-                    # Use median of team's drivers (robust to one having issues)
+                    # Median avoids single-driver outliers
                     team_times[team] = np.median(driver_best_times)
 
             if len(team_times) < 5:  # Need at least 5 teams
@@ -78,6 +78,13 @@ def extract_fp_order_from_laps(year, race_name, session_type):
             # Convert to ranks (1 = fastest time)
             sorted_teams = sorted(team_times.items(), key=lambda x: x[1])
             team_ranks = {team: rank for rank, (team, _) in enumerate(sorted_teams, 1)}
+
+            from src.extractors.validation import log_validation_warnings, validate_fp_team_order
+
+            warnings = validate_fp_team_order(
+                team_ranks, context=f"{session_type} {year} {race_name}"
+            )
+            log_validation_warnings(warnings)
 
             return team_ranks
 

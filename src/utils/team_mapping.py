@@ -155,7 +155,7 @@ def normalize_team_column(df: pd.DataFrame | pd.Series, col: str = "team") -> pd
 
 
 def _normalize_name(value: str) -> str:
-    """Normalize names for robust matching."""
+    """Normalize names for case-insensitive matching."""
     return "".join(char for char in str(value).lower() if char.isalnum())
 
 

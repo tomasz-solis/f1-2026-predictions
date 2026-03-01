@@ -180,7 +180,7 @@ _TESTING_CHARACTERISTIC_METRICS = (
 
 
 def _normalize_name(value: str) -> str:
-    """Normalize names for robust matching."""
+    """Normalize names for fuzzy matching."""
     return _normalize_name_impl(value)
 
 

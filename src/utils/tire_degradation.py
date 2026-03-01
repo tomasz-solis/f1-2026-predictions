@@ -8,11 +8,12 @@ def calculate_tire_deg_delta(
     laps_on_tire: int,
     fuel_load_kg: float,
     initial_fuel_kg: float | None = None,
+    compound: str | None = None,
 ) -> float:
     """Calculate lap time penalty from tire wear.
 
-    Degradation increases linearly with tire age, and is affected by fuel load.
-    Heavier cars degrade tires faster.
+    Degradation increases linearly with tire age up to compound max age,
+    then accelerates sharply (cliff). Fuel load also increases wear.
     """
     if tire_deg_slope <= 0.0 or laps_on_tire <= 0:
         return 0.0
@@ -27,6 +28,24 @@ def calculate_tire_deg_delta(
     # Multiplier: 1.0 (empty) to 1.1 (full tank)
     fuel_ratio = fuel_load_kg / initial_fuel_kg
     fuel_multiplier = 1.0 + (fuel_deg_multiplier * fuel_ratio)
+
+    # Tire cliff: beyond max age, degradation slope multiplies sharply
+    if compound is not None:
+        compound_max_ages = config_loader.get(
+            "baseline_predictor.race.tire_physics.compound_max_age",
+            {"SOFT": 24, "MEDIUM": 34, "HARD": 42},
+        )
+        cliff_multiplier = config_loader.get(
+            "baseline_predictor.race.tire_physics.cliff_multiplier", 2.8
+        )
+        max_age = compound_max_ages.get(compound.upper(), 40)
+        if laps_on_tire > max_age:
+            laps_past_cliff = laps_on_tire - max_age
+            linear_portion = tire_deg_slope * max_age * fuel_multiplier
+            cliff_portion = (
+                tire_deg_slope * cliff_multiplier * laps_past_cliff * fuel_multiplier
+            )
+            return float(max(0.0, linear_portion + cliff_portion))
 
     # Base degradation: slope × laps on tire × fuel effect
     degradation = tire_deg_slope * laps_on_tire * fuel_multiplier

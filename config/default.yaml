@@ -409,6 +409,13 @@ baseline_predictor:
       traffic_deg_penalty: 0.05        # 5% worse tire life in dirty air (P16+)
       clean_air_bonus: 0.05            # 5% better tire life for leaders (P1-P5)
 
+      # Tire cliff: beyond max age, degradation accelerates sharply
+      compound_max_age:
+        SOFT: 24                       # laps before cliff onset
+        MEDIUM: 34                     # laps before cliff onset
+        HARD: 42                       # laps before cliff onset
+      cliff_multiplier: 2.8            # deg slope multiplied by this beyond max age
+
     # Lap time modeling
     lap_time:
       reference_base: 90.0             # baseline lap time (seconds) - generic

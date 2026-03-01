@@ -1,7 +1,7 @@
 """
 Constants for F1 2026 Prediction System
 
-All magic numbers extracted to one place for maintainability.
+All magic numbers extracted to one place.
 """
 
 # DNF Risk Constants

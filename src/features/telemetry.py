@@ -178,7 +178,7 @@ class SessionFeatureAggregator:
         if len(lap_features) == 0:
             return driver_info
 
-        # Aggregate: median across all laps (robust to outliers)
+        # Aggregate: median across all laps (ignores outliers)
         df = pd.DataFrame(lap_features)
         aggregated = df.median().to_dict()
 

@@ -35,7 +35,7 @@ def extract_race_data(year, race_name):
         for _idx, row in race.results.iterrows():
             driver = row["Abbreviation"]
 
-            # Determine DNF robustly across FastF1 result schema variants.
+            # Detect DNFs across FastF1 result schema variants.
             if hasattr(row, "dnf"):
                 is_dnf = bool(row.dnf)
             else:
