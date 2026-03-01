@@ -205,6 +205,11 @@ def load_track_specific_params(race_name: str | None = None, year: int = 2026) -
                 if overtaking is not None:
                     track_params["track_overtaking"] = overtaking
 
+                # Extract lap 1 track-specific risk modifier
+                lap1_risk = track_info.get("lap1_risk_modifier")
+                if lap1_risk is not None:
+                    track_params["lap1_risk_modifier"] = float(lap1_risk)
+
             else:
                 logger.warning(
                     f"Track '{race_name}' not found in track_characteristics. "

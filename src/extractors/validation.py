@@ -14,6 +14,7 @@ _POSITION_MIN = 1
 _POSITION_MAX = 22
 _LAP_TIME_MIN_S = 55.0  # fastest ever ~1:02 (Monaco) with margin
 _LAP_TIME_MAX_S = 180.0  # slow outlier / safety car restart
+
 _MIN_TEAMS = 5
 _MAX_TEAMS = 11
 
@@ -42,7 +43,6 @@ def validate_session_positions(
             warnings.append(
                 f"{prefix}{driver}: position {pos} outside {_POSITION_MIN}-{_POSITION_MAX}"
             )
-
     return warnings
 
 
@@ -77,6 +77,7 @@ def validate_team_pace_data(
                     )
 
             degradation = data.get("degradation")
+
             if degradation is not None and isinstance(degradation, int | float):
                 if degradation < 0:
                     warnings.append(f"{prefix}{team}: negative degradation ({degradation:.3f})")

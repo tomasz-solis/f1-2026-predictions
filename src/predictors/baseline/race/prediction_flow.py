@@ -83,77 +83,18 @@ def predict_race_core(
     race_params["safety_car_trigger_lap"] = cfg.get(
         "baseline_predictor.race.safety_car_trigger_lap", 10
     )
+    # Compact 5-param overtake model (expanded to full set inside the simulator).
     race_params["overtake_model"] = {
         "dirty_air_window_s": cfg.get(
             "baseline_predictor.race.overtake_model.dirty_air_window_s", 1.8
         ),
-        "dirty_air_penalty_base": cfg.get(
-            "baseline_predictor.race.overtake_model.dirty_air_penalty_base", 0.05
+        "pace_weight": cfg.get("baseline_predictor.race.overtake_model.pace_weight", 0.55),
+        "racecraft_weight": cfg.get(
+            "baseline_predictor.race.overtake_model.racecraft_weight", 0.25
         ),
-        "dirty_air_penalty_track_scale": cfg.get(
-            "baseline_predictor.race.overtake_model.dirty_air_penalty_track_scale",
-            0.12,
-        ),
-        "pass_window_s": cfg.get("baseline_predictor.race.overtake_model.pass_window_s", 1.2),
-        "pass_threshold_base": cfg.get(
-            "baseline_predictor.race.overtake_model.pass_threshold_base", 0.06
-        ),
-        "pass_threshold_track_scale": cfg.get(
-            "baseline_predictor.race.overtake_model.pass_threshold_track_scale",
-            0.16,
-        ),
-        "pass_probability_base": cfg.get(
-            "baseline_predictor.race.overtake_model.pass_probability_base", 0.30
-        ),
-        "pass_probability_scale": cfg.get(
-            "baseline_predictor.race.overtake_model.pass_probability_scale", 0.45
-        ),
-        "pass_time_bonus_range": cfg.get(
-            "baseline_predictor.race.overtake_model.pass_time_bonus_range",
-            [0.08, 0.35],
-        ),
-        "pace_diff_scale": cfg.get("baseline_predictor.race.overtake_model.pace_diff_scale", 0.55),
-        "skill_scale": cfg.get("baseline_predictor.race.overtake_model.skill_scale", 0.25),
-        "defense_scale": cfg.get("baseline_predictor.race.overtake_model.defense_scale", 0.28),
-        "race_adv_scale": cfg.get("baseline_predictor.race.overtake_model.race_adv_scale", 0.20),
-        "track_ease_scale": cfg.get(
-            "baseline_predictor.race.overtake_model.track_ease_scale", 0.18
-        ),
-        "zone_front_threshold_boost": cfg.get(
-            "baseline_predictor.race.overtake_model.zone_front_threshold_boost", 0.22
-        ),
-        "zone_upper_threshold_boost": cfg.get(
-            "baseline_predictor.race.overtake_model.zone_upper_threshold_boost", 0.10
-        ),
-        "zone_mid_threshold_boost": cfg.get(
-            "baseline_predictor.race.overtake_model.zone_mid_threshold_boost", 0.02
-        ),
-        "zone_back_threshold_boost": cfg.get(
-            "baseline_predictor.race.overtake_model.zone_back_threshold_boost", -0.03
-        ),
-        "zone_front_probability_scale": cfg.get(
-            "baseline_predictor.race.overtake_model.zone_front_probability_scale", 0.55
-        ),
-        "zone_upper_probability_scale": cfg.get(
-            "baseline_predictor.race.overtake_model.zone_upper_probability_scale", 0.75
-        ),
-        "zone_mid_probability_scale": cfg.get(
-            "baseline_predictor.race.overtake_model.zone_mid_probability_scale", 0.92
-        ),
-        "zone_back_probability_scale": cfg.get(
-            "baseline_predictor.race.overtake_model.zone_back_probability_scale", 1.08
-        ),
-        "zone_front_bonus_scale": cfg.get(
-            "baseline_predictor.race.overtake_model.zone_front_bonus_scale", 0.55
-        ),
-        "zone_upper_bonus_scale": cfg.get(
-            "baseline_predictor.race.overtake_model.zone_upper_bonus_scale", 0.78
-        ),
-        "zone_mid_bonus_scale": cfg.get(
-            "baseline_predictor.race.overtake_model.zone_mid_bonus_scale", 0.93
-        ),
-        "zone_back_bonus_scale": cfg.get(
-            "baseline_predictor.race.overtake_model.zone_back_bonus_scale", 1.05
+        "track_factor": cfg.get("baseline_predictor.race.overtake_model.track_factor", 0.35),
+        "pass_chance_base": cfg.get(
+            "baseline_predictor.race.overtake_model.pass_chance_base", 0.30
         ),
     }
 

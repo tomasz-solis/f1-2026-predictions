@@ -8,158 +8,183 @@
       "pit_stop_loss": 27.5,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.0
     },
     "Bahrain Grand Prix": {
       "pit_stop_loss": 24.8,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.05
     },
     "Saudi Arabian Grand Prix": {
       "pit_stop_loss": 21.4,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.30
     },
     "Australian Grand Prix": {
       "pit_stop_loss": 18.2,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.15
     },
     "Azerbaijan Grand Prix": {
       "pit_stop_loss": 20.8,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent",
-      "has_sprint": true
+      "has_sprint": true,
+      "lap1_risk_modifier": 0.25
     },
     "Miami Grand Prix": {
       "pit_stop_loss": 22.5,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.10
     },
     "Monaco Grand Prix": {
       "pit_stop_loss": 24.6,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.03,
-      "type": "street"
+      "type": "street",
+      "lap1_risk_modifier": 0.40
     },
     "Spanish Grand Prix": {
       "pit_stop_loss": 22.4,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.0
     },
     "Canadian Grand Prix": {
       "pit_stop_loss": 22.5,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.15
     },
     "Austrian Grand Prix": {
       "pit_stop_loss": 21.8,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent",
-      "has_sprint": true
+      "has_sprint": true,
+      "lap1_risk_modifier": 0.05
     },
     "British Grand Prix": {
       "pit_stop_loss": 29.0,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.05
     },
     "Hungarian Grand Prix": {
       "pit_stop_loss": 21.7,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.10
     },
     "Belgian Grand Prix": {
       "pit_stop_loss": 23.3,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent",
-      "has_sprint": true
+      "has_sprint": true,
+      "lap1_risk_modifier": 0.05
     },
     "Dutch Grand Prix": {
       "pit_stop_loss": 20.0,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.10
     },
     "Italian Grand Prix": {
       "pit_stop_loss": 24.6,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.05
     },
     "Singapore Grand Prix": {
       "pit_stop_loss": 27.4,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.35
     },
     "Japanese Grand Prix": {
       "pit_stop_loss": 23.5,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.05,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.10
     },
     "Qatar Grand Prix": {
       "pit_stop_loss": 28.6,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent",
-      "has_sprint": true
+      "has_sprint": true,
+      "lap1_risk_modifier": 0.10
     },
     "United States Grand Prix": {
       "pit_stop_loss": 24.3,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent",
-      "has_sprint": true
+      "has_sprint": true,
+      "lap1_risk_modifier": 0.05
     },
     "Mexico City Grand Prix": {
       "pit_stop_loss": 22.7,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.10
     },
-    "S\u00e3o Paulo Grand Prix": {
+    "São Paulo Grand Prix": {
       "pit_stop_loss": 23.9,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent",
-      "has_sprint": true
+      "has_sprint": true,
+      "lap1_risk_modifier": 0.15
     },
     "Las Vegas Grand Prix": {
       "pit_stop_loss": 21.7,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.15
     },
     "Abu Dhabi Grand Prix": {
       "pit_stop_loss": 22.0,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.05
     },
     "Chinese Grand Prix": {
       "pit_stop_loss": 22.8,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
       "type": "permanent",
-      "has_sprint": true
+      "has_sprint": true,
+      "lap1_risk_modifier": 0.05
     },
     "Emilia Romagna Grand Prix": {
       "pit_stop_loss": 29.8,
       "safety_car_prob": 0.3,
       "overtaking_difficulty": 0.0,
-      "type": "permanent"
+      "type": "permanent",
+      "lap1_risk_modifier": 0.10
     }
   }
 }

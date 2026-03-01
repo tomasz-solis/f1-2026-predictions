@@ -533,42 +533,44 @@ def render_model_insights_page() -> None:
 def render_prediction_accuracy_page() -> None:
     st.header("Prediction Accuracy Tracker")
 
-    from src.utils.prediction_logger import PredictionLogger
     from src.utils.prediction_metrics import PredictionMetrics
 
-    logger_inst = PredictionLogger()
-    metrics_calc = PredictionMetrics()
+    from .accuracy import AccuracyPipeline
 
     selected_season = _get_selected_season()
-    all_predictions = logger_inst.get_all_predictions(selected_season)
+    pipeline = AccuracyPipeline(year=selected_season)
+    summary = pipeline.build_summary()
 
-    if not all_predictions:
+    if not pipeline.all_predictions:
         st.info(
             "No predictions saved yet. Enable 'Save Predictions for Accuracy Tracking' "
             "in the sidebar and generate predictions after practice sessions."
         )
         return
 
-    st.success(f"Found {len(all_predictions)} saved prediction(s)")
+    st.success(f"Found {summary.n_predictions} saved prediction(s)")
 
-    predictions_with_actuals = [
-        prediction
-        for prediction in all_predictions
-        if prediction.get("actuals")
-        and (prediction["actuals"].get("qualifying") or prediction["actuals"].get("race"))
-    ]
-
-    if predictions_with_actuals:
-        agg_metrics = metrics_calc.aggregate_metrics(predictions_with_actuals)
+    if pipeline.has_actuals:
+        agg_metrics: dict = {}
+        if summary.qualifying_aggregate:
+            agg_metrics["qualifying"] = summary.qualifying_aggregate
+        if summary.race_aggregate:
+            agg_metrics["race"] = summary.race_aggregate
         render_overall_accuracy_metrics(agg_metrics)
-        render_per_race_breakdown(predictions_with_actuals, metrics_calc)
+
+        predictions_with_actuals = [
+            p
+            for p in pipeline.all_predictions
+            if p.get("actuals") and (p["actuals"].get("qualifying") or p["actuals"].get("race"))
+        ]
+        render_per_race_breakdown(predictions_with_actuals, PredictionMetrics())
     else:
         st.info(
             "Predictions saved, but no actual results added yet. After each race, "
             "you can update predictions with actual results to calculate accuracy."
         )
 
-    render_saved_predictions_summary(all_predictions)
+    render_saved_predictions_summary(pipeline.all_predictions)
 
 
 def render_contact_page() -> None:

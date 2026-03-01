@@ -1,7 +1,15 @@
-"""Performance scoring methods for driver ranking."""
+"""Performance scoring methods for driver ranking (vectorized)."""
 
 import numpy as np
 import pandas as pd
+
+_SCORING_FEATURES = {
+    "slow_corner": "slow_corner_speed",
+    "medium_corner": "medium_corner_speed",
+    "high_corner": "high_corner_speed",
+    "straight": "avg_speed_full_throttle",
+    "throttle_usage": "pct_full_throttle",
+}
 
 
 class PerformanceScoringMethod:
@@ -25,143 +33,68 @@ class PerformanceScoringMethod:
 
 
 class AbsoluteDifferenceScoring(PerformanceScoringMethod):
-    """Score = (value - median) in actual units."""
+    """Score = (value - median) in actual units.  Vectorized."""
 
     def score_drivers(self, testing_features: pd.DataFrame) -> pd.DataFrame:
-        scores = []
-
-        features = {
-            "slow_corner": "slow_corner_speed",
-            "medium_corner": "medium_corner_speed",
-            "high_corner": "high_corner_speed",
-            "straight": "avg_speed_full_throttle",
-            "throttle_usage": "pct_full_throttle",
-        }
-
-        for _idx, row in testing_features.iterrows():
-            driver = row["driver_number"]
-
-            score = {"driver_number": driver}
-
-            for metric_name, feature_col in features.items():
-                if feature_col in testing_features.columns and pd.notna(row[feature_col]):
-                    median_val = testing_features[feature_col].median()
-                    score[f"{metric_name}_score"] = row[feature_col] - median_val
-                else:
-                    score[f"{metric_name}_score"] = np.nan
-
-            scores.append(score)
-
-        return pd.DataFrame(scores)
+        result = testing_features[["driver_number"]].copy()
+        for metric_name, col in _SCORING_FEATURES.items():
+            if col in testing_features.columns:
+                result[f"{metric_name}_score"] = (
+                    testing_features[col] - testing_features[col].median()
+                )
+            else:
+                result[f"{metric_name}_score"] = np.nan
+        return result
 
 
 class RankingScoring(PerformanceScoringMethod):
-    """Score = rank (1 = best, 20 = worst)."""
+    """Score = rank (1 = best, 20 = worst).  Vectorized."""
 
     def score_drivers(self, testing_features: pd.DataFrame) -> pd.DataFrame:
-        scores = []
-
-        features = {
-            "slow_corner": "slow_corner_speed",
-            "medium_corner": "medium_corner_speed",
-            "high_corner": "high_corner_speed",
-            "straight": "avg_speed_full_throttle",
-            "throttle_usage": "pct_full_throttle",
-        }
-
-        for _idx, row in testing_features.iterrows():
-            driver = row["driver_number"]
-
-            score = {"driver_number": driver}
-
-            for metric_name, feature_col in features.items():
-                if feature_col in testing_features.columns:
-                    # Rank (ascending=False: highest value = rank 1)
-                    rank = testing_features[feature_col].rank(
-                        ascending=False, method="min", na_option="keep"
-                    )
-                    score[f"{metric_name}_score"] = rank.loc[_idx]
-                else:
-                    score[f"{metric_name}_score"] = np.nan
-
-            scores.append(score)
-
-        return pd.DataFrame(scores)
+        result = testing_features[["driver_number"]].copy()
+        for metric_name, col in _SCORING_FEATURES.items():
+            if col in testing_features.columns:
+                result[f"{metric_name}_score"] = testing_features[col].rank(
+                    ascending=False, method="min", na_option="keep"
+                )
+            else:
+                result[f"{metric_name}_score"] = np.nan
+        return result
 
 
 class QuantileScoring(PerformanceScoringMethod):
-    """Score = quantile tier (3 = top 25%, 2 = middle 50%, 1 = bottom 25%)."""
+    """Score = quantile tier (3 = top 25%, 2 = middle 50%, 1 = bottom 25%).  Vectorized."""
 
     def score_drivers(self, testing_features: pd.DataFrame) -> pd.DataFrame:
-        scores = []
-
-        features = {
-            "slow_corner": "slow_corner_speed",
-            "medium_corner": "medium_corner_speed",
-            "high_corner": "high_corner_speed",
-            "straight": "avg_speed_full_throttle",
-            "throttle_usage": "pct_full_throttle",
-        }
-
-        for _idx, row in testing_features.iterrows():
-            driver = row["driver_number"]
-
-            score = {"driver_number": driver}
-
-            for metric_name, feature_col in features.items():
-                if feature_col in testing_features.columns and pd.notna(row[feature_col]):
-                    val = row[feature_col]
-                    q75 = testing_features[feature_col].quantile(0.75)
-                    q25 = testing_features[feature_col].quantile(0.25)
-
-                    if val >= q75:
-                        tier = 3  # Top 25%
-                    elif val >= q25:
-                        tier = 2  # Middle 50%
-                    else:
-                        tier = 1  # Bottom 25%
-
-                    score[f"{metric_name}_score"] = tier
-                else:
-                    score[f"{metric_name}_score"] = np.nan
-
-            scores.append(score)
-
-        return pd.DataFrame(scores)
+        result = testing_features[["driver_number"]].copy()
+        for metric_name, col in _SCORING_FEATURES.items():
+            if col in testing_features.columns:
+                series = testing_features[col]
+                q75 = series.quantile(0.75)
+                q25 = series.quantile(0.25)
+                result[f"{metric_name}_score"] = np.where(
+                    series.isna(),
+                    np.nan,
+                    np.where(series >= q75, 3, np.where(series >= q25, 2, 1)),
+                )
+            else:
+                result[f"{metric_name}_score"] = np.nan
+        return result
 
 
 class ZScoreScoring(PerformanceScoringMethod):
-    """Score = standardized z-score."""
+    """Score = standardized z-score.  Vectorized."""
 
     def score_drivers(self, testing_features: pd.DataFrame) -> pd.DataFrame:
-        scores = []
-
-        features = {
-            "slow_corner": "slow_corner_speed",
-            "medium_corner": "medium_corner_speed",
-            "high_corner": "high_corner_speed",
-            "straight": "avg_speed_full_throttle",
-            "throttle_usage": "pct_full_throttle",
-        }
-
-        for _idx, row in testing_features.iterrows():
-            driver = row["driver_number"]
-
-            score = {"driver_number": driver}
-
-            for metric_name, feature_col in features.items():
-                if feature_col in testing_features.columns and pd.notna(row[feature_col]):
-                    mean_val = testing_features[feature_col].mean()
-                    std_val = testing_features[feature_col].std()
-
-                    if std_val > 0:
-                        z_score = (row[feature_col] - mean_val) / std_val
-                        score[f"{metric_name}_score"] = z_score
-                    else:
-                        score[f"{metric_name}_score"] = 0
+        result = testing_features[["driver_number"]].copy()
+        for metric_name, col in _SCORING_FEATURES.items():
+            if col in testing_features.columns:
+                mean_val = testing_features[col].mean()
+                std_val = testing_features[col].std()
+                if std_val > 0:
+                    result[f"{metric_name}_score"] = (testing_features[col] - mean_val) / std_val
                 else:
-                    score[f"{metric_name}_score"] = np.nan
-
-            scores.append(score)
-
-        return pd.DataFrame(scores)
+                    result[f"{metric_name}_score"] = 0.0
+            else:
+                result[f"{metric_name}_score"] = np.nan
+        return result

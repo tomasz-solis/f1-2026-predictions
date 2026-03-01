@@ -165,26 +165,25 @@ def _render_race_result(df: pd.DataFrame) -> None:
         lambda x: "High" if x > 20 else "Medium" if x >= 10 else "Low"
     )
 
-    df_display = df[
-        [
-            "position",
-            "driver",
-            "team",
-            "confidence",
-            "podium_probability",
-            "dnf_probability",
-            "dnf_risk",
-        ]
-    ].copy()
-    df_display.columns = [
-        "Pos",
-        "Driver",
-        "Team",
-        "Confidence %",
-        "Podium %",
-        "DNF Risk %",
-        "Status",
+    # Build p5–p95 confidence interval string when columns are present.
+    has_ci = "p5" in df.columns and "p95" in df.columns
+    if has_ci:
+        df["ci_range"] = df.apply(lambda r: f"P{int(r['p5'])}–P{int(r['p95'])}", axis=1)
+
+    display_cols = [
+        "position",
+        "driver",
+        "team",
     ]
+    display_names = ["Pos", "Driver", "Team"]
+    if has_ci:
+        display_cols.append("ci_range")
+        display_names.append("p5–p95")
+    display_cols += ["confidence", "podium_probability", "dnf_probability", "dnf_risk"]
+    display_names += ["Confidence %", "Podium %", "DNF Risk %", "Status"]
+
+    df_display = df[display_cols].copy()
+    df_display.columns = display_names
 
     styled_df = _style_race_table(df_display)
 

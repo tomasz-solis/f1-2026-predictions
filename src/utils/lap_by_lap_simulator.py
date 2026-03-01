@@ -19,6 +19,69 @@ from src.utils.traffic_model import (
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Internal constants derived from the 5 exposed overtake-model parameters.
+# These ratios preserve the default behaviour while letting callers tune only
+# dirty_air_window_s, pace_weight, racecraft_weight, track_factor, and
+# pass_chance_base.
+# ---------------------------------------------------------------------------
+_OVERTAKE_INTERNAL = {
+    "pass_window_ratio": 0.67,
+    "dirty_air_penalty_base": 0.05,
+    "defense_ratio": 1.12,
+    "race_adv_ratio": 0.80,
+    "track_ease_ratio": 0.51,
+    "dirty_air_track_ratio": 0.34,
+    "pass_threshold_base": 0.06,
+    "pass_threshold_track_ratio": 0.46,
+    "pass_probability_sensitivity": 0.45,
+    "pass_time_bonus_range": [0.08, 0.35],
+}
+
+
+def _expand_overtake_cfg(compact: dict) -> dict:
+    """Expand 5 user-facing overtake params into the full internal set.
+
+    The 5 exposed params and their defaults:
+        dirty_air_window_s  (1.8)  – DRS/slipstream proximity window
+        pace_weight         (0.55) – importance of raw pace delta
+        racecraft_weight    (0.25) – combined attacker/defender skill weight
+        track_factor        (0.35) – track influence on passing difficulty
+        pass_chance_base    (0.30) – base pass probability when threshold met
+
+    If callers still supply the old 11+ granular keys they are used directly
+    for backward compatibility.
+    """
+    # If the legacy granular keys are present, pass through unchanged.
+    if "pace_diff_scale" in compact or "skill_scale" in compact:
+        return dict(compact)
+
+    daw = compact.get("dirty_air_window_s", 1.8)
+    pw = compact.get("pace_weight", 0.55)
+    rw = compact.get("racecraft_weight", 0.25)
+    tf = compact.get("track_factor", 0.35)
+    pcb = compact.get("pass_chance_base", 0.30)
+
+    c = _OVERTAKE_INTERNAL
+    return {
+        "dirty_air_window_s": daw,
+        "dirty_air_penalty_base": c["dirty_air_penalty_base"],
+        "dirty_air_penalty_track_scale": tf * c["dirty_air_track_ratio"],
+        "pass_window_s": daw * c["pass_window_ratio"],
+        "pace_diff_scale": pw,
+        "skill_scale": rw,
+        "defense_scale": rw * c["defense_ratio"],
+        "race_adv_scale": rw * c["race_adv_ratio"],
+        "track_ease_scale": tf * c["track_ease_ratio"],
+        "pass_threshold_base": c["pass_threshold_base"],
+        "pass_threshold_track_scale": tf * c["pass_threshold_track_ratio"],
+        "pass_probability_base": pcb,
+        "pass_probability_scale": c["pass_probability_sensitivity"],
+        "pass_time_bonus_range": list(c["pass_time_bonus_range"]),
+        # Forward any zone-level overrides the caller may have set.
+        **{k: v for k, v in compact.items() if k.startswith("zone_")},
+    }
+
 
 def simulate_race_lap_by_lap(
     driver_info_map: dict[str, dict[str, Any]],
@@ -35,6 +98,10 @@ def simulate_race_lap_by_lap(
         - dnf_drivers: List[str] (drivers who did not finish)
         - strategies_used: Dict[str, Dict] (strategy per driver)
     """
+    # Expand compact overtake config once before the lap loop.
+    race_params = dict(race_params)
+    race_params["overtake_model"] = _expand_overtake_cfg(race_params.get("overtake_model", {}))
+
     # Initialize driver states
     start_grid_gap_seconds = race_params.get("start_grid_gap_seconds", 0.32)
     safety_car_trigger_lap = race_params.get("safety_car_trigger_lap", 10)
@@ -174,7 +241,7 @@ def simulate_race_lap_by_lap(
             # 7. Apply chaos factors
             chaos = 0.0
 
-            # Lap 1 chaos (incidents, battles)
+            # Lap 1 chaos (incidents, battles) — with track-specific risk modifier
             if lap_num == 1:
                 chaos += _get_lap1_chaos(state["position"], race_params, rng)
 
@@ -393,7 +460,7 @@ def _get_overtake_zone_adjustments(
 
 
 def _get_lap1_chaos(position: int, race_params: dict, rng: np.random.Generator) -> float:
-    """Calculate lap 1 chaos based on grid position."""
+    """Calculate lap 1 chaos based on grid position and track-specific risk."""
     lap1_config = race_params.get("lap1_chaos", {})
 
     if position <= 3:
@@ -404,6 +471,10 @@ def _get_lap1_chaos(position: int, race_params: dict, rng: np.random.Generator) 
         std = lap1_config.get("midfield", 0.38)
     else:
         std = lap1_config.get("back_field", 0.28)
+
+    # Track-specific lap-1 risk modifier (street circuits, narrow tracks, etc.)
+    lap1_risk_modifier = race_params.get("lap1_risk_modifier", 0.0)
+    std *= 1.0 + lap1_risk_modifier
 
     return rng.normal(0, std)
 
