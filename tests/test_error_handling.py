@@ -3,15 +3,15 @@
 import numpy as np
 import pytest
 
+from src.extractors.validation import (
+    validate_fp_team_order,
+    validate_session_positions,
+    validate_team_pace_data,
+)
 from src.utils.lap_by_lap_simulator import simulate_race_lap_by_lap
 from src.utils.tire_degradation import (
     calculate_tire_deg_delta,
     get_fresh_tire_advantage,
-)
-from src.extractors.validation import (
-    validate_session_positions,
-    validate_team_pace_data,
-    validate_fp_team_order,
 )
 
 

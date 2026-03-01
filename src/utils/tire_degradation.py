@@ -42,9 +42,7 @@ def calculate_tire_deg_delta(
         if laps_on_tire > max_age:
             laps_past_cliff = laps_on_tire - max_age
             linear_portion = tire_deg_slope * max_age * fuel_multiplier
-            cliff_portion = (
-                tire_deg_slope * cliff_multiplier * laps_past_cliff * fuel_multiplier
-            )
+            cliff_portion = tire_deg_slope * cliff_multiplier * laps_past_cliff * fuel_multiplier
             return float(max(0.0, linear_portion + cliff_portion))
 
     # Base degradation: slope × laps on tire × fuel effect

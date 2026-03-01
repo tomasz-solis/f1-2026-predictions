@@ -1,7 +1,6 @@
 """Tests for safety car behavior in the lap-by-lap simulator."""
 
 import numpy as np
-import pytest
 
 from src.utils.lap_by_lap_simulator import simulate_race_lap_by_lap
 

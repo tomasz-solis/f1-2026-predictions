@@ -111,7 +111,9 @@ class TestBaseline2026Integration:
                 if entry["driver"] == driver
             )
         ]
-        assert all(pos >= 13 for pos in cadillac_positions), "Cadillac drivers should be bottom half"
+        assert all(pos >= 13 for pos in cadillac_positions), (
+            "Cadillac drivers should be bottom half"
+        )
 
     def test_sprint_weekend_detection(self, predictor):
         """Test that sprint weekends have slightly higher variance"""

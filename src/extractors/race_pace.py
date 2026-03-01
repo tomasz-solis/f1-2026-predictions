@@ -70,9 +70,7 @@ def extract_fp2_pace(year: int, race_name: str, verbose: bool = False) -> dict |
 
         from src.extractors.validation import log_validation_warnings, validate_team_pace_data
 
-        warnings = validate_team_pace_data(
-            team_pace, context=f"FP2 {year} {race_name}"
-        )
+        warnings = validate_team_pace_data(team_pace, context=f"FP2 {year} {race_name}")
         log_validation_warnings(warnings)
 
         return team_pace

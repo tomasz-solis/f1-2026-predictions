@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 # Expected bounds for extracted F1 data
 _POSITION_MIN = 1
 _POSITION_MAX = 22
-_LAP_TIME_MIN_S = 55.0   # fastest ever ~1:02 (Monaco) with margin
-_LAP_TIME_MAX_S = 180.0   # slow outlier / safety car restart
+_LAP_TIME_MIN_S = 55.0  # fastest ever ~1:02 (Monaco) with margin
+_LAP_TIME_MAX_S = 180.0  # slow outlier / safety car restart
 _MIN_TEAMS = 5
 _MAX_TEAMS = 11
 
@@ -36,10 +36,12 @@ def validate_session_positions(
         return warnings
 
     for driver, pos in positions.items():
-        if not isinstance(pos, (int, float)):
+        if not isinstance(pos, int | float):
             warnings.append(f"{prefix}{driver}: position is not numeric ({pos!r})")
         elif pos < _POSITION_MIN or pos > _POSITION_MAX:
-            warnings.append(f"{prefix}{driver}: position {pos} outside {_POSITION_MIN}-{_POSITION_MAX}")
+            warnings.append(
+                f"{prefix}{driver}: position {pos} outside {_POSITION_MIN}-{_POSITION_MAX}"
+            )
 
     return warnings
 
@@ -66,7 +68,7 @@ def validate_team_pace_data(
         if isinstance(data, dict):
             avg_pace = data.get("avg_pace")
             if avg_pace is not None:
-                if not isinstance(avg_pace, (int, float)):
+                if not isinstance(avg_pace, int | float):
                     warnings.append(f"{prefix}{team}: avg_pace is not numeric ({avg_pace!r})")
                 elif avg_pace < _LAP_TIME_MIN_S or avg_pace > _LAP_TIME_MAX_S:
                     warnings.append(
@@ -75,7 +77,7 @@ def validate_team_pace_data(
                     )
 
             degradation = data.get("degradation")
-            if degradation is not None and isinstance(degradation, (int, float)):
+            if degradation is not None and isinstance(degradation, int | float):
                 if degradation < 0:
                     warnings.append(f"{prefix}{team}: negative degradation ({degradation:.3f})")
                 elif degradation > 1.0:
