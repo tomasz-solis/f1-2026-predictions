@@ -23,12 +23,138 @@ CUSTOM_CSS = """
   --ts-gap: 1rem;
 }
 
-/* ---- App background ---- */
-[data-testid="stAppViewContainer"] {
-    background:
-      radial-gradient(120% 90% at 10% 0%, #101727 0%, #0B111D 38%, var(--ts-graphite) 72%);
-    color: var(--ts-soft-light);
+/* --- Sticky header (collapsible) --- */
+.ts-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: rgba(11,15,20,0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(232,237,242,0.10);
+  padding: 0.7rem 0;
+  transition: padding 180ms ease, background 180ms ease;
 }
+
+/* Make header content animate nicely */
+.ts-sticky-header .brand-row {
+  transition: margin 180ms ease;
+}
+.ts-sticky-header .brand-logo {
+  transition: width 180ms ease, transform 180ms ease, opacity 180ms ease;
+  transform-origin: left center;
+}
+.ts-sticky-header .sub-header,
+.ts-sticky-header .micro-disclaimer {
+  transition: opacity 160ms ease, max-height 180ms ease, margin 180ms ease;
+  overflow: hidden;
+}
+
+/* Collapsed state (added by JS) */
+.ts-sticky-header.is-collapsed {
+  padding: 0.35rem 0;
+  background: rgba(11,15,20,0.70);
+}
+
+.ts-sticky-header.is-collapsed .brand-row {
+  margin-bottom: 0.35rem;
+}
+
+.ts-sticky-header.is-collapsed .brand-logo {
+  transform: scale(0.86);
+}
+
+.ts-sticky-header.is-collapsed .sub-header {
+  opacity: 0;
+  max-height: 0;
+  margin: 0;
+}
+
+.ts-sticky-header.is-collapsed .micro-disclaimer {
+  opacity: 0;
+  max-height: 0;
+  margin: 0;
+}
+
+/* Mobile: collapse a bit earlier + keep it tighter */
+@media (max-width: 760px) {
+  .ts-sticky-header .brand-logo { transform-origin: left center; }
+  .ts-sticky-header.is-collapsed .brand-logo { transform: scale(0.80); }
+}
+
+html, body {
+  background: var(--ts-graphite) !important;
+  color-scheme: dark;
+}
+
+[data-testid="stApp"] {
+  background: var(--ts-graphite) !important;
+}
+
+[data-testid="stAppViewContainer"] > div:first-child {
+  background: transparent !important;
+}
+
+@media (max-width: 760px) {
+
+  /* Header spacing + scale */
+  .brand-row {
+    margin-bottom: 0.55rem;
+  }
+
+  .brand-logo {
+    width: min(420px, 92vw);
+  }
+
+  .sub-header {
+    font-size: 0.98rem;
+  }
+
+  .micro-disclaimer {
+    font-size: 0.80rem;
+    margin-bottom: 0.85rem;
+  }
+
+  /* Segmented nav fills width nicely */
+  [data-testid="stSegmentedControl"] [data-baseweb="button-group"] {
+    width: 100%;
+  }
+
+  [data-testid="stSegmentedControl"] [data-baseweb="button-group"] button {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  /* Settings expander lighter */
+  [data-testid="stExpander"] {
+    margin-bottom: 0.8rem;
+    border-radius: 12px !important;
+  }
+
+  /* Reduce double padding on mobile */
+  [data-testid="stAppViewContainer"] .main .block-container {
+    padding-top: 1rem;
+    padding-right: 1rem;
+    padding-left: 1rem;
+  }
+
+  /* Prevent column extra padding feel */
+  div[data-testid="column"] {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+[data-testid="stAppViewContainer"] {
+  position: relative;
+  z-index: 0;
+}
+
+[data-testid="stAppViewContainer"] .main {
+  position: relative;
+  z-index: 1;
+}
+
 [data-testid="stAppViewContainer"]::before {
     content: "";
     position: fixed;
@@ -61,14 +187,6 @@ CUSTOM_CSS = """
   [data-testid="stAppViewContainer"] .main .block-container {
     padding-right: 1.6rem;
     padding-left: 1.6rem;
-  }
-}
-
-@media (max-width: 760px) {
-  [data-testid="stAppViewContainer"] .main .block-container {
-    padding-top: 1rem;
-    padding-right: 1rem;
-    padding-left: 1rem;
   }
 }
 
@@ -249,6 +367,16 @@ h2 {
 }
 label {
   color: rgba(232,237,242,0.82) !important;
+}
+
+/* Sidebar Navigation selectbox polish */
+section[data-testid="stSidebar"] [data-baseweb="select"] > div {
+  border-radius: 14px !important;
+  border: 1px solid rgba(232,237,242,0.18) !important;
+}
+
+section[data-testid="stSidebar"] [data-baseweb="select"] svg {
+  color: rgba(232,237,242,0.75) !important;
 }
 
 /* Primary button */

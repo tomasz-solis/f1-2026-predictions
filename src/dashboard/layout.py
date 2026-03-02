@@ -5,13 +5,14 @@ from functools import lru_cache
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from .styles import CUSTOM_CSS
 
 # Brand asset config: update these filenames when you want to swap branding.
 BRAND_NAME = "Trackside Labs"
 BRAND_PAGE_TITLE = f"{BRAND_NAME} | Motorsport Forecasting"
-BRAND_ASSET_DIRS = (Path("assets/logis"), Path("assets/logos"))
+BRAND_ASSET_DIRS = (Path("assets/logos"),)
 BRAND_WORDMARK_FILE = "trackside-labs_wordmark_w800.png"
 BRAND_FAVICON_FILE = "trackside-labs_mark_32.png"
 BRAND_WORDMARK_ALT = "Trackside Labs wordmark"
@@ -74,31 +75,75 @@ def _build_asset_data_uri(path_str: str) -> str:
 def render_header() -> None:
     shell_class = f"brand-shell brand-shell--{_header_alignment()}"
     logo_path = _brand_asset_path(BRAND_WORDMARK_FILE)
+
     if logo_path.exists():
         logo_data_uri = _build_asset_data_uri(str(logo_path))
-        st.markdown(
-            (
-                f'<div class="{shell_class}">'
-                '<div class="brand-row">'
-                f'<img class="brand-logo" src="{logo_data_uri}" alt="{BRAND_WORDMARK_ALT}" />'
-                "</div>"
-                f'<div class="sub-header">{BRAND_TAGLINE}</div>'
-                f'<div class="micro-disclaimer">{BRAND_DISCLAIMER}</div>'
-                "</div>"
-            ),
-            unsafe_allow_html=True,
+        header_html = (
+            '<div class="ts-sticky-header" id="tsStickyHeader">'
+            f'<div class="{shell_class}">'
+            '<div class="brand-row">'
+            f'<img class="brand-logo" src="{logo_data_uri}" alt="{BRAND_WORDMARK_ALT}" />'
+            "</div>"
+            f'<div class="sub-header">{BRAND_TAGLINE}</div>'
+            f'<div class="micro-disclaimer">{BRAND_DISCLAIMER}</div>'
+            "</div>"
+            "</div>"
         )
     else:
-        st.markdown(
-            (
-                f'<div class="{shell_class}">'
-                f'<div class="main-header">{BRAND_NAME}</div>'
-                f'<div class="sub-header">{BRAND_TAGLINE}</div>'
-                f'<div class="micro-disclaimer">{BRAND_DISCLAIMER}</div>'
-                "</div>"
-            ),
-            unsafe_allow_html=True,
+        header_html = (
+            '<div class="ts-sticky-header" id="tsStickyHeader">'
+            f'<div class="{shell_class}">'
+            f'<div class="main-header">{BRAND_NAME}</div>'
+            f'<div class="sub-header">{BRAND_TAGLINE}</div>'
+            f'<div class="micro-disclaimer">{BRAND_DISCLAIMER}</div>'
+            "</div>"
+            "</div>"
         )
+
+    st.markdown(header_html, unsafe_allow_html=True)
+
+    components.html(
+        """
+        <script>
+        (function () {
+        // Prevent double-binding
+        if (window.__tsHeaderScrollBound) return;
+        window.__tsHeaderScrollBound = true;
+
+        const thresholdDesktop = 90;
+        const thresholdMobile = 50;
+
+        function isMobile() {
+            return window.matchMedia && window.matchMedia("(max-width: 760px)").matches;
+        }
+
+        function bind() {
+            const header = document.getElementById("tsStickyHeader");
+            if (!header) return;
+
+            function onScroll() {
+            const y = window.scrollY || document.documentElement.scrollTop || 0;
+            const threshold = isMobile() ? thresholdMobile : thresholdDesktop;
+            if (y > threshold) header.classList.add("is-collapsed");
+            else header.classList.remove("is-collapsed");
+            }
+
+            window.addEventListener("scroll", onScroll, { passive: true });
+            onScroll();
+        }
+
+        // Streamlit sometimes renders after JS runs, so retry a few times.
+        let tries = 0;
+        const t = setInterval(() => {
+            tries += 1;
+            bind();
+            if (document.getElementById("tsStickyHeader") || tries > 20) clearInterval(t);
+        }, 150);
+        })();
+        </script>
+        """,
+        height=0,
+    )
 
 
 def render_sidebar() -> tuple[str, bool]:
@@ -125,11 +170,12 @@ def render_sidebar() -> tuple[str, bool]:
             page = selection
 
     if page is None:
-        page = st.radio(
+        page = st.selectbox(
             "Navigation",
             NAVIGATION_PAGES,
-            horizontal=True,
+            index=0,
             key="nav_tabs",
+            label_visibility="collapsed",
         )
 
     with st.expander("Settings", expanded=False):
