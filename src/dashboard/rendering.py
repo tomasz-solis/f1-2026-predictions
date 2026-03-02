@@ -11,6 +11,8 @@ def _render_track_temperature_context(result: dict) -> None:
         return
 
     raw_temp = context.get("track_temperature_c")
+    if raw_temp is None:
+        return
     try:
         track_temp_c = float(raw_temp)
     except (TypeError, ValueError):
@@ -25,14 +27,22 @@ def _render_track_temperature_context(result: dict) -> None:
     raw_forecast_weight = context.get("forecast_weight")
     session_weight: float | None
     forecast_weight: float | None
-    try:
-        session_weight = float(raw_session_weight)
-    except (TypeError, ValueError):
+
+    if raw_session_weight is None:
         session_weight = None
-    try:
-        forecast_weight = float(raw_forecast_weight)
-    except (TypeError, ValueError):
+    else:
+        try:
+            session_weight = float(raw_session_weight)
+        except (TypeError, ValueError):
+            session_weight = None
+
+    if raw_forecast_weight is None:
         forecast_weight = None
+    else:
+        try:
+            forecast_weight = float(raw_forecast_weight)
+        except (TypeError, ValueError):
+            forecast_weight = None
 
     session_label = session_name or "latest session"
     if session_source == "air_temp_inferred":

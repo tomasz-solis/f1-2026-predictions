@@ -5,6 +5,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
+from typing import Any, cast
 
 import fastf1
 
@@ -115,6 +116,16 @@ _SESSION_TEMPERATURE_BLEND_WEIGHTS = {
 }
 
 
+def _coerce_float(value: object) -> float | None:
+    """Best-effort float coercion for mypy-friendly dict[str, object] payloads."""
+    try:
+        if value is None:
+            return None
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
 def _pirelli_candidate_years(year: int) -> list[int]:
     """Return candidate Pirelli-data seasons in priority order."""
     candidates = [int(year)]
@@ -220,7 +231,9 @@ def _normalize_weather_column_name(name: object) -> str:
 
 def _weather_metric_median(weather_data: object, metric_token: str) -> float | None:
     """Return median weather metric value for the matching column."""
-    columns = getattr(weather_data, "columns", [])
+    df = cast(Any, weather_data)  # FastF1 provides a pandas DataFrame
+
+    columns = getattr(df, "columns", [])
     selected_column = None
     for column in columns:
         normalized = _normalize_weather_column_name(column)
@@ -232,7 +245,7 @@ def _weather_metric_median(weather_data: object, metric_token: str) -> float | N
         return None
 
     try:
-        values = weather_data[selected_column].dropna().astype(float)
+        values = df[selected_column].dropna().astype(float)
     except Exception:
         return None
     if values.empty:
@@ -307,7 +320,11 @@ def _load_session_track_temperature_c(
     )
     if signal is None:
         return None
-    return float(signal["session_track_temperature_c"])
+
+    temp = _coerce_float(signal.get("session_track_temperature_c"))
+    if temp is None:
+        return None
+    return temp
 
 
 def _load_session_temperature_signal(
@@ -720,7 +737,9 @@ def resolve_track_temperature_profile(
             session_name=session_name,
         )
         if session_signal is not None:
-            session_track_temp_c = float(session_signal["session_track_temperature_c"])
+            session_track_temp_c = _coerce_float(session_signal.get("session_track_temperature_c"))
+            if session_track_temp_c is None:
+                continue
             session_weight = 1.0
             forecast_weight = 0.0
             final_track_temp_c = session_track_temp_c
@@ -742,7 +761,7 @@ def resolve_track_temperature_profile(
                 year,
                 race_name,
                 session_name,
-                session_signal["session_temperature_source"],
+                str(session_signal.get("session_temperature_source", "")),
                 session_weight,
                 forecast_weight,
             )
@@ -753,7 +772,9 @@ def resolve_track_temperature_profile(
                 "weather_bucket": weather_key,
                 "session_name": session_name,
                 "session_track_temperature_c": session_track_temp_c,
-                "session_temperature_source": str(session_signal["session_temperature_source"]),
+                "session_temperature_source": str(
+                    session_signal.get("session_temperature_source", "")
+                ),
                 "session_air_temperature_c": session_signal.get("session_air_temperature_c"),
                 "forecast_track_temperature_c": float(fallback_temp_c),
                 "session_weight": float(session_weight),
@@ -794,7 +815,10 @@ def resolve_track_temperature_c(
         is_sprint=is_sprint,
     )
     try:
-        return float(profile.get("track_temperature_c", _default_track_temperature_c(weather)))
+        value = _coerce_float(profile.get("track_temperature_c"))
+        if value is not None:
+            return value
+        return _default_track_temperature_c(weather)
     except Exception:
         return _default_track_temperature_c(weather)
 
@@ -812,7 +836,7 @@ def resolve_non_competitive_weather_features(
     qualifying sessions are intentionally excluded so this signal reflects
     weekend preparation context instead of competitive execution context.
     """
-    fallback = {
+    fallback: dict[str, object] = {
         "available": False,
         "source_session": None,
         "reason": "missing_race_name",
@@ -854,10 +878,8 @@ def resolve_non_competitive_weather_features(
         if weather_features is None:
             continue
 
-        rainfall_signal = weather_features.get("rainfall_signal")
-        practice_weather_bucket = _infer_weather_bucket_from_rainfall_signal(
-            float(rainfall_signal) if rainfall_signal is not None else None
-        )
+        rainfall_signal = _coerce_float(weather_features.get("rainfall_signal"))
+        practice_weather_bucket = _infer_weather_bucket_from_rainfall_signal(rainfall_signal)
         return {
             "available": True,
             "source_session": session_name,
