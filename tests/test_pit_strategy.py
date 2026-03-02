@@ -122,6 +122,23 @@ class TestGeneratePitStrategy:
             pit_lap = strategy["pit_laps"][0]
             assert 5 <= pit_lap <= 15, "Sprint pit window should be early"
 
+    def test_mixed_weather_can_select_intermediate(self):
+        """Mixed-weather strategies should sometimes include INTERMEDIATE tires."""
+        rng = np.random.default_rng(seed=42)
+        intermediate_count = 0
+
+        for _ in range(200):
+            strategy = generate_pit_strategy(
+                race_distance=57,
+                tire_stress_score=3.0,
+                available_compounds=["SOFT", "MEDIUM", "HARD", "INTERMEDIATE"],
+                rng=rng,
+                enforce_two_compound_rule=True,
+            )
+            intermediate_count += strategy["compound_sequence"].count("INTERMEDIATE")
+
+        assert intermediate_count > 0
+
 
 class TestValidateStrategy:
     """Test strategy validation."""

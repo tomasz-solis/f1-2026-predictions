@@ -393,6 +393,35 @@ baseline_predictor:
       burn_rate_kg_per_lap: 1.5        # fuel consumption per lap
       deg_multiplier: 0.10             # 10% worse tire deg when fully fueled
 
+    # Track temperature resolution for tire model realism.
+    # Final value can blend latest completed session weather with race-weather fallback.
+    track_temperature:
+      dry_c: 36.0
+      mixed_c: 29.0
+      rain_c: 23.0
+      min_c: 5.0
+      max_c: 65.0
+      air_to_track_offset_c: 9.0
+      blend:
+        enabled: true
+        session_weight: 0.70
+        session_weight_by_session:
+          R: 0.90
+          Q: 0.80
+          Sprint: 0.80
+          SQ: 0.75
+          FP3: 0.70
+          FP2: 0.65
+          FP1: 0.60
+
+    # Non-competitive (practice) weather features used to modulate race uncertainty.
+    # The weather selector still defines scenario; these are context modifiers only.
+    weather_features:
+      mismatch:
+        chaos_boost: 0.18
+        variance_boost: 0.10
+        confidence_penalty: 2.0
+
     # Tire degradation and fresh tire effects
     tire_physics:
       fresh_tire_advantage:

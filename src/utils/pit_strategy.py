@@ -10,8 +10,16 @@ from src.utils.strategy_optimizer import calculate_pit_timing_bias_laps
 
 logger = logging.getLogger(__name__)
 
-# Compound degradation order (softer = more degradation)
-COMPOUND_DEG_ORDER = ["SOFT", "MEDIUM", "HARD"]
+# Canonical compound ordering used for filtering and fallback generation.
+COMPOUND_ORDER = ["SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET"]
+
+
+def _ordered_available_compounds(available_compounds: list[str]) -> list[str]:
+    """Return available compounds in canonical order, preserving unknown extras."""
+    normalized = [str(compound).strip().upper() for compound in available_compounds if compound]
+    ordered = [compound for compound in COMPOUND_ORDER if compound in normalized]
+    extras = [compound for compound in normalized if compound not in ordered]
+    return ordered + extras
 
 
 def generate_pit_strategy(
@@ -240,8 +248,8 @@ def _sample_compound_sequence(
     #     {"SOFT": 1.0, "MEDIUM": 0.8, "HARD": 0.6},
     # )
 
-    # Filter available compounds
-    available = [c for c in COMPOUND_DEG_ORDER if c in available_compounds]
+    # Filter available compounds with wet/mixed options preserved.
+    available = _ordered_available_compounds(available_compounds)
 
     if enforce_two_compound_rule and len(available) < 2:
         logger.warning(f"Insufficient compounds available: {available}. Cannot satisfy FIA rule.")
@@ -256,14 +264,32 @@ def _sample_compound_sequence(
         "baseline_predictor.compound_selection.low_stress_threshold", 2.5
     )
 
-    if tire_stress_score > high_stress_threshold:
-        # High stress: prefer HARD, avoid SOFT
+    has_intermediate = "INTERMEDIATE" in available
+    has_wet = "WET" in available
+    wet_only = has_wet and not enforce_two_compound_rule and len(available) <= 2
+
+    if wet_only:
+        # Fully wet race: favor INTERMEDIATE unless stress strongly suggests full wets.
+        if tire_stress_score > high_stress_threshold:
+            preference_order = ["WET", "INTERMEDIATE"]
+        else:
+            preference_order = ["INTERMEDIATE", "WET"]
+    elif has_intermediate:
+        # Mixed weather: keep dry compounds in play but allow transition strategies.
+        if tire_stress_score > high_stress_threshold:
+            preference_order = ["HARD", "INTERMEDIATE", "MEDIUM", "SOFT"]
+        elif tire_stress_score < low_stress_threshold:
+            preference_order = ["SOFT", "INTERMEDIATE", "MEDIUM", "HARD"]
+        else:
+            preference_order = ["MEDIUM", "INTERMEDIATE", "SOFT", "HARD"]
+    elif tire_stress_score > high_stress_threshold:
+        # High stress: prefer HARD, avoid SOFT.
         preference_order = ["HARD", "MEDIUM", "SOFT"]
     elif tire_stress_score < low_stress_threshold:
-        # Low stress: prefer SOFT
+        # Low stress: prefer SOFT.
         preference_order = ["SOFT", "MEDIUM", "HARD"]
     else:
-        # Medium stress: prefer MEDIUM
+        # Medium stress: prefer MEDIUM.
         preference_order = ["MEDIUM", "SOFT", "HARD"]
 
     # Filter preferences to available compounds
@@ -414,7 +440,7 @@ def _get_default_strategy(
     pit_lap = race_distance // 2
 
     # Use first two available compounds for dry-race fallback.
-    available = [c for c in COMPOUND_DEG_ORDER if c in available_compounds]
+    available = _ordered_available_compounds(available_compounds)
     if len(available) < 2:
         available = available_compounds[:]
 

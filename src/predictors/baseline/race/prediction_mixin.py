@@ -17,7 +17,10 @@ from src.utils.track_data_loader import (
     get_available_compounds,
     get_tire_stress_score,
     load_track_specific_params,
+    resolve_non_competitive_weather_features,
     resolve_race_distance_laps,
+    resolve_track_temperature_c,
+    resolve_track_temperature_profile,
 )
 from src.utils.validation_helpers import validate_enum, validate_positive_int
 
@@ -128,6 +131,9 @@ class BaselineRacePredictionMixin:
             load_track_specific_params=load_track_specific_params,
             get_tire_stress_score=get_tire_stress_score,
             get_available_compounds=get_available_compounds,
+            resolve_track_temperature_c=resolve_track_temperature_c,
+            resolve_track_temperature_profile=resolve_track_temperature_profile,
+            resolve_non_competitive_weather_features=resolve_non_competitive_weather_features,
             resolve_race_distance_laps=resolve_race_distance_laps,
             generate_pit_strategy=generate_pit_strategy,
             simulate_race_lap_by_lap=simulate_race_lap_by_lap,

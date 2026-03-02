@@ -2,6 +2,7 @@
 
 import json
 import logging
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 
@@ -87,6 +88,31 @@ _TRACK_OVERTAKING_BASELINES: dict[str, float] = {
 }
 
 _UNDERSCALED_OVERTAKING_THRESHOLD = 0.10
+_CONVENTIONAL_TEMP_PRIORITY = ("R", "Q", "FP3", "FP2", "FP1")
+_SPRINT_TEMP_PRIORITY = ("R", "Q", "Sprint", "SQ", "FP1")
+_CONVENTIONAL_NON_COMPETITIVE_PRIORITY = ("FP3", "FP2", "FP1")
+_SPRINT_NON_COMPETITIVE_PRIORITY = ("FP1",)
+_SESSION_DURATION_HOURS = {
+    "FP1": 1.5,
+    "FP2": 1.5,
+    "FP3": 1.5,
+    "SQ": 1.5,
+    "Sprint": 1.0,
+    "Q": 1.5,
+    "R": 2.5,
+}
+_FINAL_STATUS_TOKENS = ("FINISHED", "FINALISED", "FINALIZED", "ENDED", "ABORTED")
+_ACTIVE_STATUS_TOKENS = ("STARTED", "GREEN", "RUNNING", "RESTART", "SUSPENDED")
+_DEFAULT_TEMPERATURE_SESSION_BLEND_WEIGHT = 0.70
+_SESSION_TEMPERATURE_BLEND_WEIGHTS = {
+    "R": 0.90,
+    "Q": 0.80,
+    "Sprint": 0.80,
+    "SQ": 0.75,
+    "FP3": 0.70,
+    "FP2": 0.65,
+    "FP1": 0.60,
+}
 
 
 def _pirelli_candidate_years(year: int) -> list[int]:
@@ -126,6 +152,347 @@ def _resolve_pirelli_path(year: int) -> Path | None:
         if candidate_path.exists():
             return candidate_path
     return None
+
+
+def _default_track_temperature_c(weather: str) -> float:
+    """Return fallback track temperature from config by weather bucket."""
+    weather_key = str(weather or "dry").strip().lower()
+    if weather_key == "rain":
+        return float(config_loader.get("baseline_predictor.race.track_temperature.rain_c", 23.0))
+    if weather_key == "mixed":
+        return float(config_loader.get("baseline_predictor.race.track_temperature.mixed_c", 29.0))
+    return float(config_loader.get("baseline_predictor.race.track_temperature.dry_c", 36.0))
+
+
+def _coerce_utc_datetime(value: object) -> datetime | None:
+    """Coerce datetime-like objects to timezone-aware UTC datetimes."""
+    if value is None:
+        return None
+
+    if hasattr(value, "to_pydatetime"):
+        try:
+            value = value.to_pydatetime()
+        except Exception:
+            return None
+
+    if not isinstance(value, datetime):
+        return None
+
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def _session_status_completed(session: object) -> bool | None:
+    """Return completion status from FastF1 session status feed when available."""
+    status_feed = getattr(session, "session_status", None)
+    if status_feed is None or getattr(status_feed, "empty", False):
+        return None
+
+    columns = getattr(status_feed, "columns", [])
+    status_values = None
+    for column in ("Status", "SessionStatus", "Message"):
+        if column in columns:
+            status_values = status_feed[column]
+            break
+    if status_values is None:
+        return None
+
+    try:
+        cleaned = status_values.dropna().astype(str)
+    except Exception:
+        return None
+    if cleaned.empty:
+        return None
+
+    latest = cleaned.iloc[-1].upper()
+    if any(token in latest for token in _FINAL_STATUS_TOKENS):
+        return True
+    if any(token in latest for token in _ACTIVE_STATUS_TOKENS):
+        return False
+    return None
+
+
+def _normalize_weather_column_name(name: object) -> str:
+    """Normalize weather column names for resilient matching."""
+    return "".join(ch for ch in str(name).lower() if ch.isalnum())
+
+
+def _weather_metric_median(weather_data: object, metric_token: str) -> float | None:
+    """Return median weather metric value for the matching column."""
+    columns = getattr(weather_data, "columns", [])
+    selected_column = None
+    for column in columns:
+        normalized = _normalize_weather_column_name(column)
+        if metric_token in normalized:
+            selected_column = column
+            break
+
+    if selected_column is None:
+        return None
+
+    try:
+        values = weather_data[selected_column].dropna().astype(float)
+    except Exception:
+        return None
+    if values.empty:
+        return None
+
+    return float(values.median())
+
+
+def _clamp_track_temperature_c(track_temp_c: float) -> float:
+    """Clamp track temperature to a realistic range."""
+    min_temp_c = float(config_loader.get("baseline_predictor.race.track_temperature.min_c", 5.0))
+    max_temp_c = float(config_loader.get("baseline_predictor.race.track_temperature.max_c", 65.0))
+    return float(max(min_temp_c, min(max_temp_c, float(track_temp_c))))
+
+
+def _resolve_session_temperature_blend_weight(session_name: str) -> float:
+    """Resolve blend weight for session signal vs race-weather fallback baseline."""
+    configured_default = config_loader.get(
+        "baseline_predictor.race.track_temperature.blend.session_weight",
+        _DEFAULT_TEMPERATURE_SESSION_BLEND_WEIGHT,
+    )
+    try:
+        default_weight = float(configured_default)
+    except (TypeError, ValueError):
+        default_weight = _DEFAULT_TEMPERATURE_SESSION_BLEND_WEIGHT
+
+    configured_by_session = config_loader.get(
+        "baseline_predictor.race.track_temperature.blend.session_weight_by_session",
+        {},
+    )
+    if isinstance(configured_by_session, dict):
+        raw_weight = configured_by_session.get(
+            session_name,
+            _SESSION_TEMPERATURE_BLEND_WEIGHTS.get(session_name, default_weight),
+        )
+    else:
+        raw_weight = _SESSION_TEMPERATURE_BLEND_WEIGHTS.get(session_name, default_weight)
+
+    try:
+        weight = float(raw_weight)
+    except (TypeError, ValueError):
+        weight = default_weight
+    return float(max(0.0, min(1.0, weight)))
+
+
+def _session_scheduled_end_passed(event: object, session_name: str, now_utc: datetime) -> bool:
+    """Return whether scheduled session end has passed based on FastF1 event metadata."""
+    try:
+        raw_start = event.get_session_date(session_name)
+    except Exception:
+        return True
+
+    session_start = _coerce_utc_datetime(raw_start)
+    if session_start is None:
+        return True
+
+    duration_hours = float(_SESSION_DURATION_HOURS.get(session_name, 2.0))
+    return now_utc >= (session_start + timedelta(hours=duration_hours))
+
+
+def _load_session_track_temperature_c(
+    *,
+    year: int,
+    race_name: str,
+    session_name: str,
+) -> float | None:
+    """Load representative track temperature from a specific FastF1 session."""
+    signal = _load_session_temperature_signal(
+        year=year,
+        race_name=race_name,
+        session_name=session_name,
+    )
+    if signal is None:
+        return None
+    return float(signal["session_track_temperature_c"])
+
+
+def _load_session_temperature_signal(
+    *,
+    year: int,
+    race_name: str,
+    session_name: str,
+) -> dict[str, object] | None:
+    """Load session temperature signal with provenance metadata."""
+    try:
+        session = fastf1.get_session(year, race_name, session_name)
+    except Exception as exc:
+        logger.debug(
+            "Could not create FastF1 session for %s %s %s while resolving track temperature: %s",
+            year,
+            race_name,
+            session_name,
+            exc,
+        )
+        return None
+
+    if session is None:
+        return None
+
+    try:
+        session.load(laps=False, telemetry=False, weather=True, messages=False)
+    except Exception as exc:
+        logger.debug(
+            "Could not load FastF1 weather for %s %s %s: %s",
+            year,
+            race_name,
+            session_name,
+            exc,
+        )
+        return None
+
+    status_completed = _session_status_completed(session)
+    if status_completed is False:
+        return None
+
+    weather_data = getattr(session, "weather_data", None)
+    if weather_data is None or getattr(weather_data, "empty", False):
+        return None
+
+    track_temp_c = _weather_metric_median(weather_data, "tracktemp")
+    if track_temp_c is not None:
+        return {
+            "session_track_temperature_c": _clamp_track_temperature_c(track_temp_c),
+            "session_temperature_source": "track_temp",
+            "session_air_temperature_c": None,
+        }
+
+    # Fallback inference: estimate track temp from air temp when TrackTemp is missing.
+    air_temp_c = _weather_metric_median(weather_data, "airtemp")
+    if air_temp_c is None:
+        return None
+    offset_c = float(
+        config_loader.get("baseline_predictor.race.track_temperature.air_to_track_offset_c", 9.0)
+    )
+    return {
+        "session_track_temperature_c": _clamp_track_temperature_c(air_temp_c + offset_c),
+        "session_temperature_source": "air_temp_inferred",
+        "session_air_temperature_c": float(air_temp_c),
+    }
+
+
+def _fallback_temperature_profile(
+    *,
+    fallback_temp_c: float,
+    weather: str,
+    reason: str,
+) -> dict[str, object]:
+    """Build forecast-only track-temperature profile for downstream transparency."""
+    return {
+        "track_temperature_c": float(fallback_temp_c),
+        "source": "forecast_fallback",
+        "reason": reason,
+        "weather_bucket": weather,
+        "session_name": None,
+        "session_track_temperature_c": None,
+        "session_temperature_source": None,
+        "session_air_temperature_c": None,
+        "forecast_track_temperature_c": float(fallback_temp_c),
+        "session_weight": 0.0,
+        "forecast_weight": 1.0,
+        "blend_enabled": False,
+    }
+
+
+def _normalize_rainfall_signal(rainfall_value: float | None) -> float | None:
+    """Normalize rainfall metric to a robust 0..1 wetness signal."""
+    if rainfall_value is None:
+        return None
+    try:
+        value = float(rainfall_value)
+    except (TypeError, ValueError):
+        return None
+    if value <= 0.0:
+        return 0.0
+    return float(min(1.0, value))
+
+
+def _infer_weather_bucket_from_rainfall_signal(rainfall_signal: float | None) -> str:
+    """Infer dry/mixed/rain weather bucket from normalized rainfall signal."""
+    if rainfall_signal is None:
+        return "unknown"
+    if rainfall_signal >= 0.60:
+        return "rain"
+    if rainfall_signal >= 0.15:
+        return "mixed"
+    return "dry"
+
+
+def _load_session_weather_features(
+    *,
+    year: int,
+    race_name: str,
+    session_name: str,
+) -> dict[str, object] | None:
+    """Load weather summary features from a specific FastF1 session."""
+    try:
+        session = fastf1.get_session(year, race_name, session_name)
+    except Exception as exc:
+        logger.debug(
+            "Could not create FastF1 session for %s %s %s while resolving weather features: %s",
+            year,
+            race_name,
+            session_name,
+            exc,
+        )
+        return None
+
+    if session is None:
+        return None
+
+    try:
+        session.load(laps=False, telemetry=False, weather=True, messages=False)
+    except Exception as exc:
+        logger.debug(
+            "Could not load FastF1 weather for %s %s %s while resolving weather features: %s",
+            year,
+            race_name,
+            session_name,
+            exc,
+        )
+        return None
+
+    status_completed = _session_status_completed(session)
+    if status_completed is False:
+        return None
+
+    weather_data = getattr(session, "weather_data", None)
+    if weather_data is None or getattr(weather_data, "empty", False):
+        return None
+
+    track_temp_c = _weather_metric_median(weather_data, "tracktemp")
+    air_temp_c = _weather_metric_median(weather_data, "airtemp")
+    if track_temp_c is None and air_temp_c is not None:
+        offset_c = float(
+            config_loader.get(
+                "baseline_predictor.race.track_temperature.air_to_track_offset_c", 9.0
+            )
+        )
+        track_temp_c = air_temp_c + offset_c
+
+    wind_speed_kph = _weather_metric_median(weather_data, "windspeed")
+    humidity_pct = _weather_metric_median(weather_data, "humidity")
+    rainfall_signal = _normalize_rainfall_signal(_weather_metric_median(weather_data, "rainfall"))
+
+    has_feature = any(
+        value is not None
+        for value in (track_temp_c, air_temp_c, wind_speed_kph, humidity_pct, rainfall_signal)
+    )
+    if not has_feature:
+        return None
+
+    return {
+        "track_temperature_c": _clamp_track_temperature_c(track_temp_c)
+        if track_temp_c is not None
+        else None,
+        "air_temperature_c": float(air_temp_c) if air_temp_c is not None else None,
+        "wind_speed_kph": float(wind_speed_kph) if wind_speed_kph is not None else None,
+        "humidity_pct": float(humidity_pct) if humidity_pct is not None else None,
+        "rainfall_signal": rainfall_signal,
+    }
 
 
 def _normalize_overtaking_difficulty(race_name: str, raw_value: object) -> float | None:
@@ -295,6 +662,211 @@ def get_available_compounds(race_name: str | None = None, weather: str = "dry") 
         return ["SOFT", "MEDIUM", "HARD", "INTERMEDIATE"]
 
     return ["SOFT", "MEDIUM", "HARD"]
+
+
+@lru_cache(maxsize=256)
+def resolve_track_temperature_profile(
+    year: int,
+    race_name: str | None,
+    weather: str = "dry",
+    is_sprint: bool = False,
+) -> dict[str, object]:
+    """
+    Resolve track temperature profile from session weather and forecast weighting.
+
+    The resolver checks latest completed sessions in reverse weekend order. When
+    a session signal is available, it is blended with race-weather fallback
+    temperature using session-specific weights. Returned metadata is used in UI.
+    """
+    weather_key = str(weather or "dry").strip().lower()
+    fallback_temp_c = _default_track_temperature_c(weather_key)
+    if not race_name:
+        return _fallback_temperature_profile(
+            fallback_temp_c=fallback_temp_c,
+            weather=weather_key,
+            reason="missing_race_name",
+        )
+
+    try:
+        event = fastf1.get_event(year, race_name)
+    except Exception as exc:
+        logger.info(
+            "Could not load FastF1 event while resolving track temperature for %s %s: %s. "
+            "Using fallback %.1fC.",
+            race_name,
+            year,
+            exc,
+            fallback_temp_c,
+        )
+        return _fallback_temperature_profile(
+            fallback_temp_c=fallback_temp_c,
+            weather=weather_key,
+            reason="event_load_failed",
+        )
+
+    session_priority = _SPRINT_TEMP_PRIORITY if is_sprint else _CONVENTIONAL_TEMP_PRIORITY
+    now_utc = datetime.now(UTC)
+    blend_enabled = bool(
+        config_loader.get("baseline_predictor.race.track_temperature.blend.enabled", True)
+    )
+
+    for session_name in session_priority:
+        if not _session_scheduled_end_passed(event, session_name, now_utc):
+            continue
+
+        session_signal = _load_session_temperature_signal(
+            year=year,
+            race_name=race_name,
+            session_name=session_name,
+        )
+        if session_signal is not None:
+            session_track_temp_c = float(session_signal["session_track_temperature_c"])
+            session_weight = 1.0
+            forecast_weight = 0.0
+            final_track_temp_c = session_track_temp_c
+            source = "session_weather"
+            if blend_enabled:
+                session_weight = _resolve_session_temperature_blend_weight(session_name)
+                forecast_weight = float(max(0.0, min(1.0, 1.0 - session_weight)))
+                final_track_temp_c = _clamp_track_temperature_c(
+                    (session_track_temp_c * session_weight) + (fallback_temp_c * forecast_weight)
+                )
+                source = "session_weather_blend"
+
+            logger.info(
+                (
+                    "Resolved track temperature %.1fC for %s %s using %s session "
+                    "signal from %s (session=%.2f, forecast=%.2f)."
+                ),
+                final_track_temp_c,
+                year,
+                race_name,
+                session_name,
+                session_signal["session_temperature_source"],
+                session_weight,
+                forecast_weight,
+            )
+            return {
+                "track_temperature_c": float(final_track_temp_c),
+                "source": source,
+                "reason": "session_signal_available",
+                "weather_bucket": weather_key,
+                "session_name": session_name,
+                "session_track_temperature_c": session_track_temp_c,
+                "session_temperature_source": str(session_signal["session_temperature_source"]),
+                "session_air_temperature_c": session_signal.get("session_air_temperature_c"),
+                "forecast_track_temperature_c": float(fallback_temp_c),
+                "session_weight": float(session_weight),
+                "forecast_weight": float(forecast_weight),
+                "blend_enabled": bool(blend_enabled),
+            }
+
+    logger.info(
+        "No reliable FastF1 weather data found for %s %s; using fallback %.1fC.",
+        race_name,
+        year,
+        fallback_temp_c,
+    )
+    return _fallback_temperature_profile(
+        fallback_temp_c=fallback_temp_c,
+        weather=weather_key,
+        reason="no_completed_session_weather",
+    )
+
+
+@lru_cache(maxsize=256)
+def resolve_track_temperature_c(
+    year: int,
+    race_name: str | None,
+    weather: str = "dry",
+    is_sprint: bool = False,
+) -> float:
+    """
+    Resolve scalar track temperature for simulation backward compatibility.
+
+    This wrapper delegates to the profile resolver and returns only the final
+    temperature consumed by lap-by-lap simulation.
+    """
+    profile = resolve_track_temperature_profile(
+        year=year,
+        race_name=race_name,
+        weather=weather,
+        is_sprint=is_sprint,
+    )
+    try:
+        return float(profile.get("track_temperature_c", _default_track_temperature_c(weather)))
+    except Exception:
+        return _default_track_temperature_c(weather)
+
+
+@lru_cache(maxsize=256)
+def resolve_non_competitive_weather_features(
+    year: int,
+    race_name: str | None,
+    is_sprint: bool = False,
+) -> dict[str, object]:
+    """
+    Resolve weather features from latest completed non-competitive session.
+
+    Non-competitive sessions are practice sessions (FP1/FP2/FP3). Sprint and
+    qualifying sessions are intentionally excluded so this signal reflects
+    weekend preparation context instead of competitive execution context.
+    """
+    fallback = {
+        "available": False,
+        "source_session": None,
+        "reason": "missing_race_name",
+        "practice_weather_bucket": "unknown",
+        "track_temperature_c": None,
+        "air_temperature_c": None,
+        "wind_speed_kph": None,
+        "humidity_pct": None,
+        "rainfall_signal": None,
+    }
+    if not race_name:
+        return fallback
+
+    try:
+        event = fastf1.get_event(year, race_name)
+    except Exception as exc:
+        logger.info(
+            "Could not load FastF1 event while resolving non-competitive weather features "
+            "for %s %s: %s.",
+            race_name,
+            year,
+            exc,
+        )
+        return {**fallback, "reason": "event_load_failed"}
+
+    session_priority = (
+        _SPRINT_NON_COMPETITIVE_PRIORITY if is_sprint else _CONVENTIONAL_NON_COMPETITIVE_PRIORITY
+    )
+    now_utc = datetime.now(UTC)
+    for session_name in session_priority:
+        if not _session_scheduled_end_passed(event, session_name, now_utc):
+            continue
+
+        weather_features = _load_session_weather_features(
+            year=year,
+            race_name=race_name,
+            session_name=session_name,
+        )
+        if weather_features is None:
+            continue
+
+        rainfall_signal = weather_features.get("rainfall_signal")
+        practice_weather_bucket = _infer_weather_bucket_from_rainfall_signal(
+            float(rainfall_signal) if rainfall_signal is not None else None
+        )
+        return {
+            "available": True,
+            "source_session": session_name,
+            "reason": "session_weather_available",
+            "practice_weather_bucket": practice_weather_bucket,
+            **weather_features,
+        }
+
+    return {**fallback, "reason": "no_completed_non_competitive_weather"}
 
 
 @lru_cache(maxsize=128)

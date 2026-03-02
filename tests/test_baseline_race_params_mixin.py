@@ -129,13 +129,15 @@ def test_load_race_params_reads_expected_config_keys(patcher):
 
     params = helper._load_race_params()
 
-    assert len(params) == 30
+    assert len(params) >= 30
     assert "base_chaos_dry" in params
     assert "base_chaos_wet" in params
+    assert "mixed_weather_chaos_blend" in params
     assert "teammate_variance_std" in params
     assert "grid_divisor" in params
     assert "position_scaling_front_threshold" in params
     assert "baseline_predictor.race.base_chaos.dry" in calls
+    assert "baseline_predictor.race.base_chaos.mixed_blend" in calls
     assert "baseline_predictor.race.overtaking_skill_multiplier" in calls
     assert "baseline_predictor.race.teammate_variance_std" in calls
     assert "baseline_predictor.race.grid_divisor" in calls

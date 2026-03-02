@@ -5,6 +5,7 @@ import pytest
 
 from src.utils.lap_by_lap_simulator import (
     _get_traffic_overtake_effect,
+    _resolve_base_chaos_std,
     simulate_race_lap_by_lap,
 )
 
@@ -65,6 +66,22 @@ def _strategy() -> dict:
         "compound_sequence": ["MEDIUM"],
         "stint_lengths": [60],
     }
+
+
+def test_mixed_weather_chaos_is_interpolated_between_dry_and_wet():
+    """Mixed weather should use blended chaos instead of full wet value."""
+    race_params = _base_race_params()
+    race_params["base_chaos"] = {"dry": 0.20, "wet": 0.60}
+    race_params["mixed_weather_chaos_blend"] = 0.50
+
+    dry_std = _resolve_base_chaos_std(race_params, "dry")
+    mixed_std = _resolve_base_chaos_std(race_params, "mixed")
+    wet_std = _resolve_base_chaos_std(race_params, "rain")
+
+    assert dry_std == pytest.approx(0.20)
+    assert mixed_std == pytest.approx(0.40)
+    assert wet_std == pytest.approx(0.60)
+    assert dry_std < mixed_std < wet_std
 
 
 def test_grid_gap_keeps_front_car_ahead_in_short_race():

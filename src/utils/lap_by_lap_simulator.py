@@ -101,6 +101,22 @@ def simulate_race_lap_by_lap(
     # Expand compact overtake config once before the lap loop.
     race_params = dict(race_params)
     race_params["overtake_model"] = _expand_overtake_cfg(race_params.get("overtake_model", {}))
+    track_temperature_c = race_params.get("track_temperature_c")
+    weather_feature_modifiers = race_params.get("weather_feature_modifiers", {})
+    chaos_multiplier = float(
+        np.clip(
+            weather_feature_modifiers.get("chaos_multiplier", 1.0),
+            0.80,
+            1.40,
+        )
+    )
+    teammate_variance_multiplier = float(
+        np.clip(
+            weather_feature_modifiers.get("teammate_variance_multiplier", 1.0),
+            0.80,
+            1.35,
+        )
+    )
 
     # Initialize driver states
     start_grid_gap_seconds = race_params.get("start_grid_gap_seconds", 0.32)
@@ -224,12 +240,14 @@ def simulate_race_lap_by_lap(
                 fuel_load_kg=fuel_load,
                 initial_fuel_kg=race_params["fuel"]["initial_load_kg"],
                 compound=compound,
+                track_temp=track_temperature_c,
             )
 
             # 5. Apply fresh tire advantage (negative delta = faster)
             fresh_tire_bonus = get_fresh_tire_advantage(
                 compound=compound,
                 laps_on_tire=laps_on_tire,
+                track_temp=track_temperature_c,
             )
 
             # 6. Apply fuel effect
@@ -246,9 +264,8 @@ def simulate_race_lap_by_lap(
                 chaos += _get_lap1_chaos(state["position"], race_params, rng)
 
             # Base chaos (weather-dependent unpredictability)
-            weather_key = "wet" if str(weather).lower() in {"wet", "rain", "mixed"} else "dry"
-            base_chaos_std = race_params["base_chaos"][weather_key]
-            chaos += rng.normal(0, base_chaos_std)
+            base_chaos_std = _resolve_base_chaos_std(race_params, weather)
+            chaos += rng.normal(0, base_chaos_std * chaos_multiplier)
 
             # Track-specific chaos (overtaking difficulty)
             # Harder tracks = less chaos (positions more stable)
@@ -264,7 +281,10 @@ def simulate_race_lap_by_lap(
                 sc_luck = rng.uniform(-sc_luck_range, sc_luck_range)
 
             # 9. Teammate variance (setup/strategy differences)
-            teammate_variance = rng.normal(0, race_params.get("teammate_variance_std", 0.15))
+            teammate_variance = rng.normal(
+                0,
+                race_params.get("teammate_variance_std", 0.15) * teammate_variance_multiplier,
+            )
 
             # 10.5 Traffic + overtaking effects
             traffic_overtake_effect = _get_traffic_overtake_effect(
@@ -310,6 +330,25 @@ def simulate_race_lap_by_lap(
 
     # Generate finish order and metadata
     return _generate_race_result(driver_states, strategies)
+
+
+def _resolve_base_chaos_std(race_params: dict, weather: str) -> float:
+    """Resolve weather-specific chaos with explicit handling for mixed conditions."""
+    base_chaos_cfg = race_params.get("base_chaos", {})
+    dry_std = float(base_chaos_cfg.get("dry", 0.35))
+    wet_std = float(base_chaos_cfg.get("wet", 0.45))
+
+    mixed_std = base_chaos_cfg.get("mixed")
+    if mixed_std is None:
+        mixed_blend = float(np.clip(race_params.get("mixed_weather_chaos_blend", 0.55), 0.0, 1.0))
+        mixed_std = dry_std + ((wet_std - dry_std) * mixed_blend)
+
+    weather_key = str(weather).strip().lower()
+    if weather_key in {"wet", "rain"}:
+        return wet_std
+    if weather_key == "mixed":
+        return float(mixed_std)
+    return dry_std
 
 
 def _get_traffic_overtake_effect(

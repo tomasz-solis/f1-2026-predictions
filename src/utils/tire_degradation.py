@@ -3,12 +3,66 @@
 from src.utils import config_loader
 
 
+def _temperature_degradation_multiplier(track_temp: float | None) -> float:
+    """Return degradation multiplier from track temperature."""
+    if track_temp is None:
+        return 1.0
+
+    try:
+        track_temp_c = float(track_temp)
+    except (TypeError, ValueError):
+        return 1.0
+
+    reference_temp_c = config_loader.get(
+        "baseline_predictor.race.tire_physics.temperature.degradation.reference_c", 35.0
+    )
+    sensitivity_per_c = config_loader.get(
+        "baseline_predictor.race.tire_physics.temperature.degradation.sensitivity_per_c", 0.006
+    )
+    min_multiplier = config_loader.get(
+        "baseline_predictor.race.tire_physics.temperature.degradation.min_multiplier", 0.88
+    )
+    max_multiplier = config_loader.get(
+        "baseline_predictor.race.tire_physics.temperature.degradation.max_multiplier", 1.18
+    )
+
+    delta_c = track_temp_c - float(reference_temp_c)
+    multiplier = 1.0 + (delta_c * float(sensitivity_per_c))
+    return float(min(max_multiplier, max(min_multiplier, multiplier)))
+
+
+def _temperature_fresh_tire_multiplier(track_temp: float | None) -> float:
+    """Return fresh-tire advantage multiplier from distance to optimal temperature."""
+    if track_temp is None:
+        return 1.0
+
+    try:
+        track_temp_c = float(track_temp)
+    except (TypeError, ValueError):
+        return 1.0
+
+    optimal_temp_c = config_loader.get(
+        "baseline_predictor.race.tire_physics.temperature.fresh.optimal_c", 30.0
+    )
+    decay_per_c = config_loader.get(
+        "baseline_predictor.race.tire_physics.temperature.fresh.decay_per_c", 0.01
+    )
+    min_multiplier = config_loader.get(
+        "baseline_predictor.race.tire_physics.temperature.fresh.min_multiplier", 0.70
+    )
+
+    temp_delta_c = abs(track_temp_c - float(optimal_temp_c))
+    multiplier = 1.0 - (temp_delta_c * float(decay_per_c))
+    return float(max(min_multiplier, min(1.0, multiplier)))
+
+
 def calculate_tire_deg_delta(
     tire_deg_slope: float,
     laps_on_tire: int,
     fuel_load_kg: float,
     initial_fuel_kg: float | None = None,
     compound: str | None = None,
+    track_temp: float | None = None,
 ) -> float:
     """Calculate lap time penalty from tire wear.
 
@@ -29,6 +83,8 @@ def calculate_tire_deg_delta(
     fuel_ratio = fuel_load_kg / initial_fuel_kg
     fuel_multiplier = 1.0 + (fuel_deg_multiplier * fuel_ratio)
 
+    temp_multiplier = _temperature_degradation_multiplier(track_temp)
+
     # Tire cliff: beyond max age, degradation slope multiplies sharply
     if compound is not None:
         compound_max_ages = config_loader.get(
@@ -41,12 +97,18 @@ def calculate_tire_deg_delta(
         max_age = compound_max_ages.get(compound.upper(), 40)
         if laps_on_tire > max_age:
             laps_past_cliff = laps_on_tire - max_age
-            linear_portion = tire_deg_slope * max_age * fuel_multiplier
-            cliff_portion = tire_deg_slope * cliff_multiplier * laps_past_cliff * fuel_multiplier
+            linear_portion = tire_deg_slope * max_age * fuel_multiplier * temp_multiplier
+            cliff_portion = (
+                tire_deg_slope
+                * cliff_multiplier
+                * laps_past_cliff
+                * fuel_multiplier
+                * temp_multiplier
+            )
             return float(max(0.0, linear_portion + cliff_portion))
 
     # Base degradation: slope × laps on tire × fuel effect
-    degradation = tire_deg_slope * laps_on_tire * fuel_multiplier
+    degradation = tire_deg_slope * laps_on_tire * fuel_multiplier * temp_multiplier
 
     return float(max(0.0, degradation))
 
@@ -110,8 +172,8 @@ def get_fresh_tire_advantage(
 
     advantage = base_advantage * decay_factor
 
-    # Optional: track temp effect (hotter tracks reduce fresh tire advantage)
-    # Intentionally omitted until a track-temperature model is added.
+    # Temperatures far from the optimal window reduce warm-up/freshness benefit.
+    advantage *= _temperature_fresh_tire_multiplier(track_temp)
 
     return float(max(0.0, advantage))
 
@@ -121,6 +183,7 @@ def estimate_stint_pace_degradation(
     stint_length: int,
     compound: str,
     fuel_load_start_kg: float = 110.0,
+    track_temp: float | None = None,
 ) -> float:
     """Estimate total pace loss over a stint from tire degradation.
 
@@ -131,21 +194,26 @@ def estimate_stint_pace_degradation(
 
     total_deg = 0.0
 
-    for lap in range(1, stint_length + 1):
-        # Approximate fuel burn
-        fuel_remaining = fuel_load_start_kg - (lap * 1.5)
+    for lap_index in range(stint_length):
+        # Keep indexing aligned with lap simulator (new stint starts at laps_on_tire=0).
+        fuel_remaining = fuel_load_start_kg - (lap_index * 1.5)
         fuel_remaining = max(0.0, fuel_remaining)
 
         # Calculate degradation for this lap
         lap_deg = calculate_tire_deg_delta(
             tire_deg_slope=tire_deg_slope,
-            laps_on_tire=lap,
+            laps_on_tire=lap_index,
             fuel_load_kg=fuel_remaining,
             initial_fuel_kg=fuel_load_start_kg,
+            track_temp=track_temp,
         )
 
         # Subtract fresh tire advantage (first few laps)
-        fresh_advantage = get_fresh_tire_advantage(compound, lap)
+        fresh_advantage = get_fresh_tire_advantage(
+            compound,
+            lap_index,
+            track_temp=track_temp,
+        )
 
         total_deg += lap_deg - fresh_advantage
 

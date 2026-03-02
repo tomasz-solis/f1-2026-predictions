@@ -55,6 +55,50 @@ def _stub_prediction_dependencies(stack: ExitStack):
     stack.enter_context(
         patch.object(
             prediction_module,
+            "resolve_track_temperature_c",
+            lambda *args, **kwargs: 31.0,
+        )
+    )
+    stack.enter_context(
+        patch.object(
+            prediction_module,
+            "resolve_track_temperature_profile",
+            lambda *args, **kwargs: {
+                "track_temperature_c": 31.0,
+                "source": "session_weather_blend",
+                "reason": "session_signal_available",
+                "weather_bucket": "dry",
+                "session_name": "Q",
+                "session_track_temperature_c": 32.0,
+                "session_temperature_source": "track_temp",
+                "session_air_temperature_c": None,
+                "forecast_track_temperature_c": 29.0,
+                "session_weight": 0.7,
+                "forecast_weight": 0.3,
+                "blend_enabled": True,
+            },
+        )
+    )
+    stack.enter_context(
+        patch.object(
+            prediction_module,
+            "resolve_non_competitive_weather_features",
+            lambda *args, **kwargs: {
+                "available": True,
+                "source_session": "FP3",
+                "reason": "session_weather_available",
+                "practice_weather_bucket": "dry",
+                "track_temperature_c": 33.0,
+                "air_temperature_c": 24.0,
+                "wind_speed_kph": 18.0,
+                "humidity_pct": 52.0,
+                "rainfall_signal": 0.0,
+            },
+        )
+    )
+    stack.enter_context(
+        patch.object(
+            prediction_module,
             "resolve_race_distance_laps",
             lambda year, race_name, is_sprint: 60,
         )
@@ -115,6 +159,46 @@ def test_predict_race_enforces_two_compounds_for_mixed_weather():
     assert enforce_flags == [True]
 
 
+def test_predict_race_exposes_track_temperature_context():
+    predictor = DummyRacePredictor()
+
+    def _fake_generate_pit_strategy(**_kwargs):
+        return {
+            "num_stops": 1,
+            "pit_laps": [30],
+            "compound_sequence": ["SOFT", "MEDIUM"],
+            "stint_lengths": [30, 30],
+        }
+
+    with ExitStack() as stack:
+        _stub_prediction_dependencies(stack)
+        stack.enter_context(
+            patch.object(prediction_module, "generate_pit_strategy", _fake_generate_pit_strategy)
+        )
+        result = predictor.predict_race(
+            qualifying_grid=[{"driver": "DRV", "team": "Team", "position": 1}],
+            weather="dry",
+            race_name="Bahrain Grand Prix",
+            n_simulations=1,
+        )
+
+    context = result["track_temperature_context"]
+    assert context["source"] == "session_weather_blend"
+    assert context["session_name"] == "Q"
+    assert context["track_temperature_c"] == pytest.approx(31.0)
+    assert context["session_weight"] == pytest.approx(0.7)
+    assert context["forecast_weight"] == pytest.approx(0.3)
+
+    weather_context = result["weather_feature_context"]
+    assert weather_context["available"] is True
+    assert weather_context["source_session"] == "FP3"
+    assert weather_context["selected_weather"] == "dry"
+    assert weather_context["practice_weather_bucket"] == "dry"
+    assert weather_context["chaos_multiplier"] == pytest.approx(1.0)
+    assert weather_context["teammate_variance_multiplier"] == pytest.approx(1.0)
+    assert weather_context["confidence_adjustment"] == pytest.approx(0.0)
+
+
 def test_predict_race_allows_single_compound_rule_override_for_rain():
     predictor = DummyRacePredictor()
 
@@ -143,6 +227,38 @@ def test_predict_race_allows_single_compound_rule_override_for_rain():
         )
 
     assert enforce_flags == [False]
+
+
+def test_predict_race_weather_feature_context_reflects_bucket_mismatch():
+    predictor = DummyRacePredictor()
+
+    def _fake_generate_pit_strategy(**_kwargs):
+        return {
+            "num_stops": 1,
+            "pit_laps": [30],
+            "compound_sequence": ["INTERMEDIATE", "WET"],
+            "stint_lengths": [30, 30],
+        }
+
+    with ExitStack() as stack:
+        _stub_prediction_dependencies(stack)
+        stack.enter_context(
+            patch.object(prediction_module, "generate_pit_strategy", _fake_generate_pit_strategy)
+        )
+        result = predictor.predict_race(
+            qualifying_grid=[{"driver": "DRV", "team": "Team", "position": 1}],
+            weather="rain",
+            race_name="Bahrain Grand Prix",
+            n_simulations=1,
+        )
+
+    weather_context = result["weather_feature_context"]
+    assert weather_context["selected_weather"] == "rain"
+    assert weather_context["practice_weather_bucket"] == "dry"
+    assert weather_context["weather_mismatch_score"] == pytest.approx(1.0)
+    assert weather_context["chaos_multiplier"] > 1.0
+    assert weather_context["teammate_variance_multiplier"] > 1.0
+    assert weather_context["confidence_adjustment"] > 0.0
 
 
 def test_predict_race_caps_extreme_backmarker_recovery():

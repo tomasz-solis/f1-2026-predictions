@@ -1,17 +1,27 @@
 """Tests for track parameter helpers."""
 
 import json
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
+
+import pandas as pd
+import pytest
 
 from src.utils.track_data_loader import (
     get_available_compounds,
     get_tire_stress_score,
     load_track_specific_params,
+    resolve_non_competitive_weather_features,
     resolve_race_distance_laps,
+    resolve_track_temperature_c,
+    resolve_track_temperature_profile,
 )
 
 
 def setup_function():
+    resolve_non_competitive_weather_features.cache_clear()
+    resolve_track_temperature_profile.cache_clear()
+    resolve_track_temperature_c.cache_clear()
     resolve_race_distance_laps.cache_clear()
 
 
@@ -164,3 +174,224 @@ def test_get_tire_stress_score_uses_resolved_year_file(tmp_path):
         stress = get_tire_stress_score("Bahrain Grand Prix", year=2027)
 
     assert stress == 3.5
+
+
+def test_resolve_track_temperature_prefers_latest_completed_session_weather():
+    now_utc = datetime.now(UTC)
+    event = MagicMock()
+    event.get_session_date.side_effect = lambda session_name: {
+        "R": now_utc + timedelta(hours=2),
+        "Q": now_utc - timedelta(hours=3),
+        "FP3": now_utc - timedelta(hours=6),
+        "FP2": now_utc - timedelta(hours=9),
+        "FP1": now_utc - timedelta(hours=12),
+    }.get(session_name)
+
+    quali_session = MagicMock()
+    quali_session.weather_data = pd.DataFrame({"TrackTemp": [36.0, 37.0, 38.0]})
+    quali_session.session_status = pd.DataFrame({"Status": ["Finished"]})
+
+    with (
+        patch("src.utils.track_data_loader.fastf1.get_event", return_value=event),
+        patch(
+            "src.utils.track_data_loader.fastf1.get_session", return_value=quali_session
+        ) as get_session,
+    ):
+        resolved = resolve_track_temperature_c(
+            year=2026,
+            race_name="Bahrain Grand Prix",
+            weather="dry",
+            is_sprint=False,
+        )
+
+    assert resolved == pytest.approx(36.8)
+    get_session.assert_called_once_with(2026, "Bahrain Grand Prix", "Q")
+
+
+def test_resolve_track_temperature_uses_air_temp_when_track_temp_missing():
+    now_utc = datetime.now(UTC)
+    event = MagicMock()
+    event.get_session_date.side_effect = lambda session_name: {
+        "R": now_utc + timedelta(hours=2),
+        "Q": now_utc + timedelta(hours=1),
+        "FP3": now_utc + timedelta(hours=1),
+        "FP2": now_utc + timedelta(hours=1),
+        "FP1": now_utc - timedelta(hours=3),
+    }.get(session_name)
+
+    fp1_session = MagicMock()
+    fp1_session.weather_data = pd.DataFrame({"AirTemp": [21.0, 22.0, 23.0]})
+    fp1_session.session_status = pd.DataFrame({"Status": ["Finished"]})
+
+    def _cfg_get(key, default=None):
+        if key == "baseline_predictor.race.track_temperature.air_to_track_offset_c":
+            return 8.0
+        return default
+
+    with (
+        patch("src.utils.track_data_loader.fastf1.get_event", return_value=event),
+        patch(
+            "src.utils.track_data_loader.fastf1.get_session", return_value=fp1_session
+        ) as get_session,
+        patch("src.utils.track_data_loader.config_loader.get", side_effect=_cfg_get),
+    ):
+        resolved = resolve_track_temperature_c(
+            year=2026,
+            race_name="Bahrain Grand Prix",
+            weather="mixed",
+            is_sprint=False,
+        )
+
+    assert resolved == pytest.approx(29.6)
+    get_session.assert_called_once_with(2026, "Bahrain Grand Prix", "FP1")
+
+
+def test_resolve_track_temperature_falls_back_when_fastf1_unavailable():
+    with patch(
+        "src.utils.track_data_loader.fastf1.get_event",
+        side_effect=RuntimeError("network unavailable"),
+    ):
+        resolved = resolve_track_temperature_c(
+            year=2026,
+            race_name="Bahrain Grand Prix",
+            weather="rain",
+            is_sprint=False,
+        )
+
+    assert resolved == pytest.approx(23.0)
+
+
+def test_resolve_track_temperature_profile_reports_session_blend_metadata():
+    now_utc = datetime.now(UTC)
+    event = MagicMock()
+    event.get_session_date.side_effect = lambda session_name: {
+        "R": now_utc + timedelta(hours=2),
+        "Q": now_utc - timedelta(hours=3),
+        "FP3": now_utc - timedelta(hours=6),
+        "FP2": now_utc - timedelta(hours=9),
+        "FP1": now_utc - timedelta(hours=12),
+    }.get(session_name)
+
+    quali_session = MagicMock()
+    quali_session.weather_data = pd.DataFrame({"TrackTemp": [36.0, 37.0, 38.0]})
+    quali_session.session_status = pd.DataFrame({"Status": ["Finished"]})
+
+    with (
+        patch("src.utils.track_data_loader.fastf1.get_event", return_value=event),
+        patch("src.utils.track_data_loader.fastf1.get_session", return_value=quali_session),
+    ):
+        profile = resolve_track_temperature_profile(
+            year=2026,
+            race_name="Bahrain Grand Prix",
+            weather="dry",
+            is_sprint=False,
+        )
+
+    assert profile["source"] == "session_weather_blend"
+    assert profile["session_name"] == "Q"
+    assert profile["session_temperature_source"] == "track_temp"
+    assert profile["session_track_temperature_c"] == pytest.approx(37.0)
+    assert profile["forecast_track_temperature_c"] == pytest.approx(36.0)
+    assert profile["track_temperature_c"] == pytest.approx(36.8)
+    assert profile["session_weight"] == pytest.approx(0.8)
+    assert profile["forecast_weight"] == pytest.approx(0.2)
+
+
+def test_resolve_track_temperature_profile_reports_air_temp_inferred_source():
+    now_utc = datetime.now(UTC)
+    event = MagicMock()
+    event.get_session_date.side_effect = lambda session_name: {
+        "R": now_utc + timedelta(hours=2),
+        "Q": now_utc + timedelta(hours=1),
+        "FP3": now_utc + timedelta(hours=1),
+        "FP2": now_utc + timedelta(hours=1),
+        "FP1": now_utc - timedelta(hours=3),
+    }.get(session_name)
+
+    fp1_session = MagicMock()
+    fp1_session.weather_data = pd.DataFrame({"AirTemp": [21.0, 22.0, 23.0]})
+    fp1_session.session_status = pd.DataFrame({"Status": ["Finished"]})
+
+    def _cfg_get(key, default=None):
+        if key == "baseline_predictor.race.track_temperature.air_to_track_offset_c":
+            return 8.0
+        return default
+
+    with (
+        patch("src.utils.track_data_loader.fastf1.get_event", return_value=event),
+        patch("src.utils.track_data_loader.fastf1.get_session", return_value=fp1_session),
+        patch("src.utils.track_data_loader.config_loader.get", side_effect=_cfg_get),
+    ):
+        profile = resolve_track_temperature_profile(
+            year=2026,
+            race_name="Bahrain Grand Prix",
+            weather="mixed",
+            is_sprint=False,
+        )
+
+    assert profile["source"] == "session_weather_blend"
+    assert profile["session_name"] == "FP1"
+    assert profile["session_temperature_source"] == "air_temp_inferred"
+    assert profile["session_air_temperature_c"] == pytest.approx(22.0)
+    assert profile["session_track_temperature_c"] == pytest.approx(30.0)
+    assert profile["forecast_track_temperature_c"] == pytest.approx(29.0)
+    assert profile["track_temperature_c"] == pytest.approx(29.6)
+
+
+def test_resolve_non_competitive_weather_features_uses_latest_completed_practice():
+    now_utc = datetime.now(UTC)
+    event = MagicMock()
+    event.get_session_date.side_effect = lambda session_name: {
+        "FP3": now_utc - timedelta(hours=2),
+        "FP2": now_utc - timedelta(hours=6),
+        "FP1": now_utc - timedelta(hours=10),
+    }.get(session_name)
+
+    fp3_session = MagicMock()
+    fp3_session.weather_data = pd.DataFrame(
+        {
+            "TrackTemp": [33.0, 34.0, 35.0],
+            "AirTemp": [23.0, 24.0, 25.0],
+            "WindSpeed": [17.0, 18.0, 19.0],
+            "Humidity": [50.0, 52.0, 54.0],
+            "Rainfall": [0.0, 0.0, 0.0],
+        }
+    )
+    fp3_session.session_status = pd.DataFrame({"Status": ["Finished"]})
+
+    with (
+        patch("src.utils.track_data_loader.fastf1.get_event", return_value=event),
+        patch(
+            "src.utils.track_data_loader.fastf1.get_session", return_value=fp3_session
+        ) as get_session,
+    ):
+        features = resolve_non_competitive_weather_features(
+            year=2026,
+            race_name="Bahrain Grand Prix",
+            is_sprint=False,
+        )
+
+    assert features["available"] is True
+    assert features["source_session"] == "FP3"
+    assert features["practice_weather_bucket"] == "dry"
+    assert features["track_temperature_c"] == pytest.approx(34.0)
+    assert features["air_temperature_c"] == pytest.approx(24.0)
+    assert features["wind_speed_kph"] == pytest.approx(18.0)
+    assert features["humidity_pct"] == pytest.approx(52.0)
+    assert features["rainfall_signal"] == pytest.approx(0.0)
+    get_session.assert_called_once_with(2026, "Bahrain Grand Prix", "FP3")
+
+
+def test_resolve_non_competitive_weather_features_falls_back_when_event_unavailable():
+    with patch(
+        "src.utils.track_data_loader.fastf1.get_event",
+        side_effect=RuntimeError("network unavailable"),
+    ):
+        features = resolve_non_competitive_weather_features(
+            year=2026,
+            race_name="Bahrain Grand Prix",
+            is_sprint=False,
+        )
+
+    assert features["available"] is False
+    assert features["reason"] == "event_load_failed"

@@ -5,6 +5,7 @@ import pytest
 from src.utils.tire_degradation import (
     calculate_fuel_delta,
     calculate_tire_deg_delta,
+    estimate_stint_pace_degradation,
     get_effective_tire_deg_slope,
     get_fresh_tire_advantage,
 )
@@ -64,6 +65,25 @@ class TestCalculateTireDegDelta:
         # Full tank should have more degradation
         assert result_full > result_empty
         assert result_empty == pytest.approx(1.5, abs=0.01)  # 0.15 * 10 * 1.0
+
+    def test_track_temperature_increases_degradation_on_hot_track(self):
+        """Higher track temperature should increase degradation penalty."""
+        cool_track = calculate_tire_deg_delta(
+            tire_deg_slope=0.15,
+            laps_on_tire=10,
+            fuel_load_kg=80.0,
+            initial_fuel_kg=110.0,
+            track_temp=20.0,
+        )
+        hot_track = calculate_tire_deg_delta(
+            tire_deg_slope=0.15,
+            laps_on_tire=10,
+            fuel_load_kg=80.0,
+            initial_fuel_kg=110.0,
+            track_temp=50.0,
+        )
+
+        assert hot_track > cool_track
 
 
 class TestCalculateFuelDelta:
@@ -126,6 +146,15 @@ class TestGetFreshTireAdvantage:
         result_mixed = get_fresh_tire_advantage(compound="Soft", laps_on_tire=0)
 
         assert result_upper == result_lower == result_mixed
+
+    def test_track_temperature_reduces_fresh_tire_advantage_away_from_optimal(self):
+        """Fresh-tire gain should fall when track temperature is far from optimum."""
+        optimal_track = get_fresh_tire_advantage(compound="SOFT", laps_on_tire=0, track_temp=30.0)
+        very_hot_track = get_fresh_tire_advantage(compound="SOFT", laps_on_tire=0, track_temp=55.0)
+        very_cold_track = get_fresh_tire_advantage(compound="SOFT", laps_on_tire=0, track_temp=5.0)
+
+        assert optimal_track > very_hot_track
+        assert optimal_track > very_cold_track
 
 
 class TestGetEffectiveTireDegSlope:
@@ -220,3 +249,24 @@ class TestIntegrationScenarios:
         )
 
         assert result == 0.0
+
+    def test_stint_estimator_uses_lap_zero_tire_age(self):
+        """Stint estimator should include lap-0 fresh-tire behavior."""
+        short_stint = estimate_stint_pace_degradation(
+            tire_deg_slope=0.15,
+            stint_length=1,
+            compound="SOFT",
+            fuel_load_start_kg=110.0,
+            track_temp=30.0,
+        )
+        longer_stint = estimate_stint_pace_degradation(
+            tire_deg_slope=0.15,
+            stint_length=5,
+            compound="SOFT",
+            fuel_load_start_kg=110.0,
+            track_temp=30.0,
+        )
+
+        # One-lap stint should carry near-zero degradation due to fresh tire lap.
+        assert short_stint == pytest.approx(0.0, abs=0.001)
+        assert longer_stint > short_stint

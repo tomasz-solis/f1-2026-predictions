@@ -97,11 +97,15 @@ class BaselineRaceParamsMixin:
 
         teammate_variance = rng.normal(0, params["teammate_variance_std"])
 
-        base_chaos_std = (
-            params["base_chaos"]["wet"]
-            if weather in ("rain", "mixed")
-            else params["base_chaos"]["dry"]
-        )
+        if weather == "rain":
+            base_chaos_std = params["base_chaos"]["wet"]
+        elif weather == "mixed":
+            mixed_blend = float(np.clip(params.get("mixed_weather_chaos_blend", 0.55), 0.0, 1.0))
+            dry_std = params["base_chaos"]["dry"]
+            wet_std = params["base_chaos"]["wet"]
+            base_chaos_std = dry_std + ((wet_std - dry_std) * mixed_blend)
+        else:
+            base_chaos_std = params["base_chaos"]["dry"]
 
         dnf_occurred = rng.random() < info["dnf_probability"]
 
@@ -127,6 +131,9 @@ class BaselineRaceParamsMixin:
         return {
             "base_chaos_dry": cfg.get("baseline_predictor.race.base_chaos.dry", 0.35),
             "base_chaos_wet": cfg.get("baseline_predictor.race.base_chaos.wet", 0.45),
+            "mixed_weather_chaos_blend": cfg.get(
+                "baseline_predictor.race.base_chaos.mixed_blend", 0.55
+            ),
             "track_chaos_multiplier": cfg.get(
                 "baseline_predictor.race.track_chaos_multiplier", 0.4
             ),
