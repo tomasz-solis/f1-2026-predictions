@@ -111,6 +111,33 @@ def test_cache_dir_race_matching_handles_date_prefixed_event_dirs():
     )
 
 
+def test_latest_data_status_message_prefers_latest_elapsed_session():
+    message = pages._latest_data_status_message(
+        boundary_refresh={"latest_elapsed_session": "FP2"},
+        practice_update={"completed_fp_sessions": ["FP1", "FP2"]},
+    )
+
+    assert "Latest completed session detected: FP2" in message
+
+
+def test_latest_data_status_message_uses_practice_sessions_when_no_elapsed():
+    message = pages._latest_data_status_message(
+        boundary_refresh={"latest_elapsed_session": None},
+        practice_update={"completed_fp_sessions": ["FP1"]},
+    )
+
+    assert "Latest practice data available: FP1" in message
+
+
+def test_latest_data_status_message_handles_schedule_unavailable():
+    message = pages._latest_data_status_message(
+        boundary_refresh={"reason": "schedule_unavailable"},
+        practice_update={},
+    )
+
+    assert "schedule is currently unavailable" in message
+
+
 def test_clear_fastf1_race_cache_removes_date_prefixed_race_dirs_only(patcher, tmp_path):
     primary_cache = tmp_path / "fastf1_cache"
     testing_cache = tmp_path / "fastf1_cache_testing"

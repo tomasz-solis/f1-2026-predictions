@@ -273,6 +273,41 @@ def _render_prediction_results(prediction_results: dict, is_sprint: bool) -> Non
     )
 
 
+def _latest_data_status_message(
+    boundary_refresh: dict[str, object],
+    practice_update: dict[str, object],
+) -> str:
+    """Build a short user-facing summary of the freshest session data in use."""
+    latest_elapsed = str(boundary_refresh.get("latest_elapsed_session") or "").strip()
+    if latest_elapsed:
+        return (
+            "Latest completed session detected: "
+            f"{latest_elapsed}. Predictions use data available through this session."
+        )
+
+    completed_fp_raw = practice_update.get("completed_fp_sessions")
+    completed_fp = (
+        [str(session) for session in completed_fp_raw] if isinstance(completed_fp_raw, list) else []
+    )
+    if completed_fp:
+        return (
+            "No completed qualifying/race sessions yet. "
+            f"Latest practice data available: {', '.join(completed_fp)}."
+        )
+
+    reason = str(boundary_refresh.get("reason", "")).strip().lower()
+    if reason == "schedule_unavailable":
+        return (
+            "Live session schedule is currently unavailable. "
+            "Using the latest persisted artifacts and cached race-weekend state."
+        )
+
+    return (
+        "No sessions finished yet for this weekend. "
+        "Using pre-weekend baseline with latest learned season artifacts."
+    )
+
+
 def execute_live_prediction_pipeline(
     race_name: str,
     weather: str,
@@ -325,7 +360,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
     st.header("Race Weekend Prediction")
     st.markdown(
         "Generate a practice-aware weekend forecast for qualifying and race. "
-        "Use forced refresh when new sessions have just completed."
+        "Session updates run automatically in the background after completion."
     )
 
     season_options = _available_seasons()
@@ -354,30 +389,15 @@ def render_live_prediction_page(enable_logging: bool) -> None:
     with col2:
         weather = st.selectbox("Weather Forecast", ["dry", "rain", "mixed"])
 
-    st.subheader("Run Options")
-    options_col, action_col = st.columns((2, 1), gap="large")
-    with options_col:
-        force_refresh = st.toggle(
-            "Force Data Refresh",
-            value=False,
-            help=(
-                "When enabled, clears FastF1 race cache before checking session completion. "
-                "When disabled, cache is preserved but live session checks still run."
-            ),
-        )
-    with action_col:
-        st.caption(" ")
-        generate_prediction = st.button(
-            "Generate Prediction",
-            type="primary",
-            width="stretch",
-        )
+    st.subheader("Run")
+    st.caption("Refresh and session-completion checks are automatic; no manual force refresh.")
+    predict_clicked = st.button(
+        "Predict",
+        type="primary",
+        width="stretch",
+    )
 
-    mode_text = "Mode: Force refresh" if force_refresh else "Mode: Standard refresh"
-    st.markdown(f'<div class="run-options-note">{mode_text}</div>', unsafe_allow_html=True)
-    st.caption("FastF1 session completion checks run on every prediction.")
-
-    if generate_prediction:
+    if predict_clicked:
         status_placeholder = st.empty()
 
         with st.spinner("Running simulation pipeline..."):
@@ -390,7 +410,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                     race_name=race_name,
                     weather=weather,
                     year=selected_season,
-                    force_refresh=force_refresh,
+                    force_refresh=False,
                     progress_callback=update_status,
                 )
                 prediction_results = pipeline_output["prediction_results"]
@@ -419,6 +439,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                         "Sprint predictions use adjusted chaos modeling "
                         "(30% less variance, grid position +10% importance)."
                     )
+                st.info(_latest_data_status_message(boundary_refresh, practice_update))
 
                 if practice_update.get("updated"):
                     st.success(

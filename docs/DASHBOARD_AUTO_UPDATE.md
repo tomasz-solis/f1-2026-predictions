@@ -2,14 +2,14 @@
 
 This guide explains what the app updates automatically and what still requires an explicit script run.
 
-## Automatic During `Generate Prediction`
+## Automatic During `Predict`
 
-When the user clicks **Generate Prediction** in `src/dashboard/pages.py` (called by `app.py`):
+When the user clicks **Predict** in `src/dashboard/pages.py` (called by `app.py`):
 
-1. If **Force Data Refresh** is enabled (default OFF), the app clears FastF1 cache entries for the selected race.
+1. Session-boundary changes are checked for the selected race.
 2. `auto_update_if_needed(force_recheck=...)` checks for race-result learning updates.
 3. If new races are found, it runs `auto_update_from_races()`.
-4. `auto_update_practice_characteristics_if_needed(force_recheck=...)` checks/update FP-derived characteristics.
+4. `auto_update_practice_characteristics_if_needed(force_recheck=...)` checks/updates FP-derived characteristics.
 5. Streamlit caches are cleared so the prediction run in the same click uses fresh artifacts.
 6. Competitive-session completion checks are re-run before using cached outputs.
 
@@ -17,10 +17,9 @@ This block is race-result ingestion.
 
 ### Practice-characteristics auto capture
 
-During weekend predictions, the app also checks completed FP sessions and can update
+During weekend predictions, the app checks completed FP sessions and can update
 car characteristics from FP telemetry (FP1/FP2/FP3). By default, the update step
-uses cached session-state checks. With **Force Data Refresh** enabled, it re-checks
-session completion even when the race was already processed.
+uses cached session-state checks and boundary signatures to avoid unnecessary refreshes.
 
 State persistence:
 
@@ -95,3 +94,14 @@ Competitive-session refresh uses fail-closed handling:
 
 - unknown completion status does not silently downgrade ACTUAL grid source to PREDICTED
 - transient FastF1 failures emit runtime alerts/counters for visibility
+
+## Background Automation (No Click Required)
+
+For fully automatic post-session updates (without a user click), run:
+
+```bash
+python scripts/run_session_automation.py --year 2026 --interval-seconds 300
+```
+
+This worker polls recent events, applies session updates, can auto-generate prediction snapshots
+for the latest completed session, and reconciles actuals after race completion.

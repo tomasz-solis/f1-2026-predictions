@@ -83,14 +83,25 @@ Outputs: Finish order + compound strategy distribution + pit window histogram.
 
 ### 1. Automatic in dashboard
 
-When you click **Generate Prediction**, the app:
+When you click **Predict**, the app:
 
-- optionally clears FastF1 race cache first (`Force Data Refresh`, default OFF),
+- runs session-boundary freshness checks automatically (no force-refresh toggle),
 - checks for race-result learning updates,
 - checks completed FP sessions (FP1/FP2/FP3) for practice-based characteristic updates,
 - clears Streamlit caches when refresh/update steps run so the same click uses fresh artifacts,
 - always runs FastF1 completion checks for competitive sessions on each click,
 - blocks silent ACTUAL -> PREDICTED downgrades when transient FastF1 failures occur.
+
+### 1b. Optional background automation (no click required)
+
+Run periodic automation to refresh right after session completion:
+
+```bash
+python scripts/run_session_automation.py --year 2026 --interval-seconds 300
+```
+
+This worker applies post-session updates, can auto-generate prediction snapshots
+for the latest completed session, and reconciles actuals after race completion.
 
 ### 2. Manual race update
 

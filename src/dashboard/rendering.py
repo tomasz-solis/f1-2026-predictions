@@ -4,6 +4,101 @@ import pandas as pd
 import streamlit as st
 
 
+def _render_track_temperature_context(result: dict) -> None:
+    """Render race track-temperature source and blend details when available."""
+    context = result.get("track_temperature_context")
+    if not isinstance(context, dict):
+        return
+
+    raw_temp = context.get("track_temperature_c")
+    try:
+        track_temp_c = float(raw_temp)
+    except (TypeError, ValueError):
+        return
+
+    source = str(context.get("source", "")).strip().lower()
+    session_name_raw = context.get("session_name")
+    session_name = str(session_name_raw).strip() if session_name_raw else ""
+    session_source = str(context.get("session_temperature_source", "")).strip().lower()
+
+    raw_session_weight = context.get("session_weight")
+    raw_forecast_weight = context.get("forecast_weight")
+    session_weight: float | None
+    forecast_weight: float | None
+    try:
+        session_weight = float(raw_session_weight)
+    except (TypeError, ValueError):
+        session_weight = None
+    try:
+        forecast_weight = float(raw_forecast_weight)
+    except (TypeError, ValueError):
+        forecast_weight = None
+
+    session_label = session_name or "latest session"
+    if session_source == "air_temp_inferred":
+        session_label = f"{session_label} weather (air->track inferred)"
+    elif session_source == "track_temp":
+        session_label = f"{session_label} weather"
+
+    if source == "session_weather_blend":
+        if session_weight is not None and forecast_weight is not None:
+            session_pct = int(round(session_weight * 100))
+            forecast_pct = int(round(forecast_weight * 100))
+            st.info(
+                f"Track temperature input: {track_temp_c:.1f}C "
+                f"({session_pct}% {session_label} + {forecast_pct}% race-weather baseline)"
+            )
+        else:
+            st.info(
+                f"Track temperature input: {track_temp_c:.1f}C "
+                f"(blended from {session_label} and race-weather baseline)"
+            )
+        return
+
+    if source == "session_weather":
+        st.info(f"Track temperature input: {track_temp_c:.1f}C ({session_label})")
+        return
+
+    if source == "forecast_fallback":
+        weather_bucket = str(context.get("weather_bucket", "dry")).strip().lower() or "dry"
+        st.info(
+            f"Track temperature input: {track_temp_c:.1f}C "
+            f"(race-weather fallback: {weather_bucket})"
+        )
+        return
+
+    if source == "track_params_override":
+        st.info(f"Track temperature input: {track_temp_c:.1f}C (track-specific override)")
+        return
+
+    st.info(f"Track temperature input: {track_temp_c:.1f}C")
+
+
+def _render_weather_feature_context(result: dict) -> None:
+    """Render non-competitive weather feature source and applied modifiers."""
+    context = result.get("weather_feature_context")
+    if not isinstance(context, dict):
+        return
+    if not context.get("available"):
+        return
+
+    source_session = str(context.get("source_session", "")).strip()
+    if not source_session:
+        return
+
+    practice_bucket = str(context.get("practice_weather_bucket", "unknown")).strip().lower()
+    selected_bucket = str(context.get("selected_weather", "unknown")).strip().lower()
+    chaos_multiplier = context.get("chaos_multiplier")
+
+    message = (
+        f"Weather feature input: {source_session} practice weather ({practice_bucket}). "
+        f"Scenario selected: {selected_bucket}."
+    )
+    if isinstance(chaos_multiplier, (int | float)):
+        message += f" Uncertainty adjustment active (chaos x{float(chaos_multiplier):.2f})."
+    st.info(message)
+
+
 def _render_compound_strategies(compound_strategies: dict) -> None:
     st.subheader("Tire Compound Strategies")
 
@@ -279,6 +374,10 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
             "Car characteristics profile in use: "
             f"`{characteristics_profile}` ({teams_with_profile} teams)"
         )
+
+    if is_race:
+        _render_track_temperature_context(result)
+        _render_weather_feature_context(result)
 
     if compound_strategies and is_race:
         _render_compound_strategies(compound_strategies)

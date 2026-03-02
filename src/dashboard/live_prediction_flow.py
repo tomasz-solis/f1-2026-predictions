@@ -394,18 +394,11 @@ def save_prediction_if_enabled_core(
     if latest_session:
         if not logger_inst.has_prediction_for_session(year, race_name, latest_session):
             try:
-                if is_sprint:
-                    quali_grid = prediction_results["main_quali"]["grid"]
-                    race_finish = prediction_results["main_race"]["finish_order"]
-                    fp_blend_info = prediction_results.get("main_quali", {}).get(
-                        "fp_blend_info", {}
-                    )
-                else:
-                    quali_grid = prediction_results["qualifying"]["grid"]
-                    race_finish = prediction_results["race"]["finish_order"]
-                    fp_blend_info = prediction_results.get("qualifying", {}).get(
-                        "fp_blend_info", {}
-                    )
+                quali_grid, race_finish, fp_blend_info = prediction_payload_for_session(
+                    prediction_results=prediction_results,
+                    is_sprint=is_sprint,
+                    session_name=str(latest_session),
+                )
 
                 logger_inst.save_prediction(
                     year=year,
@@ -425,6 +418,41 @@ def save_prediction_if_enabled_core(
         st_module.info(
             "No completed sessions yet; prediction not saved (will save after FP1/FP2/FP3/SQ)"
         )
+
+
+def prediction_payload_for_session(
+    *,
+    prediction_results: PredictionResults,
+    is_sprint: bool,
+    session_name: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    """
+    Select qualifying/race payload pair to persist for a given completed session.
+
+    For sprint weekends, sessions up to and including ``Sprint`` map to the sprint
+    cascade payload, while later sessions map to the main qualifying/race payload.
+    """
+    if not is_sprint:
+        return (
+            prediction_results["qualifying"]["grid"],
+            prediction_results["race"]["finish_order"],
+            prediction_results.get("qualifying", {}).get("fp_blend_info", {}),
+        )
+
+    session_name_upper = str(session_name).strip().upper()
+    sprint_phase_sessions = {"FP1", "SQ", "SPRINT"}
+    if session_name_upper in sprint_phase_sessions:
+        return (
+            prediction_results["sprint_quali"]["grid"],
+            prediction_results["sprint_race"]["finish_order"],
+            prediction_results.get("sprint_quali", {}).get("fp_blend_info", {}),
+        )
+
+    return (
+        prediction_results["main_quali"]["grid"],
+        prediction_results["main_race"]["finish_order"],
+        prediction_results.get("main_quali", {}).get("fp_blend_info", {}),
+    )
 
 
 def render_prediction_results_core(

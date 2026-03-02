@@ -68,6 +68,52 @@ def test_render_pit_lap_distribution_builds_summary(patcher):
     assert any("Most likely pit window" in msg for msg in info_messages)
 
 
+def test_render_track_temperature_context_shows_blend_details(patcher):
+    calls = _stub_streamlit(patcher)
+
+    rendering._render_track_temperature_context(
+        {
+            "track_temperature_context": {
+                "track_temperature_c": 31.4,
+                "source": "session_weather_blend",
+                "session_name": "Q",
+                "session_temperature_source": "track_temp",
+                "session_weight": 0.70,
+                "forecast_weight": 0.30,
+            }
+        }
+    )
+
+    info_messages = [value for kind, value in calls if kind == "info"]
+    assert any(
+        "Track temperature input: 31.4C (70% Q weather + 30% race-weather baseline)" == message
+        for message in info_messages
+    )
+
+
+def test_render_weather_feature_context_shows_practice_source(patcher):
+    calls = _stub_streamlit(patcher)
+
+    rendering._render_weather_feature_context(
+        {
+            "weather_feature_context": {
+                "available": True,
+                "source_session": "FP3",
+                "selected_weather": "dry",
+                "practice_weather_bucket": "dry",
+                "chaos_multiplier": 1.04,
+            }
+        }
+    )
+
+    info_messages = [value for kind, value in calls if kind == "info"]
+    assert any(
+        "Weather feature input: FP3 practice weather (dry). Scenario selected: dry. Uncertainty adjustment active (chaos x1.04)."
+        == message
+        for message in info_messages
+    )
+
+
 def test_render_race_result_warns_on_high_dnf(patcher):
     calls = _stub_streamlit(patcher)
 
@@ -153,6 +199,22 @@ def test_display_prediction_result_routes_race_sections(patcher):
             "pit_lap_distribution": {"lap_15-20": 20},
             "characteristics_profile_used": "long_run",
             "teams_with_characteristics_profile": 11,
+            "track_temperature_context": {
+                "track_temperature_c": 31.4,
+                "source": "session_weather_blend",
+                "session_name": "Q",
+                "session_temperature_source": "track_temp",
+                "session_weight": 0.70,
+                "forecast_weight": 0.30,
+            },
+            "weather_feature_context": {
+                "available": True,
+                "source_session": "FP3",
+                "selected_weather": "dry",
+                "practice_weather_bucket": "dry",
+                "wind_speed_kph": 18.0,
+                "chaos_multiplier": 1.04,
+            },
         },
         prediction_name="Race Prediction",
         is_race=True,

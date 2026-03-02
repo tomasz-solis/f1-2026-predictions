@@ -13,7 +13,7 @@ This guide describes how predictions are stored by session and how actual result
 ## How Saving Works
 
 1. Enable **Save Predictions for Accuracy Tracking** in the **Settings** expander on the main page.
-2. Click **Generate Prediction**.
+2. Click **Predict**.
 3. App detects the latest completed session for the weekend type.
 4. If no prediction exists yet for that race/session key, it writes one prediction artifact through `ArtifactStore`.
 
