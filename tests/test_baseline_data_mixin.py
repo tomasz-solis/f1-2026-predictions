@@ -126,6 +126,64 @@ def test_load_data_falls_back_to_files(tmp_path, patcher, sample_payloads):
     assert predictor.year == 2026
 
 
+def test_load_data_canonicalizes_sauber_key_to_audi(tmp_path, patcher, sample_payloads):
+    car, drivers, tracks = sample_payloads
+    car["teams"] = {
+        "Sauber": {
+            "overall_performance": 0.38,
+            "uncertainty": 0.30,
+            "note": "legacy team key",
+        }
+    }
+    data_dir = tmp_path / "processed"
+    _write_baseline_files(data_dir, car, drivers, tracks)
+
+    predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
+
+    predictor.load_data()
+
+    assert "Audi" in predictor.teams
+    assert "Sauber" not in predictor.teams
+    assert predictor.teams["Audi"]["overall_performance"] == 0.38
+
+
+def test_load_data_merges_sauber_and_audi_team_payloads(tmp_path, patcher, sample_payloads):
+    car, drivers, tracks = sample_payloads
+    car["teams"] = {
+        "Sauber": {
+            "overall_performance": 0.38,
+            "uncertainty": 0.30,
+        },
+        "Audi": {
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.61,
+                    "top_speed": 0.50,
+                }
+            }
+        },
+    }
+    data_dir = tmp_path / "processed"
+    _write_baseline_files(data_dir, car, drivers, tracks)
+
+    predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
+
+    predictor.load_data()
+
+    assert list(predictor.teams.keys()) == ["Audi"]
+    assert predictor.teams["Audi"]["overall_performance"] == 0.38
+    assert (
+        predictor.teams["Audi"]["testing_characteristics_profiles"]["balanced"]["overall_pace"]
+        == 0.61
+    )
+
+
 def test_load_data_missing_track_file_sets_empty_tracks(tmp_path, patcher, sample_payloads):
     car, drivers, _tracks = sample_payloads
     data_dir = tmp_path / "processed"
@@ -311,6 +369,31 @@ def test_get_blended_team_strength_prefers_configured_schedule(tmp_path, patcher
     assert captured["schedule"] == "rapid_adaptive"
 
 
+def test_get_blended_team_strength_resolves_audi_to_sauber_payload(tmp_path, patcher):
+    predictor = DummyPredictor(data_dir=tmp_path)
+    predictor.teams = {"Sauber": {"overall_performance": 0.38, "current_season_performance": []}}
+    predictor.races_completed = 0
+
+    patcher.setattr(predictor, "calculate_track_suitability", lambda team, race_name: 0.0)
+
+    captured = {}
+
+    def _fake_blend(**kwargs):
+        captured.update(kwargs)
+        return 0.41
+
+    patcher.setattr(data_mixin_module, "calculate_blended_performance", _fake_blend)
+    patcher.setattr(
+        data_mixin_module, "get_recommended_schedule", lambda is_regulation_change: "extreme"
+    )
+
+    result = predictor.get_blended_team_strength("Audi", "Bahrain Grand Prix")
+
+    assert result == 0.41
+    assert captured["baseline_score"] == 0.38
+    assert captured["current_score"] == 0.38
+
+
 @pytest.mark.parametrize(
     ("stress", "expected"),
     [
@@ -372,6 +455,26 @@ def test_get_compound_adjusted_team_strength_branches(tmp_path, patcher):
     assert predictor.get_compound_adjusted_team_strength("McLaren", "Bahrain", "SOFT") == 1.0
 
 
+def test_get_compound_adjusted_team_strength_resolves_audi_to_sauber_payload(tmp_path, patcher):
+    predictor = DummyPredictor(data_dir=tmp_path)
+    predictor.teams = {"Sauber": {"compound_characteristics": {"SOFT": {"laps_sampled": 20}}}}
+
+    patcher.setattr(predictor, "get_blended_team_strength", lambda team, race_name: 0.60)
+    patcher.setattr(
+        data_mixin_module,
+        "should_use_compound_adjustments",
+        lambda payload, min_laps_threshold: bool(payload),
+    )
+    patcher.setattr(
+        data_mixin_module,
+        "get_compound_performance_modifier",
+        lambda payload, compound: 0.05,
+    )
+
+    adjusted = predictor.get_compound_adjusted_team_strength("Audi", "Bahrain", "SOFT")
+    assert adjusted == pytest.approx(0.65)
+
+
 def test_testing_characteristics_profile_fallbacks(tmp_path):
     predictor = DummyPredictor(data_dir=tmp_path)
     predictor.teams = {
@@ -381,6 +484,7 @@ def test_testing_characteristics_profile_fallbacks(tmp_path):
         },
         "Ferrari": {"testing_characteristics": {"overall_pace": 0.55}},
         "RB": {"testing_characteristics": "invalid"},
+        "Sauber": {"testing_characteristics_profiles": {"short_run": {"overall_pace": 0.61}}},
     }
 
     assert predictor._get_testing_characteristics_for_profile("McLaren", "short_run") == {
@@ -394,6 +498,9 @@ def test_testing_characteristics_profile_fallbacks(tmp_path):
         "overall_pace": 0.55
     }
     assert predictor._get_testing_characteristics_for_profile("RB", "balanced") == {}
+    assert predictor._get_testing_characteristics_for_profile("Audi", "short_run") == {
+        "overall_pace": 0.61
+    }
 
 
 def test_compute_testing_profile_modifier_branches(tmp_path, patcher):

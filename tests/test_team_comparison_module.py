@@ -131,6 +131,29 @@ def test_build_team_comparison_dataframe_maps_sauber_payload_to_audi():
     assert neutral_fallbacks == 0
 
 
+def test_build_team_comparison_dataframe_uses_neutral_fallback_for_missing_profiles():
+    payload = {"Sauber": {"overall_performance": 0.38}}
+
+    canonical_payload = team_comparison._canonicalize_teams_payload_for_comparison(payload)
+    frame, neutral_fallbacks = team_comparison._build_team_comparison_dataframe(
+        teams_payload=canonical_payload,
+        selected_teams=["Audi"],
+        profile="balanced",
+    )
+
+    assert frame.iloc[0]["Team"] == "Audi"
+    assert frame.iloc[0]["Overall Performance"] == 0.38
+    assert frame.iloc[0]["Overall Pace"] == 0.5
+    assert frame.iloc[0]["Slow Corners"] == 0.5
+    assert frame.iloc[0]["Medium Corners"] == 0.5
+    assert frame.iloc[0]["Fast Corners"] == 0.5
+    assert frame.iloc[0]["Braking"] == 0.5
+    assert frame.iloc[0]["Top Speed"] == 0.5
+    assert frame.iloc[0]["Tire Deg"] == 0.5
+    assert frame.iloc[0]["Radar Minus Prior"] == 0.12
+    assert neutral_fallbacks == 7
+
+
 def test_load_team_characteristics_payload_handles_missing_and_invalid(tmp_path, patcher):
     patcher.setattr(team_comparison.config_loader, "get", lambda key, default=None: str(tmp_path))
 

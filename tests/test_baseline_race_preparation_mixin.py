@@ -170,6 +170,77 @@ def test_prepare_driver_info_with_compounds_builds_per_compound_strengths():
     assert info["tire_deg_by_compound"]["MEDIUM"] == pytest.approx(0.12)
 
 
+def test_prepare_driver_info_resolves_team_alias_for_uncertainty():
+    prep = DummyPreparation()
+    prep.compound_strength = 0.6
+    prep.profile_modifier = (0.0, False)
+    prep.config = DummyConfig(
+        {
+            "baseline_predictor.race.dnf_rate_historical_cap": 0.20,
+            "baseline_predictor.race.dnf_rate_final_cap": 0.35,
+            "baseline_predictor.race.team_uncertainty_dnf_multiplier": 0.20,
+        }
+    )
+    prep.teams = {"Sauber": {"overall_performance": 0.38, "uncertainty": 0.50}}
+    prep.drivers = {
+        "HUL": {
+            "pace": {"quali_pace": 0.58, "race_pace": 0.60},
+            "racecraft": {"skill_score": 0.66, "overtaking_skill": 0.62},
+            "dnf_risk": {"dnf_rate": 0.12},
+            "experience": {"tier": "established", "years_of_experience": 5},
+        }
+    }
+
+    info_map, _ = prep._prepare_driver_info(
+        qualifying_grid=[{"driver": "HUL", "team": "Audi", "position": 10}],
+        race_name="Bahrain Grand Prix",
+        race_compound="SOFT",
+    )
+
+    assert info_map["HUL"]["team_strength"] == pytest.approx(0.6)
+    assert info_map["HUL"]["dnf_probability"] == pytest.approx(0.22)
+
+
+def test_prepare_driver_info_with_compounds_resolves_team_alias_for_compound_data():
+    prep = DummyPreparation()
+    prep.blended_strength = 0.7
+    prep.profile_modifier = (0.0, False)
+    prep.config = DummyConfig(
+        {
+            "baseline_predictor.race.tire_physics.default_deg_slope": 0.12,
+            "baseline_predictor.race.dnf_rate_historical_cap": 0.20,
+            "baseline_predictor.race.dnf_rate_final_cap": 0.35,
+        }
+    )
+    prep.teams = {
+        "Sauber": {
+            "uncertainty": 0.2,
+            "compound_characteristics": {"SOFT": {"tire_deg_slope": 0.21}},
+        }
+    }
+    prep.drivers = {
+        "HUL": {
+            "pace": {"quali_pace": 0.58, "race_pace": 0.60},
+            "racecraft": {"skill_score": 0.66, "overtaking_skill": 0.62},
+            "dnf_risk": {"dnf_rate": 0.12},
+            "experience": {"tier": "established", "years_of_experience": 5},
+        }
+    }
+
+    with patch(
+        "src.utils.compound_performance.get_compound_performance_modifier",
+        lambda team_compound_chars, compound: 0.05 if compound == "SOFT" else 0.0,
+    ):
+        info_map, _ = prep._prepare_driver_info_with_compounds(
+            qualifying_grid=[{"driver": "HUL", "team": "Audi", "position": 10}],
+            race_name="Bahrain Grand Prix",
+        )
+
+    info = info_map["HUL"]
+    assert info["team_strength_by_compound"]["SOFT"] == pytest.approx(0.75)
+    assert info["tire_deg_by_compound"]["SOFT"] == pytest.approx(0.21)
+
+
 def test_get_driver_data_or_fallback_uses_teammate_profile_for_missing_lineup_driver():
     prep = DummyPreparation()
     prep.config = DummyConfig(

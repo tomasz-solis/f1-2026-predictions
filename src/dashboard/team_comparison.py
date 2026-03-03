@@ -189,18 +189,29 @@ def _canonicalize_teams_payload_for_comparison(
         display_name = (
             mapped_name if isinstance(mapped_name, str) and mapped_name else str(raw_team_name)
         )
+        team_payload = deepcopy(raw_team_data)
+        team_payload["team_name"] = display_name
 
         existing_data = canonical_payload.get(display_name)
         if existing_data is None:
-            canonical_payload[display_name] = deepcopy(raw_team_data)
+            canonical_payload[display_name] = team_payload
             continue
-        canonical_payload[display_name] = _merge_team_payload_values(existing_data, raw_team_data)
+        canonical_payload[display_name] = _merge_team_payload_values(existing_data, team_payload)
 
     return canonical_payload
 
 
 def _has_profile_metrics(team_data: dict[str, Any], profile: str) -> bool:
     """Return True when at least one profile metric is available for the selected profile."""
+    overall_perf = _coerce_unit_metric(team_data.get("overall_performance"))
+    team_name = team_data.get("team_name")
+    if (
+        overall_perf is not None
+        and isinstance(team_name, str)
+        and canonicalize_team(team_name) == "AUDI"
+    ):
+        return True
+
     metrics_payload = _resolve_profile_metrics(team_data, profile)
     if not isinstance(metrics_payload, dict):
         return False
@@ -233,14 +244,14 @@ def _build_team_comparison_dataframe(
         metrics_payload = _resolve_profile_metrics(team_data, profile)
         row: dict[str, Any] = {"Team": team_name}
 
-        overall_pace = _coerce_unit_metric(metrics_payload.get("overall_pace"))
-        row["Overall Pace"] = overall_pace if overall_pace is not None else 0.5
-        if overall_pace is None:
-            neutral_fallback_count += 1
-
         overall_perf = _coerce_unit_metric(team_data.get("overall_performance"))
         row["Overall Performance"] = overall_perf if overall_perf is not None else 0.5
         if overall_perf is None:
+            neutral_fallback_count += 1
+
+        overall_pace = _coerce_unit_metric(metrics_payload.get("overall_pace"))
+        row["Overall Pace"] = overall_pace if overall_pace is not None else 0.5
+        if overall_pace is None:
             neutral_fallback_count += 1
 
         for payload_key, label in _TEAM_RADAR_METRICS:
@@ -252,7 +263,7 @@ def _build_team_comparison_dataframe(
         radar_values = [float(row[label]) for _, label in _TEAM_RADAR_METRICS]
         radar_composite = float(sum(radar_values) / len(radar_values))
         row["Radar Composite"] = radar_composite
-        row["Prior Minus Radar"] = float(row["Overall Performance"]) - radar_composite
+        row["Radar Minus Prior"] = radar_composite - float(row["Overall Performance"])
 
         rows.append(row)
 
@@ -349,6 +360,10 @@ def _render_team_comparison_section(year: int = 2026) -> None:
         if isinstance(teams_payload.get(team_name), dict)
         and _has_profile_metrics(teams_payload[team_name], profile)
     ]
+    teams_without_signal = [
+        team_name for team_name in selected_teams if team_name not in teams_with_signal
+    ]
+
     if not teams_with_signal:
         st.info(
             "Selected teams do not have testing/practice profile metrics for this profile yet. "
@@ -357,9 +372,13 @@ def _render_team_comparison_section(year: int = 2026) -> None:
         )
         return
 
+    if teams_without_signal:
+        excluded_team_list = ", ".join(teams_without_signal)
+        st.caption(f"Excluded teams without `{profile}` profile metrics: {excluded_team_list}.")
+
     comparison_df, neutral_fallbacks = _build_team_comparison_dataframe(
         teams_payload=teams_payload,
-        selected_teams=selected_teams,
+        selected_teams=teams_with_signal,
         profile=profile,
     )
 
@@ -445,7 +464,7 @@ def _render_team_comparison_section(year: int = 2026) -> None:
         "Overall Pace",
         "Overall Performance",
         "Radar Composite",
-        "Prior Minus Radar",
+        "Radar Minus Prior",
     ]
     for column in percent_cols:
         display_df[column] = (display_df[column].astype(float) * 100.0).round(1)
@@ -455,7 +474,7 @@ def _render_team_comparison_section(year: int = 2026) -> None:
             "Overall Pace",
             "Radar Composite",
             "Overall Performance",
-            "Prior Minus Radar",
+            "Radar Minus Prior",
             *radar_labels,
         ]
     ].rename(
@@ -463,7 +482,7 @@ def _render_team_comparison_section(year: int = 2026) -> None:
             "Overall Pace": "Profile Pace (Testing)",
             "Radar Composite": "Radar Composite (6 Metrics)",
             "Overall Performance": "Season Prior Strength",
-            "Prior Minus Radar": "Prior - Radar Gap",
+            "Radar Minus Prior": "Radar - Prior Gap",
         }
     )
 

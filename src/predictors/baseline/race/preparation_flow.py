@@ -10,6 +10,7 @@ import numpy as np
 
 from src.types.prediction_types import DriverRaceInfo, QualifyingGridEntry
 from src.utils import config_loader
+from src.utils.team_mapping import map_team_to_characteristics
 
 _EXPERIENCE_DNF_MODIFIERS = {
     "rookie": 0.05,
@@ -318,6 +319,21 @@ def _load_preparation_config(config: Any | None) -> tuple[float, float, float, d
     )
 
 
+def _resolve_team_payload(teams: dict[str, dict], team: str) -> dict:
+    """Resolve a team payload with alias-aware lookup before returning defaults."""
+    team_payload = teams.get(team)
+    if isinstance(team_payload, dict):
+        return team_payload
+
+    known_teams = set(teams.keys())
+    mapped_team = map_team_to_characteristics(team, known_teams=known_teams)
+    if not isinstance(mapped_team, str) or not mapped_team:
+        return {}
+
+    mapped_payload = teams.get(mapped_team)
+    return mapped_payload if isinstance(mapped_payload, dict) else {}
+
+
 def prepare_driver_info_core(
     qualifying_grid: list[QualifyingGridEntry],
     race_name: str | None,
@@ -347,11 +363,12 @@ def prepare_driver_info_core(
         driver_code = entry["driver"]
         team = entry["team"]
         grid_pos = entry["position"]
+        team_payload = _resolve_team_payload(teams, team)
 
         if race_name:
             team_strength = get_compound_adjusted_team_strength_fn(team, race_name, race_compound)
         else:
-            team_strength = teams.get(team, {}).get("overall_performance", 0.50)
+            team_strength = team_payload.get("overall_performance", 0.50)
 
         long_modifier, has_long_profile = compute_testing_profile_modifier_fn(
             team,
@@ -369,7 +386,7 @@ def prepare_driver_info_core(
             defensive_skill_weights=defensive_skill_weights,
         )
 
-        team_uncertainty = teams.get(team, {}).get("uncertainty", 0.30)
+        team_uncertainty = team_payload.get("uncertainty", 0.30)
         dnf_probability = _compute_driver_dnf_probability(
             driver_data,
             team_uncertainty=team_uncertainty,
@@ -425,11 +442,12 @@ def prepare_driver_info_with_compounds_core(
         driver_code = entry["driver"]
         team = entry["team"]
         grid_pos = entry["position"]
+        team_payload = _resolve_team_payload(teams, team)
 
         if race_name:
             base_team_strength = get_blended_team_strength_fn(team, race_name)
         else:
-            base_team_strength = teams.get(team, {}).get("overall_performance", 0.50)
+            base_team_strength = team_payload.get("overall_performance", 0.50)
 
         long_modifier, has_long_profile = compute_testing_profile_modifier_fn(
             team,
@@ -441,7 +459,7 @@ def prepare_driver_info_with_compounds_core(
         if has_long_profile:
             teams_with_long_profile.add(team)
 
-        team_compound_chars = teams.get(team, {}).get("compound_characteristics", {})
+        team_compound_chars = team_payload.get("compound_characteristics", {})
         team_strength_by_compound: dict[str, float] = {}
         tire_deg_by_compound: dict[str, float] = {}
         for compound in ("SOFT", "MEDIUM", "HARD"):
@@ -463,7 +481,7 @@ def prepare_driver_info_with_compounds_core(
             driver_data=driver_data,
             defensive_skill_weights=defensive_skill_weights,
         )
-        team_uncertainty = teams.get(team, {}).get("uncertainty", 0.30)
+        team_uncertainty = team_payload.get("uncertainty", 0.30)
         dnf_probability = _compute_driver_dnf_probability(
             driver_data,
             team_uncertainty=team_uncertainty,
