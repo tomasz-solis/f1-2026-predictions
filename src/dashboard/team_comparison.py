@@ -1,6 +1,7 @@
 """Team-comparison data loading and rendering helpers."""
 
 import json
+from copy import deepcopy
 from math import isfinite
 from pathlib import Path
 from typing import Any
@@ -9,7 +10,7 @@ import pandas as pd
 import streamlit as st
 
 from src.utils import config_loader
-from src.utils.team_mapping import canonicalize_team
+from src.utils.team_mapping import canonicalize_team, map_team_to_characteristics
 
 _TEAM_RADAR_METRICS: tuple[tuple[str, str], ...] = (
     ("slow_corner_performance", "Slow Corners"),
@@ -26,13 +27,13 @@ _TEAM_BRAND_COLORS: dict[str, str] = {
     "MERCEDES": "#00D2BE",
     "ASTON MARTIN": "#006F62",
     "ALPINE": "#2293D1",
-    "HAAS": "#B6BABD",
+    "HAAS": "#7C8798",
     "RB": "#6692FF",
     "WILLIAMS": "#005AFF",
     "AUDI": "#C4122E",
     "CADILLAC": "#2A4AA0",
 }
-_DEFAULT_TEAM_COLOR = "#7C8798"
+_DEFAULT_TEAM_COLOR = "#B6BABD"
 _DEFAULT_BIG4_CANONICAL: tuple[str, ...] = ("MCLAREN", "MERCEDES", "FERRARI", "RED BULL")
 
 
@@ -145,6 +146,59 @@ def _resolve_profile_metrics(team_data: dict[str, Any], profile: str) -> dict[st
     return {}
 
 
+def _is_missing_payload_value(value: Any) -> bool:
+    """Return True for payload values that should be considered missing."""
+    if value is None:
+        return True
+    if isinstance(value, float):
+        return not isfinite(value)
+    return False
+
+
+def _merge_team_payload_values(existing: Any, incoming: Any) -> Any:
+    """
+    Merge team payload fragments while preserving existing non-missing values.
+
+    This is used to combine legacy and rebranded team keys that belong to the
+    same canonical constructor identity.
+    """
+    if isinstance(existing, dict) and isinstance(incoming, dict):
+        merged = deepcopy(existing)
+        for key, incoming_value in incoming.items():
+            if key not in merged:
+                merged[key] = deepcopy(incoming_value)
+                continue
+            merged[key] = _merge_team_payload_values(merged[key], incoming_value)
+        return merged
+
+    if _is_missing_payload_value(existing) and not _is_missing_payload_value(incoming):
+        return deepcopy(incoming)
+    return deepcopy(existing)
+
+
+def _canonicalize_teams_payload_for_comparison(
+    teams_payload: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Canonicalize team labels for UI display and merge alias payloads."""
+    canonical_payload: dict[str, dict[str, Any]] = {}
+    for raw_team_name, raw_team_data in teams_payload.items():
+        if not isinstance(raw_team_data, dict):
+            continue
+
+        mapped_name = map_team_to_characteristics(str(raw_team_name))
+        display_name = (
+            mapped_name if isinstance(mapped_name, str) and mapped_name else str(raw_team_name)
+        )
+
+        existing_data = canonical_payload.get(display_name)
+        if existing_data is None:
+            canonical_payload[display_name] = deepcopy(raw_team_data)
+            continue
+        canonical_payload[display_name] = _merge_team_payload_values(existing_data, raw_team_data)
+
+    return canonical_payload
+
+
 def _has_profile_metrics(team_data: dict[str, Any], profile: str) -> bool:
     """Return True when at least one profile metric is available for the selected profile."""
     metrics_payload = _resolve_profile_metrics(team_data, profile)
@@ -240,8 +294,12 @@ def _render_team_comparison_section(year: int = 2026) -> None:
         st.info(f"Team characteristics unavailable at `{characteristics_path}`.")
         return
 
-    teams_payload = payload.get("teams")
-    if not isinstance(teams_payload, dict) or not teams_payload:
+    raw_teams_payload = payload.get("teams")
+    if not isinstance(raw_teams_payload, dict) or not raw_teams_payload:
+        st.info("No team characteristics found for comparison.")
+        return
+    teams_payload = _canonicalize_teams_payload_for_comparison(raw_teams_payload)
+    if not teams_payload:
         st.info("No team characteristics found for comparison.")
         return
 

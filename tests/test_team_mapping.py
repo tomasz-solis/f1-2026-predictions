@@ -14,3 +14,10 @@ def test_map_team_to_characteristics_respects_known_teams():
     known = {"Red Bull", "McLaren"}
     assert map_team_to_characteristics("Oracle Red Bull Racing", known_teams=known) == "Red Bull"
     assert map_team_to_characteristics("Unknown Team", known_teams=known) is None
+
+
+def test_map_team_to_characteristics_supports_legacy_known_team_aliases():
+    """Known-team fallback should preserve legacy labels from older payloads."""
+    known = {"Sauber", "Red Bull Racing"}
+    assert map_team_to_characteristics("Kick Sauber", known_teams=known) == "Sauber"
+    assert map_team_to_characteristics("Audi F1 Team", known_teams=known) == "Sauber"

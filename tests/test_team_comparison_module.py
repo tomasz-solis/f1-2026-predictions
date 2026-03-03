@@ -73,6 +73,64 @@ def test_collect_profile_names_empty_when_no_testing_profiles():
     assert team_comparison._collect_profile_names(payload) == []
 
 
+def test_canonicalize_teams_payload_for_comparison_merges_sauber_into_audi():
+    payload = {
+        "Sauber": {"overall_performance": 0.38},
+        "Audi": {
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.61,
+                    "slow_corner_performance": 0.49,
+                    "medium_corner_performance": 0.44,
+                    "fast_corner_performance": 0.52,
+                    "braking_performance": 0.47,
+                    "top_speed": 0.50,
+                    "tire_deg_performance": 0.55,
+                }
+            }
+        },
+    }
+
+    canonical_payload = team_comparison._canonicalize_teams_payload_for_comparison(payload)
+
+    assert list(canonical_payload.keys()) == ["Audi"]
+    assert canonical_payload["Audi"]["overall_performance"] == 0.38
+    assert (
+        canonical_payload["Audi"]["testing_characteristics_profiles"]["balanced"]["overall_pace"]
+        == 0.61
+    )
+
+
+def test_build_team_comparison_dataframe_maps_sauber_payload_to_audi():
+    payload = {
+        "Sauber": {
+            "overall_performance": 0.38,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.61,
+                    "slow_corner_performance": 0.49,
+                    "medium_corner_performance": 0.44,
+                    "fast_corner_performance": 0.52,
+                    "braking_performance": 0.47,
+                    "top_speed": 0.50,
+                    "tire_deg_performance": 0.55,
+                }
+            },
+        }
+    }
+
+    canonical_payload = team_comparison._canonicalize_teams_payload_for_comparison(payload)
+    frame, neutral_fallbacks = team_comparison._build_team_comparison_dataframe(
+        teams_payload=canonical_payload,
+        selected_teams=["Audi"],
+        profile="balanced",
+    )
+
+    assert frame.iloc[0]["Team"] == "Audi"
+    assert frame.iloc[0]["Overall Performance"] == 0.38
+    assert neutral_fallbacks == 0
+
+
 def test_load_team_characteristics_payload_handles_missing_and_invalid(tmp_path, patcher):
     patcher.setattr(team_comparison.config_loader, "get", lambda key, default=None: str(tmp_path))
 

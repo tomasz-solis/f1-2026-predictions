@@ -159,6 +159,24 @@ def _normalize_name(value: str) -> str:
     return "".join(char for char in str(value).lower() if char.isalnum())
 
 
+def _resolve_known_team_by_canonical_id(canonical_id: str, known_teams: set[str]) -> str | None:
+    """Resolve a canonical team ID to an existing known-team label."""
+    if not canonical_id or not known_teams:
+        return None
+
+    candidates = [
+        team_name for team_name in known_teams if canonicalize_team(team_name) == canonical_id
+    ]
+    if not candidates:
+        return None
+
+    preferred = CHARACTERISTICS_TEAM_MAP.get(canonical_id)
+    if preferred in candidates:
+        return preferred
+
+    return sorted(candidates, key=lambda value: (len(value), value))[0]
+
+
 def map_team_to_characteristics(name: str, known_teams: set[str] | None = None) -> str | None:
     """
     Map a team label from FastF1/other sources to characteristics team naming.
@@ -188,6 +206,12 @@ def map_team_to_characteristics(name: str, known_teams: set[str] | None = None) 
 
     # Fuzzy fallback when an explicit known-team set is provided.
     if known_teams:
+        # Backward-compatible fallback when known teams still use legacy labels
+        # (for example, "Sauber" while canonical lineage is "Audi").
+        known_canonical_match = _resolve_known_team_by_canonical_id(canonical_id, known_teams)
+        if known_canonical_match:
+            return known_canonical_match
+
         normalized_input = _normalize_name(team_text)
         normalized_known = {_normalize_name(team): team for team in known_teams}
 
