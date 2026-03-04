@@ -366,7 +366,7 @@ def _reconcile_prediction_actuals(
     if is_sprint:
         sessions_to_reconcile = ["FP1", "SQ", "Sprint", "Q", "R"]
 
-    actual_cache: dict[str, list[dict[str, Any]] | None] = {}
+    actual_cache: dict[str, list[Any] | None] = {}
     reconciled = 0
     snapshots = 0
 

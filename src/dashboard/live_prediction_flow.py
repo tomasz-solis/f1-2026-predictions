@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
-import inspect
 import json
 import logging
 import time
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
+from datetime import UTC, datetime
 from hashlib import sha1
 from threading import RLock
 from typing import Any, Protocol
 
+from src.dashboard.precomputed_predictions import (
+    compute_artifact_hash,
+    get_prediction_precompute_config,
+    load_precomputed_prediction,
+    save_precomputed_prediction,
+)
 from src.utils.operational_observability import (
     drain_recent_alerts,
     record_alert,
@@ -38,6 +44,45 @@ class PredictionRunFn(Protocol):
     ) -> PredictionResults: ...
 
 
+class AutoUpdateIfNeededFn(Protocol):
+    """Type contract for race-update callback."""
+
+    def __call__(self, *, year: int, force_recheck: bool = False) -> None: ...
+
+
+class DetectEventBoundaryRefreshFn(Protocol):
+    """Type contract for event-boundary refresh callback."""
+
+    def __call__(
+        self,
+        *,
+        year: int,
+        race_name: str,
+        is_sprint: bool,
+        session_detector: Any | None = None,
+    ) -> dict[str, Any]: ...
+
+
+class AutoUpdatePracticeIfNeededFn(Protocol):
+    """Type contract for practice-update callback."""
+
+    def __call__(
+        self,
+        *,
+        year: int,
+        race_name: str,
+        is_sprint: bool,
+        force_recheck: bool = False,
+        session_detector: Any | None = None,
+    ) -> dict[str, Any]: ...
+
+
+class GetArtifactVersionsFn(Protocol):
+    """Type contract for artifact-version callback."""
+
+    def __call__(self, *, year: int) -> ArtifactVersions: ...
+
+
 logger = logging.getLogger(__name__)
 _PREDICTION_RESULT_CACHE_MAX_ENTRIES = 24
 _prediction_result_cache: OrderedDict[str, PredictionResults] = OrderedDict()
@@ -50,156 +95,8 @@ def clear_prediction_result_cache() -> None:
         _prediction_result_cache.clear()
 
 
-def _invoke_auto_update_if_needed(
-    auto_update_if_needed_fn: Callable[..., None],
-    *,
-    year: int,
-    force_recheck: bool,
-) -> None:
-    """
-    Invoke auto-update callback while supporting legacy callable signatures.
-    """
-    try:
-        signature = inspect.signature(auto_update_if_needed_fn)
-        parameters: Mapping[str, inspect.Parameter] = signature.parameters
-    except (TypeError, ValueError):
-        parameters = {}
-
-    supports_var_kwargs = any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-    )
-    kwargs: dict[str, Any] = {}
-    if supports_var_kwargs or "year" in parameters:
-        kwargs["year"] = year
-    if supports_var_kwargs or "force_recheck" in parameters:
-        kwargs["force_recheck"] = force_recheck
-
-    if kwargs:
-        auto_update_if_needed_fn(**kwargs)
-        return
-
-    if parameters:
-        auto_update_if_needed_fn(force_recheck)
-        return
-
-    auto_update_if_needed_fn()
-
-
-def _invoke_get_artifact_versions(
-    get_artifact_versions_fn: Callable[..., ArtifactVersions],
-    *,
-    year: int,
-) -> ArtifactVersions:
-    """Invoke artifact-version callback with year when supported."""
-    try:
-        signature = inspect.signature(get_artifact_versions_fn)
-        parameters: Mapping[str, inspect.Parameter] = signature.parameters
-    except (TypeError, ValueError):
-        parameters = {}
-
-    supports_var_kwargs = any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-    )
-    if supports_var_kwargs or "year" in parameters:
-        return get_artifact_versions_fn(year=year)
-    if parameters:
-        return get_artifact_versions_fn(year)
-    return get_artifact_versions_fn()
-
-
-def _invoke_detect_event_boundary_refresh(
-    detect_event_boundary_refresh_fn: Callable[..., dict[str, Any]],
-    *,
-    year: int,
-    race_name: str,
-    is_sprint: bool,
-    session_detector: Any | None = None,
-) -> dict[str, Any]:
-    """Invoke boundary-refresh detector with compatibility for legacy signatures."""
-    try:
-        signature = inspect.signature(detect_event_boundary_refresh_fn)
-        parameters: Mapping[str, inspect.Parameter] = signature.parameters
-    except (TypeError, ValueError):
-        parameters = {}
-
-    supports_var_kwargs = any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-    )
-    kwargs: dict[str, Any] = {}
-    if supports_var_kwargs or "year" in parameters:
-        kwargs["year"] = year
-    if supports_var_kwargs or "race_name" in parameters:
-        kwargs["race_name"] = race_name
-    if supports_var_kwargs or "is_sprint" in parameters:
-        kwargs["is_sprint"] = is_sprint
-    if session_detector is not None and (supports_var_kwargs or "session_detector" in parameters):
-        kwargs["session_detector"] = session_detector
-
-    try:
-        if kwargs:
-            result = detect_event_boundary_refresh_fn(**kwargs)
-        elif parameters:
-            result = detect_event_boundary_refresh_fn(year, race_name, is_sprint)
-        else:
-            result = detect_event_boundary_refresh_fn()
-    except TypeError:
-        # Backward-compatible fallback for patched callables with partial signatures.
-        result = detect_event_boundary_refresh_fn(year, race_name, is_sprint)
-
-    if isinstance(result, dict):
-        return result
-    return {"refresh_needed": False, "reason": "invalid_detector_response", "new_sessions": []}
-
-
-def _invoke_auto_update_practice_if_needed(
-    auto_update_practice_if_needed_fn: Callable[..., dict[str, Any]],
-    *,
-    year: int,
-    race_name: str,
-    is_sprint: bool,
-    force_recheck: bool,
-    session_detector: Any | None = None,
-) -> dict[str, Any]:
-    """Invoke practice-update callback with compatibility for legacy signatures."""
-    try:
-        signature = inspect.signature(auto_update_practice_if_needed_fn)
-        parameters: Mapping[str, inspect.Parameter] = signature.parameters
-    except (TypeError, ValueError):
-        parameters = {}
-
-    supports_var_kwargs = any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-    )
-    kwargs: dict[str, Any] = {}
-    if supports_var_kwargs or "year" in parameters:
-        kwargs["year"] = year
-    if supports_var_kwargs or "race_name" in parameters:
-        kwargs["race_name"] = race_name
-    if supports_var_kwargs or "is_sprint" in parameters:
-        kwargs["is_sprint"] = is_sprint
-    if supports_var_kwargs or "force_recheck" in parameters:
-        kwargs["force_recheck"] = force_recheck
-    if session_detector is not None and (supports_var_kwargs or "session_detector" in parameters):
-        kwargs["session_detector"] = session_detector
-
-    try:
-        if kwargs:
-            result = auto_update_practice_if_needed_fn(**kwargs)
-        elif parameters:
-            result = auto_update_practice_if_needed_fn(year, race_name, is_sprint, force_recheck)
-        else:
-            result = auto_update_practice_if_needed_fn()
-    except TypeError:
-        result = auto_update_practice_if_needed_fn(year, race_name, is_sprint, force_recheck)
-
-    if isinstance(result, dict):
-        return result
-    return {"updated": False, "completed_fp_sessions": []}
-
-
 def _prediction_cache_key(
     *,
-    cache_scope_id: str,
     year: int,
     race_name: str,
     weather: str,
@@ -209,7 +106,6 @@ def _prediction_cache_key(
 ) -> str:
     """Build stable cache key for prediction output reuse."""
     payload = {
-        "cache_scope_id": cache_scope_id,
         "year": year,
         "race_name": race_name,
         "weather": weather,
@@ -409,6 +305,15 @@ def save_prediction_if_enabled_core(
                     weather=weather,
                     fp_blend_info=fp_blend_info,
                 )
+                _persist_prediction_checkpoint_summary(
+                    logger_instance=logger_inst,
+                    prediction_results=prediction_results,
+                    year=year,
+                    race_name=race_name,
+                    session_name=str(latest_session),
+                    weather=weather,
+                    is_sprint=is_sprint,
+                )
                 st_module.info(f"Prediction saved for accuracy tracking (after {latest_session})")
             except Exception as exc:
                 st_module.warning(f"Could not save prediction: {exc}")
@@ -455,18 +360,155 @@ def prediction_payload_for_session(
     )
 
 
+def _prediction_sections_for_session(
+    *,
+    prediction_results: PredictionResults,
+    is_sprint: bool,
+    session_name: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Return qualifying/race section dicts corresponding to a checkpoint session."""
+    if not is_sprint:
+        return (
+            prediction_results.get("qualifying", {}),
+            prediction_results.get("race", {}),
+        )
+
+    session_name_upper = str(session_name).strip().upper()
+    if session_name_upper in {"FP1", "SQ", "SPRINT"}:
+        return (
+            prediction_results.get("sprint_quali", {}),
+            prediction_results.get("sprint_race", {}),
+        )
+
+    return (
+        prediction_results.get("main_quali", {}),
+        prediction_results.get("main_race", {}),
+    )
+
+
+def _mean_confidence(entries: Any) -> float | None:
+    """Compute mean confidence across prediction rows when values are present."""
+    if not isinstance(entries, list):
+        return None
+    values: list[float] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        raw_confidence = entry.get("confidence")
+        if raw_confidence is None:
+            continue
+        try:
+            values.append(float(raw_confidence))
+        except (TypeError, ValueError):
+            continue
+    if not values:
+        return None
+    return float(sum(values) / len(values))
+
+
+def _persist_prediction_checkpoint_summary(
+    *,
+    logger_instance: Any,
+    prediction_results: PredictionResults,
+    year: int,
+    race_name: str,
+    session_name: str,
+    weather: str,
+    is_sprint: bool,
+) -> None:
+    """Persist compact checkpoint metadata for session-by-session trend analysis."""
+    artifact_store = getattr(logger_instance, "artifact_store", None)
+    if artifact_store is None or not hasattr(artifact_store, "save_artifact"):
+        return
+
+    qualifying_section, race_section = _prediction_sections_for_session(
+        prediction_results=prediction_results,
+        is_sprint=is_sprint,
+        session_name=session_name,
+    )
+    if not isinstance(qualifying_section, dict):
+        qualifying_section = {}
+    if not isinstance(race_section, dict):
+        race_section = {}
+    qualifying_grid = qualifying_section.get("grid", [])
+    race_finish_order = race_section.get("finish_order", [])
+
+    payload = {
+        "metadata": {
+            "year": int(year),
+            "race_name": str(race_name),
+            "session_name": str(session_name).strip().upper(),
+            "weather": str(weather).strip().lower(),
+            "is_sprint_weekend": bool(is_sprint),
+            "generated_at": datetime.now(UTC).isoformat(),
+            "source": "dashboard_live_prediction",
+        },
+        "qualifying": {
+            "data_source": qualifying_section.get("data_source"),
+            "grid_source": qualifying_section.get("grid_source", "PREDICTED"),
+            "data_confidence_score": qualifying_section.get("data_confidence_score"),
+            "mean_confidence": _mean_confidence(qualifying_grid),
+            "driver_count": len(qualifying_grid) if isinstance(qualifying_grid, list) else 0,
+        },
+        "race": {
+            "grid_source": race_section.get("grid_source", "PREDICTED"),
+            "input_confidence": race_section.get("input_confidence"),
+            "mean_confidence": _mean_confidence(race_finish_order),
+            "driver_count": len(race_finish_order) if isinstance(race_finish_order, list) else 0,
+        },
+        "fp_blend_info": qualifying_section.get("fp_blend_info", {}),
+    }
+
+    try:
+        artifact_store.save_artifact(
+            artifact_type="prediction_checkpoint",
+            artifact_key=f"{int(year)}::{race_name}::{str(session_name).strip().upper()}",
+            data=payload,
+            version=1,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Could not persist prediction checkpoint summary for %s %s %s: %s",
+            year,
+            race_name,
+            session_name,
+            exc,
+        )
+
+
 def render_prediction_results_core(
     *,
     prediction_results: PredictionResults,
     is_sprint: bool,
     display_prediction_result_fn: Callable[[PredictionResults, str, bool], None],
     st_module: Any,
+    prediction_cache_hit: bool = False,
+    pipeline_timing: Mapping[str, Any] | None = None,
 ) -> None:
     """Render prediction result sections for sprint and non-sprint weekends."""
     first_result = list(prediction_results.values())[0]
     timing = first_result.get("timing", {})
-    if timing:
-        st_module.success(f"Predictions complete in {timing['total']:.2f}s")
+    total_runtime = (
+        float(pipeline_timing["total"])
+        if isinstance(pipeline_timing, Mapping)
+        and isinstance(pipeline_timing.get("total"), int | float)
+        else None
+    )
+    simulated_runtime = (
+        float(timing["total"])
+        if isinstance(timing, Mapping) and isinstance(timing.get("total"), int | float)
+        else None
+    )
+
+    if prediction_cache_hit:
+        if total_runtime is not None:
+            st_module.success(f"Prediction loaded from cache in {total_runtime:.2f}s")
+        else:
+            st_module.success("Prediction loaded from cache.")
+    elif simulated_runtime is not None:
+        st_module.success(f"Predictions complete in {simulated_runtime:.2f}s")
+    elif total_runtime is not None:
+        st_module.success(f"Predictions complete in {total_runtime:.2f}s")
     else:
         st_module.success("Predictions complete.")
 
@@ -514,6 +556,101 @@ def render_prediction_results_core(
         )
 
 
+def _get_prediction_precompute_settings() -> dict[str, Any]:
+    """Return normalized settings that control boundary-triggered precompute."""
+    defaults: dict[str, Any] = {
+        "enabled": True,
+        "include_next_weekend": False,
+        "weather_scenarios": ["dry", "mixed", "rain"],
+        "max_file_entries": 96,
+    }
+    try:
+        loaded = get_prediction_precompute_config()
+    except Exception as exc:
+        logger.warning("Could not load prediction precompute config: %s", exc)
+        return defaults
+
+    if not isinstance(loaded, dict):
+        return defaults
+
+    settings: dict[str, Any] = dict(defaults)
+    settings.update(loaded)
+    weather_scenarios = settings.get("weather_scenarios")
+    default_weather_scenarios = [str(item) for item in defaults["weather_scenarios"]]
+    if not isinstance(weather_scenarios, list):
+        settings["weather_scenarios"] = list(default_weather_scenarios)
+    else:
+        valid_weather = {"dry", "mixed", "rain"}
+        normalized_weather = []
+        for weather_option in weather_scenarios:
+            normalized = str(weather_option).strip().lower()
+            if normalized in valid_weather and normalized not in normalized_weather:
+                normalized_weather.append(normalized)
+        settings["weather_scenarios"] = (
+            normalized_weather if normalized_weather else list(default_weather_scenarios)
+        )
+    settings["enabled"] = bool(settings.get("enabled", defaults["enabled"]))
+    settings["include_next_weekend"] = bool(
+        settings.get("include_next_weekend", defaults["include_next_weekend"])
+    )
+    raw_max_file_entries = settings.get("max_file_entries", 96)
+    if isinstance(raw_max_file_entries, int | float | str):
+        try:
+            settings["max_file_entries"] = max(16, int(raw_max_file_entries))
+        except (TypeError, ValueError):
+            settings["max_file_entries"] = defaults["max_file_entries"]
+    else:
+        settings["max_file_entries"] = defaults["max_file_entries"]
+    return settings
+
+
+def _resolve_precompute_targets(
+    *,
+    year: int,
+    race_name: str,
+    include_next_weekend: bool,
+) -> list[str]:
+    """Resolve race targets for boundary-triggered precompute."""
+    targets = [race_name]
+    if not include_next_weekend:
+        return targets
+
+    try:
+        from src.utils.weekend import _get_schedule_rows
+
+        rows = list(_get_schedule_rows(year))
+    except Exception as exc:
+        logger.warning("Could not load schedule rows for precompute targeting: %s", exc)
+        return targets
+
+    if not rows:
+        return targets
+
+    race_names: list[str] = []
+    for event_name, _event_format in rows:
+        normalized = str(event_name).strip()
+        if not normalized:
+            continue
+        if "testing" in normalized.lower():
+            continue
+        race_names.append(normalized)
+
+    if not race_names:
+        return targets
+
+    normalized_current = race_name.strip().lower()
+    for idx, candidate in enumerate(race_names):
+        if candidate.strip().lower() != normalized_current:
+            continue
+        if idx + 1 < len(race_names):
+            next_race = race_names[idx + 1]
+            if next_race not in targets:
+                targets.append(next_race)
+        break
+
+    return targets
+
+
 def execute_live_prediction_pipeline_core(
     *,
     race_name: str,
@@ -521,21 +658,23 @@ def execute_live_prediction_pipeline_core(
     year: int,
     force_refresh: bool,
     progress_callback: Callable[[str], None] | None,
+    precompute_include_next_weekend: bool | None = None,
     clear_fastf1_race_cache_fn: Callable[[int, str], None],
-    auto_update_if_needed_fn: Callable[..., None],
+    auto_update_if_needed_fn: AutoUpdateIfNeededFn,
     is_sprint_weekend_fn: Callable[[int, str], bool],
-    detect_event_boundary_refresh_if_needed_fn: Callable[..., dict[str, Any]],
-    auto_update_practice_characteristics_if_needed_fn: Callable[..., dict[str, Any]],
+    detect_event_boundary_refresh_if_needed_fn: DetectEventBoundaryRefreshFn,
+    auto_update_practice_characteristics_if_needed_fn: AutoUpdatePracticeIfNeededFn,
     clear_resource_cache_fn: Callable[[], None],
     clear_data_cache_fn: Callable[[], None],
-    get_artifact_versions_fn: Callable[..., ArtifactVersions],
+    get_artifact_versions_fn: GetArtifactVersionsFn,
     run_prediction_fn: PredictionRunFn,
-    cache_scope_id: str = "",
 ) -> dict[str, Any]:
     """
     Refresh input data and execute a prediction run.
 
     Kept separate from Streamlit rendering so tests can assert refresh call order.
+
+    `precompute_include_next_weekend` overrides config scope when provided.
     """
     pipeline_timing: dict[str, float] = {}
     pipeline_start = time.time()
@@ -566,8 +705,7 @@ def execute_live_prediction_pipeline_core(
 
     update_start = time.time()
     _notify("Checking completed races and model updates...")
-    _invoke_auto_update_if_needed(
-        auto_update_if_needed_fn,
+    auto_update_if_needed_fn(
         year=year,
         force_recheck=force_refresh,
     )
@@ -582,8 +720,7 @@ def execute_live_prediction_pipeline_core(
     session_detector = SessionDetector()
 
     if not force_refresh:
-        boundary_refresh = _invoke_detect_event_boundary_refresh(
-            detect_event_boundary_refresh_if_needed_fn,
+        boundary_refresh = detect_event_boundary_refresh_if_needed_fn(
             year=year,
             race_name=race_name,
             is_sprint=is_sprint,
@@ -595,8 +732,7 @@ def execute_live_prediction_pipeline_core(
             should_clear_runtime_caches = True
 
             update_start = time.time()
-            _invoke_auto_update_if_needed(
-                auto_update_if_needed_fn,
+            auto_update_if_needed_fn(
                 year=year,
                 force_recheck=False,
             )
@@ -604,8 +740,7 @@ def execute_live_prediction_pipeline_core(
 
     practice_start = time.time()
     _notify("Checking completed practice sessions...")
-    practice_update = _invoke_auto_update_practice_if_needed(
-        auto_update_practice_characteristics_if_needed_fn,
+    practice_update = auto_update_practice_characteristics_if_needed_fn(
         year=year,
         race_name=race_name,
         is_sprint=is_sprint,
@@ -620,10 +755,21 @@ def execute_live_prediction_pipeline_core(
         clear_data_cache_fn()
 
     prediction_start = time.time()
-    artifact_versions = _invoke_get_artifact_versions(get_artifact_versions_fn, year=year)
+    precompute_summary: dict[str, Any] = {
+        "triggered": False,
+        "generated": 0,
+        "reused": 0,
+        "targets": [],
+        "errors": [],
+    }
+    precompute_settings = _get_prediction_precompute_settings()
+    if precompute_include_next_weekend is not None:
+        precompute_settings["include_next_weekend"] = bool(precompute_include_next_weekend)
+
+    artifact_versions = get_artifact_versions_fn(year=year)
+    artifact_hash = compute_artifact_hash(artifact_versions)
     boundary_signature = str(boundary_refresh.get("boundary_signature", ""))
     prediction_cache_key = _prediction_cache_key(
-        cache_scope_id=cache_scope_id,
         year=year,
         race_name=race_name,
         weather=weather,
@@ -634,8 +780,22 @@ def execute_live_prediction_pipeline_core(
     prediction_cache_hit = False
 
     can_use_cached_prediction = not bool(force_refresh)
+    cached_prediction = (
+        _get_cached_prediction(prediction_cache_key) if can_use_cached_prediction else None
+    )
+    if can_use_cached_prediction and cached_prediction is None:
+        persisted_prediction = load_precomputed_prediction(
+            year=year,
+            race_name=race_name,
+            weather=weather,
+            artifact_hash=artifact_hash,
+            boundary_signature=boundary_signature,
+        )
+        if persisted_prediction is not None:
+            _store_cached_prediction(prediction_cache_key, persisted_prediction)
+            cached_prediction = persisted_prediction
+
     if can_use_cached_prediction:
-        cached_prediction = _get_cached_prediction(prediction_cache_key)
         if cached_prediction is not None:
             cache_refresh_reason = _cache_hit_requires_competitive_refresh(
                 prediction_results=cached_prediction,
@@ -658,6 +818,16 @@ def execute_live_prediction_pipeline_core(
                     year=year,
                 )
                 _store_cached_prediction(prediction_cache_key, prediction_results)
+                save_precomputed_prediction(
+                    year=year,
+                    race_name=race_name,
+                    weather=weather,
+                    artifact_hash=artifact_hash,
+                    boundary_signature=boundary_signature,
+                    is_sprint=is_sprint,
+                    prediction_results=prediction_results,
+                    max_file_entries=int(precompute_settings["max_file_entries"]),
+                )
         else:
             _notify("Running qualifying and race simulations...")
             prediction_results = run_prediction_fn(
@@ -668,6 +838,16 @@ def execute_live_prediction_pipeline_core(
                 year=year,
             )
             _store_cached_prediction(prediction_cache_key, prediction_results)
+            save_precomputed_prediction(
+                year=year,
+                race_name=race_name,
+                weather=weather,
+                artifact_hash=artifact_hash,
+                boundary_signature=boundary_signature,
+                is_sprint=is_sprint,
+                prediction_results=prediction_results,
+                max_file_entries=int(precompute_settings["max_file_entries"]),
+            )
     else:
         _notify("Running qualifying and race simulations...")
         prediction_results = run_prediction_fn(
@@ -678,6 +858,147 @@ def execute_live_prediction_pipeline_core(
             year=year,
         )
         _store_cached_prediction(prediction_cache_key, prediction_results)
+        save_precomputed_prediction(
+            year=year,
+            race_name=race_name,
+            weather=weather,
+            artifact_hash=artifact_hash,
+            boundary_signature=boundary_signature,
+            is_sprint=is_sprint,
+            prediction_results=prediction_results,
+            max_file_entries=int(precompute_settings["max_file_entries"]),
+        )
+
+    trigger_precompute = precompute_settings["enabled"] and (
+        force_refresh
+        or bool(boundary_refresh.get("refresh_needed"))
+        or bool(practice_update.get("updated"))
+    )
+    if trigger_precompute:
+        precompute_summary["triggered"] = True
+        target_races = _resolve_precompute_targets(
+            year=year,
+            race_name=race_name,
+            include_next_weekend=bool(precompute_settings["include_next_weekend"]),
+        )
+        precompute_summary["targets"] = target_races
+        _notify("Precomputing weather scenarios for updated boundary...")
+        weather_scenarios = [
+            str(option).strip().lower() for option in precompute_settings["weather_scenarios"]
+        ]
+
+        for target_race in target_races:
+            if target_race == race_name:
+                target_is_sprint = is_sprint
+                target_boundary_signature = boundary_signature
+            else:
+                try:
+                    target_is_sprint = bool(is_sprint_weekend_fn(year, target_race))
+                except Exception as exc:
+                    logger.warning(
+                        "Could not resolve weekend format for precompute target %s %s: %s",
+                        year,
+                        target_race,
+                        exc,
+                    )
+                    target_is_sprint = False
+
+                try:
+                    target_boundary_refresh = detect_event_boundary_refresh_if_needed_fn(
+                        year=year,
+                        race_name=target_race,
+                        is_sprint=target_is_sprint,
+                        session_detector=session_detector,
+                    )
+                    target_boundary_signature = str(
+                        target_boundary_refresh.get("boundary_signature", "")
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Could not resolve boundary signature for precompute target %s %s: %s",
+                        year,
+                        target_race,
+                        exc,
+                    )
+                    target_boundary_signature = ""
+
+            for target_weather in weather_scenarios:
+                if target_race == race_name and target_weather == weather:
+                    # Current request already resolved this scenario above.
+                    continue
+
+                precomputed = load_precomputed_prediction(
+                    year=year,
+                    race_name=target_race,
+                    weather=target_weather,
+                    artifact_hash=artifact_hash,
+                    boundary_signature=target_boundary_signature,
+                )
+                if precomputed is not None:
+                    precompute_summary["reused"] += 1
+                    target_cache_key = _prediction_cache_key(
+                        year=year,
+                        race_name=target_race,
+                        weather=target_weather,
+                        is_sprint=target_is_sprint,
+                        artifact_versions=artifact_versions,
+                        boundary_signature=target_boundary_signature,
+                    )
+                    _store_cached_prediction(target_cache_key, precomputed)
+                    continue
+
+                try:
+                    generated_prediction = run_prediction_fn(
+                        target_race,
+                        target_weather,
+                        artifact_versions,
+                        is_sprint=target_is_sprint,
+                        year=year,
+                    )
+                    save_precomputed_prediction(
+                        year=year,
+                        race_name=target_race,
+                        weather=target_weather,
+                        artifact_hash=artifact_hash,
+                        boundary_signature=target_boundary_signature,
+                        is_sprint=target_is_sprint,
+                        prediction_results=generated_prediction,
+                        max_file_entries=int(precompute_settings["max_file_entries"]),
+                    )
+                    target_cache_key = _prediction_cache_key(
+                        year=year,
+                        race_name=target_race,
+                        weather=target_weather,
+                        is_sprint=target_is_sprint,
+                        artifact_versions=artifact_versions,
+                        boundary_signature=target_boundary_signature,
+                    )
+                    _store_cached_prediction(target_cache_key, generated_prediction)
+                    precompute_summary["generated"] += 1
+                except Exception as exc:
+                    logger.warning(
+                        "Prediction precompute failed for %s %s %s: %s",
+                        year,
+                        target_race,
+                        target_weather,
+                        exc,
+                    )
+                    error_message = f"{target_race} [{target_weather}]: {exc}"
+                    precompute_summary["errors"].append(error_message)
+                    labels = {
+                        "year": year,
+                        "race_name": target_race,
+                        "weather": target_weather,
+                    }
+                    record_counter("prediction_precompute_failure_total", labels=labels)
+                    record_alert(
+                        "prediction_precompute_failure",
+                        (
+                            "Could not precompute prediction scenario for "
+                            f"{target_race} {year} ({target_weather})."
+                        ),
+                        labels=labels,
+                    )
     pipeline_timing["prediction_run"] = time.time() - prediction_start
     pipeline_timing["total"] = time.time() - pipeline_start
     logger.info(
@@ -696,6 +1017,7 @@ def execute_live_prediction_pipeline_core(
         "is_sprint": is_sprint,
         "practice_update": practice_update,
         "boundary_refresh": boundary_refresh,
+        "precompute_summary": precompute_summary,
         "prediction_cache_hit": prediction_cache_hit,
         "pipeline_timing": pipeline_timing,
         "practice_update_error": None,

@@ -72,6 +72,12 @@ def _get_file_timestamps(year: int = _DEFAULT_SEASON) -> dict[str, tuple[int, st
         "config/default.yaml",
         "src/predictors/baseline_2026.py",
         "src/predictors/baseline/qualifying_mixin.py",
+        "src/predictors/baseline/qualifying_preparation.py",
+        "src/predictors/baseline/qualifying_simulation.py",
+        "src/predictors/baseline/race/preparation_flow.py",
+        "src/predictors/baseline/race/prediction_flow.py",
+        "src/utils/driver_fp_adjustment.py",
+        "src/utils/fp_blending.py",
     ]
 
     timestamps = {}

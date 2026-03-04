@@ -71,10 +71,15 @@ def _default_schedule_fetch(patcher):
 def test_auto_update_if_needed_skips_when_no_new_races(patcher):
     calls, progress_bar, status_text, cache_calls = _stub_streamlit(patcher)
 
-    patcher.setattr("src.utils.auto_updater.needs_update", lambda: (False, []))
+    patcher.setattr(
+        "src.utils.auto_updater.needs_update",
+        lambda year=2026, force_recheck=False: (False, []),
+    )
     patcher.setattr(
         "src.utils.auto_updater.auto_update_from_races",
-        lambda _callback=None: (_ for _ in ()).throw(AssertionError("should not be called")),
+        lambda progress_callback=None, races_to_update=None, year=2026: (_ for _ in ()).throw(
+            AssertionError("should not be called")
+        ),
     )
 
     update_flow.auto_update_if_needed()
@@ -90,10 +95,14 @@ def test_auto_update_if_needed_runs_update_and_clears_cache(patcher):
 
     patcher.setattr(
         "src.utils.auto_updater.needs_update",
-        lambda: (True, ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"]),
+        lambda year=2026, force_recheck=False: (
+            True,
+            ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"],
+        ),
     )
 
-    def _auto_update(progress_callback):
+    def _auto_update(progress_callback=None, races_to_update=None, year=2026):
+        _ = (races_to_update, year)
         progress_callback(1, 2, "Learning race 1")
         progress_callback(2, 2, "Learning race 2")
         return 2
@@ -114,8 +123,14 @@ def test_auto_update_if_needed_runs_update_and_clears_cache(patcher):
 def test_auto_update_if_needed_warns_when_update_is_incomplete(patcher):
     calls, _progress_bar, _status_text, cache_calls = _stub_streamlit(patcher)
 
-    patcher.setattr("src.utils.auto_updater.needs_update", lambda: (True, ["Bahrain Grand Prix"]))
-    patcher.setattr("src.utils.auto_updater.auto_update_from_races", lambda _callback: 0)
+    patcher.setattr(
+        "src.utils.auto_updater.needs_update",
+        lambda year=2026, force_recheck=False: (True, ["Bahrain Grand Prix"]),
+    )
+    patcher.setattr(
+        "src.utils.auto_updater.auto_update_from_races",
+        lambda progress_callback=None, races_to_update=None, year=2026: 0,
+    )
 
     update_flow.auto_update_if_needed()
 
@@ -132,12 +147,13 @@ def test_auto_update_if_needed_force_recheck_passes_explicit_race_list(patcher):
     seen_force_recheck: list[bool] = []
     captured_races: list[str] = []
 
-    def _needs_update(force_recheck=False):
+    def _needs_update(year=2026, force_recheck=False):
+        _ = year
         seen_force_recheck.append(force_recheck)
         return True, ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"]
 
-    def _auto_update_from_races(progress_callback=None, races_to_update=None):
-        del progress_callback
+    def _auto_update_from_races(progress_callback=None, races_to_update=None, year=2026):
+        _ = (progress_callback, year)
         captured_races.extend(races_to_update or [])
         return len(races_to_update or [])
 

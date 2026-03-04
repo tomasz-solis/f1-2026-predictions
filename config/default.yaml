@@ -113,6 +113,14 @@ logging:
   level: "INFO"
   format: "%(asctime)s | %(levelname)s | %(message)s"
 
+# Dashboard runtime behaviors
+dashboard:
+  prediction_precompute:
+    enabled: true
+    include_next_weekend: false
+    weather_scenarios: ["dry", "mixed", "rain"]
+    max_file_entries: 96
+
 # Baseline 2026 Predictor Parameters (used before real season data)
 baseline_predictor:
   # Team-strength blending schedule across early season races.
@@ -188,6 +196,38 @@ baseline_predictor:
     testing_fallback_short_weight_min: 0.35
     testing_fallback_short_weight_max: 0.85
     testing_fallback_divergence_scale: 1.4
+    # Soft teammate guard for testing-fallback mode.
+    # Keeps early-weekend teammate flips possible, but requires stronger signal.
+    testing_fallback_teammate_guard_enabled: true
+    testing_fallback_driver_signal_shrink: 0.14
+    testing_fallback_experience_shrink:
+      rookie: 0.22
+      second_year: 0.14
+      developing: 0.09
+      sunset: 0.03
+      unknown: 0.14
+    testing_fallback_teammate_anchor_scale: 0.07
+    testing_fallback_teammate_anchor_cap: 0.025
+    testing_fallback_teammate_anchor_experience_multiplier:
+      rookie: 0.55
+      second_year: 0.70
+      developing: 0.80
+      sunset: 1.00
+      unknown: 0.70
+    testing_fallback_teammate_gap_cap_by_experience:
+      rookie: 0.22
+      second_year: 0.18
+      developing: 0.14
+      unknown: 0.18
+    testing_fallback_teammate_gap_cap_max_races_by_experience:
+      rookie: 40
+      second_year: 55
+      developing: 55
+      unknown: 45
+    testing_fallback_teammate_gap_cap_min_scale: 0.30
+    testing_fallback_negative_delta_threshold: 0.12
+    testing_fallback_negative_delta_shrink_scale: 0.7
+    testing_fallback_negative_delta_shrink_cap: 0.12
 
     # FP blend controls
     fp_blend_weight: 0.70

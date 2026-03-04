@@ -314,20 +314,7 @@ def auto_update_if_needed(force_recheck: bool = False, year: int = 2026) -> None
     """
     from src.utils.auto_updater import auto_update_from_races, needs_update
 
-    if force_recheck:
-        try:
-            needs_update_flag, new_races = needs_update(year=year, force_recheck=True)
-        except TypeError:
-            try:
-                # Backward-compatible fallback for patched or older callables without year kwargs.
-                needs_update_flag, new_races = needs_update(force_recheck=True)
-            except TypeError:
-                needs_update_flag, new_races = needs_update()
-    else:
-        try:
-            needs_update_flag, new_races = needs_update(year=year)
-        except TypeError:
-            needs_update_flag, new_races = needs_update()
+    needs_update_flag, new_races = needs_update(year=year, force_recheck=force_recheck)
 
     if needs_update_flag:
         st.info(f"Found {len(new_races)} new race(s) to learn from. Updating characteristics...")
@@ -339,21 +326,11 @@ def auto_update_if_needed(force_recheck: bool = False, year: int = 2026) -> None
             progress_bar.progress(current / total)
             status_text.text(message)
 
-        try:
-            updated_count = auto_update_from_races(
-                progress_callback=progress_callback,
-                races_to_update=new_races,
-                year=year,
-            )
-        except TypeError:
-            try:
-                # Backward-compatible fallback for patched callables without year kwargs.
-                updated_count = auto_update_from_races(
-                    progress_callback=progress_callback,
-                    races_to_update=new_races,
-                )
-            except TypeError:
-                updated_count = auto_update_from_races(progress_callback)
+        updated_count = auto_update_from_races(
+            progress_callback=progress_callback,
+            races_to_update=new_races,
+            year=year,
+        )
 
         progress_bar.empty()
         status_text.empty()
