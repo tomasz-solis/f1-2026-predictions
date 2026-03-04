@@ -7,6 +7,87 @@ from typing import Any
 import numpy as np
 
 
+def _normalize_experience_tier(raw_tier: object) -> str:
+    """Normalize experience-tier aliases used across config and driver profiles."""
+    normalized = str(raw_tier or "unknown").strip().lower()
+    return "second_year" if normalized == "sophomore" else normalized
+
+
+def _normalized_tier_mapping(raw_mapping: object) -> dict[str, float]:
+    """Return an experience-tier mapping with numeric values and alias normalization."""
+    if not isinstance(raw_mapping, dict):
+        return {}
+
+    normalized_mapping: dict[str, float] = {}
+    for raw_key, raw_value in raw_mapping.items():
+        tier = _normalize_experience_tier(raw_key)
+        try:
+            normalized_mapping[tier] = float(raw_value)
+        except (TypeError, ValueError):
+            continue
+    return normalized_mapping
+
+
+def _resolve_teammate_gap_cap(
+    *,
+    driver_info: dict[str, Any],
+    cap_by_tier: dict[str, float],
+    max_races_by_tier: dict[str, float],
+    min_scale: float,
+) -> float | None:
+    """Resolve dynamic teammate gap cap for a driver based on experience and sample size."""
+    experience_tier = _normalize_experience_tier(driver_info.get("experience_tier", "unknown"))
+    cap = cap_by_tier.get(experience_tier)
+    if cap is None or cap <= 0:
+        return None
+
+    max_races = max_races_by_tier.get(experience_tier)
+    if max_races is None:
+        return cap
+
+    total_races = driver_info.get("experience_total_races")
+    if total_races is None:
+        return cap
+
+    try:
+        total_races_int = int(total_races)
+        max_races_int = int(max_races)
+        if total_races_int > max_races_int:
+            return None
+    except (TypeError, ValueError):
+        return cap
+
+    if max_races_int <= 0:
+        return cap
+
+    sample_ratio = float(np.clip(total_races_int / max_races_int, 0.0, 1.0))
+    reliability_scale = min_scale + ((1.0 - min_scale) * sample_ratio)
+    return cap * reliability_scale
+
+
+def _clip_driver_signal_by_team_gap(
+    *,
+    driver_signal: float,
+    team_mean: float,
+    gap_cap: float | None,
+) -> float:
+    """Clip driver signal around team mean when a teammate-gap cap is configured."""
+    if gap_cap is None:
+        return driver_signal
+    return float(np.clip(driver_signal, team_mean - gap_cap, team_mean + gap_cap))
+
+
+def _fallback_experience_multiplier(
+    mapping: dict[str, float],
+    experience_tier: str,
+    *,
+    default: float,
+) -> float:
+    """Read an experience-tier multiplier with normalized tier alias handling."""
+    tier = _normalize_experience_tier(experience_tier)
+    return float(mapping.get(tier, default))
+
+
 def run_qualifying_simulations(
     *,
     all_drivers: list[dict],
@@ -76,13 +157,7 @@ def run_qualifying_simulations(
             "unknown": 0.30,
         },
     )
-    if not isinstance(model_only_experience_shrink, dict):
-        model_only_experience_shrink = {}
-    if (
-        "second_year" not in model_only_experience_shrink
-        and "sophomore" in model_only_experience_shrink
-    ):
-        model_only_experience_shrink["second_year"] = model_only_experience_shrink["sophomore"]
+    model_only_experience_shrink = _normalized_tier_mapping(model_only_experience_shrink)
     team_driver_signal_means: dict[str, float] = {}
     for driver_info in all_drivers:
         driver_signal = (
@@ -119,15 +194,9 @@ def run_qualifying_simulations(
             "unknown": 0.45,
         },
     )
-    if not isinstance(model_only_anchor_experience_multiplier, dict):
-        model_only_anchor_experience_multiplier = {}
-    if (
-        "second_year" not in model_only_anchor_experience_multiplier
-        and "sophomore" in model_only_anchor_experience_multiplier
-    ):
-        model_only_anchor_experience_multiplier["second_year"] = (
-            model_only_anchor_experience_multiplier["sophomore"]
-        )
+    model_only_anchor_experience_multiplier = _normalized_tier_mapping(
+        model_only_anchor_experience_multiplier
+    )
     model_only_teammate_gap_cap_by_tier = cfg.get(
         "baseline_predictor.qualifying.model_only_teammate_gap_cap_by_experience",
         {
@@ -137,15 +206,9 @@ def run_qualifying_simulations(
             "unknown": 0.12,
         },
     )
-    if not isinstance(model_only_teammate_gap_cap_by_tier, dict):
-        model_only_teammate_gap_cap_by_tier = {}
-    if (
-        "second_year" not in model_only_teammate_gap_cap_by_tier
-        and "sophomore" in model_only_teammate_gap_cap_by_tier
-    ):
-        model_only_teammate_gap_cap_by_tier["second_year"] = model_only_teammate_gap_cap_by_tier[
-            "sophomore"
-        ]
+    model_only_teammate_gap_cap_by_tier = _normalized_tier_mapping(
+        model_only_teammate_gap_cap_by_tier
+    )
     model_only_teammate_gap_cap_max_races_by_tier = cfg.get(
         "baseline_predictor.qualifying.model_only_teammate_gap_cap_max_races_by_experience",
         {
@@ -155,15 +218,9 @@ def run_qualifying_simulations(
             "unknown": 45,
         },
     )
-    if not isinstance(model_only_teammate_gap_cap_max_races_by_tier, dict):
-        model_only_teammate_gap_cap_max_races_by_tier = {}
-    if (
-        "second_year" not in model_only_teammate_gap_cap_max_races_by_tier
-        and "sophomore" in model_only_teammate_gap_cap_max_races_by_tier
-    ):
-        model_only_teammate_gap_cap_max_races_by_tier["second_year"] = (
-            model_only_teammate_gap_cap_max_races_by_tier["sophomore"]
-        )
+    model_only_teammate_gap_cap_max_races_by_tier = _normalized_tier_mapping(
+        model_only_teammate_gap_cap_max_races_by_tier
+    )
     model_only_teammate_gap_cap_min_scale = float(
         cfg.get("baseline_predictor.qualifying.model_only_teammate_gap_cap_min_scale", 0.35)
     )
@@ -171,42 +228,89 @@ def run_qualifying_simulations(
         np.clip(model_only_teammate_gap_cap_min_scale, 0.0, 1.0)
     )
 
-    def _resolve_model_only_teammate_gap_cap(driver_info: dict[str, Any]) -> float | None:
-        experience_tier = str(driver_info.get("experience_tier", "unknown"))
-        if experience_tier == "sophomore":
-            experience_tier = "second_year"
-        cap_value = model_only_teammate_gap_cap_by_tier.get(experience_tier)
-        if cap_value is None:
-            return None
-        try:
-            cap = float(cap_value)
-        except (TypeError, ValueError):
-            return None
-        if cap <= 0:
-            return None
-
-        max_races_value = model_only_teammate_gap_cap_max_races_by_tier.get(experience_tier)
-        if max_races_value is None:
-            return cap
-
-        total_races = driver_info.get("experience_total_races")
-        if total_races is None:
-            return cap
-
-        try:
-            total_races_int = int(total_races)
-            max_races_int = int(max_races_value)
-            if total_races_int > max_races_int:
-                return None
-        except (TypeError, ValueError):
-            return cap
-        if max_races_int <= 0:
-            return cap
-        sample_ratio = float(np.clip(total_races_int / max_races_int, 0.0, 1.0))
-        reliability_scale = model_only_teammate_gap_cap_min_scale + (
-            (1.0 - model_only_teammate_gap_cap_min_scale) * sample_ratio
+    apply_testing_fallback_teammate_guard = (
+        use_model_only_profile
+        and has_testing_fallback_data
+        and bool(
+            cfg.get(
+                "baseline_predictor.qualifying.testing_fallback_teammate_guard_enabled",
+                True,
+            )
         )
-        return cap * reliability_scale
+    )
+    testing_fallback_driver_signal_shrink = float(
+        cfg.get("baseline_predictor.qualifying.testing_fallback_driver_signal_shrink", 0.14)
+    )
+    testing_fallback_driver_signal_shrink = float(
+        np.clip(testing_fallback_driver_signal_shrink, 0.0, 1.0)
+    )
+    testing_fallback_experience_shrink = _normalized_tier_mapping(
+        cfg.get(
+            "baseline_predictor.qualifying.testing_fallback_experience_shrink",
+            {
+                "rookie": 0.22,
+                "second_year": 0.14,
+                "developing": 0.09,
+                "sunset": 0.03,
+                "unknown": 0.14,
+            },
+        )
+    )
+    testing_fallback_anchor_experience_multiplier = _normalized_tier_mapping(
+        cfg.get(
+            "baseline_predictor.qualifying.testing_fallback_teammate_anchor_experience_multiplier",
+            {
+                "rookie": 0.55,
+                "second_year": 0.70,
+                "developing": 0.80,
+                "sunset": 1.00,
+                "unknown": 0.70,
+            },
+        )
+    )
+    testing_fallback_teammate_anchor_scale = float(
+        cfg.get("baseline_predictor.qualifying.testing_fallback_teammate_anchor_scale", 0.07)
+    )
+    testing_fallback_teammate_anchor_cap = float(
+        cfg.get("baseline_predictor.qualifying.testing_fallback_teammate_anchor_cap", 0.025)
+    )
+    testing_fallback_teammate_gap_cap_by_tier = _normalized_tier_mapping(
+        cfg.get(
+            "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_by_experience",
+            {
+                "rookie": 0.22,
+                "second_year": 0.18,
+                "developing": 0.14,
+                "unknown": 0.18,
+            },
+        )
+    )
+    testing_fallback_teammate_gap_cap_max_races_by_tier = _normalized_tier_mapping(
+        cfg.get(
+            "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_max_races_by_experience",
+            {
+                "rookie": 40,
+                "second_year": 55,
+                "developing": 55,
+                "unknown": 45,
+            },
+        )
+    )
+    testing_fallback_teammate_gap_cap_min_scale = float(
+        cfg.get("baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_min_scale", 0.30)
+    )
+    testing_fallback_teammate_gap_cap_min_scale = float(
+        np.clip(testing_fallback_teammate_gap_cap_min_scale, 0.0, 1.0)
+    )
+    testing_fallback_negative_delta_threshold = float(
+        cfg.get("baseline_predictor.qualifying.testing_fallback_negative_delta_threshold", 0.12)
+    )
+    testing_fallback_negative_delta_shrink_scale = float(
+        cfg.get("baseline_predictor.qualifying.testing_fallback_negative_delta_shrink_scale", 0.7)
+    )
+    testing_fallback_negative_delta_shrink_cap = float(
+        cfg.get("baseline_predictor.qualifying.testing_fallback_negative_delta_shrink_cap", 0.12)
+    )
 
     if use_model_only_profile:
         team_weight *= cfg.get(
@@ -295,24 +399,38 @@ def run_qualifying_simulations(
             ) / driver_weight_sum
             driver_signal = raw_driver_signal
             model_only_gap_cap = None
+            testing_fallback_gap_cap = None
             if apply_model_only_teammate_regularization:
-                model_only_gap_cap = _resolve_model_only_teammate_gap_cap(driver_info)
-                if model_only_gap_cap is not None:
-                    team_mean_for_cap = team_driver_signal_means.get(
-                        driver_info["team"], driver_signal
-                    )
-                    driver_signal = float(
-                        np.clip(
-                            driver_signal,
-                            team_mean_for_cap - model_only_gap_cap,
-                            team_mean_for_cap + model_only_gap_cap,
-                        )
-                    )
+                model_only_gap_cap = _resolve_teammate_gap_cap(
+                    driver_info=driver_info,
+                    cap_by_tier=model_only_teammate_gap_cap_by_tier,
+                    max_races_by_tier=model_only_teammate_gap_cap_max_races_by_tier,
+                    min_scale=model_only_teammate_gap_cap_min_scale,
+                )
+                team_mean_for_cap = team_driver_signal_means.get(driver_info["team"], driver_signal)
+                driver_signal = _clip_driver_signal_by_team_gap(
+                    driver_signal=driver_signal,
+                    team_mean=team_mean_for_cap,
+                    gap_cap=model_only_gap_cap,
+                )
+            elif apply_testing_fallback_teammate_guard:
+                testing_fallback_gap_cap = _resolve_teammate_gap_cap(
+                    driver_info=driver_info,
+                    cap_by_tier=testing_fallback_teammate_gap_cap_by_tier,
+                    max_races_by_tier=testing_fallback_teammate_gap_cap_max_races_by_tier,
+                    min_scale=testing_fallback_teammate_gap_cap_min_scale,
+                )
+                team_mean_for_cap = team_driver_signal_means.get(driver_info["team"], driver_signal)
+                driver_signal = _clip_driver_signal_by_team_gap(
+                    driver_signal=driver_signal,
+                    team_mean=team_mean_for_cap,
+                    gap_cap=testing_fallback_gap_cap,
+                )
             if apply_model_only_teammate_regularization and model_only_driver_signal_shrink > 0:
                 team_mean = team_driver_signal_means.get(driver_info["team"], driver_signal)
-                experience_tier = str(driver_info.get("experience_tier", "unknown"))
-                if experience_tier == "sophomore":
-                    experience_tier = "second_year"
+                experience_tier = _normalize_experience_tier(
+                    driver_info.get("experience_tier", "unknown")
+                )
                 extra_shrink = model_only_experience_shrink.get(
                     experience_tier, model_only_experience_shrink.get("unknown", 0.0)
                 )
@@ -355,10 +473,51 @@ def run_qualifying_simulations(
                     )
                 )
                 driver_signal = team_mean + ((driver_signal - team_mean) * (1.0 - total_shrink))
+            elif (
+                apply_testing_fallback_teammate_guard and testing_fallback_driver_signal_shrink > 0
+            ):
+                team_mean = team_driver_signal_means.get(driver_info["team"], driver_signal)
+                experience_tier = _normalize_experience_tier(
+                    driver_info.get("experience_tier", "unknown")
+                )
+                extra_shrink = testing_fallback_experience_shrink.get(
+                    experience_tier, testing_fallback_experience_shrink.get("unknown", 0.0)
+                )
+                delta_from_team = driver_signal - team_mean
+                extra_negative_delta_shrink = 0.0
+                if delta_from_team < -testing_fallback_negative_delta_threshold:
+                    extra_negative_delta_shrink = min(
+                        max(
+                            0.0,
+                            ((-delta_from_team) - testing_fallback_negative_delta_threshold)
+                            * testing_fallback_negative_delta_shrink_scale,
+                        ),
+                        max(0.0, testing_fallback_negative_delta_shrink_cap),
+                    )
+                total_shrink = float(
+                    np.clip(
+                        testing_fallback_driver_signal_shrink
+                        + float(extra_shrink)
+                        + float(extra_negative_delta_shrink),
+                        0.0,
+                        0.90,
+                    )
+                )
+                driver_signal = team_mean + ((driver_signal - team_mean) * (1.0 - total_shrink))
             if apply_model_only_teammate_regularization:
-                if model_only_gap_cap is not None:
-                    team_mean = team_driver_signal_means.get(driver_info["team"], driver_signal)
-                    driver_signal = max(driver_signal, team_mean - model_only_gap_cap)
+                team_mean = team_driver_signal_means.get(driver_info["team"], driver_signal)
+                driver_signal = _clip_driver_signal_by_team_gap(
+                    driver_signal=driver_signal,
+                    team_mean=team_mean,
+                    gap_cap=model_only_gap_cap,
+                )
+            elif apply_testing_fallback_teammate_guard:
+                team_mean = team_driver_signal_means.get(driver_info["team"], driver_signal)
+                driver_signal = _clip_driver_signal_by_team_gap(
+                    driver_signal=driver_signal,
+                    team_mean=team_mean,
+                    gap_cap=testing_fallback_gap_cap,
+                )
             bounded_driver_signal = 0.5 + (
                 np.tanh((driver_signal - 0.5) / driver_signal_softness) * driver_offset_cap
             )
@@ -381,11 +540,35 @@ def run_qualifying_simulations(
                     -model_only_teammate_anchor_cap,
                     model_only_teammate_anchor_cap,
                 )
-                experience_tier = str(driver_info.get("experience_tier", "unknown"))
-                if experience_tier == "sophomore":
-                    experience_tier = "second_year"
-                anchor_tier_multiplier = float(
-                    model_only_anchor_experience_multiplier.get(experience_tier, 1.0)
+                anchor_tier_multiplier = _fallback_experience_multiplier(
+                    model_only_anchor_experience_multiplier,
+                    str(driver_info.get("experience_tier", "unknown")),
+                    default=1.0,
+                )
+                anchor_adjustment *= max(0.0, anchor_tier_multiplier)
+                score += anchor_adjustment
+            elif (
+                apply_testing_fallback_teammate_guard and testing_fallback_teammate_anchor_scale > 0
+            ):
+                team_mean_raw = team_driver_signal_means.get(driver_info["team"], raw_driver_signal)
+                teammate_delta = raw_driver_signal - team_mean_raw
+                if testing_fallback_gap_cap is not None:
+                    teammate_delta = float(
+                        np.clip(
+                            teammate_delta,
+                            -testing_fallback_gap_cap,
+                            testing_fallback_gap_cap,
+                        )
+                    )
+                anchor_adjustment = np.clip(
+                    teammate_delta * testing_fallback_teammate_anchor_scale,
+                    -testing_fallback_teammate_anchor_cap,
+                    testing_fallback_teammate_anchor_cap,
+                )
+                anchor_tier_multiplier = _fallback_experience_multiplier(
+                    testing_fallback_anchor_experience_multiplier,
+                    str(driver_info.get("experience_tier", "unknown")),
+                    default=1.0,
                 )
                 anchor_adjustment *= max(0.0, anchor_tier_multiplier)
                 score += anchor_adjustment

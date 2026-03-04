@@ -27,8 +27,12 @@ def calculate_driver_fp_modifiers(
     session_types: list[str],
     scale: float = 0.10,
     smoothing_seconds: float = 0.50,
+    preloaded_session_laps: dict[str, pd.DataFrame | None] | None = None,
 ) -> dict[str, float]:
     """Estimate per-driver modifiers from teammate pace deltas in FP sessions.
+
+    Reuses `preloaded_session_laps` when provided to avoid repeated FastF1 loads
+    inside the same prediction call.
 
     Returns:
         Mapping of driver code to adjustment in [-scale, +scale].
@@ -38,15 +42,19 @@ def calculate_driver_fp_modifiers(
 
     deltas: dict[str, float] = {}
     counts: dict[str, int] = {}
+    laps_by_session = preloaded_session_laps or {}
 
     for session_type in session_types:
-        try:
-            _, laps, _ = get_fp_team_performance(year, race_name, session_type)
-        except Exception as e:
-            logger.warning(f"Could not read FP data for {session_type}: {e}")
-            continue
+        if session_type in laps_by_session:
+            laps = laps_by_session.get(session_type)
+        else:
+            try:
+                _, laps, _ = get_fp_team_performance(year, race_name, session_type)
+            except Exception as e:
+                logger.warning(f"Could not read FP data for {session_type}: {e}")
+                continue
 
-        if laps is None or laps.empty:
+        if laps is None or not isinstance(laps, pd.DataFrame) or laps.empty:
             continue
         if "Team" not in laps.columns or "Driver" not in laps.columns:
             continue

@@ -363,6 +363,35 @@ def get_best_fp_performance(
     predicted_race_weather: str | None = None,
 ) -> tuple[str | None, dict[str, float] | None, pd.DataFrame | None]:
     """Get best available practice session with staleness checks and error reporting."""
+    session_label, performance, laps, _ = get_best_fp_performance_with_session_laps(
+        year=year,
+        race_name=race_name,
+        is_sprint=is_sprint,
+        qualifying_stage=qualifying_stage,
+        predicted_race_weather=predicted_race_weather,
+    )
+    return session_label, performance, laps
+
+
+def get_best_fp_performance_with_session_laps(
+    year: int,
+    race_name: str,
+    is_sprint: bool = False,
+    qualifying_stage: str = "auto",
+    predicted_race_weather: str | None = None,
+) -> tuple[
+    str | None,
+    dict[str, float] | None,
+    pd.DataFrame | None,
+    dict[str, pd.DataFrame | None],
+]:
+    """
+    Get the best FP blend and expose per-session laps used to build it.
+
+    The additional laps map allows downstream callers to reuse already loaded
+    session data (for example, driver-level FP adjustments) and avoid duplicate
+    FastF1 calls in the same prediction run.
+    """
     stage = (qualifying_stage or "auto").strip().lower()
     if stage not in {"auto", "sprint", "main"}:
         raise ValueError("qualifying_stage must be one of: 'auto', 'sprint', 'main'")
@@ -374,8 +403,12 @@ def get_best_fp_performance(
 
     errors_encountered = []
     available_sessions: list[dict[str, Any]] = []
+    session_laps_by_code: dict[str, pd.DataFrame | None] = {}
     for session_code, session_label, session_weight in session_priority:
         fp_data, session_laps, error = get_fp_team_performance(year, race_name, session_code)
+        session_laps_by_code[session_code] = (
+            session_laps if isinstance(session_laps, pd.DataFrame) else None
+        )
         if fp_data is not None:
             available_sessions.append(
                 {
@@ -407,7 +440,7 @@ def get_best_fp_performance(
                         f"race prediction weather ({predicted_race_weather})"
                     )
         logger.info(f"Using {session_label} for blending")
-        return session_label, blended_data, blended_laps
+        return session_label, blended_data, blended_laps, session_laps_by_code
 
     # Log why we're falling back to model-only
     if errors_encountered:
@@ -416,7 +449,7 @@ def get_best_fp_performance(
     else:
         logger.info("No practice data available - using model-only predictions")
 
-    return None, None, None
+    return None, None, None, session_laps_by_code
 
 
 def blend_team_strength(

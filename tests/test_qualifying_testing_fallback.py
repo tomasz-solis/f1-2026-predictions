@@ -71,8 +71,8 @@ def _patched_prediction_dependencies():
         stack.enter_context(
             patch.object(
                 qualifying_module,
-                "get_best_fp_performance",
-                lambda **kwargs: (None, None, None),
+                "get_best_fp_performance_with_session_laps",
+                lambda **kwargs: (None, None, None, {}),
             )
         )
         yield
@@ -92,14 +92,22 @@ def test_predict_qualifying_uses_testing_short_run_fallback():
 
     captured: dict[str, object] = {}
 
-    def _fake_run(all_drivers, n_simulations, is_sprint, has_practice_data, rng):
-        _ = (n_simulations, is_sprint, rng)
+    def _fake_run(
+        all_drivers,
+        n_simulations,
+        is_sprint,
+        has_practice_data,
+        rng,
+        has_testing_fallback_data,
+    ):
+        _ = (n_simulations, is_sprint, rng, has_testing_fallback_data)
         captured["has_practice_data"] = has_practice_data
         captured["all_drivers"] = all_drivers
         return {"AAA": [1], "BBB": [2]}
 
-    def _fake_aggregate(position_records, all_drivers):
+    def _fake_aggregate(position_records, all_drivers, *, data_confidence_score=None):
         _ = position_records
+        _ = data_confidence_score
         ordered = sorted(all_drivers, key=lambda driver: driver["team_strength"], reverse=True)
         return [
             {
@@ -121,6 +129,8 @@ def test_predict_qualifying_uses_testing_short_run_fallback():
     assert result["blend_used"] is False
     assert result["testing_fallback_used"] is True
     assert result["data_source"] == "Testing short-run profile blend (no weekend practice data)"
+    teammate_probs = result.get("teammate_head_to_head", [])
+    assert isinstance(teammate_probs, list)
 
     strengths = {driver["team"]: driver["team_strength"] for driver in captured["all_drivers"]}
     assert strengths["Team A"] == pytest.approx(0.55)
@@ -141,8 +151,15 @@ def test_predict_qualifying_remains_model_only_without_testing_profiles():
 
     captured: dict[str, object] = {}
 
-    def _fake_run(all_drivers, n_simulations, is_sprint, has_practice_data, rng):
-        _ = (n_simulations, is_sprint, rng)
+    def _fake_run(
+        all_drivers,
+        n_simulations,
+        is_sprint,
+        has_practice_data,
+        rng,
+        has_testing_fallback_data,
+    ):
+        _ = (n_simulations, is_sprint, rng, has_testing_fallback_data)
         captured["has_practice_data"] = has_practice_data
         captured["all_drivers"] = all_drivers
         return {"AAA": [1], "BBB": [2]}
@@ -152,7 +169,7 @@ def test_predict_qualifying_remains_model_only_without_testing_profiles():
             with patch.object(
                 predictor,
                 "_aggregate_grid_results",
-                lambda position_records, all_drivers: [
+                lambda position_records, all_drivers, data_confidence_score=None: [
                     {
                         "position": 1,
                         "driver": all_drivers[0]["driver"],
@@ -168,10 +185,33 @@ def test_predict_qualifying_remains_model_only_without_testing_profiles():
     assert result["blend_used"] is False
     assert result["testing_fallback_used"] is False
     assert result["data_source"] == "Model-only (no practice/testing data)"
+    assert isinstance(result.get("teammate_head_to_head", []), list)
 
     strengths = {driver["team"]: driver["team_strength"] for driver in captured["all_drivers"]}
     assert strengths["Team A"] == pytest.approx(0.40)
     assert strengths["Team B"] == pytest.approx(0.60)
+
+
+def test_build_teammate_head_to_head_probabilities_from_simulation_records():
+    predictor = DummyQualifyingPredictor()
+    probabilities = predictor._build_teammate_head_to_head_probabilities(
+        position_records={
+            "VER": [1, 1, 2, 1],
+            "HAD": [2, 2, 1, 2],
+        },
+        all_drivers=[
+            {"driver": "VER", "team": "Red Bull Racing"},
+            {"driver": "HAD", "team": "Red Bull Racing"},
+        ],
+    )
+
+    assert probabilities
+    first = probabilities[0]
+    assert first["team"] == "Red Bull Racing"
+    assert first["driver_a"] == "VER"
+    assert first["driver_b"] == "HAD"
+    assert first["n_samples"] == 4
+    assert first["p_driver_a_ahead"] == pytest.approx(0.75)
 
 
 def test_model_only_teammate_anchor_reduces_extreme_inversions():
@@ -297,6 +337,85 @@ def test_testing_fallback_relaxes_model_only_teammate_regularization():
     )
 
     assert fallback_ratio > strict_ratio + 0.04
+
+
+def test_testing_fallback_teammate_guard_reduces_extreme_inversions():
+    """Fallback teammate guard should reduce unsupported flips while keeping variability."""
+    base_overrides = {
+        "baseline_predictor.qualifying.noise_std_normal": 0.018,
+        "baseline_predictor.qualifying.teammate_setup_std": 0.008,
+    }
+    predictor_without_guard = DummyQualifyingPredictor(
+        {
+            **base_overrides,
+            "baseline_predictor.qualifying.testing_fallback_teammate_guard_enabled": False,
+        }
+    )
+    predictor_with_guard = DummyQualifyingPredictor(
+        {
+            **base_overrides,
+            "baseline_predictor.qualifying.testing_fallback_teammate_guard_enabled": True,
+        }
+    )
+
+    all_drivers = [
+        {
+            "driver": "HAD",
+            "team": "Red Bull Racing",
+            "team_strength": 0.59,
+            "skill": 0.67,
+            "quali_pace": 0.705,
+            "experience_tier": "rookie",
+            "experience_total_races": 24,
+        },
+        {
+            "driver": "VER",
+            "team": "Red Bull Racing",
+            "team_strength": 0.59,
+            "skill": 0.99,
+            "quali_pace": 0.95,
+            "experience_tier": "veteran",
+            "experience_total_races": 210,
+        },
+    ]
+
+    without_guard = predictor_without_guard._run_qualifying_simulations(
+        all_drivers=all_drivers,
+        n_simulations=3000,
+        is_sprint=False,
+        has_practice_data=False,
+        rng=np.random.default_rng(2026),
+        has_testing_fallback_data=True,
+    )
+    with_guard = predictor_with_guard._run_qualifying_simulations(
+        all_drivers=all_drivers,
+        n_simulations=3000,
+        is_sprint=False,
+        has_practice_data=False,
+        rng=np.random.default_rng(2026),
+        has_testing_fallback_data=True,
+    )
+
+    ratio_without_guard = (
+        sum(
+            1
+            for had_pos, ver_pos in zip(without_guard["HAD"], without_guard["VER"], strict=True)
+            if had_pos < ver_pos
+        )
+        / 3000
+    )
+    ratio_with_guard = (
+        sum(
+            1
+            for had_pos, ver_pos in zip(with_guard["HAD"], with_guard["VER"], strict=True)
+            if had_pos < ver_pos
+        )
+        / 3000
+    )
+
+    assert ratio_with_guard < ratio_without_guard - 0.03
+    assert ratio_with_guard < 0.30
+    assert ratio_with_guard > 0.05
 
 
 def test_run_qualifying_simulations_applies_learned_position_adjustments():

@@ -10,7 +10,10 @@ import numpy as np
 
 from src.types.prediction_types import QualifyingGridEntry
 from src.utils import config_loader
-from src.utils.fp_blending import blend_team_strength, get_best_fp_performance
+from src.utils.fp_blending import (
+    blend_team_strength,
+    get_best_fp_performance_with_session_laps,
+)
 from src.utils.lineups import get_lineups
 from src.utils.validation_helpers import (
     validate_enum,
@@ -335,6 +338,74 @@ class BaselineQualifyingMixin:
 
         return grid
 
+    def _build_teammate_head_to_head_probabilities(
+        self,
+        *,
+        position_records: dict[str, list[int]],
+        all_drivers: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Build simulation-based teammate head-to-head probabilities by team."""
+        drivers_by_team: dict[str, list[str]] = {}
+        for driver_info in all_drivers:
+            team_name = str(driver_info.get("team", "")).strip()
+            driver_code = str(driver_info.get("driver", "")).strip()
+            if not team_name or not driver_code:
+                continue
+            drivers_by_team.setdefault(team_name, [])
+            if driver_code not in drivers_by_team[team_name]:
+                drivers_by_team[team_name].append(driver_code)
+
+        probabilities: list[dict[str, Any]] = []
+        for team_name, team_drivers in drivers_by_team.items():
+            if len(team_drivers) < 2:
+                continue
+
+            ranked_teammates = sorted(
+                team_drivers,
+                key=lambda driver: (
+                    float(np.mean(position_records.get(driver, [999]))),
+                    driver,
+                ),
+            )
+            driver_a, driver_b = ranked_teammates[0], ranked_teammates[1]
+            positions_a = position_records.get(driver_a, [])
+            positions_b = position_records.get(driver_b, [])
+            n_samples = min(len(positions_a), len(positions_b))
+            if n_samples <= 0:
+                continue
+
+            wins_a = 0
+            wins_b = 0
+            ties = 0
+            for position_a, position_b in zip(
+                positions_a[:n_samples], positions_b[:n_samples], strict=True
+            ):
+                if position_a < position_b:
+                    wins_a += 1
+                elif position_b < position_a:
+                    wins_b += 1
+                else:
+                    ties += 1
+
+            p_a_ahead = wins_a / n_samples
+            p_b_ahead = wins_b / n_samples
+            p_tie = ties / n_samples
+            probabilities.append(
+                {
+                    "team": team_name,
+                    "driver_a": driver_a,
+                    "driver_b": driver_b,
+                    "p_driver_a_ahead": float(p_a_ahead),
+                    "p_driver_b_ahead": float(p_b_ahead),
+                    "p_tie": float(p_tie),
+                    "n_samples": int(n_samples),
+                    "decision_margin": float(abs(p_a_ahead - p_b_ahead)),
+                }
+            )
+
+        probabilities.sort(key=lambda item: float(item.get("decision_margin", 1.0)))
+        return probabilities
+
     def predict_qualifying(
         self,
         year: int,
@@ -361,11 +432,13 @@ class BaselineQualifyingMixin:
 
         lineups = get_lineups(year, race_name)
 
-        session_name, fp_performance, session_laps = get_best_fp_performance(
-            year=year,
-            race_name=race_name,
-            is_sprint=is_sprint,
-            qualifying_stage=qualifying_stage,
+        session_name, fp_performance, session_laps, session_laps_by_type = (
+            get_best_fp_performance_with_session_laps(
+                year=year,
+                race_name=race_name,
+                is_sprint=is_sprint,
+                qualifying_stage=qualifying_stage,
+            )
         )
 
         if session_laps is not None:
@@ -415,6 +488,7 @@ class BaselineQualifyingMixin:
                 session_types=fp_session_types,
                 scale=modifier_scale,
                 smoothing_seconds=smoothing_seconds,
+                preloaded_session_laps=session_laps_by_type,
             )
             for driver_info in all_drivers:
                 fp_modifier = driver_fp_modifiers.get(driver_info["driver"], 0.0)
@@ -422,36 +496,20 @@ class BaselineQualifyingMixin:
                     continue
                 driver_info["skill"] = np.clip(driver_info["skill"] + fp_modifier, 0.01, 0.99)
 
-        try:
-            position_records = self._run_qualifying_simulations(
-                all_drivers,
-                n_simulations,
-                is_sprint,
-                session_name is not None,
-                rng,
-                testing_fallback_used,
-            )
-        except TypeError:
-            # Backward-compatible fallback for patched tests/helpers overriding the
-            # method with the older five-argument signature.
-            position_records = self._run_qualifying_simulations(
-                all_drivers,
-                n_simulations,
-                is_sprint,
-                session_name is not None,
-                rng,
-            )
+        position_records = self._run_qualifying_simulations(
+            all_drivers,
+            n_simulations,
+            is_sprint,
+            session_name is not None,
+            rng,
+            testing_fallback_used,
+        )
 
-        try:
-            grid = self._aggregate_grid_results(
-                position_records,
-                all_drivers,
-                data_confidence_score=data_confidence_score,
-            )
-        except TypeError:
-            # Backward-compatible fallback for patched tests/helpers overriding the
-            # method with the older two-argument signature.
-            grid = self._aggregate_grid_results(position_records, all_drivers)
+        grid = self._aggregate_grid_results(
+            position_records,
+            all_drivers,
+            data_confidence_score=data_confidence_score,
+        )
 
         if session_name is not None:
             data_source = session_name
@@ -459,6 +517,11 @@ class BaselineQualifyingMixin:
             data_source = "Testing short-run profile blend (no weekend practice data)"
         else:
             data_source = "Model-only (no practice/testing data)"
+
+        teammate_head_to_head = self._build_teammate_head_to_head_probabilities(
+            position_records=position_records,
+            all_drivers=all_drivers,
+        )
 
         return {
             "grid": grid,
@@ -470,6 +533,7 @@ class BaselineQualifyingMixin:
             "qualifying_stage": qualifying_stage,
             "characteristics_profile_used": "short_run",
             "teams_with_characteristics_profile": teams_with_short_profile,
+            "teammate_head_to_head": teammate_head_to_head,
         }
 
     def predict_sprint_race(
