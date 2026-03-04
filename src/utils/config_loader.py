@@ -12,6 +12,7 @@ from typing import Any
 import yaml
 
 logger = logging.getLogger(__name__)
+ValidationSpec = tuple[str, type[int] | type[float], float, float]
 
 
 class Config:
@@ -20,16 +21,16 @@ class Config:
     _instance: "Config | None" = None
     _config: dict[str, Any] | None = None
 
-    def __new__(cls):
+    def __new__(cls) -> "Config":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         if self._config is None:
             self._load()
 
-    def _load(self):
+    def _load(self) -> None:
         """Load config from YAML file."""
         # Find config file
         config_file = os.getenv("F1_CONFIG", "config/default.yaml")
@@ -50,15 +51,19 @@ class Config:
         self._validate_config()
         logger.info(f"Configuration loaded successfully from {config_path}")
 
-    def _validate_config(self):
+    def _validate_config(self) -> None:
         """Validate that required config sections exist, with correct structure and value ranges."""
+        config = self._config
+        if config is None:
+            raise ValueError("Config validation failed: configuration is not loaded")
+
         # Fast-fail validation using Pydantic schema (if available)
         try:
             from src.utils.config_schema import validate_config
 
             # Validate against Pydantic schema for structured validation
             try:
-                validate_config(self._config)
+                validate_config(config)
                 logger.info("Config passed Pydantic schema validation")
             except Exception as pydantic_error:
                 logger.warning(
@@ -79,7 +84,7 @@ class Config:
 
         missing = []
         for section in required_sections:
-            if section not in self._config:
+            if section not in config:
                 missing.append(section)
 
         if missing:
@@ -89,13 +94,18 @@ class Config:
             )
 
         # 2. Validate baseline_predictor subsections
-        if "qualifying" not in self._config["baseline_predictor"]:
+        baseline_predictor_config = config.get("baseline_predictor")
+        if not isinstance(baseline_predictor_config, dict):
+            raise ValueError(
+                "Config missing baseline_predictor section or it has an invalid structure"
+            )
+        if "qualifying" not in baseline_predictor_config:
             raise ValueError("Config missing baseline_predictor.qualifying section")
-        if "race" not in self._config["baseline_predictor"]:
+        if "race" not in baseline_predictor_config:
             raise ValueError("Config missing baseline_predictor.race section")
 
         # 3. Type and range validation for critical parameters
-        validations = [
+        validations: list[ValidationSpec] = [
             # Bayesian model parameters
             ("bayesian.base_volatility", float, 0.0, 1.0),
             ("bayesian.base_observation_noise", float, 0.0, 100.0),
@@ -149,10 +159,7 @@ class Config:
 
             # Check type
             if not isinstance(value, expected_type):
-                if isinstance(expected_type, tuple):
-                    expected_type_name = " or ".join(t.__name__ for t in expected_type)
-                else:
-                    expected_type_name = expected_type.__name__
+                expected_type_name = expected_type.__name__
                 errors.append(
                     f"Invalid type for {key}: expected {expected_type_name}, "
                     f"got {type(value).__name__}"
@@ -160,9 +167,10 @@ class Config:
                 continue
 
             # Check range
-            if not (min_val <= value <= max_val):
+            numeric_value = float(value)
+            if not (min_val <= numeric_value <= max_val):
                 errors.append(
-                    f"Value out of range for {key}: {value} "
+                    f"Value out of range for {key}: {numeric_value} "
                     f"(must be between {min_val} and {max_val})"
                 )
 
@@ -239,14 +247,14 @@ class Config:
 
         return value
 
-    def get_section(self, section: str) -> dict:
+    def get_section(self, section: str) -> dict[str, Any]:
         """Get entire config section."""
         if self._config is None:
             return {}
         value = self._config.get(section, {})
         return value if isinstance(value, dict) else {}
 
-    def reload(self):
+    def reload(self) -> None:
         """Force reload config from file."""
         self._config = None
         self._load()
@@ -261,11 +269,11 @@ def get(key: str, default: Any = None) -> Any:
     return _config.get(key, default)
 
 
-def get_section(section: str) -> dict:
+def get_section(section: str) -> dict[str, Any]:
     """Get config section."""
     return _config.get_section(section)
 
 
-def reload():
+def reload() -> None:
     """Reload config."""
     _config.reload()

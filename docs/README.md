@@ -1,6 +1,6 @@
 # Documentation Index
 
-This folder explains how the current system behaves in code.
+Use this index to find docs that match the current code path.
 
 ## Start Here
 

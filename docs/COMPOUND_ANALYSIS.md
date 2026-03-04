@@ -1,10 +1,10 @@
 # Compound Performance Analysis System
 
-This guide describes how tire compound-specific performance data is collected, normalized, and applied to improve race predictions.
+This page explains how compound-specific performance is collected, normalized, and used in race predictions.
 
 ## Overview
 
-F1 teams have varying performance characteristics on different tire compounds (SOFT, MEDIUM, HARD). Some teams excel on softer compounds with high grip but struggle with degradation, while others perform consistently across all compounds. The implementation captures these differences from session data and applies them during race predictions.
+Teams behave differently across compounds (`SOFT`, `MEDIUM`, `HARD`). This system captures those differences from session data and feeds them into race simulation.
 
 ## What Compound Data Is Collected
 
@@ -74,7 +74,7 @@ Process ([src/systems/compound_analyzer.py:196-274](../src/systems/compound_anal
 
 ### 1. Dynamic Compound Selection
 
-**New in this update:** Races now select compounds based on tire stress data.
+Races now select compounds using tire-stress data.
 
 Implemented in:
 - [src/utils/track_data_loader.py](../src/utils/track_data_loader.py) (`get_tire_stress_score`)
@@ -95,7 +95,7 @@ baseline_predictor:
     default_stress_fallback: 3.0  # Default if metric missing
 ```
 
-This allows easy tuning without code changes.
+This keeps tuning in config instead of code.
 
 ### 2. Team Strength Adjustment
 
@@ -175,8 +175,6 @@ This prevents Monaco SOFT data from contaminating Monza SOFT data.
 
 ### Lap-by-Lap Simulation
 
-Status: Implemented
-
 The race predictor now uses full lap-by-lap simulation with multi-compound pit stop strategies:
 
 **Architecture:** Three core modules
@@ -184,7 +182,7 @@ The race predictor now uses full lap-by-lap simulation with multi-compound pit s
 - [src/utils/pit_strategy.py](../src/utils/pit_strategy.py) - Monte Carlo pit strategy generation
 - [src/utils/lap_by_lap_simulator.py](../src/utils/lap_by_lap_simulator.py) - Race simulation engine
 
-**Key Features:**
+**Key features:**
 1. **FIA Rule Enforcement:** All strategies use ≥2 different compounds per dry race
 2. **Monte Carlo Pit Timing:** Realistic variance in pit stop laps (±3 laps for 1-stop)
 3. **Tire Degradation Modeling:**
@@ -219,7 +217,7 @@ L30-35: 28 stops
 L20-25: 12 stops
 ```
 
-**Testing:** Full test coverage in:
+**Relevant tests:**
 - [tests/test_tire_degradation.py](../tests/test_tire_degradation.py) (18 tests)
 - [tests/test_pit_strategy.py](../tests/test_pit_strategy.py) (22 tests)
 
@@ -243,14 +241,14 @@ Test coverage: [tests/test_compound_analyzer.py](../tests/test_compound_analyzer
 - Aggregation with track awareness
 - Minimum lap threshold enforcement
 
-## Performance Impact
+## Observed Impact
 
 With compound adjustments (realistic scenario):
 - Teams with good compound data: ±0.02 to ±0.05 strength adjustment
 - Average impact: ~0.5-1.0 position change in race predictions
 - Benefit: More accurate predictions for compound-sensitive tracks (Monaco, Singapore, Bahrain)
 
-## Future Enhancements
+## Planned Extensions
 
 1. **Temperature sensitivity**
    - Track temperature affects compound performance

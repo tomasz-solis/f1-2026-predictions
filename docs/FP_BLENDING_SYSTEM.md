@@ -1,6 +1,6 @@
 # Practice Session Blending
 
-This file describes the current blending behavior implemented in `src/utils/fp_blending.py` and consumed by `Baseline2026Predictor.predict_qualifying()`.
+This page explains the qualifying blend implemented in `src/utils/fp_blending.py` and consumed by `Baseline2026Predictor.predict_qualifying()`.
 
 ## What It Does
 
@@ -12,10 +12,16 @@ Qualifying prediction combines:
 Active formula:
 
 ```text
-blended_strength = 0.7 * session_strength + 0.3 * model_strength
+blended_strength = w * session_strength + (1 - w) * model_strength
 ```
 
-In the active baseline path, this 70/30 split is fixed in predictor logic.
+The blend weight `w` is data-confidence aware in the active baseline path:
+
+```text
+w = clip(base_weight + (confidence - 0.5) * scale, min_weight, max_weight)
+```
+
+Default values in `config/default.yaml` are `base=0.70`, `scale=0.30`, `min=0.45`, and `max=0.85`.
 
 ## Session Inputs
 

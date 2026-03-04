@@ -1,6 +1,6 @@
 # Prediction Tracking
 
-This guide describes how predictions are stored by session and how actual results are attached later for accuracy analysis.
+This page explains how session checkpoints are stored and how actual results are attached later for accuracy analysis.
 
 ## Where It Lives
 

@@ -1,6 +1,6 @@
 # Weekend Prediction Flow
 
-This guide describes the current dashboard behavior in `src/dashboard/pages.py` (entrypoint: `app.py`).
+This page maps what the dashboard does when you run predictions from `src/dashboard/pages.py` (entrypoint: `app.py`).
 
 ## Overview
 
@@ -92,7 +92,7 @@ When tracking is enabled in the **Settings** expander:
 
 - one prediction artifact is saved per detected completed session,
 - dashboard flow enforces max one save per race/session key,
-- sprint weekends save the main qualifying + main race outputs for scoring.
+- sprint weekends save sprint outputs for `FP1`/`SQ`/`Sprint` checkpoints, then main outputs for later checkpoints.
 
 Storage backend depends on `USE_DB_STORAGE` (`file_only`, `db_only`, `fallback`, `dual_write`).
 

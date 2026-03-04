@@ -1,6 +1,6 @@
 # Persistence and Supabase
 
-This guide describes current persistence behavior in runtime code.
+This page documents how persistence works in the current runtime path.
 
 ## Current Runtime Integration
 

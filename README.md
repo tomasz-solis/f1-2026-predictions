@@ -45,6 +45,13 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+For local development, use the project-managed `.venv` consistently:
+
+```bash
+uv sync --extra dev
+source .venv/bin/activate
+```
+
 If port `8501` is already in use:
 
 ```bash
@@ -230,21 +237,33 @@ These remain useful for experiments and extensions, but the app runtime path is 
 ## Tests
 
 ```bash
-pytest tests/
+.venv/bin/pytest tests/
+```
+
+Project check pipeline (lint + mypy + pytest):
+
+```bash
+make check
+```
+
+Optional stricter mypy pass (checks bodies of untyped functions):
+
+```bash
+make typecheck-strict
 ```
 
 Nightly live-network FastF1 checks (CI):
 
 ```bash
-FASTF1_LIVE_TESTS=1 pytest tests/test_fastf1_live_refresh.py -m live_fastf1
+make test-live-fastf1
 ```
 
 Targeted examples:
 
 ```bash
-pytest tests/test_baseline_2026_integration.py
-pytest tests/test_dashboard_smoke.py
-pytest tests/test_testing_updater.py
+.venv/bin/pytest tests/test_baseline_2026_integration.py
+.venv/bin/pytest tests/test_dashboard_smoke.py
+.venv/bin/pytest tests/test_testing_updater.py
 ```
 
 ## Backtesting and Ablations
