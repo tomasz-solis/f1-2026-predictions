@@ -239,14 +239,14 @@ def run_qualifying_simulations(
 
     if has_testing_fallback_data and not has_practice_data:
         # Testing fallback has team-level signal but weaker direct driver calibration.
-        # Shift a bit of weight from team to driver signal and add controlled dispersion.
+        # Keep a stronger team anchor so fallback poles stay realistic.
         team_weight *= cfg.get(
             "baseline_predictor.qualifying.testing_fallback_team_weight_multiplier",
-            0.78,
+            1.10,
         )
         skill_weight *= cfg.get(
             "baseline_predictor.qualifying.testing_fallback_skill_weight_multiplier",
-            1.35,
+            0.90,
         )
         total_weight = team_weight + skill_weight
         if total_weight <= 0:
@@ -256,11 +256,11 @@ def run_qualifying_simulations(
             skill_weight /= total_weight
 
         noise_std *= cfg.get(
-            "baseline_predictor.qualifying.testing_fallback_noise_multiplier", 1.35
+            "baseline_predictor.qualifying.testing_fallback_noise_multiplier", 0.95
         )
         teammate_setup_std *= cfg.get(
             "baseline_predictor.qualifying.testing_fallback_teammate_setup_multiplier",
-            1.25,
+            0.95,
         )
 
     weekend_form_std = cfg.get("baseline_predictor.qualifying.weekend_form_std", 0.0)
@@ -272,7 +272,7 @@ def run_qualifying_simulations(
         weekend_form_floor = float(
             cfg.get(
                 "baseline_predictor.qualifying.testing_fallback_weekend_form_std_floor",
-                0.028,
+                0.0,
             )
         )
         weekend_form_std = max(float(weekend_form_std), weekend_form_floor)
