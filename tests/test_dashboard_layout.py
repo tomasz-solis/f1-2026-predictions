@@ -156,6 +156,7 @@ def test_navigation_pages_match_dashboard_order():
     assert layout.NAVIGATION_PAGES == [
         "Prediction",
         "Team Comparison",
+        "Prediction Accuracy",
         "Model & Learning",
         "Contact",
     ]

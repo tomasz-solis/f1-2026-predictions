@@ -22,7 +22,7 @@ BRAND_DISCLAIMER = "Independent analytics project • not affiliated with any ra
 BRAND_HEADER_ALIGNMENT = "left"
 BRAND_MODEL_VERSION = "v1.3"
 BRAND_LAST_UPDATED = "2026-03-04"
-ENABLE_PREDICTION_ACCURACY_TAB = False
+ENABLE_PREDICTION_ACCURACY_TAB = True
 NAVIGATION_PAGES = ["Prediction", "Team Comparison"]
 if ENABLE_PREDICTION_ACCURACY_TAB:
     NAVIGATION_PAGES.append("Prediction Accuracy")
@@ -180,12 +180,17 @@ def render_sidebar() -> tuple[str, bool]:
 
     with st.expander("Settings", expanded=False):
         enable_logging = st.checkbox(
-            "Save Predictions for Accuracy Tracking",
+            "Save Session Checkpoints for Accuracy Tracking",
             value=False,
             help=(
-                "When enabled, predictions are saved after each session (FP1/FP2/FP3/SQ) "
-                "for later accuracy analysis. Max 1 prediction per session."
+                "Saves one prediction checkpoint per completed session (FP/SQ/Sprint/Q/R). "
+                "Checkpoints are persisted via the configured storage backend (Supabase/file) "
+                "for weekend-stage confidence and final-accuracy analysis."
             ),
+        )
+        st.markdown(
+            "_Workflow:_ run predictions after non-competitive sessions, then review the "
+            "session-by-session accuracy timeline after results are available."
         )
         st.markdown(f"**Model Version:** {BRAND_MODEL_VERSION}")
         st.markdown(f"**Last Updated:** {BRAND_LAST_UPDATED}")

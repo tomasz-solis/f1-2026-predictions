@@ -113,24 +113,30 @@ def test_cache_dir_race_matching_handles_date_prefixed_event_dirs():
 
 def test_latest_data_status_message_prefers_latest_elapsed_session():
     message = pages._latest_data_status_message(
+        race_name="Australian Grand Prix",
+        year=2026,
         boundary_refresh={"latest_elapsed_session": "FP2"},
         practice_update={"completed_fp_sessions": ["FP1", "FP2"]},
     )
 
-    assert "Latest completed session detected: FP2" in message
+    assert "Latest datapoint in use: Australian Grand Prix 2026 - Free Practice 2 (FP2)" in message
 
 
 def test_latest_data_status_message_uses_practice_sessions_when_no_elapsed():
     message = pages._latest_data_status_message(
+        race_name="Australian Grand Prix",
+        year=2026,
         boundary_refresh={"latest_elapsed_session": None},
         practice_update={"completed_fp_sessions": ["FP1"]},
     )
 
-    assert "Latest practice data available: FP1" in message
+    assert "Latest datapoint in use: Australian Grand Prix 2026 - Free Practice 1 (FP1)" in message
 
 
 def test_latest_data_status_message_handles_schedule_unavailable():
     message = pages._latest_data_status_message(
+        race_name="Australian Grand Prix",
+        year=2026,
         boundary_refresh={"reason": "schedule_unavailable"},
         practice_update={},
     )
@@ -204,6 +210,68 @@ def test_save_prediction_if_enabled_saves_new_session(patcher):
     assert saved_payload["session_name"] == "FP3"
     assert saved_payload["weather"] == "dry"
     assert "Prediction saved for accuracy tracking (after FP3)" in info_messages
+
+
+def test_save_prediction_if_enabled_persists_checkpoint_summary_when_store_available(patcher):
+    info_messages: list[str] = []
+    checkpoint_saves: list[dict] = []
+
+    class _Detector:
+        def get_latest_completed_session(self, year: int, race_name: str, is_sprint: bool):
+            assert (year, race_name, is_sprint) == (2026, "Bahrain Grand Prix", False)
+            return "FP2"
+
+    class _ArtifactStore:
+        def save_artifact(self, **kwargs):
+            checkpoint_saves.append(kwargs)
+
+    class _Logger:
+        def __init__(self):
+            self.artifact_store = _ArtifactStore()
+
+        def has_prediction_for_session(self, year: int, race_name: str, session_name: str):
+            assert (year, race_name, session_name) == (2026, "Bahrain Grand Prix", "FP2")
+            return False
+
+        def save_prediction(self, **kwargs):
+            assert kwargs["session_name"] == "FP2"
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+    patcher.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
+    patcher.setattr(pages.st, "info", lambda message: info_messages.append(str(message)))
+    patcher.setattr(pages.st, "warning", lambda _message: None)
+
+    pages._save_prediction_if_enabled(
+        enable_logging=True,
+        prediction_results={
+            "qualifying": {
+                "grid_source": "PREDICTED",
+                "data_source": "Short-stint blend",
+                "grid": [
+                    {"driver": "VER", "team": "Red Bull Racing", "position": 1, "confidence": 61.0}
+                ],
+            },
+            "race": {
+                "grid_source": "PREDICTED",
+                "finish_order": [
+                    {"driver": "VER", "team": "Red Bull Racing", "position": 1, "confidence": 58.0}
+                ],
+            },
+        },
+        is_sprint=False,
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+    )
+
+    assert len(checkpoint_saves) == 1
+    assert checkpoint_saves[0]["artifact_type"] == "prediction_checkpoint"
+    assert checkpoint_saves[0]["artifact_key"] == "2026::Bahrain Grand Prix::FP2"
+    payload = checkpoint_saves[0]["data"]
+    assert payload["metadata"]["session_name"] == "FP2"
+    assert payload["qualifying"]["mean_confidence"] == 61.0
+    assert payload["race"]["mean_confidence"] == 58.0
+    assert "Prediction saved for accuracy tracking (after FP2)" in info_messages
 
 
 def test_save_prediction_if_enabled_reports_existing_prediction(patcher):
@@ -292,6 +360,39 @@ def test_render_prediction_results_routes_normal_weekend(patcher):
         is_sprint=False,
     )
 
+    assert rendered_sections == [
+        "Qualifying Prediction:quali",
+        "Race Prediction:race",
+    ]
+
+
+def test_render_prediction_results_reports_cache_hit_runtime_from_pipeline(patcher):
+    rendered_sections: list[str] = []
+    success_messages: list[str] = []
+
+    patcher.setattr(pages.st, "success", lambda message: success_messages.append(str(message)))
+    patcher.setattr(pages.st, "markdown", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "header", lambda _msg: None)
+    patcher.setattr(pages.st, "info", lambda _msg: None)
+    patcher.setattr(
+        pages,
+        "display_prediction_result",
+        lambda _result, title, is_race=False: rendered_sections.append(
+            f"{title}:{'race' if is_race else 'quali'}"
+        ),
+    )
+
+    pages._render_prediction_results(
+        prediction_results={
+            "qualifying": {"timing": {"total": 12.65}, "grid": []},
+            "race": {"finish_order": []},
+        },
+        is_sprint=False,
+        prediction_cache_hit=True,
+        pipeline_timing={"total": 0.1},
+    )
+
+    assert success_messages == ["Prediction loaded from cache in 0.10s"]
     assert rendered_sections == [
         "Qualifying Prediction:quali",
         "Race Prediction:race",
@@ -537,7 +638,78 @@ def test_render_prediction_accuracy_page_with_actuals(patcher):
 def test_render_live_prediction_page_passes_selected_season_to_pipeline_and_save(patcher):
     _stub_page_streamlit(patcher)
 
-    selected_years: dict[str, int] = {}
+    selected_years: dict[str, int | bool] = {}
+    error_messages: list[str] = []
+
+    def _selectbox(label, options, index=0, **_kwargs):
+        if label == "Season":
+            return 2027
+        if label == "Select Grand Prix":
+            return "Bahrain Grand Prix"
+        if label == "Weather Forecast":
+            return "dry"
+        return options[index] if options else None
+
+    patcher.setattr(pages.st, "selectbox", _selectbox)
+    patcher.setattr(pages.st, "toggle", lambda *_args, **_kwargs: False)
+    patcher.setattr(pages.st, "button", lambda *_args, **_kwargs: True)
+    patcher.setattr(pages.st, "error", lambda message: error_messages.append(str(message)))
+    patcher.setattr(pages.st, "spinner", lambda *_args, **_kwargs: _Ctx())
+    patcher.setattr(
+        pages.st,
+        "empty",
+        lambda: type(
+            "_Status",
+            (),
+            {"info": lambda self, _msg: None, "empty": lambda self: None},
+        )(),
+    )
+    patcher.setattr(
+        pages, "_load_race_options", lambda year=pages.DEFAULT_SEASON: ["Bahrain Grand Prix"]
+    )
+    patcher.setattr(
+        pages,
+        "execute_live_prediction_pipeline",
+        lambda race_name,
+        weather,
+        year,
+        force_refresh,
+        progress_callback=None,
+        precompute_include_next_weekend=None: (
+            (
+                selected_years.__setitem__("pipeline", year),
+                selected_years.__setitem__(
+                    "precompute_scope", bool(precompute_include_next_weekend)
+                ),
+                {
+                    "prediction_results": {
+                        "qualifying": {"grid": []},
+                        "race": {"finish_order": []},
+                    },
+                    "is_sprint": False,
+                    "practice_update": {"updated": False, "completed_fp_sessions": []},
+                    "pipeline_timing": {},
+                },
+            )[2]
+        ),
+    )
+    patcher.setattr(
+        pages,
+        "_save_prediction_if_enabled",
+        lambda **kwargs: selected_years.__setitem__("save", kwargs["year"]),
+    )
+    patcher.setattr(pages, "_render_prediction_results", lambda *_args, **_kwargs: None)
+
+    pages.render_live_prediction_page(enable_logging=False)
+
+    assert error_messages == []
+    assert selected_years["pipeline"] == 2027
+    assert selected_years["precompute_scope"] is False
+
+
+def test_render_live_prediction_page_keeps_precompute_scope_locked_to_selected_gp_only(patcher):
+    _stub_page_streamlit(patcher)
+    captured_scope: dict[str, bool] = {}
 
     def _selectbox(label, options, index=0, **_kwargs):
         if label == "Season":
@@ -567,29 +739,32 @@ def test_render_live_prediction_page_passes_selected_season_to_pipeline_and_save
     patcher.setattr(
         pages,
         "execute_live_prediction_pipeline",
-        lambda race_name, weather, year, force_refresh, progress_callback=None: (
-            selected_years.__setitem__("pipeline", year),
-            {
-                "prediction_results": {
-                    "qualifying": {"grid": []},
-                    "race": {"finish_order": []},
+        lambda race_name,
+        weather,
+        year,
+        force_refresh,
+        progress_callback=None,
+        precompute_include_next_weekend=None: (
+            (
+                captured_scope.__setitem__("value", bool(precompute_include_next_weekend)),
+                {
+                    "prediction_results": {
+                        "qualifying": {"grid": []},
+                        "race": {"finish_order": []},
+                    },
+                    "is_sprint": False,
+                    "practice_update": {"updated": False, "completed_fp_sessions": []},
+                    "pipeline_timing": {},
                 },
-                "is_sprint": False,
-                "practice_update": {"updated": False, "completed_fp_sessions": []},
-                "pipeline_timing": {},
-            },
-        )[1],
+            )[1]
+        ),
     )
-    patcher.setattr(
-        pages,
-        "_save_prediction_if_enabled",
-        lambda **kwargs: selected_years.__setitem__("save", kwargs["year"]),
-    )
+    patcher.setattr(pages, "_save_prediction_if_enabled", lambda **kwargs: None)
     patcher.setattr(pages, "_render_prediction_results", lambda *_args, **_kwargs: None)
 
     pages.render_live_prediction_page(enable_logging=False)
 
-    assert selected_years == {"pipeline": 2027, "save": 2027}
+    assert captured_scope == {"value": False}
 
 
 def test_build_team_comparison_dataframe_uses_profile_metrics():

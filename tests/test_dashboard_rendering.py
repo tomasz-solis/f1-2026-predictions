@@ -36,7 +36,12 @@ def _stub_streamlit(patcher):
     patcher.setattr(rendering.st, "write", lambda msg: calls.append(("write", str(msg))))
     patcher.setattr(rendering.st, "dataframe", lambda *_args, **_kwargs: None)
     patcher.setattr(rendering.st, "columns", lambda n: [_Ctx() for _ in range(n)])
-    patcher.setattr(rendering.st, "expander", lambda _label: _Ctx())
+
+    def _expander(label, *_, **__):
+        calls.append(("expander", str(label)))
+        return _Ctx()
+
+    patcher.setattr(rendering.st, "expander", _expander)
 
     return calls
 
@@ -231,9 +236,9 @@ def test_render_qualifying_result_splits_grid_columns(patcher):
     rendering._render_qualifying_result(df)
 
     markdown_blocks = [value for kind, value in calls if kind == "markdown"]
-    assert any("P1-10" in block for block in markdown_blocks)
-    assert any("P11-15" in block for block in markdown_blocks)
-    assert any("P16-22" in block for block in markdown_blocks)
+    assert any("Q1 Eliminated (Final Grid P17-P22)" in block for block in markdown_blocks)
+    assert any("Q2 Eliminated (Final Grid P11-P16)" in block for block in markdown_blocks)
+    assert any("Q3 Shootout (Final Grid P1-P10)" in block for block in markdown_blocks)
 
 
 def test_display_prediction_result_routes_race_sections(patcher):
@@ -321,3 +326,38 @@ def test_display_prediction_result_routes_qualifying_sections(patcher):
         "Data source: Short-stint blend (FP3 + FP2 + FP1) (70% practice data + 30% model)." in text
         for text in details
     )
+
+
+def test_display_prediction_result_renders_teammate_head_to_head_probabilities(patcher):
+    calls = _stub_streamlit(patcher)
+    routed: list[str] = []
+
+    patcher.setattr(rendering, "_render_qualifying_result", lambda _df: routed.append("quali"))
+
+    rendering.display_prediction_result(
+        result={
+            "grid_source": "PREDICTED",
+            "data_source": "Testing short-run profile blend (no weekend practice data)",
+            "blend_used": False,
+            "grid": [{"position": 1, "driver": "VER", "team": "Red Bull Racing"}],
+            "teammate_head_to_head": [
+                {
+                    "team": "Red Bull Racing",
+                    "driver_a": "VER",
+                    "driver_b": "HAD",
+                    "p_driver_a_ahead": 0.803,
+                    "n_samples": 3000,
+                }
+            ],
+        },
+        prediction_name="Qualifying Prediction",
+        is_race=False,
+    )
+
+    assert routed == ["quali"]
+    expander_labels = [value for kind, value in calls if kind == "expander"]
+    assert any("Teammate Matchups" in text for text in expander_labels)
+    markdown_blocks = [value for kind, value in calls if kind == "markdown"]
+    assert any("How to read:" in text for text in markdown_blocks)
+    assert any("VER over HAD" in text for text in markdown_blocks)
+    assert any("80.3%" in text for text in markdown_blocks)

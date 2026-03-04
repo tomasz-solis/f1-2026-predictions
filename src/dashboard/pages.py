@@ -5,7 +5,6 @@ import unicodedata
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from uuid import uuid4
 
 import fastf1
 import streamlit as st
@@ -14,6 +13,7 @@ from src.utils.weekend import _get_schedule_rows, is_sprint_weekend
 
 from . import team_comparison as _team_comparison
 from .accuracy_view import (
+    render_checkpoint_accuracy_trend,
     render_overall_accuracy_metrics,
     render_per_race_breakdown,
     render_saved_predictions_summary,
@@ -50,6 +50,24 @@ _FASTF1_CACHE_DIRS = (
     Path("data/raw/.fastf1_cache_testing"),
 )
 _NON_DISTINCT_RACE_TOKENS = {"grand", "prix", "gp"}
+_SESSION_LABELS = {
+    "FP1": "Free Practice 1",
+    "FP2": "Free Practice 2",
+    "FP3": "Free Practice 3",
+    "SQ": "Sprint Qualifying",
+    "SPRINT": "Sprint Race",
+    "Q": "Qualifying",
+    "R": "Grand Prix Race",
+}
+_SESSION_ORDER = {
+    "FP1": 1,
+    "FP2": 2,
+    "FP3": 3,
+    "SQ": 4,
+    "SPRINT": 5,
+    "Q": 6,
+    "R": 7,
+}
 
 # Backwards-compatible exports for tests and existing imports.
 _DEFAULT_TEAM_COLOR = _team_comparison._DEFAULT_TEAM_COLOR
@@ -263,36 +281,60 @@ def _save_prediction_if_enabled(
     )
 
 
-def _render_prediction_results(prediction_results: dict, is_sprint: bool) -> None:
+def _render_prediction_results(
+    prediction_results: dict,
+    is_sprint: bool,
+    *,
+    prediction_cache_hit: bool = False,
+    pipeline_timing: dict[str, float] | None = None,
+) -> None:
     """Render prediction sections for sprint and normal weekends."""
     _render_prediction_results_core(
         prediction_results=prediction_results,
         is_sprint=is_sprint,
         display_prediction_result_fn=display_prediction_result,
         st_module=st,
+        prediction_cache_hit=prediction_cache_hit,
+        pipeline_timing=pipeline_timing,
     )
 
 
 def _latest_data_status_message(
+    race_name: str,
+    year: int,
     boundary_refresh: dict[str, object],
     practice_update: dict[str, object],
 ) -> str:
     """Build a short user-facing summary of the freshest session data in use."""
-    latest_elapsed = str(boundary_refresh.get("latest_elapsed_session") or "").strip()
+
+    def _session_label(session_name: str) -> str:
+        normalized = str(session_name).strip().upper()
+        return _SESSION_LABELS.get(normalized, normalized or "Unknown session")
+
+    latest_elapsed = str(boundary_refresh.get("latest_elapsed_session") or "").strip().upper()
     if latest_elapsed:
+        latest_label = _session_label(latest_elapsed)
         return (
-            "Latest completed session detected: "
-            f"{latest_elapsed}. Predictions use data available through this session."
+            "Latest datapoint in use: "
+            f"{race_name} {year} - {latest_label} ({latest_elapsed}). "
+            "Predictions include all data available through this session."
         )
 
     completed_fp_raw = practice_update.get("completed_fp_sessions")
     completed_fp = (
-        [str(session) for session in completed_fp_raw] if isinstance(completed_fp_raw, list) else []
+        [str(session).strip().upper() for session in completed_fp_raw]
+        if isinstance(completed_fp_raw, list)
+        else []
     )
     if completed_fp:
+        latest_practice = max(
+            completed_fp,
+            key=lambda session_name: _SESSION_ORDER.get(str(session_name).upper(), 0),
+        )
         return (
-            "No completed qualifying/race sessions yet. "
-            f"Latest practice data available: {', '.join(completed_fp)}."
+            "Latest datapoint in use: "
+            f"{race_name} {year} - {_session_label(latest_practice)} ({latest_practice}). "
+            "No completed qualifying/race sessions yet."
         )
 
     reason = str(boundary_refresh.get("reason", "")).strip().lower()
@@ -303,9 +345,55 @@ def _latest_data_status_message(
         )
 
     return (
-        "No sessions finished yet for this weekend. "
-        "Using pre-weekend baseline with latest learned season artifacts."
+        "Latest datapoint in use: pre-weekend baseline/testing only. "
+        f"No completed sessions yet for {race_name} {year}."
     )
+
+
+def _render_collapsible_runtime_messages(messages: list[tuple[str, str]]) -> None:
+    """Render runtime notices compactly to avoid stacked info/warning banners."""
+    unique_messages: list[tuple[str, str]] = []
+    for level, message in messages:
+        normalized_level = str(level).strip().lower()
+        normalized_message = str(message).strip()
+        if not normalized_message:
+            continue
+        item = (normalized_level, normalized_message)
+        if item not in unique_messages:
+            unique_messages.append(item)
+
+    if not unique_messages:
+        return
+
+    primary_level, primary_message = unique_messages[0]
+    remaining_count = len(unique_messages) - 1
+    summary_text = (
+        primary_message if remaining_count == 0 else f"{primary_message} (+{remaining_count} more)"
+    )
+
+    if primary_level == "warning":
+        st.warning(summary_text)
+    elif primary_level == "success":
+        st.success(summary_text)
+    else:
+        st.info(summary_text)
+
+    if remaining_count <= 0:
+        return
+
+    try:
+        expander = st.expander("Run Context Details", expanded=False)
+    except TypeError:
+        expander = st.expander("Run Context Details")
+
+    with expander:
+        for level, message in unique_messages:
+            prefix = "ℹ️"
+            if level == "warning":
+                prefix = "⚠️"
+            elif level == "success":
+                prefix = "✅"
+            st.markdown(f"- {prefix} {message}")
 
 
 def execute_live_prediction_pipeline(
@@ -314,6 +402,7 @@ def execute_live_prediction_pipeline(
     year: int = DEFAULT_SEASON,
     force_refresh: bool = True,
     progress_callback: Callable[[str], None] | None = None,
+    precompute_include_next_weekend: bool | None = None,
 ) -> dict:
     """
     Refresh input data and execute a prediction run.
@@ -326,23 +415,17 @@ def execute_live_prediction_pipeline(
         year: Season year
         force_refresh: If True, clears FastF1 cache and forces re-check of session completion
         progress_callback: Optional callback for progress updates
+        precompute_include_next_weekend:
+            Optional runtime override for boundary precompute scope.
+            `None` keeps config default; `True` includes next weekend.
     """
-    cache_scope_id = "global"
-    try:
-        raw_scope_id = st.session_state.get("_prediction_cache_scope_id")
-        if raw_scope_id is None:
-            raw_scope_id = uuid4().hex
-            st.session_state["_prediction_cache_scope_id"] = raw_scope_id
-        cache_scope_id = str(raw_scope_id)
-    except Exception:
-        cache_scope_id = "global"
-
     return _execute_live_prediction_pipeline_core(
         race_name=race_name,
         weather=weather,
         year=year,
         force_refresh=force_refresh,
         progress_callback=progress_callback,
+        precompute_include_next_weekend=precompute_include_next_weekend,
         clear_fastf1_race_cache_fn=_clear_fastf1_race_cache,
         auto_update_if_needed_fn=auto_update_if_needed,
         is_sprint_weekend_fn=is_sprint_weekend,
@@ -352,7 +435,6 @@ def execute_live_prediction_pipeline(
         clear_data_cache_fn=st.cache_data.clear,
         get_artifact_versions_fn=get_artifact_versions,
         run_prediction_fn=run_prediction,
-        cache_scope_id=cache_scope_id,
     )
 
 
@@ -388,9 +470,25 @@ def render_live_prediction_page(enable_logging: bool) -> None:
 
     with col2:
         weather = st.selectbox("Weather Forecast", ["dry", "rain", "mixed"])
+    st.caption(
+        "Calendar remains fully visible. Future weekends are predicted from priors/testing "
+        "with wider uncertainty, then refreshed automatically as sessions complete."
+    )
 
     st.subheader("Run")
     st.caption("Refresh and session-completion checks are automatic; no manual force refresh.")
+    precompute_include_next_weekend = False
+
+    if enable_logging:
+        st.caption(
+            "Session checkpoint logging is ON: one prediction is saved per completed session "
+            "(FP/SQ/Sprint/Q/R) for weekend-stage confidence and accuracy tracking."
+        )
+    else:
+        st.caption(
+            "Session checkpoint logging is OFF. Enable it in Settings to build a "
+            "session-by-session accuracy timeline."
+        )
     predict_clicked = st.button(
         "Predict",
         type="primary",
@@ -412,34 +510,62 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                     year=selected_season,
                     force_refresh=False,
                     progress_callback=update_status,
+                    precompute_include_next_weekend=precompute_include_next_weekend,
                 )
                 prediction_results = pipeline_output["prediction_results"]
                 is_sprint = bool(pipeline_output["is_sprint"])
                 practice_update = pipeline_output["practice_update"]
                 boundary_refresh = pipeline_output.get("boundary_refresh", {})
+                precompute_summary = pipeline_output.get("precompute_summary", {})
                 prediction_cache_hit = bool(pipeline_output.get("prediction_cache_hit", False))
                 pipeline_timing = pipeline_output.get("pipeline_timing", {})
                 observability = pipeline_output.get("observability", {})
                 status_placeholder.empty()
 
+                runtime_messages: list[tuple[str, str]] = []
                 if selected_season == 2026:
-                    st.warning(
-                        "2026 regulation reset: predictions are uncertain until races complete."
+                    runtime_messages.append(
+                        (
+                            "warning",
+                            "2026 regulation reset: predictions are uncertain until races complete.",
+                        )
                     )
                 else:
-                    st.info(
-                        f"{selected_season} season selected: predictions use currently available "
-                        "session data and learned artifacts for this season."
+                    runtime_messages.append(
+                        (
+                            "info",
+                            f"{selected_season} season selected: predictions use currently available "
+                            "session data and learned artifacts for this season.",
+                        )
                     )
 
                 if is_sprint:
-                    st.info(
-                        "**Sprint Weekend** - System predicts Sprint Qualifying (Friday) → "
-                        "Sprint Race (Saturday) → Main Qualifying (Saturday) → Main Race (Sunday). "
-                        "Sprint predictions use adjusted chaos modeling "
-                        "(30% less variance, grid position +10% importance)."
+                    runtime_messages.append(
+                        (
+                            "info",
+                            "Sprint weekend mode active: Sprint Qualifying → Sprint Race → "
+                            "Main Qualifying → Main Race cascade.",
+                        )
                     )
-                st.info(_latest_data_status_message(boundary_refresh, practice_update))
+                runtime_messages.append(
+                    (
+                        "info",
+                        _latest_data_status_message(
+                            race_name=race_name,
+                            year=selected_season,
+                            boundary_refresh=boundary_refresh,
+                            practice_update=practice_update,
+                        ),
+                    )
+                )
+                if prediction_cache_hit:
+                    runtime_messages.append(
+                        (
+                            "info",
+                            "Prediction reused from cache (inputs unchanged, no new boundary data).",
+                        )
+                    )
+                _render_collapsible_runtime_messages(runtime_messages)
 
                 if practice_update.get("updated"):
                     st.success(
@@ -471,10 +597,22 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                     else:
                         st.info(f"Auto-refresh triggered by event boundary change ({reason}).")
 
-                if prediction_cache_hit:
+                if isinstance(precompute_summary, dict) and precompute_summary.get("triggered"):
+                    generated = int(precompute_summary.get("generated", 0))
+                    reused = int(precompute_summary.get("reused", 0))
+                    targets = precompute_summary.get("targets", [])
+                    target_label = ", ".join(str(target) for target in targets) or race_name
                     st.info(
-                        "Prediction reused from cache (inputs unchanged, no new boundary data)."
+                        "Boundary precompute completed: "
+                        f"{generated} scenario(s) generated, {reused} reused "
+                        f"for {target_label}."
                     )
+                    errors = precompute_summary.get("errors", [])
+                    if isinstance(errors, list) and errors:
+                        st.warning(
+                            "Some precompute scenarios failed: "
+                            + "; ".join(str(error) for error in errors[:3])
+                        )
 
                 if pipeline_timing:
                     timing_parts = [
@@ -526,7 +664,12 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                     year=selected_season,
                 )
 
-                _render_prediction_results(prediction_results, is_sprint)
+                _render_prediction_results(
+                    prediction_results,
+                    is_sprint,
+                    prediction_cache_hit=prediction_cache_hit,
+                    pipeline_timing=pipeline_timing if isinstance(pipeline_timing, dict) else None,
+                )
 
             except Exception as e:
                 st.error(f"Prediction failed: {e}")
@@ -572,6 +715,7 @@ def render_prediction_accuracy_page() -> None:
     st.success(f"Found {summary.n_predictions} saved prediction(s)")
 
     if pipeline.has_actuals:
+        metrics_calculator = PredictionMetrics()
         agg_metrics: dict = {}
         if summary.qualifying_aggregate:
             agg_metrics["qualifying"] = summary.qualifying_aggregate
@@ -584,7 +728,8 @@ def render_prediction_accuracy_page() -> None:
             for p in pipeline.all_predictions
             if p.get("actuals") and (p["actuals"].get("qualifying") or p["actuals"].get("race"))
         ]
-        render_per_race_breakdown(predictions_with_actuals, PredictionMetrics())
+        render_checkpoint_accuracy_trend(predictions_with_actuals, metrics_calculator)
+        render_per_race_breakdown(predictions_with_actuals, metrics_calculator)
     else:
         st.info(
             "Predictions saved, but no actual results added yet. After each race, "
