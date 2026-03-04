@@ -16,9 +16,23 @@ def run_qualifying_simulations(
     rng: np.random.Generator,
     cfg: Any,
     logger: Any,
+    has_testing_fallback_data: bool = False,
 ) -> dict[str, list[int]]:
-    """Run Monte Carlo qualifying simulations and return position records."""
+    """Run Monte Carlo qualifying simulations and return position records.
+
+    Testing fallback data provides team-level signal even when weekend practice
+    laps are unavailable. In that case, avoid the strict model-only teammate
+    regularization stack and inject a small driver-specific weekend-form spread
+    so early-season fallback runs do not collapse into rigid team blocks.
+    """
     position_records = {d["driver"]: [] for d in all_drivers}
+    # Testing fallback provides team-level pace guidance but no direct driver-level
+    # weekend telemetry. Keep low-data weighting/noise behavior, but avoid full
+    # teammate regularization when fallback is available.
+    use_model_only_profile = not has_practice_data
+    apply_model_only_teammate_regularization = use_model_only_profile and (
+        not has_testing_fallback_data
+    )
 
     noise_std_sprint = cfg.get("baseline_predictor.qualifying.noise_std_sprint", 0.025)
     noise_std_normal = cfg.get("baseline_predictor.qualifying.noise_std_normal", 0.02)
@@ -194,7 +208,7 @@ def run_qualifying_simulations(
         )
         return cap * reliability_scale
 
-    if not has_practice_data:
+    if use_model_only_profile:
         team_weight *= cfg.get(
             "baseline_predictor.qualifying.model_only_team_weight_multiplier", 0.82
         )
@@ -223,11 +237,45 @@ def run_qualifying_simulations(
             "baseline_predictor.qualifying.model_only_teammate_setup_multiplier", 1.10
         )
 
+    if has_testing_fallback_data and not has_practice_data:
+        # Testing fallback has team-level signal but weaker direct driver calibration.
+        # Shift a bit of weight from team to driver signal and add controlled dispersion.
+        team_weight *= cfg.get(
+            "baseline_predictor.qualifying.testing_fallback_team_weight_multiplier",
+            0.78,
+        )
+        skill_weight *= cfg.get(
+            "baseline_predictor.qualifying.testing_fallback_skill_weight_multiplier",
+            1.35,
+        )
+        total_weight = team_weight + skill_weight
+        if total_weight <= 0:
+            team_weight, skill_weight = 0.52, 0.48
+        else:
+            team_weight /= total_weight
+            skill_weight /= total_weight
+
+        noise_std *= cfg.get(
+            "baseline_predictor.qualifying.testing_fallback_noise_multiplier", 1.35
+        )
+        teammate_setup_std *= cfg.get(
+            "baseline_predictor.qualifying.testing_fallback_teammate_setup_multiplier",
+            1.25,
+        )
+
     weekend_form_std = cfg.get("baseline_predictor.qualifying.weekend_form_std", 0.0)
-    if not has_practice_data:
+    if use_model_only_profile:
         weekend_form_std *= cfg.get(
             "baseline_predictor.qualifying.model_only_weekend_form_multiplier", 1.0
         )
+    if has_testing_fallback_data and not has_practice_data:
+        weekend_form_floor = float(
+            cfg.get(
+                "baseline_predictor.qualifying.testing_fallback_weekend_form_std_floor",
+                0.028,
+            )
+        )
+        weekend_form_std = max(float(weekend_form_std), weekend_form_floor)
     weekend_form = {
         d["driver"]: rng.normal(0, weekend_form_std) if weekend_form_std > 0 else 0.0
         for d in all_drivers
@@ -247,7 +295,7 @@ def run_qualifying_simulations(
             ) / driver_weight_sum
             driver_signal = raw_driver_signal
             model_only_gap_cap = None
-            if not has_practice_data:
+            if apply_model_only_teammate_regularization:
                 model_only_gap_cap = _resolve_model_only_teammate_gap_cap(driver_info)
                 if model_only_gap_cap is not None:
                     team_mean_for_cap = team_driver_signal_means.get(
@@ -260,7 +308,7 @@ def run_qualifying_simulations(
                             team_mean_for_cap + model_only_gap_cap,
                         )
                     )
-            if not has_practice_data and model_only_driver_signal_shrink > 0:
+            if apply_model_only_teammate_regularization and model_only_driver_signal_shrink > 0:
                 team_mean = team_driver_signal_means.get(driver_info["team"], driver_signal)
                 experience_tier = str(driver_info.get("experience_tier", "unknown"))
                 if experience_tier == "sophomore":
@@ -307,7 +355,7 @@ def run_qualifying_simulations(
                     )
                 )
                 driver_signal = team_mean + ((driver_signal - team_mean) * (1.0 - total_shrink))
-            if not has_practice_data:
+            if apply_model_only_teammate_regularization:
                 if model_only_gap_cap is not None:
                     team_mean = team_driver_signal_means.get(driver_info["team"], driver_signal)
                     driver_signal = max(driver_signal, team_mean - model_only_gap_cap)
@@ -321,7 +369,7 @@ def run_qualifying_simulations(
             learned_position_adjustment = float(driver_info.get("learned_position_adjustment", 0.0))
             score += learned_position_adjustment * effective_learning_scale
             score += weekend_form.get(driver_info["driver"], 0.0)
-            if not has_practice_data and model_only_teammate_anchor_scale > 0:
+            if apply_model_only_teammate_regularization and model_only_teammate_anchor_scale > 0:
                 team_mean_raw = team_driver_signal_means.get(driver_info["team"], raw_driver_signal)
                 teammate_delta = raw_driver_signal - team_mean_raw
                 if model_only_gap_cap is not None:

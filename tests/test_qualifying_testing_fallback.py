@@ -219,6 +219,86 @@ def test_model_only_teammate_anchor_reduces_extreme_inversions():
     assert had_ahead_ratio < 0.35
 
 
+def test_testing_fallback_relaxes_model_only_teammate_regularization():
+    """Testing fallback path should avoid hard model-only teammate compression."""
+    predictor = DummyQualifyingPredictor(
+        {
+            "baseline_predictor.qualifying.model_only_driver_signal_shrink": 0.85,
+            "baseline_predictor.qualifying.model_only_experience_shrink": {
+                "rookie": 0.55,
+                "unknown": 0.0,
+            },
+            "baseline_predictor.qualifying.model_only_teammate_anchor_scale": 0.30,
+            "baseline_predictor.qualifying.model_only_teammate_anchor_cap": 0.12,
+            "baseline_predictor.qualifying.model_only_teammate_gap_cap_by_experience": {
+                "rookie": 0.04
+            },
+            "baseline_predictor.qualifying.model_only_teammate_gap_cap_max_races_by_experience": {},
+            "baseline_predictor.qualifying.noise_std_normal": 0.018,
+            "baseline_predictor.qualifying.teammate_setup_std": 0.008,
+        }
+    )
+
+    all_drivers = [
+        {
+            "driver": "HAD",
+            "team": "Red Bull Racing",
+            "team_strength": 0.59,
+            "skill": 0.67,
+            "quali_pace": 0.705,
+            "experience_tier": "rookie",
+        },
+        {
+            "driver": "VER",
+            "team": "Red Bull Racing",
+            "team_strength": 0.59,
+            "skill": 0.99,
+            "quali_pace": 0.95,
+            "experience_tier": "veteran",
+        },
+    ]
+
+    strict_model_only = predictor._run_qualifying_simulations(
+        all_drivers=all_drivers,
+        n_simulations=2500,
+        is_sprint=False,
+        has_practice_data=False,
+        rng=np.random.default_rng(123),
+        has_testing_fallback_data=False,
+    )
+    with_testing_fallback = predictor._run_qualifying_simulations(
+        all_drivers=all_drivers,
+        n_simulations=2500,
+        is_sprint=False,
+        has_practice_data=False,
+        rng=np.random.default_rng(123),
+        has_testing_fallback_data=True,
+    )
+
+    strict_ratio = (
+        sum(
+            1
+            for had_pos, ver_pos in zip(
+                strict_model_only["HAD"], strict_model_only["VER"], strict=True
+            )
+            if had_pos < ver_pos
+        )
+        / 2500
+    )
+    fallback_ratio = (
+        sum(
+            1
+            for had_pos, ver_pos in zip(
+                with_testing_fallback["HAD"], with_testing_fallback["VER"], strict=True
+            )
+            if had_pos < ver_pos
+        )
+        / 2500
+    )
+
+    assert fallback_ratio > strict_ratio + 0.04
+
+
 def test_run_qualifying_simulations_applies_learned_position_adjustments():
     predictor = DummyQualifyingPredictor(
         {

@@ -20,8 +20,8 @@ BRAND_TAGLINE = "Motorsport data forecasting and telemetry insights"
 BRAND_DISCLAIMER = "Independent analytics project • not affiliated with any racing series, teams, or governing bodies"
 # Header alignment toggle. Options: "left" or "center".
 BRAND_HEADER_ALIGNMENT = "left"
-BRAND_MODEL_VERSION = "v1.2"
-BRAND_LAST_UPDATED = "2026-02-23"
+BRAND_MODEL_VERSION = "v1.3"
+BRAND_LAST_UPDATED = "2026-03-04"
 ENABLE_PREDICTION_ACCURACY_TAB = False
 NAVIGATION_PAGES = ["Prediction", "Team Comparison"]
 if ENABLE_PREDICTION_ACCURACY_TAB:

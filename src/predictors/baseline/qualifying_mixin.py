@@ -254,6 +254,7 @@ class BaselineQualifyingMixin:
         is_sprint: bool,
         has_practice_data: bool,
         rng: np.random.Generator,
+        has_testing_fallback_data: bool = False,
     ) -> dict[str, list[int]]:
         """Run Monte Carlo qualifying simulations and return position records."""
         cfg = getattr(self, "config", config_loader)
@@ -262,6 +263,7 @@ class BaselineQualifyingMixin:
             n_simulations=n_simulations,
             is_sprint=is_sprint,
             has_practice_data=has_practice_data,
+            has_testing_fallback_data=has_testing_fallback_data,
             rng=rng,
             cfg=cfg,
             logger=logger,
@@ -420,9 +422,25 @@ class BaselineQualifyingMixin:
                     continue
                 driver_info["skill"] = np.clip(driver_info["skill"] + fp_modifier, 0.01, 0.99)
 
-        position_records = self._run_qualifying_simulations(
-            all_drivers, n_simulations, is_sprint, session_name is not None, rng
-        )
+        try:
+            position_records = self._run_qualifying_simulations(
+                all_drivers,
+                n_simulations,
+                is_sprint,
+                session_name is not None,
+                rng,
+                testing_fallback_used,
+            )
+        except TypeError:
+            # Backward-compatible fallback for patched tests/helpers overriding the
+            # method with the older five-argument signature.
+            position_records = self._run_qualifying_simulations(
+                all_drivers,
+                n_simulations,
+                is_sprint,
+                session_name is not None,
+                rng,
+            )
 
         try:
             grid = self._aggregate_grid_results(

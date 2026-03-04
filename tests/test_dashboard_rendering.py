@@ -152,6 +152,76 @@ def test_render_race_result_warns_on_high_dnf(patcher):
     assert any("High DNF risk" in msg for msg in warning_messages)
 
 
+def test_render_race_result_explains_sorting_and_interval(patcher):
+    calls = _stub_streamlit(patcher)
+
+    df = pd.DataFrame(
+        [
+            {
+                "position": 1,
+                "driver": "VER",
+                "team": "Red Bull Racing",
+                "position_blend_score": 1.82,
+                "confidence": 58.0,
+                "podium_probability": 64.2,
+                "dnf_probability": 0.04,
+                "p5": 1,
+                "p95": 4,
+            }
+        ]
+    )
+
+    rendering._render_race_result(df)
+
+    captions = [value for kind, value in calls if kind == "caption"]
+    table_html_blocks = [value for kind, value in calls if kind == "markdown" and "<table" in value]
+    assert any("Rows are ranked by expected finishing position" in text for text in captions)
+    assert any("90% Pos Range" in text for text in captions)
+    assert table_html_blocks
+    assert all(">Status<" not in html for html in table_html_blocks)
+
+
+def test_render_race_result_warns_on_low_confidence_signals(patcher):
+    calls = _stub_streamlit(patcher)
+
+    df = pd.DataFrame(
+        [
+            {
+                "position": 1,
+                "driver": "VER",
+                "team": "Red Bull Racing",
+                "position_blend_score": 2.10,
+                "confidence": 49.0,
+                "podium_probability": 41.0,
+                "dnf_probability": 0.08,
+                "p5": 1,
+                "p95": 11,
+            },
+            {
+                "position": 2,
+                "driver": "NOR",
+                "team": "McLaren",
+                "position_blend_score": 2.44,
+                "confidence": 50.0,
+                "podium_probability": 40.0,
+                "dnf_probability": 0.09,
+                "p5": 1,
+                "p95": 10,
+            },
+        ]
+    )
+    df.attrs["input_confidence"] = 0.42
+
+    rendering._render_race_result(df)
+
+    warnings = [value for kind, value in calls if kind == "warning"]
+    details = [value for kind, value in calls if kind == "markdown"]
+    assert any("Low confidence run" in text for text in warnings)
+    assert any("(+1 more)" in text for text in warnings)
+    assert any("Low confidence run" in text for text in details)
+    assert any("Low input-data confidence" in text for text in details)
+
+
 def test_render_qualifying_result_splits_grid_columns(patcher):
     calls = _stub_streamlit(patcher)
     df = pd.DataFrame(
@@ -242,8 +312,12 @@ def test_display_prediction_result_routes_qualifying_sections(patcher):
     )
 
     assert routed == ["quali"]
-    assert ("info", "Using PREDICTED grid") in calls
-    assert (
-        "success",
-        "Using Short-stint blend (FP3 + FP2 + FP1) (70% practice data + 30% model)",
-    ) in calls
+    warnings = [value for kind, value in calls if kind == "warning"]
+    details = [value for kind, value in calls if kind == "markdown"]
+    assert any("Grid source: PREDICTED qualifying grid." in text for text in warnings)
+    assert any("(+1 more)" in text for text in warnings)
+    assert any("Grid source: PREDICTED qualifying grid." in text for text in details)
+    assert any(
+        "Data source: Short-stint blend (FP3 + FP2 + FP1) (70% practice data + 30% model)." in text
+        for text in details
+    )

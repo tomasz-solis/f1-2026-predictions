@@ -502,6 +502,23 @@ def predict_race_core(
 
     aggregated = aggregate_simulation_results(simulation_results)
 
+    confidence_floor = cfg.get("baseline_predictor.race.confidence.min", 40.0)
+    confidence_cap = cfg.get("baseline_predictor.race.confidence.max", 60.0)
+    context_confidence_scale = float(
+        cfg.get("baseline_predictor.race.confidence.context_scale", 8.0)
+    )
+    context_confidence = (
+        0.5 if input_confidence is None else float(np.clip(input_confidence, 0.0, 1.0))
+    )
+    low_confidence_share = float(np.clip(1.0 - context_confidence, 0.0, 1.0))
+    context_confidence_adjustment = (context_confidence - 0.5) * context_confidence_scale
+    weather_penalty = (
+        cfg.get("baseline_predictor.race.confidence.weather_penalty_wet", 4.0)
+        if weather in ("rain", "mixed")
+        else 0.0
+    )
+    weather_penalty += float(weather_feature_modifiers.get("confidence_adjustment", 0.0))
+
     track_overtaking = race_params.get("track_overtaking", 0.5)
     grid_anchor_weight = np.clip(
         cfg.get("baseline_predictor.race.grid_anchor.base", 0.25)
@@ -517,6 +534,17 @@ def predict_race_core(
     else:
         grid_anchor_weight = max(grid_anchor_weight, grid_anchor_min)
         grid_anchor_weight = min(grid_anchor_weight, main_grid_anchor_max)
+        # Keep low-signal runs closer to grid order to avoid overconfident reshuffles.
+        grid_anchor_low_confidence_scale = float(
+            cfg.get("baseline_predictor.race.grid_anchor.low_confidence_scale", 0.18)
+        )
+        grid_anchor_weight = float(
+            np.clip(
+                grid_anchor_weight + (low_confidence_share * grid_anchor_low_confidence_scale),
+                grid_anchor_min,
+                main_grid_anchor_max,
+            )
+        )
     overtake_blend_scale = cfg.get(
         "baseline_predictor.race.final_blend.overtaking_skill_scale", 1.6
     )
@@ -546,21 +574,28 @@ def predict_race_core(
     )
     max_gain_floor = cfg.get("baseline_predictor.race.final_blend.max_gain_floor", 4.0)
     max_gain_ceiling = cfg.get("baseline_predictor.race.final_blend.max_gain_ceiling", 11.0)
-    confidence_floor = cfg.get("baseline_predictor.race.confidence.min", 40.0)
-    confidence_cap = cfg.get("baseline_predictor.race.confidence.max", 60.0)
-    context_confidence_scale = float(
-        cfg.get("baseline_predictor.race.confidence.context_scale", 8.0)
+    low_confidence_racecraft_floor = float(
+        cfg.get("baseline_predictor.race.final_blend.low_confidence_racecraft_floor", 0.72)
     )
-    context_confidence = (
-        0.5 if input_confidence is None else float(np.clip(input_confidence, 0.0, 1.0))
+    low_confidence_max_gain_floor = float(
+        cfg.get("baseline_predictor.race.final_blend.low_confidence_max_gain_floor", 0.82)
     )
-    context_confidence_adjustment = (context_confidence - 0.5) * context_confidence_scale
-    weather_penalty = (
-        cfg.get("baseline_predictor.race.confidence.weather_penalty_wet", 4.0)
-        if weather in ("rain", "mixed")
-        else 0.0
+    racecraft_confidence_scale = float(
+        np.clip(
+            low_confidence_racecraft_floor
+            + ((1.0 - low_confidence_racecraft_floor) * context_confidence),
+            0.0,
+            1.0,
+        )
     )
-    weather_penalty += float(weather_feature_modifiers.get("confidence_adjustment", 0.0))
+    max_gain_confidence_scale = float(
+        np.clip(
+            low_confidence_max_gain_floor
+            + ((1.0 - low_confidence_max_gain_floor) * context_confidence),
+            0.0,
+            1.0,
+        )
+    )
 
     finish_order = []
     blended_samples_by_driver: dict[str, list[float]] = {}
@@ -604,6 +639,7 @@ def predict_race_core(
             * (0.6 + (0.4 * overtake_ease))
         )
         racecraft_adjustment += elite_driver_adjustment
+        racecraft_adjustment *= racecraft_confidence_scale
 
         is_elite_driver = info["skill"] >= elite_skill_threshold
         if info["grid_pos"] <= 3 and not is_elite_driver:
@@ -627,6 +663,7 @@ def predict_race_core(
             + ((info["overtaking_skill"] - 0.5) * skill_gain_scale)
             + (max(0.0, info["race_advantage"]) * race_adv_gain_scale)
         )
+        max_gain *= max_gain_confidence_scale
         max_gain = np.clip(max_gain, max_gain_floor, max_gain_ceiling)
         min_position_score = max(1.0, info["grid_pos"] - max_gain)
 
