@@ -15,9 +15,12 @@ from typing import Any, Protocol
 from src.dashboard.precomputed_predictions import (
     compute_artifact_hash,
     get_prediction_precompute_config,
+    load_precompute_horizon_index,
     load_precomputed_prediction,
+    save_precompute_horizon_index,
     save_precomputed_prediction,
 )
+from src.dashboard.update_flow import _boundary_signature, _build_event_boundary_snapshot
 from src.utils.operational_observability import (
     drain_recent_alerts,
     record_alert,
@@ -560,9 +563,10 @@ def _get_prediction_precompute_settings() -> dict[str, Any]:
     """Return normalized settings that control boundary-triggered precompute."""
     defaults: dict[str, Any] = {
         "enabled": True,
-        "include_next_weekend": False,
+        "inline_enabled": True,
+        "horizon_races": 3,
         "weather_scenarios": ["dry", "mixed", "rain"],
-        "max_file_entries": 96,
+        "max_file_entries": 2048,
     }
     try:
         loaded = get_prediction_precompute_config()
@@ -590,10 +594,16 @@ def _get_prediction_precompute_settings() -> dict[str, Any]:
             normalized_weather if normalized_weather else list(default_weather_scenarios)
         )
     settings["enabled"] = bool(settings.get("enabled", defaults["enabled"]))
-    settings["include_next_weekend"] = bool(
-        settings.get("include_next_weekend", defaults["include_next_weekend"])
-    )
-    raw_max_file_entries = settings.get("max_file_entries", 96)
+    settings["inline_enabled"] = bool(settings.get("inline_enabled", defaults["inline_enabled"]))
+    raw_horizon_races = settings.get("horizon_races", defaults["horizon_races"])
+    if isinstance(raw_horizon_races, int | float | str):
+        try:
+            settings["horizon_races"] = max(1, int(raw_horizon_races))
+        except (TypeError, ValueError):
+            settings["horizon_races"] = defaults["horizon_races"]
+    else:
+        settings["horizon_races"] = defaults["horizon_races"]
+    raw_max_file_entries = settings.get("max_file_entries", defaults["max_file_entries"])
     if isinstance(raw_max_file_entries, int | float | str):
         try:
             settings["max_file_entries"] = max(16, int(raw_max_file_entries))
@@ -608,17 +618,18 @@ def _resolve_precompute_targets(
     *,
     year: int,
     race_name: str,
-    include_next_weekend: bool,
+    horizon_races: int,
 ) -> list[str]:
-    """Resolve race targets for boundary-triggered precompute."""
+    """Resolve race targets for boundary-triggered precompute horizon."""
+    requested_horizon = max(1, int(horizon_races))
     targets = [race_name]
-    if not include_next_weekend:
+    if requested_horizon <= 1:
         return targets
 
     try:
-        from src.utils.weekend import _get_schedule_rows
+        from src.utils.weekend import get_schedule_rows
 
-        rows = list(_get_schedule_rows(year))
+        rows = list(get_schedule_rows(year))
     except Exception as exc:
         logger.warning("Could not load schedule rows for precompute targeting: %s", exc)
         return targets
@@ -627,11 +638,12 @@ def _resolve_precompute_targets(
         return targets
 
     race_names: list[str] = []
-    for event_name, _event_format in rows:
+    for event_name, event_format in rows:
         normalized = str(event_name).strip()
+        normalized_format = str(event_format).strip().lower()
         if not normalized:
             continue
-        if "testing" in normalized.lower():
+        if "testing" in normalized.lower() or "testing" in normalized_format:
             continue
         race_names.append(normalized)
 
@@ -642,13 +654,38 @@ def _resolve_precompute_targets(
     for idx, candidate in enumerate(race_names):
         if candidate.strip().lower() != normalized_current:
             continue
-        if idx + 1 < len(race_names):
-            next_race = race_names[idx + 1]
+        for next_race in race_names[idx + 1 : idx + requested_horizon]:
             if next_race not in targets:
                 targets.append(next_race)
         break
 
     return targets
+
+
+def _resolve_race_boundary_context(
+    *,
+    year: int,
+    race_name: str,
+    is_sprint: bool,
+    session_detector: Any | None = None,
+) -> tuple[str, str]:
+    """
+    Resolve race-specific boundary signature and checkpoint label.
+
+    Returns:
+        Tuple ``(boundary_signature, checkpoint_label)`` where checkpoint label
+        is latest elapsed session or ``PRE``.
+    """
+    snapshot = _build_event_boundary_snapshot(
+        year=year,
+        race_name=race_name,
+        is_sprint=is_sprint,
+        session_detector=session_detector,
+    )
+    checkpoint = str(snapshot.get("latest_elapsed_session") or "PRE").strip().upper() or "PRE"
+    if not bool(snapshot.get("has_schedule_data")):
+        return "", checkpoint
+    return _boundary_signature(snapshot), checkpoint
 
 
 def execute_live_prediction_pipeline_core(
@@ -658,7 +695,6 @@ def execute_live_prediction_pipeline_core(
     year: int,
     force_refresh: bool,
     progress_callback: Callable[[str], None] | None,
-    precompute_include_next_weekend: bool | None = None,
     clear_fastf1_race_cache_fn: Callable[[int, str], None],
     auto_update_if_needed_fn: AutoUpdateIfNeededFn,
     is_sprint_weekend_fn: Callable[[int, str], bool],
@@ -674,7 +710,6 @@ def execute_live_prediction_pipeline_core(
 
     Kept separate from Streamlit rendering so tests can assert refresh call order.
 
-    `precompute_include_next_weekend` overrides config scope when provided.
     """
     pipeline_timing: dict[str, float] = {}
     pipeline_start = time.time()
@@ -760,15 +795,50 @@ def execute_live_prediction_pipeline_core(
         "generated": 0,
         "reused": 0,
         "targets": [],
+        "ready_races": [],
         "errors": [],
+        "skipped_reason": "",
     }
     precompute_settings = _get_prediction_precompute_settings()
-    if precompute_include_next_weekend is not None:
-        precompute_settings["include_next_weekend"] = bool(precompute_include_next_weekend)
 
     artifact_versions = get_artifact_versions_fn(year=year)
     artifact_hash = compute_artifact_hash(artifact_versions)
     boundary_signature = str(boundary_refresh.get("boundary_signature", ""))
+    boundary_session_name = str(boundary_refresh.get("latest_elapsed_session") or "PRE").strip()
+    if not boundary_session_name:
+        boundary_session_name = "PRE"
+    boundary_session_name = boundary_session_name.upper()
+    if not boundary_signature:
+        try:
+            resolved_boundary_signature, resolved_boundary_session_name = (
+                _resolve_race_boundary_context(
+                    year=year,
+                    race_name=race_name,
+                    is_sprint=is_sprint,
+                    session_detector=session_detector,
+                )
+            )
+            boundary_signature = resolved_boundary_signature
+            if boundary_session_name == "PRE":
+                boundary_session_name = resolved_boundary_session_name
+        except Exception as exc:
+            logger.warning(
+                "Could not resolve race boundary context for %s %s: %s",
+                year,
+                race_name,
+                exc,
+            )
+    weather_normalized = str(weather).strip().lower()
+    weather_scenarios = [
+        str(option).strip().lower() for option in precompute_settings["weather_scenarios"]
+    ]
+    target_races = _resolve_precompute_targets(
+        year=year,
+        race_name=race_name,
+        horizon_races=int(precompute_settings["horizon_races"]),
+    )
+    precompute_summary["targets"] = target_races
+
     prediction_cache_key = _prediction_cache_key(
         year=year,
         race_name=race_name,
@@ -826,6 +896,10 @@ def execute_live_prediction_pipeline_core(
                     boundary_signature=boundary_signature,
                     is_sprint=is_sprint,
                     prediction_results=prediction_results,
+                    metadata={
+                        "source_race_name": race_name,
+                        "boundary_session_name": boundary_session_name,
+                    },
                     max_file_entries=int(precompute_settings["max_file_entries"]),
                 )
         else:
@@ -846,6 +920,10 @@ def execute_live_prediction_pipeline_core(
                 boundary_signature=boundary_signature,
                 is_sprint=is_sprint,
                 prediction_results=prediction_results,
+                metadata={
+                    "source_race_name": race_name,
+                    "boundary_session_name": boundary_session_name,
+                },
                 max_file_entries=int(precompute_settings["max_file_entries"]),
             )
     else:
@@ -866,31 +944,67 @@ def execute_live_prediction_pipeline_core(
             boundary_signature=boundary_signature,
             is_sprint=is_sprint,
             prediction_results=prediction_results,
+            metadata={
+                "source_race_name": race_name,
+                "boundary_session_name": boundary_session_name,
+            },
             max_file_entries=int(precompute_settings["max_file_entries"]),
         )
 
-    trigger_precompute = precompute_settings["enabled"] and (
-        force_refresh
-        or bool(boundary_refresh.get("refresh_needed"))
-        or bool(practice_update.get("updated"))
+    horizon_index = load_precompute_horizon_index(year=year, artifact_hash=artifact_hash)
+    index_matches_current_boundary = False
+    if isinstance(horizon_index, dict):
+        indexed_boundary = str(horizon_index.get("boundary_signature", "")).strip()
+        indexed_anchor = str(horizon_index.get("anchor_race_name", "")).strip()
+        indexed_targets_raw = horizon_index.get("expected_targets", [])
+        indexed_ready_raw = horizon_index.get("ready_races", [])
+        indexed_targets = (
+            {str(race).strip() for race in indexed_targets_raw}
+            if isinstance(indexed_targets_raw, list)
+            else set()
+        )
+        indexed_ready = (
+            [str(race).strip() for race in indexed_ready_raw if str(race).strip()]
+            if isinstance(indexed_ready_raw, list)
+            else []
+        )
+        if (
+            indexed_boundary == boundary_signature
+            and indexed_anchor == race_name
+            and indexed_targets == {str(race).strip() for race in target_races}
+        ):
+            index_matches_current_boundary = True
+            precompute_summary["ready_races"] = indexed_ready
+
+    precompute_inline_enabled = bool(precompute_settings.get("inline_enabled", True))
+    if not precompute_inline_enabled:
+        precompute_summary["skipped_reason"] = "inline_precompute_disabled"
+
+    trigger_precompute = (
+        precompute_settings["enabled"]
+        and precompute_inline_enabled
+        and (
+            force_refresh
+            or bool(boundary_refresh.get("refresh_needed"))
+            or bool(practice_update.get("updated"))
+            or not index_matches_current_boundary
+        )
     )
     if trigger_precompute:
         precompute_summary["triggered"] = True
-        target_races = _resolve_precompute_targets(
-            year=year,
-            race_name=race_name,
-            include_next_weekend=bool(precompute_settings["include_next_weekend"]),
-        )
-        precompute_summary["targets"] = target_races
-        _notify("Precomputing weather scenarios for updated boundary...")
-        weather_scenarios = [
-            str(option).strip().lower() for option in precompute_settings["weather_scenarios"]
-        ]
+        _notify("Precomputing horizon weather scenarios...")
+        race_weather_coverage: dict[str, set[str]] = {
+            str(target).strip(): set() for target in target_races if str(target).strip()
+        }
+        race_boundaries: dict[str, str] = {}
+        if race_name in race_weather_coverage:
+            race_weather_coverage[race_name].add(weather_normalized)
 
         for target_race in target_races:
             if target_race == race_name:
                 target_is_sprint = is_sprint
                 target_boundary_signature = boundary_signature
+                target_boundary_session_name = boundary_session_name
             else:
                 try:
                     target_is_sprint = bool(is_sprint_weekend_fn(year, target_race))
@@ -902,28 +1016,18 @@ def execute_live_prediction_pipeline_core(
                         exc,
                     )
                     target_is_sprint = False
-
-                try:
-                    target_boundary_refresh = detect_event_boundary_refresh_if_needed_fn(
+                target_boundary_signature, target_boundary_session_name = (
+                    _resolve_race_boundary_context(
                         year=year,
                         race_name=target_race,
                         is_sprint=target_is_sprint,
                         session_detector=session_detector,
                     )
-                    target_boundary_signature = str(
-                        target_boundary_refresh.get("boundary_signature", "")
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "Could not resolve boundary signature for precompute target %s %s: %s",
-                        year,
-                        target_race,
-                        exc,
-                    )
-                    target_boundary_signature = ""
+                )
+            race_boundaries[target_race] = target_boundary_signature
 
             for target_weather in weather_scenarios:
-                if target_race == race_name and target_weather == weather:
+                if target_race == race_name and target_weather == weather_normalized:
                     # Current request already resolved this scenario above.
                     continue
 
@@ -936,6 +1040,7 @@ def execute_live_prediction_pipeline_core(
                 )
                 if precomputed is not None:
                     precompute_summary["reused"] += 1
+                    race_weather_coverage.setdefault(target_race, set()).add(target_weather)
                     target_cache_key = _prediction_cache_key(
                         year=year,
                         race_name=target_race,
@@ -963,6 +1068,10 @@ def execute_live_prediction_pipeline_core(
                         boundary_signature=target_boundary_signature,
                         is_sprint=target_is_sprint,
                         prediction_results=generated_prediction,
+                        metadata={
+                            "source_race_name": race_name,
+                            "boundary_session_name": target_boundary_session_name,
+                        },
                         max_file_entries=int(precompute_settings["max_file_entries"]),
                     )
                     target_cache_key = _prediction_cache_key(
@@ -975,6 +1084,7 @@ def execute_live_prediction_pipeline_core(
                     )
                     _store_cached_prediction(target_cache_key, generated_prediction)
                     precompute_summary["generated"] += 1
+                    race_weather_coverage.setdefault(target_race, set()).add(target_weather)
                 except Exception as exc:
                     logger.warning(
                         "Prediction precompute failed for %s %s %s: %s",
@@ -999,6 +1109,33 @@ def execute_live_prediction_pipeline_core(
                         ),
                         labels=labels,
                     )
+        expected_weather = set(weather_scenarios)
+        ready_races = [
+            target_race
+            for target_race in target_races
+            if expected_weather.issubset(race_weather_coverage.get(target_race, set()))
+        ]
+        precompute_summary["ready_races"] = ready_races
+        try:
+            save_precompute_horizon_index(
+                year=year,
+                artifact_hash=artifact_hash,
+                boundary_signature=boundary_signature,
+                anchor_race_name=race_name,
+                anchor_session_name=boundary_session_name,
+                expected_targets=target_races,
+                ready_races=ready_races,
+                weather_scenarios=weather_scenarios,
+                race_boundaries=race_boundaries,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Could not persist precompute horizon index for %s %s (%s): %s",
+                year,
+                race_name,
+                boundary_signature,
+                exc,
+            )
     pipeline_timing["prediction_run"] = time.time() - prediction_start
     pipeline_timing["total"] = time.time() - pipeline_start
     logger.info(

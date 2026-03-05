@@ -92,6 +92,95 @@ def test_load_race_options_uses_requested_year(patcher):
     assert options == ["Bahrain Grand Prix"]
 
 
+def test_filter_race_options_to_precomputed_horizon_filters_to_ready_races(patcher):
+    patcher.setattr(pages, "get_artifact_versions", lambda year=2026: {"k": (1, "ts")})
+    patcher.setattr(pages, "compute_artifact_hash", lambda versions: "artifact_hash")
+    patcher.setattr(
+        pages, "_current_anchor_boundary_signature", lambda year, anchor_race_name: "sig_a"
+    )
+    patcher.setattr(
+        pages,
+        "load_precompute_horizon_index",
+        lambda year, artifact_hash: {
+            "ready_races": ["Bahrain Grand Prix", "Chinese Grand Prix"],
+            "expected_targets": [
+                "Bahrain Grand Prix",
+                "Chinese Grand Prix",
+                "Japanese Grand Prix",
+            ],
+            "anchor_race_name": "Bahrain Grand Prix",
+            "anchor_session_name": "FP1",
+            "boundary_signature": "sig_a",
+        },
+    )
+
+    filtered, metadata = pages._filter_race_options_to_precomputed_horizon(
+        year=2026,
+        race_options=[
+            "Bahrain Grand Prix",
+            "Chinese Grand Prix (Sprint)",
+            "Japanese Grand Prix",
+        ],
+    )
+
+    assert filtered == ["Bahrain Grand Prix", "Chinese Grand Prix (Sprint)"]
+    assert metadata["applied"] is True
+    assert metadata["anchor_race_name"] == "Bahrain Grand Prix"
+    assert metadata["anchor_session_name"] == "FP1"
+
+
+def test_filter_race_options_to_precomputed_horizon_keeps_full_calendar_when_index_missing(patcher):
+    patcher.setattr(pages, "get_artifact_versions", lambda year=2026: {"k": (1, "ts")})
+    patcher.setattr(pages, "compute_artifact_hash", lambda versions: "artifact_hash")
+    patcher.setattr(
+        pages,
+        "load_precompute_horizon_index",
+        lambda year, artifact_hash: None,
+    )
+
+    options = ["Bahrain Grand Prix", "Chinese Grand Prix (Sprint)"]
+    filtered, metadata = pages._filter_race_options_to_precomputed_horizon(
+        year=2026,
+        race_options=options,
+    )
+
+    assert filtered == options
+    assert metadata["applied"] is False
+
+
+def test_filter_race_options_to_precomputed_horizon_keeps_full_calendar_when_boundary_stale(
+    patcher,
+):
+    patcher.setattr(pages, "get_artifact_versions", lambda year=2026: {"k": (1, "ts")})
+    patcher.setattr(pages, "compute_artifact_hash", lambda versions: "artifact_hash")
+    patcher.setattr(
+        pages,
+        "_current_anchor_boundary_signature",
+        lambda year, anchor_race_name: "sig_live",
+    )
+    patcher.setattr(
+        pages,
+        "load_precompute_horizon_index",
+        lambda year, artifact_hash: {
+            "ready_races": ["Bahrain Grand Prix"],
+            "expected_targets": ["Bahrain Grand Prix"],
+            "anchor_race_name": "Bahrain Grand Prix",
+            "anchor_session_name": "FP1",
+            "boundary_signature": "sig_old",
+        },
+    )
+
+    options = ["Bahrain Grand Prix", "Chinese Grand Prix (Sprint)"]
+    filtered, metadata = pages._filter_race_options_to_precomputed_horizon(
+        year=2026,
+        race_options=options,
+    )
+
+    assert filtered == options
+    assert metadata["applied"] is False
+    assert metadata["stale_reason"] == "boundary_mismatch"
+
+
 def test_cache_dir_race_matching_handles_date_prefixed_event_dirs():
     assert pages._cache_dir_matches_race(
         "2025-04-13_Bahrain_Grand_Prix",
@@ -638,7 +727,7 @@ def test_render_prediction_accuracy_page_with_actuals(patcher):
 def test_render_live_prediction_page_passes_selected_season_to_pipeline_and_save(patcher):
     _stub_page_streamlit(patcher)
 
-    selected_years: dict[str, int | bool] = {}
+    selected_years: dict[str, int] = {}
     error_messages: list[str] = []
 
     def _selectbox(label, options, index=0, **_kwargs):
@@ -669,29 +758,24 @@ def test_render_live_prediction_page_passes_selected_season_to_pipeline_and_save
     )
     patcher.setattr(
         pages,
+        "_filter_race_options_to_precomputed_horizon",
+        lambda year, race_options: (race_options, {"applied": False}),
+    )
+    patcher.setattr(
+        pages,
         "execute_live_prediction_pipeline",
-        lambda race_name,
-        weather,
-        year,
-        force_refresh,
-        progress_callback=None,
-        precompute_include_next_weekend=None: (
-            (
-                selected_years.__setitem__("pipeline", year),
-                selected_years.__setitem__(
-                    "precompute_scope", bool(precompute_include_next_weekend)
-                ),
-                {
-                    "prediction_results": {
-                        "qualifying": {"grid": []},
-                        "race": {"finish_order": []},
-                    },
-                    "is_sprint": False,
-                    "practice_update": {"updated": False, "completed_fp_sessions": []},
-                    "pipeline_timing": {},
+        lambda race_name, weather, year, force_refresh, progress_callback=None: (
+            selected_years.__setitem__("pipeline", year),
+            {
+                "prediction_results": {
+                    "qualifying": {"grid": []},
+                    "race": {"finish_order": []},
                 },
-            )[2]
-        ),
+                "is_sprint": False,
+                "practice_update": {"updated": False, "completed_fp_sessions": []},
+                "pipeline_timing": {},
+            },
+        )[1],
     )
     patcher.setattr(
         pages,
@@ -704,17 +788,17 @@ def test_render_live_prediction_page_passes_selected_season_to_pipeline_and_save
 
     assert error_messages == []
     assert selected_years["pipeline"] == 2027
-    assert selected_years["precompute_scope"] is False
 
 
-def test_render_live_prediction_page_keeps_precompute_scope_locked_to_selected_gp_only(patcher):
+def test_render_live_prediction_page_uses_filtered_precompute_race_options(patcher):
     _stub_page_streamlit(patcher)
-    captured_scope: dict[str, bool] = {}
+    options_seen: list[list[str]] = []
 
     def _selectbox(label, options, index=0, **_kwargs):
         if label == "Season":
             return 2027
         if label == "Select Grand Prix":
+            options_seen.append(list(options))
             return "Bahrain Grand Prix"
         if label == "Weather Forecast":
             return "dry"
@@ -738,33 +822,39 @@ def test_render_live_prediction_page_keeps_precompute_scope_locked_to_selected_g
     )
     patcher.setattr(
         pages,
-        "execute_live_prediction_pipeline",
-        lambda race_name,
-        weather,
-        year,
-        force_refresh,
-        progress_callback=None,
-        precompute_include_next_weekend=None: (
-            (
-                captured_scope.__setitem__("value", bool(precompute_include_next_weekend)),
-                {
-                    "prediction_results": {
-                        "qualifying": {"grid": []},
-                        "race": {"finish_order": []},
-                    },
-                    "is_sprint": False,
-                    "practice_update": {"updated": False, "completed_fp_sessions": []},
-                    "pipeline_timing": {},
-                },
-            )[1]
+        "_filter_race_options_to_precomputed_horizon",
+        lambda year, race_options: (
+            ["Bahrain Grand Prix"],
+            {
+                "applied": True,
+                "ready_races": ["Bahrain Grand Prix"],
+                "expected_targets": ["Bahrain Grand Prix", "Chinese Grand Prix"],
+                "anchor_race_name": "Bahrain Grand Prix",
+                "anchor_session_name": "PRE",
+            },
         ),
+    )
+    patcher.setattr(
+        pages,
+        "execute_live_prediction_pipeline",
+        lambda race_name, weather, year, force_refresh, progress_callback=None: (
+            {
+                "prediction_results": {
+                    "qualifying": {"grid": []},
+                    "race": {"finish_order": []},
+                },
+                "is_sprint": False,
+                "practice_update": {"updated": False, "completed_fp_sessions": []},
+                "pipeline_timing": {},
+            },
+        )[1],
     )
     patcher.setattr(pages, "_save_prediction_if_enabled", lambda **kwargs: None)
     patcher.setattr(pages, "_render_prediction_results", lambda *_args, **_kwargs: None)
 
     pages.render_live_prediction_page(enable_logging=False)
 
-    assert captured_scope == {"value": False}
+    assert options_seen == [["Bahrain Grand Prix"]]
 
 
 def test_build_team_comparison_dataframe_uses_profile_metrics():

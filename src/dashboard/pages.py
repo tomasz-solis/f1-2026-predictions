@@ -5,6 +5,7 @@ import unicodedata
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import fastf1
 import streamlit as st
@@ -34,9 +35,12 @@ from .page_content import (
     QUALIFYING_HYPERPARAMETERS_MARKDOWN,
     RACE_HYPERPARAMETERS_MARKDOWN,
 )
+from .precomputed_predictions import compute_artifact_hash, load_precompute_horizon_index
 from .prediction_flow import run_prediction
 from .rendering import display_prediction_result
 from .update_flow import (
+    _boundary_signature,
+    _build_event_boundary_snapshot,
     auto_update_if_needed,
     auto_update_practice_characteristics_if_needed,
     detect_event_boundary_refresh_if_needed,
@@ -256,6 +260,133 @@ def _load_race_options(year: int = DEFAULT_SEASON) -> list[str]:
     return race_options
 
 
+@st.cache_data(show_spinner=False, ttl=120)
+def _current_anchor_boundary_signature(year: int, anchor_race_name: str) -> str | None:
+    """
+    Resolve current boundary signature for horizon anchor race.
+
+    Returns ``None`` when boundary state cannot be validated.
+    """
+    try:
+        is_sprint = bool(is_sprint_weekend(year, anchor_race_name))
+    except Exception as exc:
+        logger.warning(
+            "Could not determine weekend type for anchor boundary validation (%s %s): %s",
+            year,
+            anchor_race_name,
+            exc,
+        )
+        return None
+
+    from src.utils.session_detector import SessionDetector
+
+    try:
+        snapshot = _build_event_boundary_snapshot(
+            year=year,
+            race_name=anchor_race_name,
+            is_sprint=is_sprint,
+            session_detector=SessionDetector(),
+            now_utc=datetime.now(UTC),
+        )
+    except Exception as exc:
+        logger.warning(
+            "Could not build anchor boundary snapshot for dropdown filtering (%s %s): %s",
+            year,
+            anchor_race_name,
+            exc,
+        )
+        return None
+
+    if not bool(snapshot.get("has_schedule_data")):
+        return None
+    return _boundary_signature(snapshot)
+
+
+def _filter_race_options_to_precomputed_horizon(
+    *,
+    year: int,
+    race_options: list[str],
+) -> tuple[list[str], dict[str, Any]]:
+    """
+    Filter race dropdown options to precomputed races for the active artifact state.
+
+    Returns:
+        Tuple of ``(filtered_options, metadata)`` where metadata includes whether
+        filtering was applied and contextual details for user-facing captions.
+    """
+    if not race_options:
+        return race_options, {"applied": False}
+
+    try:
+        artifact_versions = get_artifact_versions(year=year)
+        artifact_hash = compute_artifact_hash(artifact_versions)
+    except Exception as exc:
+        logger.warning("Could not compute artifact hash for dropdown filtering: %s", exc)
+        return race_options, {"applied": False}
+
+    index_payload = load_precompute_horizon_index(year=year, artifact_hash=artifact_hash)
+    if not isinstance(index_payload, dict):
+        return race_options, {"applied": False, "artifact_hash": artifact_hash}
+
+    anchor_race_name = str(index_payload.get("anchor_race_name", "")).strip()
+    indexed_boundary = str(index_payload.get("boundary_signature", "")).strip()
+    if not anchor_race_name or not indexed_boundary:
+        return race_options, {
+            "applied": False,
+            "artifact_hash": artifact_hash,
+            "stale_reason": "missing_anchor_or_boundary",
+        }
+
+    current_boundary = _current_anchor_boundary_signature(year, anchor_race_name)
+    if not current_boundary:
+        return race_options, {
+            "applied": False,
+            "artifact_hash": artifact_hash,
+            "stale_reason": "boundary_unavailable",
+            "anchor_race_name": anchor_race_name,
+            "indexed_boundary_signature": indexed_boundary,
+        }
+    if current_boundary != indexed_boundary:
+        return race_options, {
+            "applied": False,
+            "artifact_hash": artifact_hash,
+            "stale_reason": "boundary_mismatch",
+            "anchor_race_name": anchor_race_name,
+            "indexed_boundary_signature": indexed_boundary,
+            "current_boundary_signature": current_boundary,
+        }
+
+    ready_races_raw = index_payload.get("ready_races", [])
+    if not isinstance(ready_races_raw, list):
+        return race_options, {"applied": False, "artifact_hash": artifact_hash}
+    ready_races = [str(race).strip() for race in ready_races_raw if str(race).strip()]
+    if not ready_races:
+        return race_options, {"applied": False, "artifact_hash": artifact_hash}
+
+    ready_set = set(ready_races)
+    filtered_options = [
+        option for option in race_options if option.replace(" (Sprint)", "").strip() in ready_set
+    ]
+    if not filtered_options:
+        return race_options, {"applied": False, "artifact_hash": artifact_hash}
+
+    return filtered_options, {
+        "applied": True,
+        "artifact_hash": artifact_hash,
+        "anchor_race_name": anchor_race_name,
+        "anchor_session_name": str(index_payload.get("anchor_session_name", "")).strip(),
+        "boundary_signature": indexed_boundary,
+        "expected_targets": [
+            str(race).strip()
+            for race in index_payload.get("expected_targets", [])
+            if str(race).strip()
+        ]
+        if isinstance(index_payload.get("expected_targets"), list)
+        else [],
+        "ready_races": ready_races,
+    }
+
+
 def _save_prediction_if_enabled(
     enable_logging: bool,
     prediction_results: dict,
@@ -402,7 +533,6 @@ def execute_live_prediction_pipeline(
     year: int = DEFAULT_SEASON,
     force_refresh: bool = True,
     progress_callback: Callable[[str], None] | None = None,
-    precompute_include_next_weekend: bool | None = None,
 ) -> dict:
     """
     Refresh input data and execute a prediction run.
@@ -415,9 +545,6 @@ def execute_live_prediction_pipeline(
         year: Season year
         force_refresh: If True, clears FastF1 cache and forces re-check of session completion
         progress_callback: Optional callback for progress updates
-        precompute_include_next_weekend:
-            Optional runtime override for boundary precompute scope.
-            `None` keeps config default; `True` includes next weekend.
     """
     return _execute_live_prediction_pipeline_core(
         race_name=race_name,
@@ -425,7 +552,6 @@ def execute_live_prediction_pipeline(
         year=year,
         force_refresh=force_refresh,
         progress_callback=progress_callback,
-        precompute_include_next_weekend=precompute_include_next_weekend,
         clear_fastf1_race_cache_fn=_clear_fastf1_race_cache,
         auto_update_if_needed_fn=auto_update_if_needed,
         is_sprint_weekend_fn=is_sprint_weekend,
@@ -461,6 +587,10 @@ def render_live_prediction_page(enable_logging: bool) -> None:
     _set_selected_season(selected_season)
 
     race_options = _load_race_options(selected_season)
+    race_options, precompute_filter_meta = _filter_race_options_to_precomputed_horizon(
+        year=selected_season,
+        race_options=race_options,
+    )
 
     col1, col2 = st.columns(2, gap="large")
 
@@ -470,14 +600,31 @@ def render_live_prediction_page(enable_logging: bool) -> None:
 
     with col2:
         weather = st.selectbox("Weather Forecast", ["dry", "rain", "mixed"])
-    st.caption(
-        "Calendar remains fully visible. Future weekends are predicted from priors/testing "
-        "with wider uncertainty, then refreshed automatically as sessions complete."
-    )
+    if bool(precompute_filter_meta.get("applied")):
+        ready_count = len(precompute_filter_meta.get("ready_races", []))
+        expected_targets = precompute_filter_meta.get("expected_targets", [])
+        horizon_count = len(expected_targets) if isinstance(expected_targets, list) else ready_count
+        anchor_race = str(precompute_filter_meta.get("anchor_race_name", "")).strip()
+        anchor_session = str(precompute_filter_meta.get("anchor_session_name", "")).strip()
+        if anchor_race and anchor_session:
+            st.caption(
+                f"Showing {ready_count}/{horizon_count} precomputed races from "
+                f"{anchor_race} checkpoint {anchor_session}. "
+                "Hidden races will appear after the horizon is warmed."
+            )
+        else:
+            st.caption(
+                f"Showing {ready_count} precomputed races. "
+                "Hidden races will appear after the horizon is warmed."
+            )
+    else:
+        st.caption(
+            "No warmed precompute horizon yet. First run builds checkpoint snapshots for the "
+            "current race and nearby weekends."
+        )
 
     st.subheader("Run")
     st.caption("Refresh and session-completion checks are automatic; no manual force refresh.")
-    precompute_include_next_weekend = False
 
     if enable_logging:
         st.caption(
@@ -510,7 +657,6 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                     year=selected_season,
                     force_refresh=False,
                     progress_callback=update_status,
-                    precompute_include_next_weekend=precompute_include_next_weekend,
                 )
                 prediction_results = pipeline_output["prediction_results"]
                 is_sprint = bool(pipeline_output["is_sprint"])
@@ -601,11 +747,13 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                     generated = int(precompute_summary.get("generated", 0))
                     reused = int(precompute_summary.get("reused", 0))
                     targets = precompute_summary.get("targets", [])
+                    ready_races = precompute_summary.get("ready_races", [])
                     target_label = ", ".join(str(target) for target in targets) or race_name
+                    ready_count = len(ready_races) if isinstance(ready_races, list) else 0
                     st.info(
                         "Boundary precompute completed: "
                         f"{generated} scenario(s) generated, {reused} reused "
-                        f"for {target_label}."
+                        f"for {target_label}. Ready races: {ready_count}."
                     )
                     errors = precompute_summary.get("errors", [])
                     if isinstance(errors, list) and errors:

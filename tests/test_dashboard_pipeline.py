@@ -13,13 +13,15 @@ def _default_boundary_refresh_stub(patcher):
         "_get_prediction_precompute_settings",
         lambda: {
             "enabled": False,
-            "include_next_weekend": False,
+            "horizon_races": 3,
             "weather_scenarios": ["dry", "mixed", "rain"],
-            "max_file_entries": 96,
+            "max_file_entries": 2048,
         },
     )
     patcher.setattr(live_prediction_flow, "load_precomputed_prediction", lambda **kwargs: None)
     patcher.setattr(live_prediction_flow, "save_precomputed_prediction", lambda **kwargs: None)
+    patcher.setattr(live_prediction_flow, "load_precompute_horizon_index", lambda **kwargs: None)
+    patcher.setattr(live_prediction_flow, "save_precompute_horizon_index", lambda **kwargs: None)
     patcher.setattr(
         pages,
         "detect_event_boundary_refresh_if_needed",
@@ -841,6 +843,65 @@ def test_execute_live_prediction_pipeline_reuses_persisted_prediction_when_memor
     assert run_calls == {"direct": 0}
 
 
+def test_execute_live_prediction_pipeline_resolves_current_race_boundary_when_refresh_empty(
+    patcher,
+):
+    """Current-race persisted lookup should use resolved boundary when refresh payload omits it."""
+    load_calls: list[str] = []
+    run_calls = {"direct": 0}
+
+    def _load_precomputed(**kwargs):
+        load_calls.append(str(kwargs.get("boundary_signature", "")))
+        if str(kwargs.get("boundary_signature", "")) == "sig_resolved":
+            return {"qualifying": {"grid": []}, "race": {"finish_order": []}}
+        return None
+
+    patcher.setattr(live_prediction_flow, "load_precomputed_prediction", _load_precomputed)
+    patcher.setattr(
+        live_prediction_flow,
+        "_resolve_race_boundary_context",
+        lambda year, race_name, is_sprint, session_detector=None: ("sig_resolved", "FP1"),
+    )
+
+    output = live_prediction_flow.execute_live_prediction_pipeline_core(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+        progress_callback=None,
+        clear_fastf1_race_cache_fn=lambda year, race_name: None,
+        auto_update_if_needed_fn=lambda force_recheck=False, year=2026: None,
+        is_sprint_weekend_fn=lambda year, race_name: False,
+        detect_event_boundary_refresh_if_needed_fn=lambda year,
+        race_name,
+        is_sprint,
+        session_detector=None: {
+            "refresh_needed": False,
+            "reason": "no_change",
+            "new_sessions": [],
+            "boundary_signature": "",
+            "latest_elapsed_session": None,
+        },
+        auto_update_practice_characteristics_if_needed_fn=(
+            lambda year, race_name, is_sprint, force_recheck=False, session_detector=None: {
+                "updated": False,
+                "completed_fp_sessions": [],
+            }
+        ),
+        clear_resource_cache_fn=lambda: None,
+        clear_data_cache_fn=lambda: None,
+        get_artifact_versions_fn=lambda year=2026: {"k": (1, "ts")},
+        run_prediction_fn=lambda race_name, weather, versions, is_sprint=False, year=2026: (
+            run_calls.__setitem__("direct", run_calls["direct"] + 1),
+            {"qualifying": {"grid": []}, "race": {"finish_order": []}},
+        )[1],
+    )
+
+    assert load_calls == ["sig_resolved"]
+    assert output["prediction_cache_hit"] is True
+    assert run_calls == {"direct": 0}
+
+
 def test_execute_live_prediction_pipeline_precomputes_weather_scenarios_after_boundary(
     patcher,
 ):
@@ -852,16 +913,23 @@ def test_execute_live_prediction_pipeline_precomputes_weather_scenarios_after_bo
         "_get_prediction_precompute_settings",
         lambda: {
             "enabled": True,
-            "include_next_weekend": False,
+            "horizon_races": 3,
             "weather_scenarios": ["dry", "mixed", "rain"],
-            "max_file_entries": 96,
+            "max_file_entries": 2048,
         },
     )
     patcher.setattr(live_prediction_flow, "load_precomputed_prediction", lambda **kwargs: None)
+    patcher.setattr(live_prediction_flow, "load_precompute_horizon_index", lambda **kwargs: None)
+    patcher.setattr(live_prediction_flow, "save_precompute_horizon_index", lambda **kwargs: None)
     patcher.setattr(
         live_prediction_flow,
         "save_precomputed_prediction",
         lambda **kwargs: save_calls.append((kwargs["race_name"], kwargs["weather"])),
+    )
+    patcher.setattr(
+        live_prediction_flow,
+        "_resolve_precompute_targets",
+        lambda year, race_name, horizon_races: [race_name],
     )
 
     output = live_prediction_flow.execute_live_prediction_pipeline_core(
@@ -909,26 +977,121 @@ def test_execute_live_prediction_pipeline_precomputes_weather_scenarios_after_bo
     assert output["precompute_summary"]["targets"] == ["Bahrain Grand Prix"]
 
 
-def test_execute_live_prediction_pipeline_precompute_scope_override_takes_ui_value(patcher):
-    include_next_weekend_values: list[bool] = []
+def test_execute_live_prediction_pipeline_precompute_uses_target_boundary_signatures(patcher):
+    save_calls: list[tuple[str, str, str, str]] = []
+    horizon_calls: list[dict[str, object]] = []
 
     patcher.setattr(
         live_prediction_flow,
         "_get_prediction_precompute_settings",
         lambda: {
             "enabled": True,
-            "include_next_weekend": False,
+            "horizon_races": 3,
             "weather_scenarios": ["dry", "mixed", "rain"],
-            "max_file_entries": 96,
+            "max_file_entries": 2048,
         },
     )
     patcher.setattr(live_prediction_flow, "load_precomputed_prediction", lambda **kwargs: None)
+    patcher.setattr(live_prediction_flow, "load_precompute_horizon_index", lambda **kwargs: None)
+    patcher.setattr(
+        live_prediction_flow,
+        "save_precompute_horizon_index",
+        lambda **kwargs: horizon_calls.append(kwargs),
+    )
+    patcher.setattr(
+        live_prediction_flow,
+        "_resolve_precompute_targets",
+        lambda year, race_name, horizon_races: [race_name, "Saudi Arabian Grand Prix"],
+    )
+    patcher.setattr(
+        live_prediction_flow,
+        "_resolve_race_boundary_context",
+        lambda year, race_name, is_sprint, session_detector=None: (
+            ("sig_future", "PRE")
+            if race_name == "Saudi Arabian Grand Prix"
+            else ("sig_anchor", "FP1")
+        ),
+    )
+    patcher.setattr(
+        live_prediction_flow,
+        "save_precomputed_prediction",
+        lambda **kwargs: save_calls.append(
+            (
+                kwargs["race_name"],
+                kwargs["weather"],
+                kwargs["boundary_signature"],
+                str(kwargs.get("metadata", {}).get("boundary_session_name", "")),
+            )
+        ),
+    )
+
+    output = live_prediction_flow.execute_live_prediction_pipeline_core(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+        progress_callback=None,
+        clear_fastf1_race_cache_fn=lambda year, race_name: None,
+        auto_update_if_needed_fn=lambda force_recheck=False, year=2026: None,
+        is_sprint_weekend_fn=lambda year, race_name: False,
+        detect_event_boundary_refresh_if_needed_fn=lambda year,
+        race_name,
+        is_sprint,
+        session_detector=None: {
+            "refresh_needed": True,
+            "reason": "session_boundary_delta",
+            "new_sessions": ["FP1"],
+            "boundary_signature": "sig_anchor",
+            "latest_elapsed_session": "FP1",
+        },
+        auto_update_practice_characteristics_if_needed_fn=(
+            lambda year, race_name, is_sprint, force_recheck=False, session_detector=None: {
+                "updated": False,
+                "completed_fp_sessions": [],
+            }
+        ),
+        clear_resource_cache_fn=lambda: None,
+        clear_data_cache_fn=lambda: None,
+        get_artifact_versions_fn=lambda year=2026: {"k": (1, "ts")},
+        run_prediction_fn=lambda race_name, weather, versions, is_sprint=False, year=2026: {
+            "qualifying": {"grid": []},
+            "race": {"finish_order": []},
+        },
+    )
+
+    assert output["precompute_summary"]["triggered"] is True
+    assert ("Saudi Arabian Grand Prix", "mixed", "sig_future", "PRE") in save_calls
+    assert ("Saudi Arabian Grand Prix", "rain", "sig_future", "PRE") in save_calls
+    assert ("Bahrain Grand Prix", "mixed", "sig_anchor", "FP1") in save_calls
+    assert horizon_calls
+    assert horizon_calls[0]["race_boundaries"] == {
+        "Bahrain Grand Prix": "sig_anchor",
+        "Saudi Arabian Grand Prix": "sig_future",
+    }
+
+
+def test_execute_live_prediction_pipeline_precompute_horizon_uses_configured_count(patcher):
+    horizon_values: list[int] = []
+
+    patcher.setattr(
+        live_prediction_flow,
+        "_get_prediction_precompute_settings",
+        lambda: {
+            "enabled": True,
+            "horizon_races": 3,
+            "weather_scenarios": ["dry", "mixed", "rain"],
+            "max_file_entries": 2048,
+        },
+    )
+    patcher.setattr(live_prediction_flow, "load_precomputed_prediction", lambda **kwargs: None)
+    patcher.setattr(live_prediction_flow, "load_precompute_horizon_index", lambda **kwargs: None)
+    patcher.setattr(live_prediction_flow, "save_precompute_horizon_index", lambda **kwargs: None)
     patcher.setattr(live_prediction_flow, "save_precomputed_prediction", lambda **kwargs: None)
     patcher.setattr(
         live_prediction_flow,
         "_resolve_precompute_targets",
-        lambda year, race_name, include_next_weekend: (
-            include_next_weekend_values.append(bool(include_next_weekend)),
+        lambda year, race_name, horizon_races: (
+            horizon_values.append(int(horizon_races)),
             [race_name],
         )[1],
     )
@@ -939,7 +1102,6 @@ def test_execute_live_prediction_pipeline_precompute_scope_override_takes_ui_val
         year=2026,
         force_refresh=False,
         progress_callback=None,
-        precompute_include_next_weekend=True,
         clear_fastf1_race_cache_fn=lambda year, race_name: None,
         auto_update_if_needed_fn=lambda force_recheck=False, year=2026: None,
         is_sprint_weekend_fn=lambda year, race_name: False,
@@ -967,8 +1129,98 @@ def test_execute_live_prediction_pipeline_precompute_scope_override_takes_ui_val
         },
     )
 
-    assert include_next_weekend_values == [True]
+    assert horizon_values == [3]
     assert output["precompute_summary"]["targets"] == ["Bahrain Grand Prix"]
+
+
+def test_execute_live_prediction_pipeline_skips_inline_precompute_when_disabled(patcher):
+    """Inline horizon precompute should be skipped when inline mode is disabled."""
+    run_calls: list[tuple[str, str]] = []
+
+    patcher.setattr(
+        live_prediction_flow,
+        "_get_prediction_precompute_settings",
+        lambda: {
+            "enabled": True,
+            "inline_enabled": False,
+            "horizon_races": 3,
+            "weather_scenarios": ["dry", "mixed", "rain"],
+            "max_file_entries": 2048,
+        },
+    )
+    patcher.setattr(live_prediction_flow, "load_precomputed_prediction", lambda **kwargs: None)
+    patcher.setattr(live_prediction_flow, "load_precompute_horizon_index", lambda **kwargs: None)
+    patcher.setattr(
+        live_prediction_flow,
+        "save_precompute_horizon_index",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("save_precompute_horizon_index should not run when inline is disabled")
+        ),
+    )
+    patcher.setattr(
+        live_prediction_flow,
+        "save_precomputed_prediction",
+        lambda **kwargs: None,
+    )
+
+    output = live_prediction_flow.execute_live_prediction_pipeline_core(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=True,
+        progress_callback=None,
+        clear_fastf1_race_cache_fn=lambda year, race_name: None,
+        auto_update_if_needed_fn=lambda force_recheck=False, year=2026: None,
+        is_sprint_weekend_fn=lambda year, race_name: False,
+        detect_event_boundary_refresh_if_needed_fn=lambda year,
+        race_name,
+        is_sprint,
+        session_detector=None: {
+            "refresh_needed": True,
+            "reason": "session_boundary_delta",
+            "new_sessions": ["FP1"],
+            "boundary_signature": "sig_scope",
+        },
+        auto_update_practice_characteristics_if_needed_fn=(
+            lambda year, race_name, is_sprint, force_recheck=False, session_detector=None: {
+                "updated": False,
+                "completed_fp_sessions": [],
+            }
+        ),
+        clear_resource_cache_fn=lambda: None,
+        clear_data_cache_fn=lambda: None,
+        get_artifact_versions_fn=lambda year=2026: {"k": (1, "ts")},
+        run_prediction_fn=lambda race_name, weather, versions, is_sprint=False, year=2026: (
+            run_calls.append((race_name, weather)),
+            {"qualifying": {"grid": []}, "race": {"finish_order": []}},
+        )[1],
+    )
+
+    assert run_calls == [("Bahrain Grand Prix", "dry")]
+    assert output["precompute_summary"]["triggered"] is False
+    assert output["precompute_summary"]["skipped_reason"] == "inline_precompute_disabled"
+
+
+def test_resolve_precompute_targets_skips_testing_by_event_format(patcher):
+    """Precompute target resolution should ignore testing rows by EventFormat and name."""
+    patcher.setattr(
+        "src.utils.weekend.get_schedule_rows",
+        lambda year: (
+            ("Pre-Season Track Day", "testing"),
+            ("Bahrain Grand Prix", "conventional"),
+            ("Saudi Arabian Grand Prix", "conventional"),
+            ("In-Season Testing", "conventional"),
+            ("Australian Grand Prix", "conventional"),
+        ),
+    )
+
+    targets = live_prediction_flow._resolve_precompute_targets(
+        year=2026,
+        race_name="Bahrain Grand Prix",
+        horizon_races=3,
+    )
+
+    assert targets == ["Bahrain Grand Prix", "Saudi Arabian Grand Prix", "Australian Grand Prix"]
 
 
 def test_execute_live_prediction_pipeline_cache_is_reused_across_scopes():

@@ -117,9 +117,10 @@ logging:
 dashboard:
   prediction_precompute:
     enabled: true
-    include_next_weekend: false
+    inline_enabled: false
+    horizon_races: 3
     weather_scenarios: ["dry", "mixed", "rain"]
-    max_file_entries: 96
+    max_file_entries: 2048
 
 # Baseline 2026 Predictor Parameters (used before real season data)
 baseline_predictor:

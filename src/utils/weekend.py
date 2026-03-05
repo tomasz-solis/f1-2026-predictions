@@ -83,6 +83,11 @@ def refresh_schedule_cache() -> None:
     _get_schedule_rows.cache_clear()
 
 
+def get_schedule_rows(year: int) -> tuple[tuple[str, str], ...]:
+    """Return cached `(EventName, EventFormat)` rows for a season."""
+    return _get_schedule_rows(year)
+
+
 def _find_event_format(year: int, race_name: str) -> str | None:
     """Return EventFormat string for race_name, or None if not found."""
     race_name_lower = race_name.lower()
