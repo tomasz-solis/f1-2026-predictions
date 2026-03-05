@@ -629,12 +629,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
     if enable_logging:
         st.caption(
             "Session checkpoint logging is ON: one prediction is saved per completed session "
-            "(FP/SQ/Sprint/Q/R) for weekend-stage confidence and accuracy tracking."
-        )
-    else:
-        st.caption(
-            "Session checkpoint logging is OFF. Enable it in Settings to build a "
-            "session-by-session accuracy timeline."
+            "(FP1/FP2/FP3 or FP1/SQ/Sprint) for weekend-stage confidence and accuracy tracking."
         )
     predict_clicked = st.button(
         "Predict",
@@ -855,8 +850,8 @@ def render_prediction_accuracy_page() -> None:
 
     if not pipeline.all_predictions:
         st.info(
-            "No predictions saved yet. Enable 'Save Predictions for Accuracy Tracking' "
-            "in the sidebar and generate predictions after practice sessions."
+            "No predictions saved yet. Run predictions after practice sessions to start "
+            "building checkpoint accuracy history."
         )
         return
 

@@ -1,8 +1,8 @@
 # Formula 1 2026 Prediction Engine
 
-This repository predicts F1 weekends for the 2026 season using a simulation-first approach.
+This repository predicts F1 race weekends for the 2026 season using simulation-based models.
 
-## What Runs In Production (Current Path)
+## What Runs In Production
 
 The Streamlit app and the main weekend flow use:
 
@@ -22,14 +22,15 @@ The Streamlit app and the main weekend flow use:
 
 Current dashboard tabs:
 
-- `Live Prediction`
+- `Prediction`
+- `Team Comparison`
 - `Model & Learning`
 - `Prediction Accuracy`
 - `Contact`
 
-## Predictor Structure (Current)
+## Predictor Structure
 
-`Baseline2026Predictor` is now a composed class, not a single monolithic implementation file.
+`Baseline2026Predictor` is a composed class, split into focused modules.
 
 - `src/predictors/baseline/data_mixin.py`: artifact loading, blended team strength, compound selection helpers
 - `src/predictors/baseline/qualifying_mixin.py`: qualifying and sprint-quali flow
@@ -45,7 +46,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-For local development, use the project-managed `.venv` consistently:
+For local development, use the project `.venv`:
 
 ```bash
 uv sync --extra dev
@@ -58,7 +59,7 @@ If port `8501` is already in use:
 streamlit run app.py --server.port 8502
 ```
 
-## Prediction Logic (As Implemented)
+## Prediction Logic
 
 ### Qualifying
 
@@ -88,7 +89,7 @@ Outputs: Finish order + compound strategy distribution + pit window histogram.
 
 ## Data Update Flows
 
-### 1. Automatic in dashboard
+### 1. Automatic on Predict
 
 When you click **Predict**, the app:
 
@@ -107,8 +108,8 @@ Run periodic automation to refresh right after session completion:
 python scripts/run_session_automation.py --year 2026 --interval-seconds 300
 ```
 
-This worker applies post-session updates, can auto-generate prediction snapshots
-for the latest completed session, and reconciles actuals after race completion.
+This worker applies post-session updates, can auto-generate prediction snapshots,
+and reconciles actuals after race completion.
 
 ### 1c. Warm precompute for instant dropdown load
 
@@ -134,7 +135,8 @@ What it does:
 - computes/stores only missing weather scenarios (`dry`, `mixed`, `rain`)
 - updates the precompute horizon index used by the race dropdown filter
 
-By default, inline horizon precompute in the Streamlit request path is disabled (`inline_enabled: false`) to avoid user-facing latency spikes.
+Inline horizon precompute in the Streamlit request path is disabled by default
+(`inline_enabled: false`) to avoid user-facing latency spikes.
 
 Cron example (hourly):
 
@@ -177,8 +179,8 @@ Note: this script now defaults to dry-run mode; use `--apply` to persist changes
 In DB-enabled modes (`db_only`, `fallback`, `dual_write`), `--apply` also persists
 `car_characteristics` to Supabase via `ArtifactStore`.
 
-If testing/practice profiles are missing, Team Comparison will show an availability message
-instead of neutral placeholder radar values.
+If testing/practice profiles are missing, Team Comparison shows an availability
+message instead of neutral placeholder radar values.
 
 Testing cache defaults to `data/raw/.fastf1_cache_testing`.
 
@@ -245,13 +247,14 @@ Rollout guidance:
 - `fallback`: DB-first reads with file fallback (recommended when validating Supabase reads).
 - `dual_write`: safest migration mode if you still rely on local prediction-history files.
 
-## What Exists But Is Not The Main Dashboard Path
+## Modules Outside Main Dashboard Path
 
 - Bayesian ranking components (`src/models/bayesian.py`)
 - Legacy learning-history module (`src/systems/learning.py`)
 - Additional scripts and legacy-compatible interfaces
 
-These remain useful for experiments and extensions, but the app runtime path is the baseline predictor stack listed above.
+These are still useful for experiments and extensions, but the dashboard runtime
+path is the baseline predictor stack listed above.
 
 ## Documentation
 

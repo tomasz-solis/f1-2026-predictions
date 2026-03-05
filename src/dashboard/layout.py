@@ -147,6 +147,7 @@ def render_header() -> None:
 
 
 def render_sidebar() -> tuple[str, bool]:
+    """Render sidebar navigation and return selected page with logging enabled."""
     segmented_control = getattr(st, "segmented_control", None)
     page: str | None = None
     if callable(segmented_control):
@@ -178,21 +179,11 @@ def render_sidebar() -> tuple[str, bool]:
             label_visibility="collapsed",
         )
 
-    with st.expander("Settings", expanded=False):
-        enable_logging = st.checkbox(
-            "Save Session Checkpoints for Accuracy Tracking",
-            value=False,
-            help=(
-                "Saves one prediction checkpoint per completed session (FP/SQ/Sprint/Q/R). "
-                "Checkpoints are persisted via the configured storage backend (Supabase/file) "
-                "for weekend-stage confidence and final-accuracy analysis."
-            ),
-        )
-        st.markdown(
-            "_Workflow:_ run predictions after non-competitive sessions, then review the "
-            "session-by-session accuracy timeline after results are available."
-        )
-        st.markdown(f"**Model Version:** {BRAND_MODEL_VERSION}")
-        st.markdown(f"**Last Updated:** {BRAND_LAST_UPDATED}")
+    st.caption(
+        "Session checkpoint logging is always ON. One prediction is persisted per completed "
+        "practice/sprint checkpoint (FP1/FP2/FP3 or FP1/SQ/Sprint) for accuracy tracking."
+    )
+    st.markdown(f"**Model Version:** {BRAND_MODEL_VERSION}")
+    st.markdown(f"**Last Updated:** {BRAND_LAST_UPDATED}")
 
-    return page, enable_logging
+    return page, True

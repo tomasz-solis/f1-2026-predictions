@@ -13,7 +13,7 @@ When the user clicks **Predict** in `src/dashboard/pages.py` (called by `app.py`
 5. Streamlit caches are cleared so the prediction run in the same click uses fresh artifacts.
 6. Competitive-session completion checks are re-run before using cached outputs.
 
-This block is race-result ingestion.
+Steps 2 and 3 above handle race-result ingestion.
 
 ### Practice-characteristics auto capture
 
