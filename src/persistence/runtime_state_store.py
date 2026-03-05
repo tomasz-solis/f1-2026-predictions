@@ -156,3 +156,15 @@ class RuntimeStateStore:
         client.table(_RUNTIME_LOCK_TABLE).delete().eq("lock_key", str(lock_key)).eq(
             "owner_id", str(owner_id)
         ).execute()
+
+    def delete_records(self, namespace: str, state_keys: list[str]) -> None:
+        """Delete runtime state records by namespace/state-key list."""
+        if not self.db_writes_enabled:
+            return
+        normalized_keys = [str(key).strip() for key in state_keys if str(key).strip()]
+        if not normalized_keys:
+            return
+        client = get_supabase_client()
+        client.table(_RUNTIME_STATE_TABLE).delete().eq("namespace", str(namespace)).in_(
+            "state_key", normalized_keys
+        ).execute()

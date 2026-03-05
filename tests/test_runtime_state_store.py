@@ -106,3 +106,29 @@ def test_acquire_lock_raises_on_non_conflict_error(patcher):
     store = RuntimeStateStore()
     with pytest.raises(RuntimeError, match="Could not acquire Supabase lock"):
         store.acquire_lock("practice_backlog::2026::Bahrain Grand Prix", "owner-1")
+
+
+def test_delete_records_deletes_namespace_keys(patcher):
+    query = MagicMock()
+    query.delete.return_value = query
+    query.eq.return_value = query
+    query.in_.return_value = query
+    query.execute.return_value = SimpleNamespace(data=[])
+    client = MagicMock()
+    client.table.return_value = query
+
+    patcher.setattr("src.persistence.runtime_state_store.should_read_db_first", lambda: True)
+    patcher.setattr("src.persistence.runtime_state_store.should_write_to_db", lambda: True)
+    patcher.setattr("src.persistence.runtime_state_store.get_storage_mode", lambda: "db_only")
+    patcher.setattr("src.persistence.runtime_state_store.get_supabase_client", lambda: client)
+
+    store = RuntimeStateStore()
+    store.delete_records(
+        "precomputed_predictions",
+        ["a", "  ", "b"],
+    )
+
+    client.table.assert_called_with("runtime_state")
+    query.delete.assert_called_once()
+    query.eq.assert_called_once_with("namespace", "precomputed_predictions")
+    query.in_.assert_called_once_with("state_key", ["a", "b"])
