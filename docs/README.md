@@ -31,6 +31,9 @@ Tire compound performance collection, dynamic selection, and race prediction adj
 ### `PERSISTENCE_SUPABASE.md`
 ArtifactStore modes, Supabase migration workflow, and active artifact keys.
 
+### `WARMUP_PRECOMPUTE.md`
+Background warmup worker for checkpoint-aware precompute and ready-race horizon indexing.
+
 ## Validation Notebooks
 
 - `../notebooks/validate_testing_predictions.ipynb`

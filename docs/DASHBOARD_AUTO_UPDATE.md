@@ -105,3 +105,16 @@ python scripts/run_session_automation.py --year 2026 --interval-seconds 300
 
 This worker polls recent events, applies session updates, can auto-generate prediction snapshots
 for the latest completed session, and reconciles actuals after race completion.
+
+To warm dashboard precompute payloads ahead of user clicks, run:
+
+```bash
+python scripts/warmup_precompute.py --year 2026 --require-db
+```
+
+This worker is checkpoint-aware and idempotent. It warms the next 3 races,
+stores missing weather scenarios only, and updates the ready-race horizon index
+used by the race dropdown.
+
+For production, keep `dashboard.prediction_precompute.inline_enabled: false` so
+this warmup runs outside the Streamlit request thread.

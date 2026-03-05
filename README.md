@@ -110,6 +110,38 @@ python scripts/run_session_automation.py --year 2026 --interval-seconds 300
 This worker applies post-session updates, can auto-generate prediction snapshots
 for the latest completed session, and reconciles actuals after race completion.
 
+### 1c. Warm precompute for instant dropdown load
+
+Run checkpoint-aware warmup outside Streamlit so ready races load instantly:
+
+```bash
+python scripts/warmup_precompute.py --year 2026
+```
+
+Debug options:
+
+```bash
+python scripts/warmup_precompute.py --year 2026 --dry-run --verbose
+python scripts/warmup_precompute.py --year 2026 --require-db
+```
+
+What it does:
+
+- reads the current schedule and picks the next race plus a 3-race horizon
+- resolves checkpoint readiness from actual session data (`PRE`, `FP1`, `FP2`, `FP3` or sprint `PRE`, `FP1`, `SQ`)
+- exits early (code `0`) when the expected checkpoint is not ready yet
+- computes/stores missing base features once per `(race, checkpoint, artifact, boundary)`
+- computes/stores only missing weather scenarios (`dry`, `mixed`, `rain`)
+- updates the precompute horizon index used by the race dropdown filter
+
+By default, inline horizon precompute in the Streamlit request path is disabled (`inline_enabled: false`) to avoid user-facing latency spikes.
+
+Cron example (hourly):
+
+```bash
+0 * * * * cd /path/to/formula1-2026 && /path/to/formula1-2026/.venv/bin/python scripts/warmup_precompute.py --year 2026 --require-db >> /tmp/f1_warmup.log 2>&1
+```
+
 ### 2. Manual race update
 
 ```bash
@@ -233,6 +265,7 @@ These remain useful for experiments and extensions, but the app runtime path is 
 - `docs/WEIGHT_SCHEDULE_GUIDE.md`
 - `docs/COMPOUND_ANALYSIS.md` - Tire compound performance system
 - `docs/PERSISTENCE_SUPABASE.md` - ArtifactStore modes, migration flow, and current rollout status
+- `docs/WARMUP_PRECOMPUTE.md` - Scheduled checkpoint-aware warmup for instant dashboard load
 
 ## Tests
 
