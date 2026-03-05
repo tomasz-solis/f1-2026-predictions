@@ -1,5 +1,7 @@
 """Tests for dashboard cache/bootstrap helpers."""
 
+import hashlib
+
 from src.dashboard import cache
 
 
@@ -30,28 +32,39 @@ def test_enable_fastf1_cache_swallows_cache_errors(patcher, tmp_path):
 
 def test_get_file_timestamps_reports_existing_and_missing_files(patcher):
     class _FakePath:
-        def __init__(self, raw_path: str, exists: bool):
+        def __init__(self, raw_path: str, existing_content: dict[str, bytes]):
             self._raw_path = raw_path
-            self._exists = exists
+            self._existing_content = existing_content
 
         def exists(self) -> bool:
-            return self._exists
+            return self._raw_path in self._existing_content
+
+        def read_bytes(self) -> bytes:
+            return self._existing_content[self._raw_path]
 
         def __fspath__(self) -> str:
             return self._raw_path
 
-    existing_files = {"data/2025_pirelli_info.json", "config/default.yaml"}
+    existing_files = {
+        "data/2025_pirelli_info.json": b"pirelli",
+        "config/default.yaml": b"defaults",
+    }
     patcher.setattr(
         cache,
         "Path",
-        lambda file_path: _FakePath(file_path, file_path in existing_files),
+        lambda file_path: _FakePath(file_path, existing_files),
     )
-    patcher.setattr(cache.os.path, "getmtime", lambda _path: 123.456)
 
-    timestamps = cache._get_file_timestamps()
+    timestamps = cache._get_file_timestamps(include_runtime_files=False)
 
-    assert timestamps["data/2025_pirelli_info.json"] == (123, "123.456")
-    assert timestamps["config/default.yaml"] == (123, "123.456")
+    assert timestamps["data/2025_pirelli_info.json"] == (
+        len(existing_files["data/2025_pirelli_info.json"]),
+        hashlib.sha1(existing_files["data/2025_pirelli_info.json"]).hexdigest(),
+    )
+    assert timestamps["config/default.yaml"] == (
+        len(existing_files["config/default.yaml"]),
+        hashlib.sha1(existing_files["config/default.yaml"]).hexdigest(),
+    )
     assert timestamps["data/2026_pirelli_info.json"] == (0, "")
     assert timestamps["src/predictors/baseline_2026.py"] == (0, "")
 
@@ -72,8 +85,9 @@ def test_get_artifact_versions_combines_store_and_file_timestamps(patcher):
     patcher.setattr(
         cache,
         "_get_file_timestamps",
-        lambda year=2026: {"config/default.yaml": (9, "9.1")},
+        lambda year=2026, include_runtime_files=False: {"config/default.yaml": (9, "9.1")},
     )
+    patcher.setattr(cache, "should_read_db_first", lambda: True)
 
     versions = cache.get_artifact_versions()
 
@@ -104,7 +118,10 @@ def test_get_artifact_versions_supports_non_default_year(patcher):
             return None
 
     patcher.setattr(cache, "ArtifactStore", _Store)
-    patcher.setattr(cache, "_get_file_timestamps", lambda year=2027: {})
+    patcher.setattr(
+        cache, "_get_file_timestamps", lambda year=2027, include_runtime_files=False: {}
+    )
+    patcher.setattr(cache, "should_read_db_first", lambda: True)
 
     versions = cache.get_artifact_versions(year=2027)
 
@@ -120,6 +137,58 @@ def test_get_artifact_versions_supports_non_default_year(patcher):
         2,
         "2027-02-03T00:00:00",
     )
+
+
+def test_get_artifact_versions_excludes_runtime_files_when_db_first(patcher):
+    class _Store:
+        def __init__(self, data_root: str):
+            assert data_root == "data"
+
+        def load_artifact(self, artifact_type: str, artifact_key: str):
+            _ = (artifact_type, artifact_key)
+            return None
+
+    include_flags: list[bool] = []
+
+    patcher.setattr(cache, "ArtifactStore", _Store)
+    patcher.setattr(cache, "should_read_db_first", lambda: True)
+    patcher.setattr(
+        cache,
+        "_get_file_timestamps",
+        lambda year=2026, include_runtime_files=False: (
+            include_flags.append(bool(include_runtime_files)) or {}
+        ),
+    )
+
+    cache.get_artifact_versions()
+
+    assert include_flags == [False]
+
+
+def test_get_artifact_versions_includes_runtime_files_when_file_first(patcher):
+    class _Store:
+        def __init__(self, data_root: str):
+            assert data_root == "data"
+
+        def load_artifact(self, artifact_type: str, artifact_key: str):
+            _ = (artifact_type, artifact_key)
+            return None
+
+    include_flags: list[bool] = []
+
+    patcher.setattr(cache, "ArtifactStore", _Store)
+    patcher.setattr(cache, "should_read_db_first", lambda: False)
+    patcher.setattr(
+        cache,
+        "_get_file_timestamps",
+        lambda year=2026, include_runtime_files=False: (
+            include_flags.append(bool(include_runtime_files)) or {}
+        ),
+    )
+
+    cache.get_artifact_versions()
+
+    assert include_flags == [True]
 
 
 def test_get_predictor_passes_year_to_predictor_bootstrap(patcher):

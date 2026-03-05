@@ -1,13 +1,14 @@
 """Dashboard caching and predictor bootstrap."""
 
+import hashlib
 import logging
-import os
 from pathlib import Path
 
 import fastf1
 import streamlit as st
 
 from src.persistence.artifact_store import ArtifactStore
+from src.persistence.config import should_read_db_first
 
 logger = logging.getLogger(__name__)
 _FASTF1_CACHE_DIR = Path("data/raw/.fastf1_cache")
@@ -24,7 +25,7 @@ def enable_fastf1_cache() -> None:
 
 
 def get_artifact_versions(year: int = _DEFAULT_SEASON) -> dict[str, tuple[int, str]]:
-    """Get version and timestamp for artifacts (DB-backed and file-based)."""
+    """Get version and deterministic fingerprint for artifacts."""
     store = ArtifactStore(data_root="data")
     versions = {}
     season_year = int(year)
@@ -51,22 +52,26 @@ def get_artifact_versions(year: int = _DEFAULT_SEASON) -> dict[str, tuple[int, s
             logger.warning(f"Failed to load version for {artifact_type}::{artifact_key}: {e}")
             versions[f"{artifact_type}::{artifact_key}"] = (0, "")
 
-    file_timestamps = _get_file_timestamps(year=season_year)
-    versions.update(file_timestamps)
+    # In DB-backed modes, ignore mutable local runtime files so hashes remain
+    # consistent across web/worker instances (for example Render web + cron).
+    file_fingerprints = _get_file_timestamps(
+        year=season_year,
+        include_runtime_files=not should_read_db_first(),
+    )
+    versions.update(file_fingerprints)
 
     return versions
 
 
-def _get_file_timestamps(year: int = _DEFAULT_SEASON) -> dict[str, tuple[int, str]]:
-    """Get timestamps for non-DB artifacts (config, code, Pirelli info)."""
+def _get_file_timestamps(
+    year: int = _DEFAULT_SEASON,
+    *,
+    include_runtime_files: bool = True,
+) -> dict[str, tuple[int, str]]:
+    """Get deterministic file fingerprints for non-DB artifacts."""
     season_year = int(year)
     previous_year = max(season_year - 1, 0)
-    files = [
-        f"data/processed/car_characteristics/{season_year}_car_characteristics.json",
-        f"data/processed/driver_characteristics/{season_year}_driver_characteristics.json",
-        "data/processed/driver_characteristics.json",
-        f"data/processed/track_characteristics/{season_year}_track_characteristics.json",
-        "data/systems/practice_characteristics_state.json",
+    static_files = [
         f"data/{previous_year}_pirelli_info.json",
         f"data/{season_year}_pirelli_info.json",
         "config/default.yaml",
@@ -79,13 +84,26 @@ def _get_file_timestamps(year: int = _DEFAULT_SEASON) -> dict[str, tuple[int, st
         "src/utils/driver_fp_adjustment.py",
         "src/utils/fp_blending.py",
     ]
+    runtime_files = [
+        f"data/processed/car_characteristics/{season_year}_car_characteristics.json",
+        f"data/processed/driver_characteristics/{season_year}_driver_characteristics.json",
+        "data/processed/driver_characteristics.json",
+        f"data/processed/track_characteristics/{season_year}_track_characteristics.json",
+        "data/systems/practice_characteristics_state.json",
+    ]
+    files = static_files + (runtime_files if include_runtime_files else [])
 
-    timestamps = {}
+    timestamps: dict[str, tuple[int, str]] = {}
     for file in files:
         path = Path(file)
         if path.exists():
-            mtime = os.path.getmtime(path)
-            timestamps[file] = (int(mtime), str(mtime))
+            try:
+                raw = path.read_bytes()
+            except OSError:
+                timestamps[file] = (0, "")
+                continue
+            digest = hashlib.sha1(raw).hexdigest()
+            timestamps[file] = (len(raw), digest)
         else:
             timestamps[file] = (0, "")
 
