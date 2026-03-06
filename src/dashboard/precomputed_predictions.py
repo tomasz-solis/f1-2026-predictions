@@ -69,25 +69,42 @@ def _prune_db_namespace_entries(
     Entries with missing or invalid ``updated_at`` are treated as oldest.
     """
     runtime_store = store or RuntimeStateStore()
-    entries = runtime_store.load_namespace(namespace)
-    if not isinstance(entries, dict) or len(entries) <= max_entries:
+    overflow = 0
+    if hasattr(runtime_store, "count_records") and callable(
+        getattr(runtime_store, "count_records", None)
+    ):
+        namespace_count = runtime_store.count_records(namespace)
+        overflow = max(0, int(namespace_count) - int(max_entries))
+    if overflow <= 0:
         return
 
-    sortable: list[tuple[str, datetime]] = []
-    for state_key, payload in entries.items():
-        if not isinstance(state_key, str):
-            continue
-        updated_at = _parse_updated_at(
-            payload.get("updated_at") if isinstance(payload, dict) else ""
-        )
-        sortable.append((state_key, updated_at))
-    if len(sortable) <= max_entries:
-        return
+    stale_keys: list[str] = []
+    if hasattr(runtime_store, "list_oldest_state_keys") and callable(
+        getattr(runtime_store, "list_oldest_state_keys", None)
+    ):
+        stale_keys = runtime_store.list_oldest_state_keys(namespace, limit=overflow)
 
-    sortable.sort(key=lambda item: item[1])
-    overflow = len(sortable) - max_entries
-    stale_keys = [state_key for state_key, _ in sortable[:overflow]]
-    runtime_store.delete_records(namespace, stale_keys)
+    if not stale_keys:
+        entries = runtime_store.load_namespace(namespace)
+        if not isinstance(entries, dict) or len(entries) <= max_entries:
+            return
+
+        sortable: list[tuple[str, datetime]] = []
+        for state_key, payload in entries.items():
+            if not isinstance(state_key, str):
+                continue
+            updated_at = _parse_updated_at(
+                payload.get("updated_at") if isinstance(payload, dict) else ""
+            )
+            sortable.append((state_key, updated_at))
+        if len(sortable) <= max_entries:
+            return
+        sortable.sort(key=lambda item: item[1])
+        overflow = len(sortable) - max_entries
+        stale_keys = [state_key for state_key, _ in sortable[:overflow]]
+
+    if stale_keys:
+        runtime_store.delete_records(namespace, stale_keys)
 
 
 def get_prediction_precompute_config() -> dict[str, Any]:

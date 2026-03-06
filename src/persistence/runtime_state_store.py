@@ -51,6 +51,60 @@ class RuntimeStateStore:
             logger.warning("Could not read runtime state from Supabase: %s", exc)
             return {}
 
+    def count_records(self, namespace: str) -> int:
+        """Return record count for a namespace without loading payload bodies."""
+        if not self.db_reads_enabled:
+            return 0
+        try:
+            client = get_supabase_client()
+            result = (
+                client.table(_RUNTIME_STATE_TABLE)
+                .select("state_key", count="exact", head=True)
+                .eq("namespace", str(namespace))
+                .execute()
+            )
+            raw_count = getattr(result, "count", 0)
+            return int(raw_count or 0)
+        except Exception as exc:
+            if self.db_writes_enabled:
+                raise RuntimeError(
+                    f"Supabase runtime state count failed for namespace={namespace}: {exc}"
+                ) from exc
+            logger.warning("Could not count runtime state records in Supabase: %s", exc)
+            return 0
+
+    def list_oldest_state_keys(self, namespace: str, *, limit: int) -> list[str]:
+        """Return oldest state keys in a namespace using table-level timestamps."""
+        if not self.db_reads_enabled:
+            return []
+        normalized_limit = max(0, int(limit))
+        if normalized_limit == 0:
+            return []
+        try:
+            client = get_supabase_client()
+            result = (
+                client.table(_RUNTIME_STATE_TABLE)
+                .select("state_key")
+                .eq("namespace", str(namespace))
+                .order("updated_at", desc=False)
+                .limit(normalized_limit)
+                .execute()
+            )
+            rows = cast(list[dict[str, Any]], result.data or [])
+            keys: list[str] = []
+            for row in rows:
+                key = str(row.get("state_key", "")).strip()
+                if key:
+                    keys.append(key)
+            return keys
+        except Exception as exc:
+            if self.db_writes_enabled:
+                raise RuntimeError(
+                    f"Supabase runtime state oldest-key read failed for namespace={namespace}: {exc}"
+                ) from exc
+            logger.warning("Could not list oldest runtime state keys in Supabase: %s", exc)
+            return []
+
     def get_record(self, namespace: str, state_key: str) -> dict[str, Any] | None:
         """Load single runtime state record."""
         if not self.db_reads_enabled:

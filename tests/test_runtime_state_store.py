@@ -132,3 +132,52 @@ def test_delete_records_deletes_namespace_keys(patcher):
     query.delete.assert_called_once()
     query.eq.assert_called_once_with("namespace", "precomputed_predictions")
     query.in_.assert_called_once_with("state_key", ["a", "b"])
+
+
+def test_count_records_uses_head_count_query(patcher):
+    query = MagicMock()
+    query.select.return_value = query
+    query.eq.return_value = query
+    query.execute.return_value = SimpleNamespace(count=17)
+    client = MagicMock()
+    client.table.return_value = query
+
+    patcher.setattr("src.persistence.runtime_state_store.should_read_db_first", lambda: True)
+    patcher.setattr("src.persistence.runtime_state_store.should_write_to_db", lambda: True)
+    patcher.setattr("src.persistence.runtime_state_store.get_storage_mode", lambda: "db_only")
+    patcher.setattr("src.persistence.runtime_state_store.get_supabase_client", lambda: client)
+
+    store = RuntimeStateStore()
+    assert store.count_records("precomputed_predictions") == 17
+
+    query.select.assert_called_once_with("state_key", count="exact", head=True)
+    query.eq.assert_called_once_with("namespace", "precomputed_predictions")
+
+
+def test_list_oldest_state_keys_orders_by_updated_at(patcher):
+    query = MagicMock()
+    query.select.return_value = query
+    query.eq.return_value = query
+    query.order.return_value = query
+    query.limit.return_value = query
+    query.execute.return_value = SimpleNamespace(
+        data=[
+            {"state_key": "k_oldest"},
+            {"state_key": "k_next"},
+            {"state_key": " "},
+        ]
+    )
+    client = MagicMock()
+    client.table.return_value = query
+
+    patcher.setattr("src.persistence.runtime_state_store.should_read_db_first", lambda: True)
+    patcher.setattr("src.persistence.runtime_state_store.should_write_to_db", lambda: True)
+    patcher.setattr("src.persistence.runtime_state_store.get_storage_mode", lambda: "db_only")
+    patcher.setattr("src.persistence.runtime_state_store.get_supabase_client", lambda: client)
+
+    store = RuntimeStateStore()
+    keys = store.list_oldest_state_keys("precomputed_predictions", limit=2)
+
+    assert keys == ["k_oldest", "k_next"]
+    query.order.assert_called_once_with("updated_at", desc=False)
+    query.limit.assert_called_once_with(2)

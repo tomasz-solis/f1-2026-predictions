@@ -169,3 +169,35 @@ def test_list_precomputed_race_names_db_only_does_not_merge_file_fallback(patche
     )
 
     assert listed == ["Bahrain Grand Prix"]
+
+
+def test_prune_db_namespace_entries_uses_key_only_strategy_when_available():
+    """DB pruning should avoid loading full namespace payloads when key APIs are available."""
+
+    class _Store:
+        def __init__(self):
+            self.deleted: list[str] = []
+
+        def count_records(self, namespace: str) -> int:
+            assert namespace == "precomputed_predictions"
+            return 5
+
+        def list_oldest_state_keys(self, namespace: str, *, limit: int) -> list[str]:
+            assert namespace == "precomputed_predictions"
+            assert limit == 2
+            return ["k1", "k2"]
+
+        def load_namespace(self, namespace: str):
+            raise AssertionError("Full namespace load should not be used in optimized prune.")
+
+        def delete_records(self, namespace: str, keys: list[str]) -> None:
+            assert namespace == "precomputed_predictions"
+            self.deleted = list(keys)
+
+    fake_store = _Store()
+    store._prune_db_namespace_entries(
+        "precomputed_predictions",
+        max_entries=3,
+        store=fake_store,
+    )
+    assert fake_store.deleted == ["k1", "k2"]

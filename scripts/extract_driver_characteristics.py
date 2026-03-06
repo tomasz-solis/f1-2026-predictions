@@ -20,6 +20,7 @@ import csv
 import gc
 import json
 import logging
+import os
 import sys
 import time
 from collections import defaultdict
@@ -73,6 +74,42 @@ def _fastf1_call(operation_name: str, fn, *, labels: dict | None = None):
     if _REQUEST_DELAY_SECONDS > 0:
         time.sleep(_REQUEST_DELAY_SECONDS)
     return result
+
+
+def _read_cgroup_memory_limit_mb() -> int | None:
+    """Read cgroup memory limit in MB when available."""
+    candidates = (
+        "/sys/fs/cgroup/memory.max",  # cgroup v2
+        "/sys/fs/cgroup/memory/memory.limit_in_bytes",  # cgroup v1
+    )
+    for path in candidates:
+        try:
+            with open(path) as handle:
+                raw = handle.read().strip().lower()
+        except OSError:
+            continue
+        if not raw or raw == "max":
+            continue
+        try:
+            limit_bytes = int(raw)
+        except ValueError:
+            continue
+        # Ignore unrealistic sentinel values that represent "unlimited".
+        if limit_bytes <= 0 or limit_bytes >= 2**60:
+            continue
+        return max(1, int(limit_bytes / (1024 * 1024)))
+    return None
+
+
+def _is_render_web_instance() -> bool:
+    """Return True when running inside Render web service context."""
+    if not os.getenv("RENDER"):
+        return False
+    service_type = str(os.getenv("RENDER_SERVICE_TYPE", "")).strip().lower()
+    if service_type:
+        return service_type == "web"
+    # Fallback for environments where service type is not exposed.
+    return bool(os.getenv("PORT"))
 
 
 def load_driver_debuts(csv_path: str = "data/driver_debuts.csv") -> dict[str, int]:
@@ -668,6 +705,14 @@ def main():
         default=180.0,
         help="Total retry timeout budget per FastF1 request",
     )
+    parser.add_argument(
+        "--allow-web-instance-run",
+        action="store_true",
+        help=(
+            "Allow extractor execution on Render web instances. "
+            "Use only when you understand memory-risk tradeoffs."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -675,6 +720,20 @@ def main():
     _REQUEST_DELAY_SECONDS = max(0.0, float(args.request_delay))
     max_attempts = max(1, int(args.max_attempts))
     timeout_budget_seconds = max(5.0, float(args.timeout_budget_seconds))
+    memory_limit_mb = _read_cgroup_memory_limit_mb()
+    if (
+        _is_render_web_instance()
+        and not args.allow_web_instance_run
+        and memory_limit_mb is not None
+        and memory_limit_mb <= 768
+    ):
+        raise RuntimeError(
+            "Refusing to run driver extraction on a memory-constrained Render web instance "
+            f"({memory_limit_mb}MB limit). "
+            "Run this command from a dedicated background worker or local machine. "
+            "If you still want to force it, pass --allow-web-instance-run."
+        )
+
     _FASTF1_POLICY = FastF1ResiliencePolicy(
         max_attempts=max_attempts,
         timeout_budget_seconds=timeout_budget_seconds,
