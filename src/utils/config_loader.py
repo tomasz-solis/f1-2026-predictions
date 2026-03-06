@@ -157,6 +157,31 @@ class Config:
             ("baseline_predictor.race.position_interval_floor.top_n", int, 1, 22),
             ("baseline_predictor.race.position_interval_floor.min_width", int, 0, 21),
             ("baseline_predictor.race.position_interval_floor.max_extra_width", int, 0, 21),
+            # Race parameters - overtaking transition blend
+            (
+                "baseline_predictor.race.overtaking_transition.min_observed_weight",
+                float,
+                0.0,
+                1.0,
+            ),
+            (
+                "baseline_predictor.race.overtaking_transition.max_observed_weight",
+                float,
+                0.0,
+                1.0,
+            ),
+            (
+                "baseline_predictor.race.overtaking_transition.races_to_full_weight",
+                int,
+                1,
+                50,
+            ),
+            (
+                "baseline_predictor.race.overtaking_transition.max_delta_from_prior",
+                float,
+                0.0,
+                1.0,
+            ),
         ]
 
         errors = []
@@ -195,6 +220,19 @@ class Config:
         if confidence_min > confidence_cap:
             raise ValueError(
                 "baseline_predictor.qualifying.confidence_min must be <= confidence_cap"
+            )
+
+        transition_min_weight = self.get(
+            "baseline_predictor.race.overtaking_transition.min_observed_weight",
+            0.12,
+        )
+        transition_max_weight = self.get(
+            "baseline_predictor.race.overtaking_transition.max_observed_weight",
+            0.65,
+        )
+        if transition_min_weight > transition_max_weight:
+            raise ValueError(
+                "baseline_predictor.race.overtaking_transition.min_observed_weight must be <= max_observed_weight"
             )
 
         fallback_tier = self.get("baseline_predictor.race.default_experience_tier", "developing")

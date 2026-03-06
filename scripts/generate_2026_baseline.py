@@ -163,6 +163,68 @@ def _filter_outlier_pit_losses(losses: list[float]) -> list[float]:
     return filtered if filtered else clean
 
 
+def _estimate_overtaking_changes_per_lap(laps: pd.DataFrame | None) -> float | None:
+    """Estimate overtaking intensity as mean driver position changes per lap.
+
+    The estimate compares consecutive laps, excludes lap 1 start chaos, and
+    filters pit-out laps to avoid counting pit cycle reshuffles as overtakes.
+    """
+    if laps is None or laps.empty:
+        return None
+    required_columns = {"LapNumber", "Driver", "Position"}
+    if not required_columns.issubset(laps.columns):
+        return None
+
+    lap_numbers = sorted(laps["LapNumber"].dropna().unique().tolist())
+    if len(lap_numbers) < 3:
+        return None
+
+    changes_per_lap: list[int] = []
+    for lap_num in lap_numbers[1:]:
+        prev_lap = laps[laps["LapNumber"] == (lap_num - 1)]
+        curr_lap = laps[laps["LapNumber"] == lap_num]
+        if prev_lap.empty or curr_lap.empty:
+            continue
+
+        if "PitOutTime" in curr_lap.columns:
+            curr_lap = curr_lap[curr_lap["PitOutTime"].isna()]
+        if curr_lap.empty:
+            continue
+
+        drivers_in_both = set(prev_lap["Driver"]) & set(curr_lap["Driver"])
+        if len(drivers_in_both) < 5:
+            continue
+
+        lap_changes = 0
+        for driver in drivers_in_both:
+            prev_pos_series = prev_lap.loc[prev_lap["Driver"] == driver, "Position"]
+            curr_pos_series = curr_lap.loc[curr_lap["Driver"] == driver, "Position"]
+            if prev_pos_series.empty or curr_pos_series.empty:
+                continue
+            prev_pos = prev_pos_series.iloc[0]
+            curr_pos = curr_pos_series.iloc[0]
+            if pd.notna(prev_pos) and pd.notna(curr_pos) and prev_pos != curr_pos:
+                lap_changes += 1
+
+        changes_per_lap.append(lap_changes)
+
+    if not changes_per_lap:
+        return None
+    return float(np.mean(changes_per_lap))
+
+
+def _changes_per_lap_to_overtaking_difficulty(avg_changes_per_lap: float | None) -> float:
+    """Convert overtaking activity to race-model difficulty on a 0..1 scale.
+
+    Lower values mean easier overtaking. The mapping is calibrated to keep the
+    output in a realistic range used by the race simulator.
+    """
+    if avg_changes_per_lap is None:
+        return 0.5
+    normalized = (7.5 - float(avg_changes_per_lap)) / 6.5
+    return float(np.clip(normalized, 0.2, 0.95))
+
+
 def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
     """
     Calculate track characteristics from historical race data.
@@ -185,7 +247,15 @@ def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
         logger.info(f"Processing {year} season...")
         try:
             schedule = fastf1.get_event_schedule(year)
-            races = schedule[schedule["EventFormat"].notna()].copy()
+            races = schedule.copy()
+            if "EventName" in races.columns:
+                is_testing = races["EventName"].astype(str).str.contains("testing", case=False)
+                races = races.loc[~is_testing]
+            if "EventFormat" in races.columns:
+                is_testing_format = (
+                    races["EventFormat"].astype(str).str.contains("testing", case=False)
+                )
+                races = races.loc[~is_testing_format]
 
             for _, event in races.iterrows():
                 race_name = event["EventName"]
@@ -201,7 +271,7 @@ def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
                             "pit_times": [],
                             "sc_laps": [],
                             "total_laps": [],
-                            "overtakes": [],
+                            "overtaking_changes_per_lap": [],
                             "event_format": str(event.get("EventFormat", "")).lower(),
                         }
 
@@ -225,14 +295,12 @@ def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
                             track_stats[race_name]["sc_laps"].append(sc_laps)
 
                     # Overtaking difficulty (from position changes)
-                    # Higher position changes = easier overtaking
-                    if hasattr(session, "results") and session.results is not None:
-                        results = session.results
-                        if "GridPosition" in results.columns and "Position" in results.columns:
-                            position_changes = abs(
-                                results["Position"] - results["GridPosition"]
-                            ).sum()
-                            track_stats[race_name]["overtakes"].append(position_changes)
+                    if hasattr(session, "laps") and session.laps is not None:
+                        changes_per_lap = _estimate_overtaking_changes_per_lap(session.laps)
+                        if changes_per_lap is not None:
+                            track_stats[race_name]["overtaking_changes_per_lap"].append(
+                                changes_per_lap
+                            )
 
                 except Exception as e:
                     logger.warning(f"  Failed to load {year} {race_name}: {e}")
@@ -258,13 +326,11 @@ def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
         pit_time = float(np.clip(pit_time, 15.0, 30.0))
         sc_prob = 0.3  # Default - would need better telemetry to calculate
 
-        # Overtaking difficulty: normalize position changes
-        if stats["overtakes"]:
-            avg_overtakes = np.mean(stats["overtakes"])
-            # Scale: 0-20 changes → 1.0-0.0 difficulty (more changes = easier)
-            overtaking_difficulty = max(0.0, min(1.0, 1.0 - (avg_overtakes / 40)))
-        else:
-            overtaking_difficulty = 0.5  # Default medium
+        # Overtaking difficulty: calibrated from lap-by-lap position-change rate.
+        avg_changes_per_lap = None
+        if stats["overtaking_changes_per_lap"]:
+            avg_changes_per_lap = float(np.mean(stats["overtaking_changes_per_lap"]))
+        overtaking_difficulty = _changes_per_lap_to_overtaking_difficulty(avg_changes_per_lap)
 
         # Determine track type
         track_type = "permanent"
@@ -277,6 +343,13 @@ def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
             "pit_stop_loss": round(pit_time, 1),
             "safety_car_prob": round(sc_prob, 2),
             "overtaking_difficulty": round(overtaking_difficulty, 2),
+            **(
+                {"overtaking_avg_changes_per_lap": round(avg_changes_per_lap, 2)}
+                if avg_changes_per_lap is not None
+                else {}
+            ),
+            "overtaking_years_analyzed": int(len(stats["overtaking_changes_per_lap"])),
+            "overtaking_observed_races": 0,
             "type": track_type,
             **({"has_sprint": True} if has_sprint else {}),
         }

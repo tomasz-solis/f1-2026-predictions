@@ -524,6 +524,14 @@ baseline_predictor:
       min_width: 1
       max_extra_width: 1
 
+    # Regulation-transition blend for track overtaking difficulty.
+    # Early 2026 observations should move historical priors gradually, not jump.
+    overtaking_transition:
+      min_observed_weight: 0.12
+      max_observed_weight: 0.65
+      races_to_full_weight: 8
+      max_delta_from_prior: 0.25
+
     final_blend:
       overtaking_skill_scale: 1.0       # Down from 1.3 - reduce driver adjustment magnitude
       race_advantage_scale: 0.8         # Down from 1.0 - moderate race pace impact

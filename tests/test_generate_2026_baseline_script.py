@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 
 def _load_baseline_module():
@@ -107,3 +108,26 @@ def test_filter_outlier_pit_losses_keeps_small_samples():
 
     filtered = module._filter_outlier_pit_losses(losses)
     assert filtered == losses
+
+
+def test_estimate_overtaking_changes_per_lap_uses_lap_by_lap_positions():
+    module = _load_baseline_module()
+    laps = pd.DataFrame(
+        {
+            "LapNumber": [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
+            "Driver": ["A", "B", "C", "D", "E"] * 3,
+            "Position": [1, 2, 3, 4, 5, 2, 1, 3, 4, 5, 2, 1, 4, 3, 5],
+            "PitOutTime": [pd.NaT] * 15,
+        }
+    )
+
+    changes = module._estimate_overtaking_changes_per_lap(laps)
+    assert changes == 2.0
+
+
+def test_changes_per_lap_to_overtaking_difficulty_is_calibrated():
+    module = _load_baseline_module()
+
+    assert module._changes_per_lap_to_overtaking_difficulty(None) == 0.5
+    assert module._changes_per_lap_to_overtaking_difficulty(1.0) == 0.95
+    assert module._changes_per_lap_to_overtaking_difficulty(5.0) == pytest.approx(0.3846, abs=1e-4)

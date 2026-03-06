@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import fastf1
+import numpy as np
 
 from src.utils import config_loader
 
@@ -88,6 +89,14 @@ _TRACK_OVERTAKING_BASELINES: dict[str, float] = {
     "Abu Dhabi Grand Prix": 0.50,
 }
 
+_OVERTAKING_DIFFICULTY_LABELS: dict[str, float] = {
+    "very_hard": 0.95,
+    "hard": 0.75,
+    "moderate": 0.55,
+    "easy": 0.35,
+    "very_easy": 0.20,
+}
+
 _UNDERSCALED_OVERTAKING_THRESHOLD = 0.10
 _CONVENTIONAL_TEMP_PRIORITY = ("R", "Q", "FP3", "FP2", "FP1")
 _SPRINT_TEMP_PRIORITY = ("R", "Q", "Sprint", "SQ", "FP1")
@@ -124,6 +133,31 @@ def _coerce_float(value: object) -> float | None:
         return float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
+
+
+def _coerce_unit_interval_value(value: object) -> float | None:
+    """Coerce value to a 0..1 float; supports percentages and common labels."""
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        normalized = value.strip().lower().replace(" ", "_")
+        if not normalized:
+            return None
+        if normalized in _OVERTAKING_DIFFICULTY_LABELS:
+            return _OVERTAKING_DIFFICULTY_LABELS[normalized]
+        try:
+            numeric_value = float(normalized)
+        except ValueError:
+            return None
+    elif isinstance(value, int | float):
+        numeric_value = float(value)
+    else:
+        return None
+
+    if numeric_value > 1.0 and numeric_value <= 100.0:
+        numeric_value /= 100.0
+    return float(max(0.0, min(1.0, numeric_value)))
 
 
 def _pirelli_candidate_years(year: int) -> list[int]:
@@ -512,23 +546,50 @@ def _load_session_weather_features(
     }
 
 
-def _normalize_overtaking_difficulty(race_name: str, raw_value: object) -> float | None:
-    """Normalize overtaking difficulty to a bounded 0..1 scale."""
-    if raw_value is None:
-        return None
-    if not isinstance(raw_value, (int | float | str)):
-        return None
-    try:
-        overtaking = float(raw_value)
-    except (TypeError, ValueError):
-        return None
+def _normalize_overtaking_difficulty(
+    race_name: str,
+    raw_value: object,
+    *,
+    raw_likelihood: object | None = None,
+) -> float | None:
+    """Normalize overtaking difficulty to a bounded 0..1 scale.
 
-    overtaking = float(max(0.0, min(1.0, overtaking)))
+    Supports three encodings commonly found in generated files:
+    - numeric difficulty in ``[0, 1]`` (canonical)
+    - numeric percentages in ``[0, 100]``
+    - categorical labels like ``hard`` or ``very_easy``
+
+    If the resolved value still looks under-scaled, we first try to infer
+    difficulty from ``overtaking_likelihood`` (difficulty ~= ``1 - likelihood``)
+    before falling back to track priors.
+    """
+    overtaking = _coerce_unit_interval_value(raw_value)
+    likelihood = _coerce_unit_interval_value(raw_likelihood)
+
+    if overtaking is None and likelihood is not None:
+        overtaking = float(max(0.0, min(1.0, 1.0 - likelihood)))
+        return overtaking
+
+    if overtaking is None:
+        return None
 
     # Some generated files compress values to ~0.00-0.05 for most tracks, which
     # unrealistically treats nearly every circuit as easy to overtake.
-    if overtaking <= _UNDERSCALED_OVERTAKING_THRESHOLD and race_name in _TRACK_OVERTAKING_BASELINES:
-        baseline = _TRACK_OVERTAKING_BASELINES[race_name]
+    if overtaking <= _UNDERSCALED_OVERTAKING_THRESHOLD:
+        if likelihood is not None:
+            inferred = float(max(0.0, min(1.0, 1.0 - likelihood)))
+            if inferred > _UNDERSCALED_OVERTAKING_THRESHOLD:
+                logger.info(
+                    "Overtaking difficulty for %s appears under-scaled (%.3f); inferred %.2f from likelihood",
+                    race_name,
+                    overtaking,
+                    inferred,
+                )
+                return inferred
+
+        baseline = _TRACK_OVERTAKING_BASELINES.get(race_name)
+        if baseline is None:
+            baseline = float(config_loader.get("track_defaults.overtaking_difficulty", 0.5))
         logger.info(
             "Overtaking difficulty for %s appears under-scaled (%.3f); using baseline %.2f",
             race_name,
@@ -538,6 +599,75 @@ def _normalize_overtaking_difficulty(race_name: str, raw_value: object) -> float
         return baseline
 
     return overtaking
+
+
+def _blend_overtaking_with_transition_prior(
+    race_name: str,
+    observed_overtaking: float,
+    *,
+    observed_races: int | None,
+) -> float:
+    """Blend observed overtaking with track prior for gradual regulation adaptation.
+
+    When a track payload includes ``overtaking_observed_races``, this applies a
+    bounded transition from historical prior to observed value. Early races
+    nudge the prior; larger evidence allows stronger movement.
+    """
+    if observed_races is None:
+        return observed_overtaking
+    if observed_races <= 0:
+        return observed_overtaking
+
+    prior = _TRACK_OVERTAKING_BASELINES.get(race_name)
+    if prior is None:
+        prior = float(config_loader.get("track_defaults.overtaking_difficulty", 0.5))
+
+    min_weight = float(
+        config_loader.get(
+            "baseline_predictor.race.overtaking_transition.min_observed_weight",
+            0.12,
+        )
+    )
+    max_weight = float(
+        config_loader.get(
+            "baseline_predictor.race.overtaking_transition.max_observed_weight",
+            0.65,
+        )
+    )
+    races_to_full = int(
+        config_loader.get(
+            "baseline_predictor.race.overtaking_transition.races_to_full_weight",
+            8,
+        )
+    )
+    max_delta = float(
+        config_loader.get(
+            "baseline_predictor.race.overtaking_transition.max_delta_from_prior",
+            0.25,
+        )
+    )
+
+    races_to_full = max(1, races_to_full)
+    min_weight = float(np.clip(min_weight, 0.0, 1.0))
+    max_weight = float(np.clip(max_weight, min_weight, 1.0))
+    max_delta = float(max(0.0, min(1.0, max_delta)))
+
+    evidence_ratio = float(np.clip(float(observed_races) / float(races_to_full), 0.0, 1.0))
+    observed_weight = min_weight + ((max_weight - min_weight) * evidence_ratio)
+
+    capped_delta = float(np.clip(observed_overtaking - prior, -max_delta, max_delta))
+    blended = float(np.clip(prior + (capped_delta * observed_weight), 0.0, 1.0))
+
+    logger.info(
+        "Blended overtaking difficulty for %s using transition prior: prior=%.2f observed=%.2f races=%s weight=%.2f result=%.2f",
+        race_name,
+        prior,
+        observed_overtaking,
+        observed_races,
+        observed_weight,
+        blended,
+    )
+    return blended
 
 
 def load_track_specific_params(race_name: str | None = None, year: int = 2026) -> dict:
@@ -585,8 +715,18 @@ def load_track_specific_params(race_name: str | None = None, year: int = 2026) -
                 overtaking = _normalize_overtaking_difficulty(
                     race_name,
                     track_info.get("overtaking_difficulty"),
+                    raw_likelihood=track_info.get("overtaking_likelihood"),
                 )
                 if overtaking is not None:
+                    observed_races_raw = _coerce_float(track_info.get("overtaking_observed_races"))
+                    observed_races = (
+                        int(observed_races_raw) if observed_races_raw is not None else None
+                    )
+                    overtaking = _blend_overtaking_with_transition_prior(
+                        race_name,
+                        overtaking,
+                        observed_races=observed_races,
+                    )
                     track_params["track_overtaking"] = overtaking
 
                 # Extract lap 1 track-specific risk modifier

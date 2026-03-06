@@ -153,6 +153,127 @@ def test_load_track_specific_params_normalizes_underscaled_overtaking_values(tmp
     assert params["track_overtaking"] == 0.95
 
 
+def test_load_track_specific_params_accepts_categorical_overtaking_difficulty(tmp_path):
+    processed_root = tmp_path / "processed"
+    track_path = processed_root / "track_characteristics" / "2026_track_characteristics.json"
+    track_path.parent.mkdir(parents=True, exist_ok=True)
+    track_path.write_text(
+        json.dumps(
+            {
+                "tracks": {
+                    "Monaco Grand Prix": {
+                        "pit_stop_loss": 19.0,
+                        "safety_car_prob": 0.7,
+                        "overtaking_difficulty": "very_hard",
+                    }
+                }
+            }
+        )
+    )
+
+    with patch(
+        "src.utils.track_data_loader.config_loader.get",
+        side_effect=lambda key, default=None: (
+            str(processed_root) if key == "paths.processed" else default
+        ),
+    ):
+        params = load_track_specific_params("Monaco Grand Prix", year=2026)
+
+    assert params["track_overtaking"] == pytest.approx(0.95)
+
+
+def test_load_track_specific_params_infers_overtaking_from_likelihood_when_needed(tmp_path):
+    processed_root = tmp_path / "processed"
+    track_path = processed_root / "track_characteristics" / "2026_track_characteristics.json"
+    track_path.parent.mkdir(parents=True, exist_ok=True)
+    track_path.write_text(
+        json.dumps(
+            {
+                "tracks": {
+                    "Australian Grand Prix": {
+                        "pit_stop_loss": 18.2,
+                        "safety_car_prob": 0.3,
+                        "overtaking_difficulty": 0.0,
+                        "overtaking_likelihood": 0.62,
+                    }
+                }
+            }
+        )
+    )
+
+    with patch(
+        "src.utils.track_data_loader.config_loader.get",
+        side_effect=lambda key, default=None: (
+            str(processed_root) if key == "paths.processed" else default
+        ),
+    ):
+        params = load_track_specific_params("Australian Grand Prix", year=2026)
+
+    assert params["track_overtaking"] == pytest.approx(0.38)
+
+
+def test_load_track_specific_params_uses_default_baseline_for_unknown_under_scaled_track(tmp_path):
+    processed_root = tmp_path / "processed"
+    track_path = processed_root / "track_characteristics" / "2026_track_characteristics.json"
+    track_path.parent.mkdir(parents=True, exist_ok=True)
+    track_path.write_text(
+        json.dumps(
+            {
+                "tracks": {
+                    "Imaginary Grand Prix": {
+                        "pit_stop_loss": 22.0,
+                        "safety_car_prob": 0.3,
+                        "overtaking_difficulty": 0.01,
+                    }
+                }
+            }
+        )
+    )
+
+    def _cfg_get(key, default=None):
+        if key == "paths.processed":
+            return str(processed_root)
+        if key == "track_defaults.overtaking_difficulty":
+            return 0.46
+        return default
+
+    with patch("src.utils.track_data_loader.config_loader.get", side_effect=_cfg_get):
+        params = load_track_specific_params("Imaginary Grand Prix", year=2026)
+
+    assert params["track_overtaking"] == pytest.approx(0.46)
+
+
+def test_load_track_specific_params_blends_observed_overtaking_gradually(tmp_path):
+    processed_root = tmp_path / "processed"
+    track_path = processed_root / "track_characteristics" / "2026_track_characteristics.json"
+    track_path.parent.mkdir(parents=True, exist_ok=True)
+    track_path.write_text(
+        json.dumps(
+            {
+                "tracks": {
+                    "Australian Grand Prix": {
+                        "pit_stop_loss": 18.2,
+                        "safety_car_prob": 0.3,
+                        "overtaking_difficulty": 0.2,
+                        "overtaking_observed_races": 1,
+                    }
+                }
+            }
+        )
+    )
+
+    with patch(
+        "src.utils.track_data_loader.config_loader.get",
+        side_effect=lambda key, default=None: (
+            str(processed_root) if key == "paths.processed" else default
+        ),
+    ):
+        params = load_track_specific_params("Australian Grand Prix", year=2026)
+
+    assert params["track_overtaking"] == pytest.approx(0.45, abs=0.02)
+    assert 0.2 < params["track_overtaking"] < 0.5
+
+
 def test_get_tire_stress_score_uses_resolved_year_file(tmp_path):
     pirelli_path = tmp_path / "2027_pirelli_info.json"
     pirelli_path.write_text(
