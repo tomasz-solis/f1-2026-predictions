@@ -182,6 +182,8 @@ class SessionDetector:
         if now < session_date_utc:
             return "incomplete"
 
+        is_practice = str(session_name).upper().startswith("FP")
+
         try:
             session = call_with_resilience(
                 "fastf1_get_session",
@@ -189,13 +191,25 @@ class SessionDetector:
                 labels={"year": year, "race_name": race_name, "session_name": session_name},
             )
         except Exception as exc:  # pragma: no cover - fastf1 edge behavior
+            if is_practice:
+                return (
+                    "completed"
+                    if self._fallback_elapsed_completion(session_date_utc, session_name, now)
+                    else "incomplete"
+                )
             raise SessionCompletionCheckError(f"could not create FastF1 session: {exc}") from exc
 
         if session is None:
+            if is_practice:
+                return (
+                    "completed"
+                    if self._fallback_elapsed_completion(session_date_utc, session_name, now)
+                    else "incomplete"
+                )
             raise SessionCompletionCheckError("FastF1 returned no session object")
 
-        # Practice sessions require non-empty lap data; competitive sessions require results.
-        is_practice = str(session_name).upper().startswith("FP")
+        # Practice sessions should be picked up quickly after the scheduled end, even if
+        # FastF1 laps/status payloads lag for a short period.
         if is_practice:
             try:
                 call_with_resilience(
@@ -203,17 +217,25 @@ class SessionDetector:
                     lambda: session.load(laps=True, telemetry=False, weather=False, messages=False),
                     labels={"year": year, "race_name": race_name, "session_name": session_name},
                 )
-            except Exception as exc:
-                raise SessionCompletionCheckError(f"practice session load failed: {exc}") from exc
+            except Exception:
+                return (
+                    "completed"
+                    if self._fallback_elapsed_completion(session_date_utc, session_name, now)
+                    else "incomplete"
+                )
 
             laps = getattr(session, "laps", None)
             has_laps = laps is not None and not laps.empty
-            if not has_laps:
-                return "incomplete"
-
             status_complete = self._session_status_completed(session)
             if status_complete is not None:
                 return "completed" if status_complete else "incomplete"
+
+            if not has_laps:
+                return (
+                    "completed"
+                    if self._fallback_elapsed_completion(session_date_utc, session_name, now)
+                    else "incomplete"
+                )
 
             return (
                 "completed"

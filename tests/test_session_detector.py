@@ -40,6 +40,31 @@ def test_is_session_completed_practice_requires_non_empty_laps():
             assert detector.is_session_completed(2026, "Bahrain Grand Prix", "FP1") is True
 
 
+def test_is_session_completed_practice_without_laps_uses_elapsed_fallback():
+    detector = SessionDetector()
+    past_start = datetime.now(UTC) - timedelta(hours=3)
+
+    session = MagicMock()
+    session.laps = pd.DataFrame()
+    session.session_status = pd.DataFrame()
+
+    with patch("src.utils.session_detector.fastf1.get_event", return_value=_FakeEvent(past_start)):
+        with patch("src.utils.session_detector.fastf1.get_session", return_value=session):
+            assert detector.is_session_completed(2026, "Bahrain Grand Prix", "FP1") is True
+
+
+def test_is_session_completed_practice_load_failure_uses_elapsed_fallback():
+    detector = SessionDetector()
+    past_start = datetime.now(UTC) - timedelta(hours=3)
+
+    session = MagicMock()
+    session.load.side_effect = RuntimeError("temporary FastF1 lapse")
+
+    with patch("src.utils.session_detector.fastf1.get_event", return_value=_FakeEvent(past_start)):
+        with patch("src.utils.session_detector.fastf1.get_session", return_value=session):
+            assert detector.is_session_completed(2026, "Bahrain Grand Prix", "FP2") is True
+
+
 def test_is_session_completed_competitive_requires_results():
     past_start = datetime.now(UTC) - timedelta(hours=4)
 

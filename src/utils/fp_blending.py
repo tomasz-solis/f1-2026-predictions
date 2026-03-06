@@ -3,7 +3,7 @@
 import logging
 import time
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 
@@ -19,6 +19,15 @@ from src.utils.team_mapping import map_team_to_characteristics
 
 logging.getLogger("fastf1").setLevel(logging.CRITICAL)
 logger = logging.getLogger(__name__)
+
+_SESSION_DURATION_HOURS: dict[str, float] = {
+    "FP1": 1.5,
+    "FP2": 1.5,
+    "FP3": 1.5,
+    "SQ": 1.5,
+    "Sprint": 1.0,
+    "Sprint Qualifying": 1.5,
+}
 
 
 class CircuitBreaker:
@@ -401,10 +410,33 @@ def get_best_fp_performance_with_session_laps(
         qualifying_stage=stage,
     )
 
+    event = None
+    try:
+        event = _fastf1_with_retry(lambda: ff1.get_event(year, race_name), max_retries=1)
+    except Exception:
+        event = None
+
+    now_utc = datetime.now(UTC)
     errors_encountered = []
     available_sessions: list[dict[str, Any]] = []
     session_laps_by_code: dict[str, pd.DataFrame | None] = {}
     for session_code, session_label, session_weight in session_priority:
+        if event is not None:
+            try:
+                raw_session_date = event.get_session_date(session_code)
+            except Exception:
+                raw_session_date = None
+
+            if raw_session_date is not None:
+                if raw_session_date.tzinfo is None:
+                    session_date_utc = raw_session_date.replace(tzinfo=UTC)
+                else:
+                    session_date_utc = raw_session_date.astimezone(UTC)
+                estimated_duration = _SESSION_DURATION_HOURS.get(session_code, 2.0)
+                if now_utc < session_date_utc + timedelta(hours=float(estimated_duration)):
+                    session_laps_by_code[session_code] = None
+                    continue
+
         fp_data, session_laps, error = get_fp_team_performance(year, race_name, session_code)
         session_laps_by_code[session_code] = (
             session_laps if isinstance(session_laps, pd.DataFrame) else None
