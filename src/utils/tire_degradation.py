@@ -7,12 +7,13 @@ from src.utils import config_loader
 
 def _coerce_base_tire_deg_slope(base_tire_deg_slope: float | None) -> float:
     """Return a valid base tire degradation slope using configured fallback when needed."""
-    try:
-        slope = float(base_tire_deg_slope)
-        if math.isfinite(slope):
-            return slope
-    except (TypeError, ValueError):
-        pass
+    if base_tire_deg_slope is not None:
+        try:
+            slope = float(base_tire_deg_slope)
+            if math.isfinite(slope):
+                return slope
+        except (TypeError, ValueError):
+            pass
 
     configured_default = config_loader.get(
         "baseline_predictor.race.tire_physics.default_deg_slope",
