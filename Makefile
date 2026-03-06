@@ -3,7 +3,7 @@ RUFF ?= $(VENV_BIN)/ruff
 MYPY ?= $(VENV_BIN)/mypy
 PYTEST ?= $(VENV_BIN)/pytest
 
-.PHONY: dev-sync ensure-venv fmt lint typecheck typecheck-strict test test-live-fastf1 check
+.PHONY: dev-sync ensure-venv fmt lint typecheck typecheck-strict test test-live-fastf1 check precommit-install precommit
 
 dev-sync:
 	uv sync --extra dev
@@ -31,3 +31,9 @@ test-live-fastf1: ensure-venv
 	FASTF1_LIVE_TESTS=1 $(PYTEST) tests/test_fastf1_live_refresh.py -m live_fastf1 -vv
 
 check: lint typecheck test
+
+precommit-install: ensure-venv
+	$(VENV_BIN)/pre-commit install
+
+precommit: ensure-venv
+	$(VENV_BIN)/pre-commit run --all-files

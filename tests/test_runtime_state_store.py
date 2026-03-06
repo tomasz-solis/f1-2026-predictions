@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from postgrest.types import CountMethod
 
 from src.persistence.runtime_state_store import RuntimeStateStore
 
@@ -150,7 +151,7 @@ def test_count_records_uses_head_count_query(patcher):
     store = RuntimeStateStore()
     assert store.count_records("precomputed_predictions") == 17
 
-    query.select.assert_called_once_with("state_key", count="exact", head=True)
+    query.select.assert_called_once_with("state_key", count=CountMethod.exact, head=True)
     query.eq.assert_called_once_with("namespace", "precomputed_predictions")
 
 

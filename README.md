@@ -282,6 +282,18 @@ Project check pipeline (lint + mypy + pytest):
 make check
 ```
 
+Run checks automatically before every commit:
+
+```bash
+make precommit-install
+```
+
+Run the same hook suite manually at any time:
+
+```bash
+make precommit
+```
+
 Optional stricter mypy pass (checks bodies of untyped functions):
 
 ```bash

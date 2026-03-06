@@ -6,6 +6,8 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
+from postgrest.types import CountMethod
+
 from .config import get_storage_mode, should_read_db_first, should_write_to_db
 from .db import get_supabase_client
 
@@ -59,7 +61,7 @@ class RuntimeStateStore:
             client = get_supabase_client()
             result = (
                 client.table(_RUNTIME_STATE_TABLE)
-                .select("state_key", count="exact", head=True)
+                .select("state_key", count=CountMethod.exact, head=True)
                 .eq("namespace", str(namespace))
                 .execute()
             )

@@ -7,3 +7,11 @@ repos:
         exclude: ^notebooks/
       - id: ruff-format
         exclude: ^notebooks/
+  - repo: local
+    hooks:
+      - id: mypy-dashboard-utils
+        name: mypy (src/dashboard + src/utils)
+        entry: .venv/bin/mypy src/dashboard src/utils
+        language: system
+        pass_filenames: false
+        require_serial: true
