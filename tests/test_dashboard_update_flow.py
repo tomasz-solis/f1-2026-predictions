@@ -413,6 +413,75 @@ def test_auto_update_practice_characteristics_force_recheck_processes_all_comple
     assert captured_kwargs["sessions"] == ["FP1", "FP2"]
 
 
+def test_auto_update_practice_characteristics_sprint_updates_fp1_and_sq(patcher, tmp_path):
+    state_file = tmp_path / "practice_state.json"
+    patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
+
+    class _Detector:
+        def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool):
+            del year, race_name
+            assert is_sprint is True
+            return ["SQ", "FP1", "Sprint"]
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+
+    captured_kwargs: dict = {}
+
+    def _update_from_testing_sessions(**kwargs):
+        captured_kwargs.update(kwargs)
+        return {"updated_teams": ["McLaren"]}
+
+    patcher.setattr(
+        "src.systems.testing_updater.update_from_testing_sessions",
+        _update_from_testing_sessions,
+    )
+
+    result = update_flow.auto_update_practice_characteristics_if_needed(
+        year=2026,
+        race_name="Chinese Grand Prix",
+        is_sprint=True,
+    )
+
+    assert result["updated"] is True
+    assert result["completed_fp_sessions"] == ["FP1", "SQ"]
+    assert captured_kwargs["sessions"] == ["FP1", "SQ"]
+
+
+def test_auto_update_practice_characteristics_sprint_skips_when_fp1_sq_processed(patcher, tmp_path):
+    state_file = tmp_path / "practice_state.json"
+    state_file.write_text(
+        json.dumps(
+            {
+                "races": {
+                    "2026::Chinese Grand Prix": {
+                        "sessions": ["FP1", "SQ"],
+                    }
+                }
+            }
+        )
+    )
+    patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
+
+    class _Detector:
+        def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool):
+            del year, race_name, is_sprint
+            return ["FP1", "SQ"]
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+    patcher.setattr(
+        "src.systems.testing_updater.update_from_testing_sessions",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("should not update")),
+    )
+
+    result = update_flow.auto_update_practice_characteristics_if_needed(
+        year=2026,
+        race_name="Chinese Grand Prix",
+        is_sprint=True,
+    )
+
+    assert result == {"updated": False, "completed_fp_sessions": ["FP1", "SQ"]}
+
+
 def test_auto_update_practice_characteristics_processes_backlog_across_raceweekends(
     patcher, tmp_path
 ):

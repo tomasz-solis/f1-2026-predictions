@@ -17,6 +17,7 @@ USAGE:
 
 import argparse
 import csv
+import gc
 import json
 import logging
 import sys
@@ -195,15 +196,49 @@ def calculate_driver_pace_gap(driver_laps, teammate_laps, session_type="R") -> f
     return gap_pct
 
 
-def extract_teammate_comparisons(years: list[int]) -> list[dict]:
+def _normalize_finish_position(raw_position) -> int | None:
+    """Return integer finish position when valid; otherwise None."""
+    if pd.isna(raw_position):
+        return None
+    try:
+        position = int(raw_position)
+    except (TypeError, ValueError):
+        return None
+    if position <= 0:
+        return None
+    return position
+
+
+def _build_race_summary_rows(results: pd.DataFrame) -> list[dict]:
+    """Convert FastF1 results DataFrame to compact serializable rows."""
+    rows: list[dict] = []
+    for _, row in results.iterrows():
+        driver = str(row.get("Abbreviation", "")).strip().upper()
+        if not driver:
+            continue
+        status = str(row.get("Status", "")).strip().lower()
+        team = str(row.get("TeamName", "")).strip()
+        rows.append(
+            {
+                "driver": driver,
+                "team": team,
+                "status": status,
+                "position": _normalize_finish_position(row.get("Position")),
+            }
+        )
+    return rows
+
+
+def extract_teammate_comparisons(years: list[int]) -> tuple[list[dict], list[dict]]:
     """
-    Extract all teammate pace comparisons across multiple seasons.
+    Extract teammate pace comparisons and compact race summaries.
 
     Returns list of comparisons with confidence and recency weighting.
     """
     logger.info(f"Extracting teammate comparisons from {years}...")
 
     comparisons = []
+    race_summaries: list[dict] = []
 
     for year in years:
         # Recency weight: 2025=1.0, 2024=0.8, 2023=0.6
@@ -218,7 +253,10 @@ def extract_teammate_comparisons(years: list[int]) -> list[dict]:
             logger.error(f"Failed to load {year} schedule: {e}")
             continue
 
-        for race_name in race_names:
+        for race_index, race_name in enumerate(race_names, start=1):
+            session = None
+            laps = None
+            results = None
             try:
                 session = _load_completed_race_session(year, race_name)
                 if session is None:
@@ -238,6 +276,16 @@ def extract_teammate_comparisons(years: list[int]) -> list[dict]:
 
                 laps = session.laps
                 results = session.results
+                summary_rows = _build_race_summary_rows(results)
+                if summary_rows:
+                    race_summaries.append(
+                        {
+                            "year": int(year),
+                            "race": race_name,
+                            "race_index": int(race_index),
+                            "rows": summary_rows,
+                        }
+                    )
 
                 # For each team, compare teammates
                 for team in laps["Team"].unique():
@@ -285,9 +333,15 @@ def extract_teammate_comparisons(years: list[int]) -> list[dict]:
             except Exception as e:
                 logger.debug(f"  Failed: {e}")
                 continue
+            finally:
+                # Release large objects between sessions to keep peak memory lower.
+                laps = None
+                results = None
+                session = None
+                gc.collect()
 
     logger.info(f"Extracted {len(comparisons)} teammate comparisons")
-    return comparisons
+    return comparisons, race_summaries
 
 
 def solve_global_ratings(comparisons: list[dict], iterations=15) -> dict[str, float]:
@@ -297,6 +351,9 @@ def solve_global_ratings(comparisons: list[dict], iterations=15) -> dict[str, fl
     Similar to Elo/TrueSkill - all comparisons constrain the solution space.
     """
     logger.info("Solving global driver ratings...")
+    if not comparisons:
+        logger.warning("No teammate comparisons available; cannot solve global ratings.")
+        return {}
 
     # Get all unique drivers
     drivers = set()
@@ -364,54 +421,34 @@ def solve_global_ratings(comparisons: list[dict], iterations=15) -> dict[str, fl
     return ratings
 
 
-def calculate_racecraft_scores(years: list[int], ratings: dict[str, float]) -> dict[str, float]:
+def calculate_racecraft_scores(
+    years: list[int], ratings: dict[str, float], race_summaries: list[dict]
+) -> dict[str, float]:
     """Calculate racecraft adjustment based on finish position versus pace-expected position."""
     logger.info("Calculating racecraft adjustments...")
 
     racecraft_scores = defaultdict(list)
+    valid_years = set(years)
 
-    for year in years:
-        try:
-            race_names = _iter_non_testing_race_names(year)
-        except Exception:
+    for summary in race_summaries:
+        year = int(summary.get("year", 0))
+        if year not in valid_years:
             continue
 
-        for race_name in race_names:
-            try:
-                session = _load_completed_race_session(year, race_name)
-                if session is None:
-                    continue
+        expected_order = []
+        for row in summary.get("rows", []):
+            driver = str(row.get("driver", "")).strip().upper()
+            actual_pos = row.get("position")
+            if driver in ratings and isinstance(actual_pos, int) and actual_pos <= 20:
+                expected_order.append((driver, ratings[driver], actual_pos))
 
-                _fastf1_call(
-                    "extract_driver_characteristics_load_results",
-                    lambda session=session: session.load(
-                        laps=False,
-                        telemetry=False,
-                        weather=False,
-                        messages=False,
-                    ),
-                    labels={"year": year, "race_name": race_name},
-                )
-                results = session.results
+        expected_order.sort(key=lambda x: x[1], reverse=True)
 
-                # Sort by driver rating (pace-based expected position)
-                expected_order = []
-                for _, row in results.iterrows():
-                    driver = row["Abbreviation"]
-                    if driver in ratings:
-                        expected_order.append((driver, ratings[driver], row["Position"]))
-
-                expected_order.sort(key=lambda x: x[1], reverse=True)
-
-                # Compare expected vs actual
-                for expected_pos, (driver, _rating, actual_pos) in enumerate(expected_order, 1):
-                    if pd.notna(actual_pos) and actual_pos <= 20:
-                        # Positive = beat expectations (good racecraft)
-                        racecraft_gain = expected_pos - actual_pos
-                        racecraft_scores[driver].append(racecraft_gain)
-
-            except Exception:
-                continue
+        # Compare expected vs actual
+        for expected_pos, (driver, _rating, actual_pos) in enumerate(expected_order, 1):
+            # Positive = beat expectations (good racecraft)
+            racecraft_gain = expected_pos - actual_pos
+            racecraft_scores[driver].append(racecraft_gain)
 
     # Average racecraft scores
     racecraft_ratings = {}
@@ -424,7 +461,9 @@ def calculate_racecraft_scores(years: list[int], ratings: dict[str, float]) -> d
     return racecraft_ratings
 
 
-def calculate_experience_and_consistency(years: list[int], driver_debuts: dict[str, int]) -> dict:
+def calculate_experience_and_consistency(
+    years: list[int], driver_debuts: dict[str, int], race_summaries: list[dict]
+) -> dict:
     """
     Calculate experience tiers, total races, and DNF rates.
     """
@@ -439,53 +478,60 @@ def calculate_experience_and_consistency(years: list[int], driver_debuts: dict[s
         }
     )
 
-    for year in years:
-        try:
-            race_names = _iter_non_testing_race_names(year)
-        except Exception:
+    valid_years = set(years)
+    non_finish_markers = (
+        "dnf",
+        "retired",
+        "disqualified",
+        "not classified",
+        "did not finish",
+        "accident",
+        "collision",
+        "crash",
+        "damage",
+        "spun",
+        "engine",
+        "gearbox",
+        "hydraulic",
+        "brake",
+        "electrical",
+        "power unit",
+        "fuel pressure",
+        "transmission",
+    )
+
+    for summary in race_summaries:
+        year = int(summary.get("year", 0))
+        if year not in valid_years:
             continue
 
-        for race_name in race_names:
-            try:
-                session = _load_completed_race_session(year, race_name)
-                if session is None:
-                    continue
-
-                _fastf1_call(
-                    "extract_driver_characteristics_load_results",
-                    lambda session=session: session.load(
-                        laps=False,
-                        telemetry=False,
-                        weather=False,
-                        messages=False,
-                    ),
-                    labels={"year": year, "race_name": race_name},
-                )
-                results = session.results
-
-                for _, row in results.iterrows():
-                    driver = row["Abbreviation"]
-                    status = str(row["Status"]).lower()
-
-                    driver_stats[driver]["seasons"].add(year)
-                    driver_stats[driver]["total_races"] += 1
-
-                    # Only count CRASH-related DNFs (driver error), not mechanical failures
-                    if any(
-                        word in status
-                        for word in [
-                            "accident",
-                            "collision",
-                            "crash",
-                            "damage",
-                            "spun",
-                        ]
-                    ):
-                        driver_stats[driver]["dnf_count"] += 1
-                        driver_stats[driver]["crash_count"] += 1
-
-            except Exception:
+        for row in summary.get("rows", []):
+            driver = str(row.get("driver", "")).strip().upper()
+            if not driver:
                 continue
+            status = str(row.get("status", "")).lower()
+
+            driver_stats[driver]["seasons"].add(year)
+            driver_stats[driver]["total_races"] += 1
+
+            # Count all non-finish outcomes for race-level reliability risk.
+            # Keep crash_count separate for optional driver-error diagnostics.
+            finish_markers = ("finished", "classified")
+            is_explicit_finish = (
+                status.startswith("+")
+                or " lap" in status
+                or any(marker in status for marker in finish_markers)
+            )
+            is_non_finish = (not is_explicit_finish) and any(
+                marker in status for marker in non_finish_markers
+            )
+            if is_non_finish:
+                driver_stats[driver]["dnf_count"] += 1
+                if any(
+                    marker in status
+                    for marker in ("accident", "collision", "crash", "damage", "spun")
+                ):
+                    driver_stats[driver]["crash_count"] += 1
 
     # Process into output format
     output = {}
@@ -516,7 +562,7 @@ def calculate_experience_and_consistency(years: list[int], driver_debuts: dict[s
         else:
             tier = "rookie"
 
-        # DNF rate (crash-based only)
+        # DNF rate (all non-finish outcomes)
         dnf_rate = stats["dnf_count"] / total_races
 
         output[driver] = {
@@ -529,6 +575,72 @@ def calculate_experience_and_consistency(years: list[int], driver_debuts: dict[s
 
     logger.info(f"Processed experience for {len(output)} drivers")
     return output
+
+
+def calculate_championship_overperformance(
+    years: list[int],
+    pace_ratings: dict[str, float],
+    race_summaries: list[dict],
+) -> dict[str, float]:
+    """Estimate overperformance versus car baseline using latest race per season."""
+    logger.info("Calculating championship overperformance bonuses...")
+
+    latest_summary_by_year: dict[int, dict] = {}
+    for summary in race_summaries:
+        year = int(summary.get("year", 0))
+        if year not in years:
+            continue
+        race_index = int(summary.get("race_index", 0))
+        previous = latest_summary_by_year.get(year)
+        previous_index = int(previous.get("race_index", 0)) if previous else -1
+        if race_index >= previous_index:
+            latest_summary_by_year[year] = summary
+
+    championship_adjustments: dict[str, list[float]] = {}
+    for year in years:
+        summary = latest_summary_by_year.get(year)
+        if summary is None:
+            continue
+
+        team_points = defaultdict(list)
+        for row in summary.get("rows", []):
+            driver = str(row.get("driver", "")).strip().upper()
+            team = str(row.get("team", "")).strip()
+            position = row.get("position")
+            if not driver or not team or driver not in pace_ratings:
+                continue
+            if not isinstance(position, int):
+                continue
+            team_points[team].append(position)
+
+        team_expected = {
+            team: float(np.mean(positions)) for team, positions in team_points.items() if positions
+        }
+
+        for row in summary.get("rows", []):
+            driver = str(row.get("driver", "")).strip().upper()
+            team = str(row.get("team", "")).strip()
+            position = row.get("position")
+            if (
+                driver not in pace_ratings
+                or team not in team_expected
+                or not isinstance(position, int)
+            ):
+                continue
+
+            expected_pos = team_expected[team]
+            overperformance = expected_pos - position  # Positive = beat expectations
+            championship_adjustments.setdefault(driver, []).append(overperformance)
+
+    championship_bonuses: dict[str, float] = {}
+    for driver, overperfs in championship_adjustments.items():
+        avg_overperf = float(np.mean(overperfs))
+        # +1 position vs team = +0.03 rating (max ±0.10)
+        championship_bonuses[driver] = float(np.clip(avg_overperf * 0.03, -0.10, 0.10))
+        if abs(championship_bonuses[driver]) > 0.05:
+            logger.info(f"  {driver}: {championship_bonuses[driver]:+.3f} (overperformed car)")
+
+    return championship_bonuses
 
 
 def main():
@@ -587,90 +699,29 @@ def main():
     driver_debuts = load_driver_debuts()
 
     # Step 1: Extract teammate comparisons
-    comparisons = extract_teammate_comparisons(years)
+    comparisons, race_summaries = extract_teammate_comparisons(years)
+    if not comparisons:
+        raise RuntimeError(
+            "No completed race comparisons were extracted. "
+            "Verify FastF1 data availability and the selected --years range."
+        )
 
     # Step 2: Solve global ratings
     pace_ratings = solve_global_ratings(comparisons, iterations=15)
 
     # Step 3: Calculate racecraft adjustments
-    racecraft_adjustments = calculate_racecraft_scores(years, pace_ratings)
+    racecraft_adjustments = calculate_racecraft_scores(years, pace_ratings, race_summaries)
 
     # Step 4: Calculate experience and consistency
-    experience_data = calculate_experience_and_consistency(years, driver_debuts)
+    experience_data = calculate_experience_and_consistency(years, driver_debuts, race_summaries)
 
     # Step 5: Calculate championship overperformance (car vs driver finish)
     # This rewards drivers who overdeliver in bad cars (ALO, HAM in 2024)
-    logger.info("Calculating championship overperformance bonuses...")
-
-    championship_adjustments = {}
-    for year in years:
-        try:
-            # Get championship standings
-            race_names = _iter_non_testing_race_names(year)
-            if not race_names:
-                continue
-            session = _load_completed_race_session(year, race_names[-1])
-            if session is None:
-                continue
-
-            _fastf1_call(
-                "extract_driver_characteristics_load_results",
-                lambda session=session: session.load(
-                    laps=False,
-                    telemetry=False,
-                    weather=False,
-                    messages=False,
-                ),
-                labels={"year": year, "race_name": race_names[-1]},
-            )
-            results = session.results
-
-            # Get team championship order (average of drivers)
-            team_points = defaultdict(list)
-            driver_positions = {}
-
-            for _idx, row in results.iterrows():
-                driver = row["Abbreviation"]
-                team = row["TeamName"]
-                position = row["Position"]
-
-                if pd.notna(position) and driver in pace_ratings:
-                    driver_positions[driver] = position
-                    team_points[team].append(position)
-
-            # Calculate team expected position (avg of both drivers)
-            team_expected = {}
-            for team, positions in team_points.items():
-                team_expected[team] = np.mean(positions)
-
-            # For each driver, compare their finish vs team expected
-            for _idx, row in results.iterrows():
-                driver = row["Abbreviation"]
-                team = row["TeamName"]
-                position = row["Position"]
-
-                if driver not in pace_ratings or team not in team_expected:
-                    continue
-
-                expected_pos = team_expected[team]
-                overperformance = expected_pos - position  # Positive = beat expectations
-
-                if driver not in championship_adjustments:
-                    championship_adjustments[driver] = []
-                championship_adjustments[driver].append(overperformance)
-
-        except Exception as e:
-            logger.debug(f"Failed to calculate championship for {year}: {e}")
-            continue
-
-    # Average championship bonuses
-    championship_bonuses = {}
-    for driver, overperfs in championship_adjustments.items():
-        avg_overperf = np.mean(overperfs)
-        # +1 position vs team = +0.03 rating (max ±0.10)
-        championship_bonuses[driver] = np.clip(avg_overperf * 0.03, -0.10, 0.10)
-        if abs(championship_bonuses[driver]) > 0.05:
-            logger.info(f"  {driver}: {championship_bonuses[driver]:+.3f} (overperformed car)")
+    championship_bonuses = calculate_championship_overperformance(
+        years,
+        pace_ratings,
+        race_summaries,
+    )
 
     # Step 6: Combine into final ratings
     final_ratings = {}

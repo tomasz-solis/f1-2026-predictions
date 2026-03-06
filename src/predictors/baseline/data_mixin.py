@@ -190,7 +190,7 @@ class BaselineDataMixin:
         if errors:
             logger.warning(
                 f"Driver data has {len(errors)} validation errors. "
-                "Consider re-running extraction: python scripts/extract_driver_characteristics.py --years 2023,2024,2025"
+                "Consider re-running extraction: python scripts/extract_driver_characteristics.py --years 2023,2024,2025,2026"
             )
 
         self.drivers = driver_data["drivers"]

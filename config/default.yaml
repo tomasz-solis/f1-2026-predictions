@@ -349,6 +349,7 @@ baseline_predictor:
     # DNF rate caps
     dnf_rate_historical_cap: 0.20  # Cap on historical DNF rate before team uncertainty adjustment
     dnf_rate_final_cap: 0.35       # Final maximum DNF probability per driver
+    dnf_rate_floor: 0.02           # Minimum per-race DNF probability to avoid zero-risk overconfidence
 
     # Program-aware testing/practice modifier
     # Uses long-run profile characteristics to make a small team-strength adjustment.

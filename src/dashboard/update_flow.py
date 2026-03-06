@@ -21,6 +21,16 @@ _SPRINT_BOUNDARY_SESSIONS = ("FP1", "SQ", "Sprint", "Q", "R")
 _STATE_NAMESPACE_EVENT_BOUNDARY = "event_boundary_refresh"
 _STATE_NAMESPACE_PRACTICE = "practice_characteristics"
 _PRACTICE_BACKLOG_LOCK_TTL_SECONDS = 900
+_PRACTICE_CAPTURE_SESSIONS_BY_WEEKEND: dict[bool, tuple[str, ...]] = {
+    False: ("FP1", "FP2", "FP3"),
+    True: ("FP1", "SQ"),
+}
+_PRACTICE_CAPTURE_SESSION_ORDER = {
+    "FP1": 1,
+    "FP2": 2,
+    "FP3": 3,
+    "SQ": 4,
+}
 
 logger = logging.getLogger(__name__)
 
@@ -472,9 +482,12 @@ def auto_update_practice_characteristics_if_needed(
     session_detector=None,
 ) -> dict:
     """
-    Update car characteristics from completed free-practice sessions (FP1/FP2/FP3).
+    Update car characteristics from completed checkpoint sessions.
 
-    This is conservative and only runs when new FP sessions are completed for a race.
+    Conventional weekends ingest FP1/FP2/FP3.
+    Sprint weekends ingest FP1/SQ.
+    Updates run incrementally only for newly completed sessions unless
+    ``force_recheck`` is enabled.
 
     Args:
         year: Season year
@@ -488,11 +501,6 @@ def auto_update_practice_characteristics_if_needed(
     from src.utils.session_detector import SessionDetector
 
     detector = session_detector or SessionDetector()
-    session_order = {"FP1": 1, "FP2": 2, "FP3": 3}
-    expected_fp_sessions_by_weekend = {
-        False: {"FP1", "FP2", "FP3"},
-        True: {"FP1"},
-    }
     race_key = f"{year}::{race_name}"
     state = _load_practice_update_state()
     completed_by_race: dict[str, list[str]] = {}
@@ -507,34 +515,43 @@ def auto_update_practice_characteristics_if_needed(
         processed_sessions = {
             str(session) for session in state["races"].get(event_key, {}).get("sessions", [])
         }
-        expected_sessions = expected_fp_sessions_by_weekend[event_is_sprint]
+        checkpoint_sessions = _PRACTICE_CAPTURE_SESSIONS_BY_WEEKEND[event_is_sprint]
+        expected_sessions = set(checkpoint_sessions)
         if not force_recheck and expected_sessions.issubset(processed_sessions):
             completed_by_race[event_name] = sorted(
                 expected_sessions,
-                key=lambda s: session_order.get(s, 99),
+                key=lambda s: _PRACTICE_CAPTURE_SESSION_ORDER.get(s, 99),
             )
             continue
 
-        completed = detector.get_completed_sessions(year, event_name, event_is_sprint)
-        completed_fp_sessions = sorted(
-            {session for session in completed if session.startswith("FP")},
-            key=lambda s: session_order.get(s, 99),
+        completed = [
+            str(session)
+            for session in detector.get_completed_sessions(year, event_name, event_is_sprint)
+        ]
+        completed_checkpoint_sessions = sorted(
+            {session for session in completed if session in expected_sessions},
+            key=lambda s: _PRACTICE_CAPTURE_SESSION_ORDER.get(s, 99),
         )
-        if not completed_fp_sessions:
+        if not completed_checkpoint_sessions:
             completed_by_race[event_name] = []
             continue
 
-        completed_by_race[event_name] = completed_fp_sessions
+        completed_by_race[event_name] = completed_checkpoint_sessions
         sessions_to_update = (
-            completed_fp_sessions
+            completed_checkpoint_sessions
             if force_recheck
-            else [session for session in completed_fp_sessions if session not in processed_sessions]
+            else [
+                session
+                for session in completed_checkpoint_sessions
+                if session not in processed_sessions
+            ]
         )
         if sessions_to_update:
-            pending_updates.append((event_name, completed_fp_sessions, sessions_to_update))
+            pending_updates.append((event_name, completed_checkpoint_sessions, sessions_to_update))
 
     focus_completed_sessions = completed_by_race.get(race_name, [])
     if not pending_updates:
+        # Keep legacy key name for compatibility with dashboard renderers/tests.
         return {"updated": False, "completed_fp_sessions": focus_completed_sessions}
 
     practice_new_weight = config_loader.get("baseline_predictor.practice_capture.new_weight", 0.35)

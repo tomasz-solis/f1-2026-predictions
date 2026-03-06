@@ -435,3 +435,70 @@ def test_prepare_driver_info_uses_effective_experience_tier_for_dnf_modifier():
 
     # Second-year driver should receive "second_year" (+0.03) modifier, not rookie (+0.05).
     assert info_map["ANT"]["dnf_probability"] == pytest.approx(0.13)
+
+
+def test_prepare_driver_info_applies_configured_dnf_floor():
+    prep = DummyPreparation()
+    prep.year = 2026
+    prep.compound_strength = 0.70
+    prep.profile_modifier = (0.0, False)
+    prep.config = DummyConfig(
+        {
+            "baseline_predictor.race.dnf_rate_historical_cap": 0.20,
+            "baseline_predictor.race.dnf_rate_final_cap": 0.35,
+            "baseline_predictor.race.dnf_rate_floor": 0.02,
+            "baseline_predictor.race.testing_long_run_modifier_scale": 0.05,
+            "baseline_predictor.race.team_uncertainty_dnf_multiplier": 0.20,
+        }
+    )
+    prep.teams = {"McLaren": {"overall_performance": 0.70, "uncertainty": 0.05}}
+    prep.drivers = {
+        "NOR": {
+            "pace": {"quali_pace": 0.75, "race_pace": 0.78},
+            "racecraft": {"skill_score": 0.78, "overtaking_skill": 0.76},
+            "dnf_risk": {"dnf_rate": 0.0},
+            "experience": {"tier": "established", "years_of_experience": 6},
+        }
+    }
+
+    info_map, _ = prep._prepare_driver_info(
+        qualifying_grid=[{"driver": "NOR", "team": "McLaren", "position": 1}],
+        race_name="Australian Grand Prix",
+        race_compound="SOFT",
+    )
+
+    assert info_map["NOR"]["dnf_probability"] == pytest.approx(0.02)
+
+
+def test_prepare_driver_info_coerces_invalid_dnf_rate_values():
+    prep = DummyPreparation()
+    prep.year = 2026
+    prep.compound_strength = 0.70
+    prep.profile_modifier = (0.0, False)
+    prep.config = DummyConfig(
+        {
+            "baseline_predictor.race.dnf_rate_historical_cap": 0.20,
+            "baseline_predictor.race.dnf_rate_final_cap": 0.35,
+            "baseline_predictor.race.dnf_rate_floor": 0.02,
+            "baseline_predictor.race.testing_long_run_modifier_scale": 0.05,
+            "baseline_predictor.race.team_uncertainty_dnf_multiplier": 0.20,
+        }
+    )
+    prep.teams = {"McLaren": {"overall_performance": 0.70, "uncertainty": 0.05}}
+    prep.drivers = {
+        "NOR": {
+            "pace": {"quali_pace": 0.75, "race_pace": 0.78},
+            "racecraft": {"skill_score": 0.78, "overtaking_skill": 0.76},
+            "dnf_risk": {"dnf_rate": None},
+            "experience": {"tier": "established", "years_of_experience": 6},
+        }
+    }
+
+    info_map, _ = prep._prepare_driver_info(
+        qualifying_grid=[{"driver": "NOR", "team": "McLaren", "position": 1}],
+        race_name="Australian Grand Prix",
+        race_compound="SOFT",
+    )
+
+    # Invalid values should fallback to the neutral baseline (0.10) and remain bounded.
+    assert info_map["NOR"]["dnf_probability"] == pytest.approx(0.10)

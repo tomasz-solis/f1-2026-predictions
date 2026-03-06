@@ -282,11 +282,20 @@ def _compute_driver_dnf_probability(
     team_uncertainty: float,
     dnf_rate_historical_cap: float,
     dnf_rate_final_cap: float,
+    dnf_rate_floor: float,
     team_uncertainty_dnf_multiplier: float,
     resolve_effective_experience_tier_for_race_fn: Callable[[dict], str],
 ) -> float:
-    """Compute capped DNF probability with experience and uncertainty modifiers."""
-    dnf_rate = min(driver_data.get("dnf_risk", {}).get("dnf_rate", 0.10), dnf_rate_historical_cap)
+    """Compute capped DNF probability with experience, uncertainty, and a safety floor."""
+    raw_dnf_rate = driver_data.get("dnf_risk", {}).get("dnf_rate", 0.10)
+    try:
+        parsed_dnf_rate = float(raw_dnf_rate)
+    except (TypeError, ValueError):
+        parsed_dnf_rate = 0.10
+    if not np.isfinite(parsed_dnf_rate):
+        parsed_dnf_rate = 0.10
+
+    dnf_rate = min(max(0.0, parsed_dnf_rate), dnf_rate_historical_cap)
     experience_tier = resolve_effective_experience_tier_for_race_fn(driver_data)
     experience_dnf_modifier = _EXPERIENCE_DNF_MODIFIERS.get(experience_tier, 0.0)
 
@@ -299,14 +308,18 @@ def _compute_driver_dnf_probability(
     else:
         adjusted_dnf = dnf_rate + experience_dnf_modifier
 
-    return max(0.0, min(adjusted_dnf, dnf_rate_final_cap))
+    floor = float(np.clip(dnf_rate_floor, 0.0, dnf_rate_final_cap))
+    return max(floor, min(adjusted_dnf, dnf_rate_final_cap))
 
 
-def _load_preparation_config(config: Any | None) -> tuple[float, float, float, dict, dict, float]:
+def _load_preparation_config(
+    config: Any | None,
+) -> tuple[float, float, float, float, dict, dict, float]:
     """Load shared prep configuration for race info builders."""
     cfg = config or config_loader
     dnf_rate_historical_cap = cfg.get("baseline_predictor.race.dnf_rate_historical_cap", 0.20)
     dnf_rate_final_cap = cfg.get("baseline_predictor.race.dnf_rate_final_cap", 0.35)
+    dnf_rate_floor = cfg.get("baseline_predictor.race.dnf_rate_floor", 0.02)
     long_profile_scale = cfg.get("baseline_predictor.race.testing_long_run_modifier_scale", 0.05)
     long_profile_weights = cfg.get(
         "baseline_predictor.race.testing_profile_weights.long_run",
@@ -329,6 +342,7 @@ def _load_preparation_config(config: Any | None) -> tuple[float, float, float, d
     return (
         dnf_rate_historical_cap,
         dnf_rate_final_cap,
+        dnf_rate_floor,
         long_profile_scale,
         long_profile_weights,
         defensive_skill_weights,
@@ -367,6 +381,7 @@ def prepare_driver_info_core(
     (
         dnf_rate_historical_cap,
         dnf_rate_final_cap,
+        dnf_rate_floor,
         long_profile_scale,
         long_profile_weights,
         defensive_skill_weights,
@@ -409,6 +424,7 @@ def prepare_driver_info_core(
             team_uncertainty=team_uncertainty,
             dnf_rate_historical_cap=dnf_rate_historical_cap,
             dnf_rate_final_cap=dnf_rate_final_cap,
+            dnf_rate_floor=dnf_rate_floor,
             team_uncertainty_dnf_multiplier=team_uncertainty_dnf_multiplier,
             resolve_effective_experience_tier_for_race_fn=resolve_effective_experience_tier_for_race_fn,
         )
@@ -444,6 +460,7 @@ def prepare_driver_info_with_compounds_core(
     (
         dnf_rate_historical_cap,
         dnf_rate_final_cap,
+        dnf_rate_floor,
         long_profile_scale,
         long_profile_weights,
         defensive_skill_weights,
@@ -508,6 +525,7 @@ def prepare_driver_info_with_compounds_core(
             team_uncertainty=team_uncertainty,
             dnf_rate_historical_cap=dnf_rate_historical_cap,
             dnf_rate_final_cap=dnf_rate_final_cap,
+            dnf_rate_floor=dnf_rate_floor,
             team_uncertainty_dnf_multiplier=team_uncertainty_dnf_multiplier,
             resolve_effective_experience_tier_for_race_fn=resolve_effective_experience_tier_for_race_fn,
         )

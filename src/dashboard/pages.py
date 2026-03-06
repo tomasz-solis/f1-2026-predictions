@@ -818,7 +818,8 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                 st.error(f"Prediction failed: {e}")
                 st.info(
                     "Make sure data files are generated. Run: "
-                    "`python scripts/extract_driver_characteristics.py --years 2023,2024,2025`"
+                    "`python scripts/extract_driver_characteristics.py --years 2023,2024,2025,2026`"
+                    " (prefer a background job or local shell on Render; web-shell runs can hit memory limits)."
                 )
 
 
