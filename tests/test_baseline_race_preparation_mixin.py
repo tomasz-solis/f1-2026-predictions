@@ -170,6 +170,45 @@ def test_prepare_driver_info_with_compounds_builds_per_compound_strengths():
     assert info["tire_deg_by_compound"]["MEDIUM"] == pytest.approx(0.12)
 
 
+def test_prepare_driver_info_with_compounds_defaults_missing_tire_deg_slope():
+    prep = DummyPreparation()
+    prep.blended_strength = 0.7
+    prep.profile_modifier = (0.0, False)
+    prep.config = DummyConfig(
+        {
+            "baseline_predictor.race.tire_physics.default_deg_slope": 0.12,
+            "baseline_predictor.race.dnf_rate_historical_cap": 0.20,
+            "baseline_predictor.race.dnf_rate_final_cap": 0.35,
+        }
+    )
+    prep.teams = {
+        "McLaren": {
+            "uncertainty": 0.2,
+            "compound_characteristics": {"SOFT": {"tire_deg_slope": None}},
+        }
+    }
+    prep.drivers = {
+        "NOR": {
+            "pace": {"quali_pace": 0.6, "race_pace": 0.65},
+            "racecraft": {"skill_score": 0.7, "overtaking_skill": 0.6},
+            "dnf_risk": {"dnf_rate": 0.12},
+            "experience": {"tier": "established"},
+        }
+    }
+
+    with patch(
+        "src.utils.compound_performance.get_compound_performance_modifier",
+        lambda team_compound_chars, compound: 0.0,
+    ):
+        info_map, _ = prep._prepare_driver_info_with_compounds(
+            qualifying_grid=[{"driver": "NOR", "team": "McLaren", "position": 2}],
+            race_name="Bahrain Grand Prix",
+        )
+
+    info = info_map["NOR"]
+    assert info["tire_deg_by_compound"]["SOFT"] == pytest.approx(0.12)
+
+
 def test_prepare_driver_info_resolves_team_alias_for_uncertainty():
     prep = DummyPreparation()
     prep.compound_strength = 0.6

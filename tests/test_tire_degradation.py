@@ -194,6 +194,20 @@ class TestGetEffectiveTireDegSlope:
         result = get_effective_tire_deg_slope(base_slope, traffic_position=1, total_cars=0)
         assert result == base_slope
 
+    def test_missing_base_slope_uses_config_default(self, monkeypatch):
+        """Missing slope should fall back to configured default instead of crashing."""
+        import src.utils.tire_degradation as tire_degradation
+
+        def _mock_config_get(key, default=None):
+            if key == "baseline_predictor.race.tire_physics.default_deg_slope":
+                return 0.21
+            return default
+
+        monkeypatch.setattr(tire_degradation.config_loader, "get", _mock_config_get)
+
+        result = get_effective_tire_deg_slope(None, traffic_position=10)
+        assert result == pytest.approx(0.21, abs=0.001)
+
 
 class TestIntegrationScenarios:
     """Integration tests combining multiple effects."""

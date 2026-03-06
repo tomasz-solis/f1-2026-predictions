@@ -1,6 +1,27 @@
 """Tire degradation and fuel effect modeling for lap-by-lap race simulation."""
 
+import math
+
 from src.utils import config_loader
+
+
+def _coerce_base_tire_deg_slope(base_tire_deg_slope: float | None) -> float:
+    """Return a valid base tire degradation slope using configured fallback when needed."""
+    try:
+        slope = float(base_tire_deg_slope)
+        if math.isfinite(slope):
+            return slope
+    except (TypeError, ValueError):
+        pass
+
+    configured_default = config_loader.get(
+        "baseline_predictor.race.tire_physics.default_deg_slope",
+        0.15,
+    )
+    try:
+        return float(configured_default)
+    except (TypeError, ValueError):
+        return 0.15
 
 
 def _temperature_degradation_multiplier(track_temp: float | None) -> float:
@@ -221,7 +242,7 @@ def estimate_stint_pace_degradation(
 
 
 def get_effective_tire_deg_slope(
-    base_tire_deg_slope: float,
+    base_tire_deg_slope: float | None,
     traffic_position: int,
     total_cars: int = 20,
 ) -> float:
@@ -230,8 +251,10 @@ def get_effective_tire_deg_slope(
     Cars running in dirty air experience more tire degradation.
     Leaders have cleaner air and better tire management.
     """
+    resolved_base_slope = _coerce_base_tire_deg_slope(base_tire_deg_slope)
+
     if total_cars <= 0:
-        return base_tire_deg_slope
+        return resolved_base_slope
 
     # Load config
     clean_air_bonus = config_loader.get(
@@ -255,4 +278,4 @@ def get_effective_tire_deg_slope(
         # Dirty air penalty
         multiplier = 1.0 + traffic_deg_penalty
 
-    return base_tire_deg_slope * multiplier
+    return resolved_base_slope * multiplier

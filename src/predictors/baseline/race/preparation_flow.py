@@ -22,6 +22,23 @@ _EXPERIENCE_DNF_MODIFIERS = {
 }
 
 
+def _coerce_tire_deg_slope(value: Any, *, default: float) -> float:
+    """Return a finite tire degradation slope, falling back to default when missing."""
+    try:
+        fallback = float(default)
+    except (TypeError, ValueError):
+        fallback = 0.15
+
+    try:
+        slope = float(value)
+    except (TypeError, ValueError):
+        return fallback
+
+    if not np.isfinite(slope):
+        return fallback
+    return slope
+
+
 def _resolve_experience_tier_from_years(years_experience: int) -> str:
     """Map years-of-experience to canonical experience tier."""
     if years_experience <= 0:
@@ -433,7 +450,10 @@ def prepare_driver_info_with_compounds_core(
         team_uncertainty_dnf_multiplier,
     ) = _load_preparation_config(config)
     cfg = config or config_loader
-    default_tire_deg_slope = cfg.get("baseline_predictor.race.tire_physics.default_deg_slope", 0.15)
+    default_tire_deg_slope = _coerce_tire_deg_slope(
+        cfg.get("baseline_predictor.race.tire_physics.default_deg_slope", 0.15),
+        default=0.15,
+    )
 
     driver_info_map: dict[str, DriverRaceInfo] = {}
     teams_with_long_profile: set[str] = set()
@@ -466,15 +486,16 @@ def prepare_driver_info_with_compounds_core(
             if compound in team_compound_chars:
                 modifier = get_compound_performance_modifier_fn(team_compound_chars, compound)
                 adjusted_strength = base_team_strength + modifier
-                tire_deg_slope = team_compound_chars[compound].get(
-                    "tire_deg_slope", default_tire_deg_slope
+                tire_deg_slope = _coerce_tire_deg_slope(
+                    team_compound_chars[compound].get("tire_deg_slope"),
+                    default=default_tire_deg_slope,
                 )
             else:
                 adjusted_strength = base_team_strength
                 tire_deg_slope = default_tire_deg_slope
 
             team_strength_by_compound[compound] = np.clip(adjusted_strength, 0.0, 1.0)
-            tire_deg_by_compound[compound] = tire_deg_slope
+            tire_deg_by_compound[compound] = float(tire_deg_slope)
 
         driver_data = get_driver_data_or_fallback_fn(driver_code, team)
         race_advantage, skill, overtaking_skill, defensive_skill = _resolve_racecraft_metrics(
