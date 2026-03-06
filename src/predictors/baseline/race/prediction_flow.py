@@ -100,6 +100,99 @@ def _build_weather_feature_context(
     return modifiers, context
 
 
+def _apply_low_confidence_interval_floor(
+    *,
+    finish_order: list[dict[str, Any]],
+    input_confidence: float | None,
+    cfg: Any,
+    field_size: int,
+) -> None:
+    """Widen top-driver position ranges when run confidence is explicitly low.
+
+    The race simulator can occasionally produce a point interval (for example
+    ``P1-P1``) when one driver dominates all sampled outcomes. That can still
+    happen in low-signal runs where inputs are incomplete and uncertainty should
+    remain visible. This helper applies a small, bounded interval-width floor to
+    top-ranked drivers only when the caller provided a low ``input_confidence``.
+    """
+    if input_confidence is None or field_size <= 1:
+        return
+
+    confidence = float(np.clip(input_confidence, 0.0, 1.0))
+    threshold = float(
+        np.clip(
+            cfg.get(
+                "baseline_predictor.race.position_interval_floor.apply_below_input_confidence",
+                0.65,
+            ),
+            0.0,
+            1.0,
+        )
+    )
+    if threshold <= 0.0 or confidence >= threshold:
+        return
+
+    top_n = int(cfg.get("baseline_predictor.race.position_interval_floor.top_n", 3))
+    top_n = max(1, min(top_n, field_size))
+
+    min_width = int(cfg.get("baseline_predictor.race.position_interval_floor.min_width", 1))
+    min_width = max(0, min(min_width, field_size - 1))
+    max_extra_width = int(
+        cfg.get("baseline_predictor.race.position_interval_floor.max_extra_width", 1)
+    )
+    max_extra_width = max(0, min(max_extra_width, field_size - 1))
+
+    low_confidence_share = float((threshold - confidence) / max(threshold, 1e-6))
+    target_width = min(
+        field_size - 1,
+        min_width + int(round(low_confidence_share * max_extra_width)),
+    )
+    if target_width <= 0:
+        return
+
+    for row in finish_order:
+        try:
+            position = int(row.get("position", field_size))
+            p5 = int(row.get("p5", position))
+            p95 = int(row.get("p95", position))
+        except (TypeError, ValueError):
+            continue
+
+        if position > top_n:
+            continue
+
+        p5 = max(1, min(p5, field_size))
+        p95 = max(p5, min(p95, field_size))
+        current_width = p95 - p5
+        if current_width >= target_width:
+            row["p5"] = p5
+            row["p95"] = p95
+            continue
+
+        deficit = target_width - current_width
+
+        # Prefer widening upward for front-runners (P1 -> P2/P3) to keep the
+        # optimistic tail realistic without implying impossible negative places.
+        upper_room = field_size - p95
+        add_upper = min(upper_room, deficit)
+        deficit -= add_upper
+
+        lower_room = p5 - 1
+        add_lower = min(lower_room, deficit)
+        deficit -= add_lower
+
+        if deficit > 0 and upper_room > add_upper:
+            extra_upper = min(upper_room - add_upper, deficit)
+            add_upper += extra_upper
+            deficit -= extra_upper
+        if deficit > 0 and lower_room > add_lower:
+            extra_lower = min(lower_room - add_lower, deficit)
+            add_lower += extra_lower
+
+        row["p5"] = p5 - add_lower
+        row["p95"] = p95 + add_upper
+
+
 def predict_race_core(
     *,
     validated_grid: list[QualifyingGridEntry],
@@ -931,6 +1024,13 @@ def predict_race_core(
         smoothed_values = enforce_non_increasing(raw_podium_values)
         for row, smoothed in zip(finish_order, smoothed_values, strict=True):
             row["podium_probability"] = round(float(np.clip(smoothed, 0.0, 100.0)), 1)
+
+    _apply_low_confidence_interval_floor(
+        finish_order=finish_order,
+        input_confidence=input_confidence,
+        cfg=cfg,
+        field_size=max(1, len(validated_grid)),
+    )
 
     return {
         "finish_order": finish_order,

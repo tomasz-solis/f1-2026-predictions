@@ -147,6 +147,16 @@ class Config:
             ("baseline_predictor.race.min_laps_for_compound_data", int, 1, 500),
             ("baseline_predictor.race.weekend_long_run_min_laps", int, 1, 70),
             ("baseline_predictor.race.long_run_outlier_threshold", float, 0.1, 5.0),
+            # Race parameters - low-confidence interval floor
+            (
+                "baseline_predictor.race.position_interval_floor.apply_below_input_confidence",
+                float,
+                0.0,
+                1.0,
+            ),
+            ("baseline_predictor.race.position_interval_floor.top_n", int, 1, 22),
+            ("baseline_predictor.race.position_interval_floor.min_width", int, 0, 21),
+            ("baseline_predictor.race.position_interval_floor.max_extra_width", int, 0, 21),
         ]
 
         errors = []

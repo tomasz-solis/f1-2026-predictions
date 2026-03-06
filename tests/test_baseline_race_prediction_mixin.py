@@ -511,6 +511,116 @@ def test_predict_race_podium_probability_matches_ranked_outcomes():
     assert by_position[3]["podium_probability"] == 0.0
 
 
+def test_predict_race_widens_top_interval_when_input_confidence_is_low():
+    class IntervalFloorPredictor(BaselineRacePredictionMixin):
+        seed = 31
+
+        def _load_race_params(self) -> dict:
+            return {}
+
+        def _prepare_driver_info_with_compounds(
+            self, qualifying_grid: list[dict], race_name: str | None
+        ) -> tuple[dict, int]:
+            _ = race_name
+            info_map = {}
+            for row in qualifying_grid:
+                info_map[row["driver"]] = {
+                    "driver": row["driver"],
+                    "team": row["team"],
+                    "grid_pos": row["position"],
+                    "team_strength": 0.5,
+                    "team_strength_by_compound": {"SOFT": 0.5, "MEDIUM": 0.5, "HARD": 0.5},
+                    "tire_deg_by_compound": {"SOFT": 0.1, "MEDIUM": 0.1, "HARD": 0.1},
+                    "skill": 0.5,
+                    "race_advantage": 0.0,
+                    "overtaking_skill": 0.5,
+                    "defensive_skill": 0.5,
+                    "dnf_probability": 0.0,
+                }
+            return info_map, 0
+
+    predictor = IntervalFloorPredictor()
+
+    qualifying_grid = [
+        {"driver": "A", "team": "TeamA", "position": 1},
+        {"driver": "B", "team": "TeamB", "position": 2},
+        {"driver": "C", "team": "TeamC", "position": 3},
+    ]
+
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch.object(prediction_module, "load_track_specific_params", lambda _race_name: {})
+        )
+        stack.enter_context(
+            patch.object(prediction_module, "get_tire_stress_score", lambda _race_name: 3.0)
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "get_available_compounds",
+                lambda _race_name, weather="dry": ["SOFT", "MEDIUM", "HARD"],
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "resolve_race_distance_laps",
+                lambda year, race_name, is_sprint: 60,
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "generate_pit_strategy",
+                lambda **kwargs: {
+                    "num_stops": 0,
+                    "pit_laps": [],
+                    "compound_sequence": ["MEDIUM"],
+                    "stint_lengths": [60],
+                },
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "simulate_race_lap_by_lap",
+                lambda **kwargs: {
+                    "finish_order": [
+                        entry["driver"] for entry in kwargs["driver_info_map"].values()
+                    ],
+                    "dnf_drivers": [],
+                    "strategies_used": kwargs["strategies"],
+                },
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "aggregate_simulation_results",
+                lambda _simulation_results: {
+                    "median_positions": {"A": 1, "B": 2, "C": 3},
+                    "position_distributions": {"A": [1, 1, 1], "B": [2, 2, 2], "C": [3, 3, 3]},
+                    "dnf_rates": {"A": 0.0, "B": 0.0, "C": 0.0},
+                    "compound_strategy_distribution": {"MEDIUM": 1.0},
+                    "pit_lap_distribution": {},
+                },
+            )
+        )
+
+        result = predictor.predict_race(
+            qualifying_grid=qualifying_grid,
+            weather="dry",
+            race_name="Bahrain Grand Prix",
+            n_simulations=3,
+            input_confidence=0.35,
+        )
+
+    by_position = sorted(result["finish_order"], key=lambda row: row["position"])
+    assert by_position[0]["driver"] == "A"
+    assert by_position[0]["p5"] == 1
+    assert by_position[0]["p95"] >= 2
+
+
 def test_predict_race_applies_learned_position_adjustment():
     class _CalibrationStub:
         def get_combined_position_adjustment(

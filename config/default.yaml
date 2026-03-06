@@ -515,6 +515,15 @@ baseline_predictor:
     main_race_movement_floor: 1.0
     main_race_movement_quantile: 20.0
 
+    # Low-confidence interval floor for top positions.
+    # Prevents pathological point ranges (for example P1-P1) when the run is
+    # explicitly marked as low-confidence due to missing/weak weekend inputs.
+    position_interval_floor:
+      apply_below_input_confidence: 0.65
+      top_n: 3
+      min_width: 1
+      max_extra_width: 1
+
     final_blend:
       overtaking_skill_scale: 1.0       # Down from 1.3 - reduce driver adjustment magnitude
       race_advantage_scale: 0.8         # Down from 1.0 - moderate race pace impact
