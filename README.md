@@ -129,7 +129,9 @@ python scripts/warmup_precompute.py --year 2026 --require-db
 What it does:
 
 - reads the current schedule and picks the next race plus a 3-race horizon
-- resolves checkpoint readiness from actual session data (`PRE`, `FP1`, `FP2`, `FP3` or sprint `PRE`, `FP1`, `SQ`)
+- resolves checkpoint readiness from actual session data
+  - conventional: `PRE`, `FP1`, `FP2`, `FP3`, `Q`
+  - sprint: `PRE`, `FP1`, `SQ`, `Sprint`, `Q`
 - exits early (code `0`) when the expected checkpoint is not ready yet
 - computes/stores missing base features once per `(race, checkpoint, artifact, boundary)`
 - computes/stores only missing weather scenarios (`dry`, `mixed`, `rain`)
@@ -138,10 +140,10 @@ What it does:
 Inline horizon precompute in the Streamlit request path is disabled by default
 (`inline_enabled: false`) to avoid user-facing latency spikes.
 
-Cron example (hourly):
+Cron example (Render preheat every 5 minutes):
 
 ```bash
-0 * * * * cd /path/to/formula1-2026 && /path/to/formula1-2026/.venv/bin/python scripts/warmup_precompute.py --year 2026 --require-db >> /tmp/f1_warmup.log 2>&1
+*/5 * * * * cd /path/to/formula1-2026 && /path/to/formula1-2026/.venv/bin/python scripts/warmup_precompute.py --year 2026 --require-db >> /tmp/f1_warmup.log 2>&1
 ```
 
 ### 2. Manual race update

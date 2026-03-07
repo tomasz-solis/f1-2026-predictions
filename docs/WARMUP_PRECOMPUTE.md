@@ -39,8 +39,8 @@ Each run:
 1. Loads the current calendar and selects the next upcoming race as anchor.
 2. Builds a 3-race horizon (`anchor + 2`).
 3. Resolves checkpoint readiness from real session data:
-   - conventional: `PRE`, `FP1`, `FP2`, `FP3`
-   - sprint: `PRE`, `FP1`, `SQ`
+   - conventional: `PRE`, `FP1`, `FP2`, `FP3`, `Q`
+   - sprint: `PRE`, `FP1`, `SQ`, `Sprint`, `Q`
 4. If expected checkpoint data is not ready, writes a throttled lightweight status and exits.
 5. If ready, for each target race:
    - computes/stores base features once per key
@@ -56,10 +56,11 @@ PRE behavior:
 
 ## Scheduling
 
-Hourly cron is usually enough:
+For production preheat, run it every 5 minutes so completed `Q`/`SQ`/`Sprint`
+sessions are warmed quickly after the boundary flips:
 
 ```bash
-0 * * * * cd /path/to/formula1-2026 && /path/to/formula1-2026/.venv/bin/python scripts/warmup_precompute.py --year 2026 --require-db >> /tmp/f1_warmup.log 2>&1
+*/5 * * * * cd /path/to/formula1-2026 && /path/to/formula1-2026/.venv/bin/python scripts/warmup_precompute.py --year 2026 --require-db >> /tmp/f1_warmup.log 2>&1
 ```
 
 If you use multiple workers, keep the same cadence; warmup writes are idempotent.
