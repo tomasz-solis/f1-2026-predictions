@@ -3,6 +3,7 @@
 import pandas as pd
 
 from src.dashboard import pages
+from src.dashboard.prediction_flow import CompetitiveSessionStatusUnavailableError
 
 
 def test_load_race_options_filters_testing_and_tags_sprint(patcher):
@@ -256,6 +257,28 @@ def test_clear_fastf1_race_cache_removes_date_prefixed_race_dirs_only(patcher, t
     assert not target_primary.exists()
     assert not target_testing.exists()
     assert untouched_other_race.exists()
+
+
+def test_prediction_failure_hint_uses_fastf1_specific_guidance():
+    hint = pages._prediction_failure_hint(
+        CompetitiveSessionStatusUnavailableError(
+            "Could not verify completion state for Australian Grand Prix 2026 Q; "
+            "refusing to fall back to predicted grid."
+        )
+    )
+
+    assert hint is not None
+    assert "live-data sync problem" in hint
+    assert "missing artifact problem" in hint
+
+
+def test_prediction_failure_hint_uses_artifact_guidance_for_missing_data():
+    hint = pages._prediction_failure_hint(
+        FileNotFoundError("Could not locate driver characteristics fallback for season 2026")
+    )
+
+    assert hint is not None
+    assert "extract_driver_characteristics.py" in hint
 
 
 def test_save_prediction_if_enabled_saves_new_session(patcher):

@@ -36,7 +36,7 @@ from .page_content import (
     RACE_HYPERPARAMETERS_MARKDOWN,
 )
 from .precomputed_predictions import compute_artifact_hash, load_precompute_horizon_index
-from .prediction_flow import run_prediction
+from .prediction_flow import CompetitiveSessionStatusUnavailableError, run_prediction
 from .rendering import display_prediction_result
 from .update_flow import (
     _boundary_signature,
@@ -564,6 +564,38 @@ def execute_live_prediction_pipeline(
     )
 
 
+def _prediction_failure_hint(error: Exception) -> str | None:
+    """Return the most relevant user-facing hint for a prediction failure."""
+    message = str(error).strip()
+    normalized_message = message.lower()
+
+    if isinstance(error, CompetitiveSessionStatusUnavailableError) or (
+        "could not verify completion state" in normalized_message
+        and "predicted grid" in normalized_message
+    ):
+        return (
+            "FastF1 has not exposed a reliable completion state for that session yet. "
+            "This is a live-data sync problem, not a missing artifact problem. "
+            "Retry shortly; if the session is clearly finished, clear that race's FastF1 cache "
+            "and rerun."
+        )
+
+    artifact_error_markers = (
+        "driver characteristics",
+        "track characteristics",
+        "extract_driver_characteristics.py",
+        "could not locate driver characteristics fallback",
+    )
+    if any(marker in normalized_message for marker in artifact_error_markers):
+        return (
+            "Make sure data files are generated. Run: "
+            "`python scripts/extract_driver_characteristics.py --years 2023,2024,2025,2026`"
+            " (prefer a background job or local shell on Render; web-shell runs can hit memory limits)."
+        )
+
+    return None
+
+
 def render_live_prediction_page(enable_logging: bool) -> None:
     st.header("Race Weekend Prediction")
     st.markdown(
@@ -816,11 +848,9 @@ def render_live_prediction_page(enable_logging: bool) -> None:
 
             except Exception as e:
                 st.error(f"Prediction failed: {e}")
-                st.info(
-                    "Make sure data files are generated. Run: "
-                    "`python scripts/extract_driver_characteristics.py --years 2023,2024,2025,2026`"
-                    " (prefer a background job or local shell on Render; web-shell runs can hit memory limits)."
-                )
+                hint = _prediction_failure_hint(e)
+                if hint:
+                    st.info(hint)
 
 
 def render_model_insights_page() -> None:

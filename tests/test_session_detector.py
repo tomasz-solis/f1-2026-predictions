@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+from fastf1.exceptions import DataNotLoadedError
 
 from src.utils.session_detector import SessionDetector
 
@@ -153,6 +154,34 @@ def test_get_session_completion_state_returns_unknown_on_fastf1_error():
                 detector.get_session_completion_state(2026, "Bahrain Grand Prix", "Q") == "unknown"
             )
             assert detector.is_session_completed(2026, "Bahrain Grand Prix", "Q") is False
+
+
+def test_is_session_completed_competitive_ignores_unloaded_session_status():
+    detector = SessionDetector()
+    past_start = datetime.now(UTC) - timedelta(hours=4)
+
+    class _CompetitiveSessionWithoutStatus:
+        """Competitive session stub with results loaded but no status feed."""
+
+        def __init__(self) -> None:
+            self.results = pd.DataFrame([{"Position": 1}])
+
+        def load(self, **_kwargs) -> None:
+            """Simulate a successful FastF1 load call."""
+
+        @property
+        def session_status(self):
+            """Match FastF1 behavior when status data was never loaded."""
+            raise DataNotLoadedError("The data you are trying to access has not been loaded yet.")
+
+    session = _CompetitiveSessionWithoutStatus()
+
+    with patch("src.utils.session_detector.fastf1.get_event", return_value=_FakeEvent(past_start)):
+        with patch("src.utils.session_detector.fastf1.get_session", return_value=session):
+            assert detector.get_session_completion_state(2026, "Australian Grand Prix", "Q") == (
+                "completed"
+            )
+            assert detector.is_session_completed(2026, "Australian Grand Prix", "Q") is True
 
 
 def test_get_completed_sessions_uses_single_event_lookup_per_race():

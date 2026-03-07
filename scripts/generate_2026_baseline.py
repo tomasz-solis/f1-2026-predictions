@@ -1,7 +1,7 @@
 """
-Generate 2026 Baseline Data from Historical Averages (2023-2025)
+Generate 2026 baseline data from historical averages (2023-2025).
 
-This script creates proper baseline characteristics for the 2026 season:
+This script creates baseline characteristics for the 2026 season:
 - Track characteristics: 3-year averages of pit times, SC probability, overtaking difficulty
 - Car/Team characteristics: 2025-seeded preseason starting point (high uncertainty);
   optional neutral mode when explicitly requested
@@ -12,7 +12,7 @@ WHY THIS MATTERS:
 - Tracks don't change much → use historical data
 - Driver skills persist → carry over from 2025
 
-USAGE:
+Usage:
     python scripts/generate_2026_baseline.py --years 2023,2024,2025 --output data/processed
 """
 
@@ -29,6 +29,21 @@ import pandas as pd
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 logging.getLogger("fastf1").setLevel(logging.ERROR)
+
+
+_TEAM_BASELINE_KEYS = {
+    "overall_performance",
+    "uncertainty",
+    "note",
+    "last_updated",
+    "races_completed",
+}
+_TEAM_ENRICHED_KEYS = {
+    "directionality",
+    "testing_characteristics",
+    "testing_characteristics_profiles",
+    "compound_characteristics",
+}
 
 
 def _timedelta_to_seconds(value: object) -> float | None:
@@ -136,6 +151,55 @@ def _estimate_pit_losses_from_laps(laps: pd.DataFrame | None) -> list[float]:
                 losses.append(loss)
 
     return losses
+
+
+def _team_payload_contains_enrichment(team_payload: object) -> bool:
+    """Return True when a team payload includes testing or session-derived fields."""
+    if not isinstance(team_payload, dict):
+        return False
+
+    payload_keys = set(team_payload.keys())
+    if payload_keys & _TEAM_ENRICHED_KEYS:
+        return True
+
+    last_updated = team_payload.get("last_updated")
+    if last_updated not in (None, ""):
+        return True
+
+    try:
+        races_completed = int(team_payload.get("races_completed", 0) or 0)
+    except (TypeError, ValueError):
+        races_completed = 0
+
+    return races_completed > 0
+
+
+def _existing_team_file_is_enriched(output_file: Path) -> bool:
+    """Return True when the current team artifact is richer than a bare preseason seed."""
+    if not output_file.exists():
+        return False
+
+    try:
+        with open(output_file) as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning(f"Could not inspect existing team characteristics at {output_file}: {exc}")
+        return False
+
+    teams = payload.get("teams")
+    if not isinstance(teams, dict):
+        return False
+
+    for team_payload in teams.values():
+        if _team_payload_contains_enrichment(team_payload):
+            return True
+
+        if isinstance(team_payload, dict) and not set(team_payload.keys()).issubset(
+            _TEAM_BASELINE_KEYS
+        ):
+            return True
+
+    return False
 
 
 def _filter_outlier_pit_losses(losses: list[float]) -> list[float]:
@@ -365,13 +429,30 @@ def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
     logger.info(f"  Tracks analyzed: {len(track_characteristics['tracks'])}")
 
 
-def generate_team_characteristics(output_dir: Path, *, neutral_start: bool = False) -> None:
+def generate_team_characteristics(
+    output_dir: Path,
+    *,
+    neutral_start: bool = False,
+    force_reset: bool = False,
+) -> None:
     """
     Generate preseason team characteristics for 2026.
 
     Default behavior seeds rankings from 2025 constructor order while keeping high uncertainty.
     Use neutral_start=True only when you explicitly want all teams initialized equally.
+    Existing testing or practice-enriched files are preserved unless force_reset=True.
     """
+    output_file = output_dir / "car_characteristics" / "2026_car_characteristics.json"
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    if not force_reset and _existing_team_file_is_enriched(output_file):
+        logger.warning(
+            "Existing 2026 car characteristics already contain testing or practice-derived data; "
+            "preserving %s. Re-run with --force-reset-teams only if you intend to wipe that state.",
+            output_file,
+        )
+        return
+
     if neutral_start:
         logger.info("Generating neutral team characteristics for 2026...")
         team_2026_seed = {
@@ -436,9 +517,6 @@ def generate_team_characteristics(output_dir: Path, *, neutral_start: bool = Fal
             "last_updated": None,
             "races_completed": 0,
         }
-
-    output_file = output_dir / "car_characteristics" / "2026_car_characteristics.json"
-    output_file.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_file, "w") as f:
         json.dump(team_characteristics, f, indent=2)
@@ -545,6 +623,14 @@ def main():
         action="store_true",
         help="Initialize all teams at 0.5 (use only for explicitly neutral preseason experiments).",
     )
+    parser.add_argument(
+        "--force-reset-teams",
+        action="store_true",
+        help=(
+            "Overwrite an existing 2026 car characteristics file even if it already contains "
+            "testing or practice-derived fields."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -565,7 +651,11 @@ def main():
 
     # Step 2: Neutral team characteristics (nobody knows 2026 performance yet!)
     if not args.skip_teams:
-        generate_team_characteristics(output_dir, neutral_start=args.neutral_teams)
+        generate_team_characteristics(
+            output_dir,
+            neutral_start=args.neutral_teams,
+            force_reset=args.force_reset_teams,
+        )
         logger.info("")
 
     # Step 3: Copy 2025 driver characteristics (skills persist)

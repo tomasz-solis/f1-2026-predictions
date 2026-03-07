@@ -9,6 +9,7 @@ from typing import Any, cast
 
 import fastf1
 import numpy as np
+from fastf1.exceptions import DataNotLoadedError
 
 from src.utils import config_loader
 
@@ -230,7 +231,11 @@ def _coerce_utc_datetime(value: object) -> datetime | None:
 
 def _session_status_completed(session: object) -> bool | None:
     """Return completion status from FastF1 session status feed when available."""
-    status_feed = getattr(session, "session_status", None)
+    try:
+        status_feed = session.session_status
+    except (AttributeError, DataNotLoadedError):
+        return None
+
     if status_feed is None or getattr(status_feed, "empty", False):
         return None
 

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import fastf1
+from fastf1.exceptions import DataNotLoadedError
 
 from src.utils.fastf1_resilience import call_with_resilience
 from src.utils.operational_observability import record_alert, record_counter
@@ -276,7 +277,11 @@ class SessionDetector:
 
         Returns True/False when a clear status is available, otherwise None.
         """
-        status_feed = getattr(session, "session_status", None)
+        try:
+            status_feed = session.session_status
+        except (AttributeError, DataNotLoadedError):
+            return None
+
         if status_feed is None:
             return None
 

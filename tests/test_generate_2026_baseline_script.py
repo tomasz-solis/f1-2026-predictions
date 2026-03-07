@@ -42,6 +42,63 @@ def test_generate_team_characteristics_neutral_mode_sets_all_equal(tmp_path):
     assert values == {0.5}
 
 
+def test_generate_team_characteristics_preserves_enriched_existing_file_by_default(tmp_path):
+    module = _load_baseline_module()
+    output_file = tmp_path / "car_characteristics" / "2026_car_characteristics.json"
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    enriched_payload = {
+        "year": 2026,
+        "generated_at": "2026-03-03T23:33:59.825095",
+        "data_freshness": "TESTING_ENRICHED",
+        "teams": {
+            "McLaren": {
+                "overall_performance": 0.85,
+                "uncertainty": 0.3,
+                "note": "existing enriched payload",
+                "last_updated": "2026-03-03T23:33:59.825095",
+                "races_completed": 0,
+                "directionality": {"max_speed": -0.0098},
+                "testing_characteristics": {"overall_pace": 0.4879},
+            }
+        },
+    }
+    output_file.write_text(json.dumps(enriched_payload, indent=2))
+
+    module.generate_team_characteristics(tmp_path)
+
+    assert _load_team_file(tmp_path) == enriched_payload
+
+
+def test_generate_team_characteristics_force_reset_overwrites_enriched_file(tmp_path):
+    module = _load_baseline_module()
+    output_file = tmp_path / "car_characteristics" / "2026_car_characteristics.json"
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    enriched_payload = {
+        "year": 2026,
+        "generated_at": "2026-03-03T23:33:59.825095",
+        "data_freshness": "TESTING_ENRICHED",
+        "teams": {
+            "McLaren": {
+                "overall_performance": 0.85,
+                "uncertainty": 0.3,
+                "note": "existing enriched payload",
+                "last_updated": "2026-03-03T23:33:59.825095",
+                "races_completed": 0,
+                "directionality": {"max_speed": -0.0098},
+                "testing_characteristics": {"overall_pace": 0.4879},
+            }
+        },
+    }
+    output_file.write_text(json.dumps(enriched_payload, indent=2))
+
+    module.generate_team_characteristics(tmp_path, force_reset=True)
+    payload = _load_team_file(tmp_path)
+
+    assert payload["data_freshness"] == "BASELINE_PRESEASON"
+    assert payload["teams"]["McLaren"]["last_updated"] is None
+    assert "directionality" not in payload["teams"]["McLaren"]
+
+
 def test_estimate_pit_losses_from_pit_timestamps():
     module = _load_baseline_module()
     laps = pd.DataFrame(

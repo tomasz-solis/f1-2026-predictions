@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from fastf1.exceptions import DataNotLoadedError
 
 from src.utils.track_data_loader import (
     get_available_compounds,
@@ -380,6 +381,45 @@ def test_resolve_track_temperature_falls_back_when_fastf1_unavailable():
         )
 
     assert resolved == pytest.approx(23.0)
+
+
+def test_resolve_track_temperature_handles_unloaded_session_status():
+    now_utc = datetime.now(UTC)
+    event = MagicMock()
+    event.get_session_date.side_effect = lambda session_name: {
+        "R": now_utc + timedelta(hours=2),
+        "Q": now_utc - timedelta(hours=3),
+        "FP3": now_utc - timedelta(hours=6),
+        "FP2": now_utc - timedelta(hours=9),
+        "FP1": now_utc - timedelta(hours=12),
+    }.get(session_name)
+
+    class _WeatherOnlySession:
+        """Weather-only FastF1 stub that does not expose session status."""
+
+        def __init__(self) -> None:
+            self.weather_data = pd.DataFrame({"TrackTemp": [36.0, 37.0, 38.0]})
+
+        def load(self, **_kwargs) -> None:
+            """Simulate a successful weather-only load."""
+
+        @property
+        def session_status(self):
+            """Match FastF1 behavior when laps were not loaded."""
+            raise DataNotLoadedError("The data you are trying to access has not been loaded yet.")
+
+    with (
+        patch("src.utils.track_data_loader.fastf1.get_event", return_value=event),
+        patch("src.utils.track_data_loader.fastf1.get_session", return_value=_WeatherOnlySession()),
+    ):
+        resolved = resolve_track_temperature_c(
+            year=2026,
+            race_name="Bahrain Grand Prix",
+            weather="dry",
+            is_sprint=False,
+        )
+
+    assert resolved == pytest.approx(36.8)
 
 
 def test_resolve_track_temperature_profile_reports_session_blend_metadata():
