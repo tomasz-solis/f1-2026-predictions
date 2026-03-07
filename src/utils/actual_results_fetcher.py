@@ -1,7 +1,7 @@
 """Fetches actual results from competitive F1 sessions."""
 
 import logging
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import fastf1
 
@@ -21,16 +21,128 @@ _MIN_COMPETITIVE_ENTRIES_BY_SESSION = {
 }
 
 
-def _coerce_position(raw_position: Any) -> int:
-    """Coerce FastF1 position payload to integer and fail closed for malformed values."""
+def _coerce_optional_position(raw_position: Any) -> int | None:
+    """Coerce a FastF1 position-like payload to an integer when present."""
     if raw_position is None:
-        raise ValueError("missing position")
-    if str(raw_position).strip().lower() in {"", "nan", "none"}:
-        raise ValueError("missing position")
+        return None
+
+    text = str(raw_position).strip()
+    if text.lower() in {"", "nan", "none"}:
+        return None
+
     try:
         return int(raw_position)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"Invalid result position value: {raw_position!r}") from exc
+        try:
+            numeric_position = float(raw_position)
+        except (TypeError, ValueError):
+            raise ValueError(f"Invalid result position value: {raw_position!r}") from exc
+
+        if not numeric_position.is_integer():
+            raise ValueError(f"Invalid result position value: {raw_position!r}") from exc
+        return int(numeric_position)
+
+
+def _infer_trailing_qualifying_positions(
+    grid_rows: list[dict[str, Any]],
+    *,
+    race_name: str,
+    session_name: str,
+    labels: dict[str, Any],
+) -> None:
+    """Fill trailing blank qualifying positions when FastF1 preserves row order."""
+    if session_name not in {"Q", "SQ"}:
+        return
+
+    missing_indices = [
+        index for index, entry in enumerate(grid_rows) if entry.get("position") is None
+    ]
+    if not missing_indices:
+        return
+
+    first_missing_index = missing_indices[0]
+    if first_missing_index == 0:
+        raise ValueError("no explicit qualifying positions available for inference")
+
+    expected_missing = list(range(first_missing_index, len(grid_rows)))
+    if missing_indices != expected_missing:
+        raise ValueError("qualifying positions can only be inferred for a trailing missing block")
+
+    known_positions = [cast(int, entry["position"]) for entry in grid_rows[:first_missing_index]]
+    expected_known_positions = list(range(1, len(known_positions) + 1))
+    if known_positions != expected_known_positions:
+        raise ValueError(
+            "qualifying positions can only be inferred when known positions are sequential"
+        )
+
+    next_position = len(known_positions) + 1
+    for entry in grid_rows[first_missing_index:]:
+        entry["position"] = next_position
+        next_position += 1
+
+    inferred_count = len(missing_indices)
+    logger.warning(
+        "FastF1 qualifying results for %s %s omitted %s trailing positions; "
+        "inferring positions %s-%s from row order.",
+        race_name,
+        session_name,
+        inferred_count,
+        len(known_positions) + 1,
+        len(grid_rows),
+    )
+    record_counter(
+        "fastf1_results_position_inferred_total",
+        labels={**labels, "count": inferred_count},
+    )
+
+
+def _refresh_partial_qualifying_results(
+    session: Any,
+    *,
+    race_name: str,
+    session_name: str,
+    labels: dict[str, Any],
+) -> Any:
+    """Ask FastF1 to recompute missing qualifying positions from lap times when possible."""
+    results = getattr(session, "results", None)
+    if results is None or session_name not in {"Q", "SQ"}:
+        return results
+
+    columns = getattr(results, "columns", [])
+    if "Position" not in columns:
+        return results
+
+    try:
+        missing_positions = bool(results["Position"].isna().any())
+    except Exception:
+        return results
+
+    if not missing_positions:
+        return results
+
+    recompute_results = getattr(session, "_calculate_quali_like_session_results", None)
+    if not callable(recompute_results):
+        return results
+
+    try:
+        recompute_results(force=True)
+    except Exception as exc:
+        logger.warning(
+            "Could not recompute partial qualifying positions for %s %s: %s",
+            race_name,
+            session_name,
+            exc,
+        )
+        record_counter("fastf1_results_recompute_failed_total", labels=labels)
+        return results
+
+    logger.info(
+        "Recomputed partial qualifying positions from lap data for %s %s",
+        race_name,
+        session_name,
+    )
+    record_counter("fastf1_results_recomputed_total", labels=labels)
+    return getattr(session, "results", results)
 
 
 def fetch_actual_session_results(
@@ -51,7 +163,12 @@ def fetch_actual_session_results(
         )
 
         # Get results
-        results = session.results
+        results = _refresh_partial_qualifying_results(
+            session,
+            race_name=race_name,
+            session_name=session_name,
+            labels=labels,
+        )
 
         if results is None or len(results) == 0:
             logger.warning(f"No results available for {race_name} {session_name}")
@@ -59,7 +176,7 @@ def fetch_actual_session_results(
             return None
 
         # Extract relevant data and fail closed on malformed rows.
-        grid: list[QualifyingGridEntry] = []
+        grid_rows: list[dict[str, Any]] = []
         for row_index, (_, row) in enumerate(results.iterrows(), start=1):
             try:
                 driver_raw = row.get("Abbreviation", row.get("DriverNumber", ""))
@@ -73,14 +190,15 @@ def fetch_actual_session_results(
                     raise ValueError("missing team name")
                 team = map_team_to_characteristics(team_raw_str) or team_raw_str
 
-                position_raw = row.get("Position")
-                position = _coerce_position(position_raw)
+                position = _coerce_optional_position(row.get("Position"))
+                if position is None:
+                    position = _coerce_optional_position(row.get("ClassifiedPosition"))
 
-                grid.append(
+                grid_rows.append(
                     {
-                        "position": position,
                         "driver": driver,
                         "team": str(team).strip(),
+                        "position": position,
                     }
                 )
             except Exception as e:
@@ -97,14 +215,16 @@ def fetch_actual_session_results(
                 )
                 return None
 
-        # Sort by position
-        grid.sort(key=lambda item: int(item["position"]))
-
-        min_entries = _MIN_COMPETITIVE_ENTRIES_BY_SESSION.get(str(session_name), 10)
         try:
-            validated_grid = validate_qualifying_grid(
-                grid,
-                min_entries=min_entries,
+            _infer_trailing_qualifying_positions(
+                grid_rows,
+                race_name=race_name,
+                session_name=session_name,
+                labels=labels,
+            )
+            grid = validate_qualifying_grid(
+                cast(list[QualifyingGridEntry], grid_rows),
+                min_entries=_MIN_COMPETITIVE_ENTRIES_BY_SESSION.get(str(session_name), 10),
                 require_sequential_positions=True,
             )
         except ValueError as exc:
@@ -117,13 +237,16 @@ def fetch_actual_session_results(
             record_counter("fastf1_results_invalid_total", labels=labels)
             return None
 
+        # Sort by position
+        grid.sort(key=lambda item: int(item["position"]))
+
         logger.info(
             "Fetched %s results from %s %s",
-            len(validated_grid),
+            len(grid),
             race_name,
             session_name,
         )
-        return validated_grid
+        return grid
 
     except Exception as e:
         logger.error(f"Failed to fetch {session_name} results for {race_name}: {e}")
