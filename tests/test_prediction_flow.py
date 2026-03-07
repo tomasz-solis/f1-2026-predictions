@@ -24,6 +24,11 @@ def test_run_prediction_executes_on_repeated_calls(patcher):
     patcher.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
     patcher.setattr(
         prediction_flow,
+        "fetch_actual_competitive_results_if_completed",
+        lambda year, race_name, session_name: (None, "INCOMPLETE"),
+    )
+    patcher.setattr(
+        prediction_flow,
         "fetch_grid_if_available",
         lambda year, race_name, session_name, predicted_grid: (predicted_grid, "PREDICTED"),
     )
@@ -51,6 +56,11 @@ def test_run_prediction_sprint_path_refreshes_both_competitive_grids(patcher):
     }
 
     patcher.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
+    patcher.setattr(
+        prediction_flow,
+        "fetch_actual_competitive_results_if_completed",
+        lambda year, race_name, session_name: (None, "INCOMPLETE"),
+    )
 
     grid_sessions: list[str] = []
 
@@ -92,6 +102,11 @@ def test_run_prediction_uses_explicit_year_for_fastf1_refresh(patcher):
         return mock_predictor
 
     patcher.setattr(prediction_flow, "get_predictor", _get_predictor)
+    patcher.setattr(
+        prediction_flow,
+        "fetch_actual_competitive_results_if_completed",
+        lambda year, race_name, session_name: (None, "INCOMPLETE"),
+    )
 
     years_seen: list[int] = []
 
@@ -129,6 +144,11 @@ def test_run_prediction_passes_race_input_confidence_from_quali_context(patcher)
     patcher.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
     patcher.setattr(
         prediction_flow,
+        "fetch_actual_competitive_results_if_completed",
+        lambda year, race_name, session_name: (None, "INCOMPLETE"),
+    )
+    patcher.setattr(
+        prediction_flow,
         "fetch_grid_if_available",
         lambda year, race_name, session_name, predicted_grid: (predicted_grid, "ACTUAL"),
     )
@@ -160,6 +180,11 @@ def test_run_prediction_falls_back_when_predict_race_signature_is_legacy(patcher
 
     predictor = _LegacyPredictor()
     patcher.setattr(prediction_flow, "get_predictor", lambda _versions: predictor)
+    patcher.setattr(
+        prediction_flow,
+        "fetch_actual_competitive_results_if_completed",
+        lambda year, race_name, session_name: (None, "INCOMPLETE"),
+    )
     patcher.setattr(
         prediction_flow,
         "fetch_grid_if_available",
@@ -198,6 +223,11 @@ def test_run_prediction_accepts_real_baseline_predictor_signatures(patcher):
     patcher.setattr(prediction_flow, "get_predictor", lambda _versions, year=2026: predictor)
     patcher.setattr(
         prediction_flow,
+        "fetch_actual_competitive_results_if_completed",
+        lambda year, race_name, session_name: (None, "INCOMPLETE"),
+    )
+    patcher.setattr(
+        prediction_flow,
         "fetch_grid_if_available",
         lambda year, race_name, session_name, predicted_grid: (predicted_grid, "PREDICTED"),
     )
@@ -214,6 +244,91 @@ def test_run_prediction_accepts_real_baseline_predictor_signatures(patcher):
     assert result["race"]["finish_order"][0]["driver"] == "NOR"
     assert calls["qualifying"]["year"] == 2027
     assert calls["race"]["year"] == 2027
+
+
+def test_run_prediction_uses_actual_qualifying_section_without_predicting_when_q_completed(patcher):
+    """Completed qualifying should render as an actual result and feed the race model directly."""
+    mock_predictor = MagicMock()
+    mock_predictor.predict_race.return_value = {
+        "finish_order": [{"driver": "NOR", "team": "McLaren", "position": 1}]
+    }
+
+    patcher.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
+
+    def _fetch_actual(year: int, race_name: str, session_name: str):
+        if session_name == "Q":
+            return ([{"driver": "RUS", "team": "Mercedes", "position": 1}], "ACTUAL")
+        return None, "INCOMPLETE"
+
+    patcher.setattr(
+        prediction_flow,
+        "fetch_actual_competitive_results_if_completed",
+        _fetch_actual,
+    )
+
+    artifact_versions = {"car_characteristics::2026::car_characteristics": (1, "ts")}
+    result = prediction_flow.run_prediction(
+        "Australian Grand Prix",
+        "dry",
+        artifact_versions,
+        is_sprint=False,
+    )
+
+    assert mock_predictor.predict_qualifying.call_count == 0
+    assert result["qualifying"]["result_mode"] == "ACTUAL"
+    assert result["qualifying"]["grid"][0]["driver"] == "RUS"
+    assert result["race"]["grid_source"] == "ACTUAL"
+    assert "no penalties applied" in result["race"]["starting_grid_note"].lower()
+    assert mock_predictor.predict_race.call_args.kwargs["qualifying_grid"] == [
+        {"driver": "RUS", "team": "Mercedes", "position": 1}
+    ]
+    assert mock_predictor.predict_race.call_args.kwargs["input_confidence"] == pytest.approx(1.0)
+
+
+def test_run_prediction_uses_actual_sprint_race_section_after_completion(patcher):
+    """Completed sprint sessions should not be regenerated as predictions."""
+    mock_predictor = MagicMock()
+    mock_predictor.predict_qualifying.return_value = {
+        "grid": [{"driver": "NOR", "team": "McLaren", "position": 1}]
+    }
+    mock_predictor.predict_race.return_value = {
+        "finish_order": [{"driver": "NOR", "team": "McLaren", "position": 1}]
+    }
+
+    patcher.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
+
+    def _fetch_actual(year: int, race_name: str, session_name: str):
+        if session_name == "SQ":
+            return ([{"driver": "RUS", "team": "Mercedes", "position": 1}], "ACTUAL")
+        if session_name == "Sprint":
+            return ([{"driver": "RUS", "team": "Mercedes", "position": 1}], "ACTUAL")
+        return None, "INCOMPLETE"
+
+    patcher.setattr(
+        prediction_flow,
+        "fetch_actual_competitive_results_if_completed",
+        _fetch_actual,
+    )
+    patcher.setattr(
+        prediction_flow,
+        "fetch_grid_if_available",
+        lambda year, race_name, session_name, predicted_grid: (predicted_grid, "PREDICTED"),
+    )
+
+    artifact_versions = {"car_characteristics::2026::car_characteristics": (1, "ts")}
+    result = prediction_flow.run_prediction(
+        "Chinese Grand Prix",
+        "dry",
+        artifact_versions,
+        is_sprint=True,
+    )
+
+    assert mock_predictor.predict_sprint_race.call_count == 0
+    assert result["sprint_quali"]["result_mode"] == "ACTUAL"
+    assert result["sprint_race"]["result_mode"] == "ACTUAL"
+    assert result["main_quali"]["grid_source"] == "PREDICTED"
+    assert mock_predictor.predict_qualifying.call_count == 1
+    assert mock_predictor.predict_race.call_count == 1
 
 
 def test_fetch_grid_if_available_uses_actual_grid_for_completed_session(patcher):

@@ -517,3 +517,76 @@ def test_run_warmup_precompute_cycle_returns_locked_when_another_worker_holds_lo
 
     assert result.status == "locked"
     assert result.reason == "another_worker_holds_lock"
+
+
+def test_compute_base_features_uses_actual_qualifying_section_after_completed_q(patcher):
+    """Warmup base features should stop predicting qualifying once Q is complete."""
+
+    class _Predictor:
+        def predict_qualifying(self, **kwargs):
+            raise AssertionError("predict_qualifying should not run for completed qualifying")
+
+    patcher.setattr(
+        warmup,
+        "fetch_actual_competitive_results_if_completed",
+        lambda year, race_name, session_name: (
+            ([{"position": 1, "driver": "RUS", "team": "Mercedes"}], "ACTUAL")
+            if session_name == "Q"
+            else (None, "INCOMPLETE")
+        ),
+    )
+
+    result = warmup.compute_base_features(
+        2026,
+        "Australian Grand Prix",
+        "Q",
+        "artifact_hash",
+        "boundary_signature",
+        predictor=_Predictor(),
+        is_sprint=False,
+    )
+
+    assert result["qualifying"]["result_mode"] == "ACTUAL"
+    assert result["qualifying"]["grid"][0]["driver"] == "RUS"
+    assert result["race_input_confidence"] == 1.0
+
+
+def test_compute_weather_predictions_uses_actual_sprint_race_after_completion(patcher):
+    """Warmup weather overlays should not regenerate completed sprint races."""
+
+    class _Predictor:
+        def predict_sprint_race(self, **kwargs):
+            raise AssertionError("predict_sprint_race should not run for completed sprint race")
+
+        def predict_race(self, **kwargs):
+            return {"finish_order": [{"position": 1, "driver": "NOR", "team": "McLaren"}]}
+
+    patcher.setattr(
+        warmup,
+        "fetch_actual_competitive_results_if_completed",
+        lambda year, race_name, session_name: (
+            ([{"position": 1, "driver": "RUS", "team": "Mercedes"}], "ACTUAL")
+            if session_name == "Sprint"
+            else (None, "INCOMPLETE")
+        ),
+    )
+
+    result = warmup.compute_weather_predictions(
+        {
+            "is_sprint": True,
+            "sprint_quali": {"grid_source": "ACTUAL"},
+            "sprint_grid_for_race": [{"position": 1, "driver": "RUS", "team": "Mercedes"}],
+            "sprint_race_input_confidence": 1.0,
+            "main_quali": {"grid_source": "PREDICTED"},
+            "main_grid_for_race": [{"position": 1, "driver": "NOR", "team": "McLaren"}],
+            "main_race_input_confidence": 0.7,
+            "timing": {"sprint_quali": 0.1, "main_quali": 0.1},
+        },
+        "dry",
+        predictor=_Predictor(),
+        year=2026,
+        target_race="Chinese Grand Prix",
+    )
+
+    assert result["sprint_race"]["result_mode"] == "ACTUAL"
+    assert "no penalties applied" in result["sprint_race"]["starting_grid_note"].lower()

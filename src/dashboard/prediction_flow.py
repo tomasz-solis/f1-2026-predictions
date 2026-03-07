@@ -4,6 +4,8 @@ import logging
 import time
 from typing import Any
 
+from src.types.prediction_types import QualifyingGridEntry
+
 from .cache import get_predictor
 
 logger = logging.getLogger(__name__)
@@ -13,12 +15,77 @@ class CompetitiveSessionStatusUnavailableError(RuntimeError):
     """Raised when competitive-session status cannot be verified from FastF1."""
 
 
+def _session_display_name(session_name: str) -> str:
+    """Return a human-readable name for a competitive session code."""
+    session_key = str(session_name).strip().upper()
+    session_labels = {
+        "SQ": "Sprint Qualifying",
+        "SPRINT": "Sprint Race",
+        "Q": "Qualifying",
+        "R": "Race",
+    }
+    return session_labels.get(session_key, str(session_name).strip() or session_key)
+
+
+def build_actual_qualifying_section(
+    actual_grid: list[QualifyingGridEntry],
+    *,
+    session_name: str,
+) -> dict[str, Any]:
+    """Build dashboard payload for a completed qualifying-style session."""
+    session_label = _session_display_name(session_name)
+    return {
+        "grid": list(actual_grid),
+        "grid_source": "ACTUAL",
+        "result_mode": "ACTUAL",
+        "session_name": str(session_name).strip().upper(),
+        "data_source": f"Actual {session_label} classification",
+        "classification_note": (
+            f"Showing ACTUAL {session_label.lower()} classification from the completed session."
+        ),
+        "classification_caption": (
+            "No grid penalties are applied here. This is the raw post-session classification "
+            "used as the race input grid."
+        ),
+    }
+
+
+def build_actual_race_section(
+    actual_results: list[QualifyingGridEntry],
+    *,
+    session_name: str,
+) -> dict[str, Any]:
+    """Build dashboard payload for a completed race-style session."""
+    session_label = _session_display_name(session_name)
+    return {
+        "finish_order": list(actual_results),
+        "result_mode": "ACTUAL",
+        "session_name": str(session_name).strip().upper(),
+        "classification_note": (
+            f"Showing ACTUAL {session_label.lower()} classification from the completed session."
+        ),
+        "classification_caption": "This table shows the completed-session classification from FastF1.",
+    }
+
+
+def build_starting_grid_note(session_name: str) -> str:
+    """Describe the actual grid source used as race-model input."""
+    session_label = _session_display_name(session_name)
+    return (
+        f"Starting grid: ACTUAL {session_label.lower()} classification from the completed session "
+        "(no penalties applied)."
+    )
+
+
 def _derive_race_input_confidence(
     qualifying_result: dict[str, Any],
     *,
     grid_source: str,
 ) -> float:
     """Estimate race input confidence from qualifying data quality and grid source."""
+    if str(grid_source).upper() == "ACTUAL":
+        return 1.0
+
     base_confidence = float(qualifying_result.get("data_confidence_score", 0.5))
     base_confidence = float(max(0.0, min(base_confidence, 1.0)))
 
@@ -33,10 +100,63 @@ def _derive_race_input_confidence(
     return float(max(0.0, min(base_confidence + source_adjustment + grid_adjustment, 1.0)))
 
 
+def fetch_actual_competitive_results_if_completed(
+    year: int,
+    race_name: str,
+    session_name: str,
+) -> tuple[list[QualifyingGridEntry] | None, str]:
+    """Return actual competitive-session results when the session is complete."""
+    from src.utils.actual_results_fetcher import (
+        fetch_actual_session_results,
+        get_competitive_session_completion_state,
+    )
+    from src.utils.grid_validation import validate_qualifying_grid
+
+    logger.info(
+        "FastF1 actual-results refresh check started: race=%s year=%s session=%s",
+        race_name,
+        year,
+        session_name,
+    )
+
+    completion_state = get_competitive_session_completion_state(year, race_name, session_name)
+    logger.info(
+        "FastF1 actual-results completion status: race=%s year=%s session=%s state=%s",
+        race_name,
+        year,
+        session_name,
+        completion_state,
+    )
+
+    if completion_state == "completed":
+        actual_results = fetch_actual_session_results(year, race_name, session_name)
+        if actual_results:
+            validated_results = validate_qualifying_grid(actual_results)
+            logger.info(
+                "Actual results resolved: race=%s year=%s session=%s drivers=%s",
+                race_name,
+                year,
+                session_name,
+                len(validated_results),
+            )
+            return validated_results, "ACTUAL"
+        raise RuntimeError(
+            f"FastF1 returned no {session_name} results for completed session at "
+            f"{race_name} {year}; refusing to fall back to predicted output."
+        )
+    if completion_state == "incomplete":
+        return None, "INCOMPLETE"
+
+    raise CompetitiveSessionStatusUnavailableError(
+        f"Could not verify completion state for {race_name} {year} {session_name}; "
+        "refusing to fall back to predicted output."
+    )
+
+
 def _predict_race_with_optional_confidence(
     predictor: Any,
     *,
-    qualifying_grid: list[dict[str, Any]],
+    qualifying_grid: list[QualifyingGridEntry],
     weather: str,
     race_name: str,
     year: int,
@@ -121,6 +241,96 @@ def fetch_grid_if_available(
     )
 
 
+def _resolve_qualifying_section(
+    predictor: Any,
+    *,
+    year: int,
+    race_name: str,
+    session_name: str,
+    qualifying_stage: str,
+) -> tuple[dict[str, Any], list[QualifyingGridEntry], str]:
+    """Return actual completed-session results or a predicted qualifying payload."""
+    actual_results, result_source = fetch_actual_competitive_results_if_completed(
+        year=year,
+        race_name=race_name,
+        session_name=session_name,
+    )
+    if actual_results is not None:
+        return (
+            build_actual_qualifying_section(actual_results, session_name=session_name),
+            actual_results,
+            result_source,
+        )
+
+    predicted_result = predictor.predict_qualifying(
+        year=year,
+        race_name=race_name,
+        qualifying_stage=qualifying_stage,
+    )
+    qualifying_grid, grid_source = fetch_grid_if_available(
+        year,
+        race_name,
+        session_name,
+        predicted_result["grid"],
+    )
+    if grid_source == "ACTUAL":
+        return (
+            build_actual_qualifying_section(qualifying_grid, session_name=session_name),
+            qualifying_grid,
+            grid_source,
+        )
+
+    predicted_result["grid_source"] = grid_source
+    return predicted_result, qualifying_grid, grid_source
+
+
+def _resolve_race_section(
+    predictor: Any,
+    *,
+    year: int,
+    race_name: str,
+    session_name: str,
+    qualifying_grid: list[QualifyingGridEntry],
+    qualifying_grid_source: str,
+    grid_session_name: str,
+    weather: str,
+    input_confidence: float,
+) -> dict[str, Any]:
+    """Return actual completed-session race results or a predicted race payload."""
+    actual_results, _ = fetch_actual_competitive_results_if_completed(
+        year=year,
+        race_name=race_name,
+        session_name=session_name,
+    )
+    if actual_results is not None:
+        actual_payload = build_actual_race_section(actual_results, session_name=session_name)
+        actual_payload["grid_source"] = qualifying_grid_source
+        if qualifying_grid_source == "ACTUAL":
+            actual_payload["starting_grid_note"] = build_starting_grid_note(grid_session_name)
+        return actual_payload
+
+    if str(session_name).strip().upper() == "SPRINT":
+        race_result = predictor.predict_sprint_race(
+            sprint_quali_grid=qualifying_grid,
+            weather=weather,
+            race_name=race_name,
+            n_simulations=50,
+        )
+    else:
+        race_result = _predict_race_with_optional_confidence(
+            predictor,
+            qualifying_grid=qualifying_grid,
+            weather=weather,
+            race_name=race_name,
+            year=year,
+            input_confidence=input_confidence,
+        )
+    race_result["grid_source"] = qualifying_grid_source
+    if qualifying_grid_source == "ACTUAL":
+        race_result["starting_grid_note"] = build_starting_grid_note(grid_session_name)
+    return race_result
+
+
 def run_prediction(
     race_name: str,
     weather: str,
@@ -150,58 +360,68 @@ def run_prediction(
         # SPRINT WEEKEND CASCADE: SQ -> Sprint -> Main Quali -> Main Race
 
         sq_start = time.time()
-        sq_result = predictor.predict_qualifying(
+        sq_result, sq_grid, sprint_grid_source = _resolve_qualifying_section(
+            predictor,
             year=year,
             race_name=race_name,
+            session_name="SQ",
             qualifying_stage="sprint",
         )
         timing["sprint_quali"] = time.time() - sq_start
         results["sprint_quali"] = sq_result
 
         sprint_start = time.time()
-        sq_grid, grid_source = fetch_grid_if_available(year, race_name, "SQ", sq_result["grid"])
-        results["sprint_quali"]["grid_source"] = grid_source
         sprint_input_confidence = _derive_race_input_confidence(
             sq_result,
-            grid_source=grid_source,
+            grid_source=sprint_grid_source,
         )
 
-        sprint_result = predictor.predict_sprint_race(
-            sprint_quali_grid=sq_grid,
-            weather=weather,
+        sprint_result = _resolve_race_section(
+            predictor,
+            year=year,
             race_name=race_name,
-            n_simulations=50,
+            session_name="Sprint",
+            qualifying_grid=sq_grid,
+            qualifying_grid_source=sprint_grid_source,
+            grid_session_name="SQ",
+            weather=weather,
+            input_confidence=sprint_input_confidence,
         )
-        sprint_result["input_confidence"] = round(float(sprint_input_confidence), 3)
+        if str(sprint_result.get("result_mode", "")).upper() != "ACTUAL":
+            sprint_result["input_confidence"] = round(float(sprint_input_confidence), 3)
         timing["sprint_race"] = time.time() - sprint_start
         results["sprint_race"] = sprint_result
 
         mq_start = time.time()
-        mq_result = predictor.predict_qualifying(
+        mq_result, main_grid, main_grid_source = _resolve_qualifying_section(
+            predictor,
             year=year,
             race_name=race_name,
+            session_name="Q",
             qualifying_stage="main",
         )
         timing["main_quali"] = time.time() - mq_start
         results["main_quali"] = mq_result
 
         mr_start = time.time()
-        quali_grid, grid_source = fetch_grid_if_available(year, race_name, "Q", mq_result["grid"])
-        results["main_quali"]["grid_source"] = grid_source
         main_race_input_confidence = _derive_race_input_confidence(
             mq_result,
-            grid_source=grid_source,
+            grid_source=main_grid_source,
         )
 
-        main_race_result = _predict_race_with_optional_confidence(
+        main_race_result = _resolve_race_section(
             predictor,
-            qualifying_grid=quali_grid,
-            weather=weather,
-            race_name=race_name,
             year=year,
+            race_name=race_name,
+            session_name="R",
+            qualifying_grid=main_grid,
+            qualifying_grid_source=main_grid_source,
+            grid_session_name="Q",
+            weather=weather,
             input_confidence=main_race_input_confidence,
         )
-        main_race_result["input_confidence"] = round(float(main_race_input_confidence), 3)
+        if str(main_race_result.get("result_mode", "")).upper() != "ACTUAL":
+            main_race_result["input_confidence"] = round(float(main_race_input_confidence), 3)
         timing["main_race"] = time.time() - mr_start
         results["main_race"] = main_race_result
 
@@ -209,33 +429,35 @@ def run_prediction(
         # NORMAL WEEKEND CASCADE: Quali -> Race
 
         quali_start = time.time()
-        quali_result = predictor.predict_qualifying(
+        quali_result, quali_grid, grid_source = _resolve_qualifying_section(
+            predictor,
             year=year,
             race_name=race_name,
+            session_name="Q",
             qualifying_stage="main",
         )
         timing["qualifying"] = time.time() - quali_start
         results["qualifying"] = quali_result
 
         race_start = time.time()
-        quali_grid, grid_source = fetch_grid_if_available(
-            year, race_name, "Q", quali_result["grid"]
-        )
-        results["qualifying"]["grid_source"] = grid_source
         race_input_confidence = _derive_race_input_confidence(
             quali_result,
             grid_source=grid_source,
         )
 
-        race_result = _predict_race_with_optional_confidence(
+        race_result = _resolve_race_section(
             predictor,
-            qualifying_grid=quali_grid,
-            weather=weather,
-            race_name=race_name,
             year=year,
+            race_name=race_name,
+            session_name="R",
+            qualifying_grid=quali_grid,
+            qualifying_grid_source=grid_source,
+            grid_session_name="Q",
+            weather=weather,
             input_confidence=race_input_confidence,
         )
-        race_result["input_confidence"] = round(float(race_input_confidence), 3)
+        if str(race_result.get("result_mode", "")).upper() != "ACTUAL":
+            race_result["input_confidence"] = round(float(race_input_confidence), 3)
         timing["race"] = time.time() - race_start
         results["race"] = race_result
 

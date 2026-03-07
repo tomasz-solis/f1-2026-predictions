@@ -328,6 +328,34 @@ def test_display_prediction_result_routes_qualifying_sections(patcher):
     )
 
 
+def test_display_prediction_result_routes_actual_qualifying_classification(patcher):
+    calls = _stub_streamlit(patcher)
+    routed: list[str] = []
+
+    patcher.setattr(
+        rendering,
+        "_render_actual_classification",
+        lambda _df, caption: routed.append(str(caption)),
+    )
+
+    rendering.display_prediction_result(
+        result={
+            "result_mode": "ACTUAL",
+            "classification_note": "Showing ACTUAL qualifying classification from the completed session.",
+            "classification_caption": "No grid penalties are applied here.",
+            "grid": [{"position": 1, "driver": "RUS", "team": "Mercedes"}],
+        },
+        prediction_name="Qualifying Result",
+        is_race=False,
+    )
+
+    assert routed == ["No grid penalties are applied here."]
+    assert (
+        "success",
+        "Showing ACTUAL qualifying classification from the completed session.",
+    ) in calls
+
+
 def test_display_prediction_result_renders_teammate_head_to_head_probabilities(patcher):
     calls = _stub_streamlit(patcher)
     routed: list[str] = []

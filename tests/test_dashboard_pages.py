@@ -544,6 +544,35 @@ def test_render_prediction_results_routes_sprint_weekend(patcher):
     ]
 
 
+def test_render_prediction_results_renames_completed_sections_as_results(patcher):
+    rendered_sections: list[str] = []
+
+    patcher.setattr(pages.st, "success", lambda _msg: None)
+    patcher.setattr(pages.st, "markdown", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "header", lambda _msg: None)
+    patcher.setattr(pages.st, "info", lambda _msg: None)
+    patcher.setattr(
+        pages,
+        "display_prediction_result",
+        lambda _result, title, is_race=False: rendered_sections.append(
+            f"{title}:{'race' if is_race else 'quali'}"
+        ),
+    )
+
+    pages._render_prediction_results(
+        prediction_results={
+            "qualifying": {"timing": {"total": 1.1}, "grid": [], "result_mode": "ACTUAL"},
+            "race": {"finish_order": [], "grid_source": "ACTUAL"},
+        },
+        is_sprint=False,
+    )
+
+    assert rendered_sections == [
+        "Qualifying Result:quali",
+        "Race Prediction:race",
+    ]
+
+
 def test_render_page_routes_by_selected_tab(patcher):
     called: list[str] = []
 

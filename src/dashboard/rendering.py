@@ -481,6 +481,18 @@ def _render_qualifying_result(df: pd.DataFrame) -> None:
             )
 
 
+def _render_actual_classification(df: pd.DataFrame, *, caption: str) -> None:
+    """Render a completed-session classification without prediction-specific extras."""
+    df_display = df[["position", "driver", "team"]].copy()
+    df_display = df_display.sort_values("position", ascending=True)
+    df_display.columns = ["Pos", "Driver", "Team"]
+    st.caption(caption)
+    st.markdown(
+        f'<div class="rc-table">{df_display.to_html(index=False)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def _render_teammate_head_to_head_probabilities(probabilities: list[dict[str, object]]) -> None:
     """Render teammate head-to-head probabilities derived from qualifying simulations."""
 
@@ -552,13 +564,27 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
     df = pd.DataFrame(result[results_key])
     df["position"] = df["position"].astype(int)
     df.attrs["input_confidence"] = result.get("input_confidence")
+    result_mode = str(result.get("result_mode", "")).strip().upper()
+
+    if result_mode == "ACTUAL":
+        classification_note = str(result.get("classification_note", "")).strip()
+        classification_caption = str(result.get("classification_caption", "")).strip()
+        if classification_note:
+            st.success(classification_note)
+        _render_actual_classification(
+            df,
+            caption=classification_caption
+            or "This table shows the completed-session classification from FastF1.",
+        )
+        return
 
     grid_source = result.get("grid_source")
     qualifying_warning_messages: list[str] = []
     if grid_source:
         if is_race:
             if grid_source == "ACTUAL":
-                st.success("Using ACTUAL grid from completed session")
+                starting_grid_note = str(result.get("starting_grid_note", "")).strip()
+                st.success(starting_grid_note or "Using ACTUAL grid from completed session")
             else:
                 st.info("Using PREDICTED grid")
         else:

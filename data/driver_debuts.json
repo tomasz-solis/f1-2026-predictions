@@ -26,8 +26,9 @@
     "ANT": 2025,
     "BOR": 2025,
     "DOO": 2025,
-    "LIN": 2026
+    "LIN": 2026,
+    "LAW": 2026
   },
   "source_file": "driver_debuts.csv",
-  "total_drivers": 27
+  "total_drivers": 28
 }

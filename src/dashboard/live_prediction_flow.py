@@ -489,6 +489,14 @@ def render_prediction_results_core(
     pipeline_timing: Mapping[str, Any] | None = None,
 ) -> None:
     """Render prediction result sections for sprint and non-sprint weekends."""
+
+    def _section_title(section: Mapping[str, Any], default_title: str) -> str:
+        """Rename completed-session sections from Prediction to Result."""
+        result_mode = str(section.get("result_mode", "")).strip().upper()
+        if result_mode == "ACTUAL":
+            return default_title.replace("Prediction", "Result")
+        return default_title
+
     first_result = list(prediction_results.values())[0]
     timing = first_result.get("timing", {})
     total_runtime = (
@@ -524,22 +532,22 @@ def render_prediction_results_core(
 
         display_prediction_result_fn(
             prediction_results["sprint_quali"],
-            "Sprint Qualifying Prediction",
+            _section_title(prediction_results["sprint_quali"], "Sprint Qualifying Prediction"),
             False,
         )
         display_prediction_result_fn(
             prediction_results["sprint_race"],
-            "Sprint Race Prediction",
+            _section_title(prediction_results["sprint_race"], "Sprint Race Prediction"),
             True,
         )
         display_prediction_result_fn(
             prediction_results["main_quali"],
-            "Main Qualifying Prediction",
+            _section_title(prediction_results["main_quali"], "Main Qualifying Prediction"),
             False,
         )
         display_prediction_result_fn(
             prediction_results["main_race"],
-            "Main Race Prediction",
+            _section_title(prediction_results["main_race"], "Main Race Prediction"),
             True,
         )
     else:
@@ -549,12 +557,12 @@ def render_prediction_results_core(
 
         display_prediction_result_fn(
             prediction_results["qualifying"],
-            "Qualifying Prediction",
+            _section_title(prediction_results["qualifying"], "Qualifying Prediction"),
             False,
         )
         display_prediction_result_fn(
             prediction_results["race"],
-            "Race Prediction",
+            _section_title(prediction_results["race"], "Race Prediction"),
             True,
         )
 
