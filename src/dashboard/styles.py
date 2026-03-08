@@ -161,9 +161,11 @@ html, body {
     inset: 0;
     pointer-events: none;
     background:
-      linear-gradient(110deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.0) 18%, rgba(255,255,255,0.04) 36%, rgba(255,255,255,0.0) 54%),
-      radial-gradient(80% 60% at 90% 8%, rgba(37,71,130,0.14), rgba(11,15,20,0));
-    opacity: 0.5;
+      radial-gradient(62% 70% at 12% 0%, rgba(255,77,45,0.10), rgba(11,15,20,0) 60%),
+      radial-gradient(58% 68% at 88% 6%, rgba(52,99,184,0.18), rgba(11,15,20,0) 62%),
+      linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.0) 28%),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 132px);
+    opacity: 0.42;
     z-index: 0;
 }
 [data-testid="stHeader"] {
@@ -538,6 +540,193 @@ hr {
   padding: 1rem 1.05rem;
   box-shadow: 0 12px 28px rgba(0,0,0,0.26);
 }
+.ts-hero-deck {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 1fr);
+  gap: 1rem;
+  align-items: stretch;
+  margin: 0.25rem 0 1rem;
+}
+.ts-hero-deck__lead,
+.ts-hero-deck__meta {
+  min-width: 0;
+}
+.ts-hero-deck__lead .ts-surface-header {
+  height: 100%;
+  margin: 0;
+}
+.ts-hero-deck__meta .ts-stat-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 0.9rem;
+  margin: 0;
+  height: 100%;
+}
+.ts-hero-deck__meta .ts-stat-card {
+  min-height: 0;
+  height: 100%;
+}
+.ts-surface-header {
+  margin: 0.2rem 0 1rem;
+  padding: 1.2rem 1.25rem 1.1rem;
+  border-radius: 24px;
+  border: 1px solid rgba(232,237,242,0.12);
+  background:
+    linear-gradient(135deg, rgba(18,29,45,0.92), rgba(11,18,30,0.84)),
+    radial-gradient(circle at top right, rgba(255,77,45,0.12), rgba(255,77,45,0));
+  box-shadow: 0 18px 36px rgba(0,0,0,0.28);
+}
+.ts-surface-header--default {
+  border-color: rgba(232,237,242,0.12);
+}
+.ts-surface-header__eyebrow {
+  margin-bottom: 0.45rem;
+  color: rgba(255,122,98,0.96);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.ts-surface-header__title {
+  margin: 0;
+  font-family: "Sora", "IBM Plex Sans", sans-serif;
+  font-size: clamp(1.45rem, 1.4rem + 0.8vw, 2.3rem);
+  line-height: 1.08;
+}
+.ts-surface-header__summary {
+  margin: 0.7rem 0 0;
+  max-width: 68ch;
+  color: rgba(232,237,242,0.82);
+  font-size: 0.98rem;
+  line-height: 1.58;
+}
+.ts-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.8rem;
+  margin: 0.2rem 0 1rem;
+}
+.ts-stat-grid--hero {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.ts-stat-card {
+  min-height: 112px;
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(232,237,242,0.10);
+  background: linear-gradient(180deg, rgba(15,24,38,0.94), rgba(11,18,30,0.86));
+  box-shadow: 0 14px 26px rgba(0,0,0,0.22);
+}
+.ts-stat-card--accent {
+  border-color: rgba(255,122,98,0.42);
+  background:
+    linear-gradient(180deg, rgba(28,24,24,0.96), rgba(20,17,22,0.90)),
+    radial-gradient(circle at top right, rgba(255,122,98,0.14), rgba(255,122,98,0));
+}
+.ts-stat-card--warning {
+  border-color: rgba(245,183,74,0.35);
+}
+.ts-stat-card--success {
+  border-color: rgba(72,191,145,0.34);
+}
+.ts-stat-card__label {
+  color: rgba(139,148,158,0.96);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.ts-stat-card__value {
+  margin-top: 0.45rem;
+  color: rgba(232,237,242,0.96);
+  font-family: "Sora", "IBM Plex Sans", sans-serif;
+  font-size: 1.28rem;
+  line-height: 1.15;
+}
+.ts-stat-card__meta {
+  margin-top: 0.55rem;
+  color: rgba(139,148,158,0.92);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.ts-notice {
+  margin: 0.55rem 0;
+  padding: 0.85rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(232,237,242,0.12);
+  background: linear-gradient(180deg, rgba(16,24,38,0.9), rgba(11,18,30,0.82));
+  box-shadow: 0 10px 22px rgba(0,0,0,0.18);
+}
+.ts-notice--info {
+  border-color: rgba(120,167,255,0.22);
+}
+.ts-notice--warning {
+  border-color: rgba(245,183,74,0.28);
+  background: linear-gradient(180deg, rgba(38,33,18,0.92), rgba(25,22,14,0.84));
+}
+.ts-notice--success {
+  border-color: rgba(72,191,145,0.26);
+  background: linear-gradient(180deg, rgba(18,37,28,0.92), rgba(14,25,21,0.84));
+}
+.ts-notice__label {
+  color: rgba(139,148,158,0.94);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.ts-notice__body {
+  margin-top: 0.28rem;
+  color: rgba(232,237,242,0.92);
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+.ts-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.8rem;
+  margin: 0.4rem 0 1.15rem;
+}
+.ts-stage-card {
+  position: relative;
+  min-height: 118px;
+  padding: 0.95rem 1rem 0.9rem;
+  border-radius: 18px;
+  border: 1px solid rgba(232,237,242,0.10);
+  background: linear-gradient(180deg, rgba(15,23,36,0.92), rgba(10,17,28,0.86));
+  box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+}
+.ts-stage-card__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  background: rgba(255,122,98,0.18);
+  border: 1px solid rgba(255,122,98,0.38);
+  color: rgba(255,235,231,0.96);
+  font-weight: 700;
+  font-size: 0.84rem;
+}
+.ts-stage-card__title {
+  margin-top: 0.75rem;
+  font-family: "Sora", "IBM Plex Sans", sans-serif;
+  font-size: 1rem;
+  color: rgba(232,237,242,0.96);
+}
+.ts-stage-card__state {
+  margin-top: 0.35rem;
+  color: rgba(255,122,98,0.94);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.ts-stage-card__meta {
+  margin-top: 0.5rem;
+  color: rgba(139,148,158,0.9);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
 .section-kicker {
   margin: 0;
   color: rgba(255,122,98,0.92);
@@ -657,11 +846,32 @@ footer, [data-testid="stFooter"] { display: none !important; }
 }
 
 @media (max-width: 980px) {
+  .ts-hero-deck {
+    grid-template-columns: 1fr;
+  }
+  .ts-hero-deck__meta .ts-stat-grid,
+  .ts-stat-grid--hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .contact-grid {
     grid-template-columns: 1fr;
   }
   .contact-card {
     min-height: 0;
+  }
+  .ts-surface-header {
+    padding: 1rem 1rem 0.95rem;
+  }
+  .ts-stat-card,
+  .ts-stage-card {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .ts-hero-deck__meta .ts-stat-grid,
+  .ts-stat-grid--hero {
+    grid-template-columns: 1fr;
   }
 }
 

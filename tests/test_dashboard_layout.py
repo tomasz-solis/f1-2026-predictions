@@ -117,7 +117,6 @@ def test_render_header_falls_back_to_text_when_logo_missing(tmp_path, patcher):
 
 def test_render_sidebar_returns_page_and_logging_toggle(patcher):
     calls = {
-        "markdown": [],
         "segmented_label": None,
         "segmented_options": None,
         "radio_called": False,
@@ -136,11 +135,6 @@ def test_render_sidebar_returns_page_and_logging_toggle(patcher):
     patcher.setattr(layout.st, "radio", _radio)
     patcher.setattr(layout.st, "expander", lambda *args, **kwargs: _Context())
     patcher.setattr(layout.st, "checkbox", lambda *args, **kwargs: True)
-    patcher.setattr(
-        layout.st,
-        "markdown",
-        lambda body, **_kwargs: calls["markdown"].append(body),
-    )
 
     page, enable_logging = layout.render_sidebar()
 
@@ -149,14 +143,12 @@ def test_render_sidebar_returns_page_and_logging_toggle(patcher):
     assert calls["segmented_label"] == "Navigation"
     assert calls["segmented_options"] == layout.NAVIGATION_PAGES
     assert calls["radio_called"] is False
-    assert any("Model Version" in text for text in calls["markdown"])
 
 
 def test_navigation_pages_match_dashboard_order():
     assert layout.NAVIGATION_PAGES == [
         "Prediction",
         "Team Comparison",
-        "Prediction Accuracy",
         "Model & Learning",
         "Contact",
     ]

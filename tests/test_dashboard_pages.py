@@ -598,7 +598,7 @@ def test_render_page_routes_by_selected_tab(patcher):
         "insights",
         "insights",
         "comparison",
-        "accuracy",
+        "live",
         "contact",
         "contact",
         "live",
@@ -785,9 +785,9 @@ def test_render_live_prediction_page_passes_selected_season_to_pipeline_and_save
     def _selectbox(label, options, index=0, **_kwargs):
         if label == "Season":
             return 2027
-        if label == "Select Grand Prix":
+        if label == "Grand Prix":
             return "Bahrain Grand Prix"
-        if label == "Weather Forecast":
+        if label == "Weather":
             return "dry"
         return options[index] if options else None
 
@@ -849,10 +849,10 @@ def test_render_live_prediction_page_uses_filtered_precompute_race_options(patch
     def _selectbox(label, options, index=0, **_kwargs):
         if label == "Season":
             return 2027
-        if label == "Select Grand Prix":
+        if label == "Grand Prix":
             options_seen.append(list(options))
             return "Bahrain Grand Prix"
-        if label == "Weather Forecast":
+        if label == "Weather":
             return "dry"
         return options[index] if options else None
 

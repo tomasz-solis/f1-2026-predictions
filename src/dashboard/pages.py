@@ -20,6 +20,7 @@ from .accuracy_view import (
     render_saved_predictions_summary,
 )
 from .cache import get_artifact_versions
+from .layout import BRAND_LAST_UPDATED, BRAND_MODEL_VERSION, ENABLE_PREDICTION_ACCURACY_TAB
 from .live_prediction_flow import (
     execute_live_prediction_pipeline_core as _execute_live_prediction_pipeline_core,
 )
@@ -37,7 +38,11 @@ from .page_content import (
 )
 from .precomputed_predictions import compute_artifact_hash, load_precompute_horizon_index
 from .prediction_flow import CompetitiveSessionStatusUnavailableError, run_prediction
-from .rendering import display_prediction_result
+from .rendering import (
+    display_prediction_result,
+    render_notice_banner,
+    render_prediction_hero_deck,
+)
 from .update_flow import (
     _boundary_signature,
     _build_event_boundary_snapshot,
@@ -501,13 +506,12 @@ def _render_collapsible_runtime_messages(messages: list[tuple[str, str]]) -> Non
     summary_text = (
         primary_message if remaining_count == 0 else f"{primary_message} (+{remaining_count} more)"
     )
-
-    if primary_level == "warning":
-        st.warning(summary_text)
-    elif primary_level == "success":
-        st.success(summary_text)
-    else:
-        st.info(summary_text)
+    render_notice_banner(
+        summary_text,
+        tone=primary_level,
+        label="Run context",
+        st_module=st,
+    )
 
     if remaining_count <= 0:
         return
@@ -597,10 +601,41 @@ def _prediction_failure_hint(error: Exception) -> str | None:
 
 
 def render_live_prediction_page(enable_logging: bool) -> None:
-    st.header("Race Weekend Prediction")
-    st.markdown(
-        "Generate a practice-aware weekend forecast for qualifying and race. "
-        "Session updates run automatically in the background after completion."
+    render_prediction_hero_deck(
+        title="Race Weekend Prediction",
+        summary=(
+            "Practice-aware forecasts for qualifying and race. The layout now pushes the "
+            "key weekend signals forward so sprint rounds stay readable instead of turning "
+            "into one long stack of tables."
+        ),
+        eyebrow="Prediction lab",
+        cards=[
+            {
+                "label": "Model",
+                "value": BRAND_MODEL_VERSION,
+                "meta": "Current dashboard release.",
+                "tone": "accent",
+            },
+            {
+                "label": "Updated",
+                "value": BRAND_LAST_UPDATED,
+                "meta": "Latest dashboard refresh stamp.",
+                "tone": "neutral",
+            },
+            {
+                "label": "Logging",
+                "value": "ON" if enable_logging else "OFF",
+                "meta": "One checkpoint saved per session boundary.",
+                "tone": "success" if enable_logging else "warning",
+            },
+            {
+                "label": "Refresh",
+                "value": "Automatic",
+                "meta": "FastF1 session checks rerun on every prediction.",
+                "tone": "neutral",
+            },
+        ],
+        st_module=st,
     )
 
     season_options = _available_seasons()
@@ -608,14 +643,19 @@ def render_live_prediction_page(enable_logging: bool) -> None:
     if selected_season not in season_options:
         season_options = [selected_season, *season_options]
     season_index = season_options.index(selected_season)
-    selected_season = int(
-        st.selectbox(
-            "Season",
-            options=season_options,
-            index=season_index,
-            help="Controls schedule lookup, update checks, artifacts, and prediction execution year.",
+    control_col1, control_col2, control_col3 = st.columns([0.9, 1.8, 1.1], gap="large")
+    with control_col1:
+        selected_season = int(
+            st.selectbox(
+                "Season",
+                options=season_options,
+                index=season_index,
+                help=(
+                    "Controls schedule lookup, update checks, artifacts, and prediction "
+                    "execution year."
+                ),
+            )
         )
-    )
     _set_selected_season(selected_season)
 
     race_options = _load_race_options(selected_season)
@@ -624,14 +664,26 @@ def render_live_prediction_page(enable_logging: bool) -> None:
         race_options=race_options,
     )
 
-    col1, col2 = st.columns(2, gap="large")
-
-    with col1:
-        race_selection = st.selectbox("Select Grand Prix", race_options)
+    with control_col2:
+        race_selection = st.selectbox("Grand Prix", race_options)
         race_name = race_selection.replace(" (Sprint)", "")
 
-    with col2:
-        weather = st.selectbox("Weather Forecast", ["dry", "rain", "mixed"])
+    with control_col3:
+        weather = st.selectbox("Weather", ["dry", "rain", "mixed"])
+
+    selected_weekend_label = (
+        "Sprint weekend" if race_selection.endswith("(Sprint)") else "Race weekend"
+    )
+    render_notice_banner(
+        (
+            f"{selected_weekend_label} selected for {race_name} {selected_season}. "
+            "Refresh and session-completion checks are automatic; no manual force refresh."
+        ),
+        tone="info",
+        label="Run setup",
+        st_module=st,
+    )
+
     if bool(precompute_filter_meta.get("applied")):
         ready_count = len(precompute_filter_meta.get("ready_races", []))
         expected_targets = precompute_filter_meta.get("expected_targets", [])
@@ -639,32 +691,30 @@ def render_live_prediction_page(enable_logging: bool) -> None:
         anchor_race = str(precompute_filter_meta.get("anchor_race_name", "")).strip()
         anchor_session = str(precompute_filter_meta.get("anchor_session_name", "")).strip()
         if anchor_race and anchor_session:
-            st.caption(
+            precompute_message = (
                 f"Showing {ready_count}/{horizon_count} precomputed races from "
                 f"{anchor_race} checkpoint {anchor_session}. "
                 "Hidden races will appear after the horizon is warmed."
             )
         else:
-            st.caption(
+            precompute_message = (
                 f"Showing {ready_count} precomputed races. "
                 "Hidden races will appear after the horizon is warmed."
             )
     else:
-        st.caption(
+        precompute_message = (
             "No warmed precompute horizon yet. First run builds checkpoint snapshots for the "
             "current race and nearby weekends."
         )
+    render_notice_banner(
+        precompute_message,
+        tone="success" if bool(precompute_filter_meta.get("applied")) else "info",
+        label="Precompute horizon",
+        st_module=st,
+    )
 
-    st.subheader("Run")
-    st.caption("Refresh and session-completion checks are automatic; no manual force refresh.")
-
-    if enable_logging:
-        st.caption(
-            "Session checkpoint logging is ON: one prediction is saved per completed session "
-            "(FP1/FP2/FP3 or FP1/SQ/Sprint) for weekend-stage confidence and accuracy tracking."
-        )
     predict_clicked = st.button(
-        "Predict",
+        "Predict sprint weekend" if race_selection.endswith("(Sprint)") else "Predict weekend",
         type="primary",
         width="stretch",
     )
@@ -738,37 +788,52 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                             "Prediction reused from cache (inputs unchanged, no new boundary data).",
                         )
                     )
-                _render_collapsible_runtime_messages(runtime_messages)
-
                 if practice_update.get("updated"):
-                    st.success(
-                        "Updated car characteristics from completed practice sessions: "
-                        f"{', '.join(practice_update['completed_fp_sessions'])} "
-                        f"({practice_update['teams_updated']} teams)"
+                    runtime_messages.append(
+                        (
+                            "success",
+                            "Updated car characteristics from completed practice sessions: "
+                            f"{', '.join(practice_update['completed_fp_sessions'])} "
+                            f"({practice_update['teams_updated']} teams)",
+                        )
                     )
                 elif practice_update.get("completed_fp_sessions"):
-                    st.info(
-                        "Practice characteristics already up to date for sessions: "
-                        f"{', '.join(practice_update['completed_fp_sessions'])}"
+                    runtime_messages.append(
+                        (
+                            "info",
+                            "Practice characteristics already up to date for sessions: "
+                            f"{', '.join(practice_update['completed_fp_sessions'])}",
+                        )
                     )
 
                 retried_events = practice_update.get("retried_events", [])
                 if retried_events:
-                    st.warning(
-                        "Practice backlog updates deferred due to active processing lock: "
-                        f"{', '.join(str(event) for event in retried_events)}"
+                    runtime_messages.append(
+                        (
+                            "warning",
+                            "Practice backlog updates deferred due to active processing lock: "
+                            f"{', '.join(str(event) for event in retried_events)}",
+                        )
                     )
 
                 if boundary_refresh.get("refresh_needed"):
                     new_sessions = boundary_refresh.get("new_sessions", [])
                     reason = boundary_refresh.get("reason", "session_boundary_delta")
                     if new_sessions:
-                        st.info(
-                            "Auto-refresh triggered by event boundary change "
-                            f"({reason}): {', '.join(new_sessions)}"
+                        runtime_messages.append(
+                            (
+                                "info",
+                                "Auto-refresh triggered by event boundary change "
+                                f"({reason}): {', '.join(new_sessions)}",
+                            )
                         )
                     else:
-                        st.info(f"Auto-refresh triggered by event boundary change ({reason}).")
+                        runtime_messages.append(
+                            (
+                                "info",
+                                f"Auto-refresh triggered by event boundary change ({reason}).",
+                            )
+                        )
 
                 if isinstance(precompute_summary, dict) and precompute_summary.get("triggered"):
                     generated = int(precompute_summary.get("generated", 0))
@@ -777,17 +842,25 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                     ready_races = precompute_summary.get("ready_races", [])
                     target_label = ", ".join(str(target) for target in targets) or race_name
                     ready_count = len(ready_races) if isinstance(ready_races, list) else 0
-                    st.info(
-                        "Boundary precompute completed: "
-                        f"{generated} scenario(s) generated, {reused} reused "
-                        f"for {target_label}. Ready races: {ready_count}."
+                    runtime_messages.append(
+                        (
+                            "info",
+                            "Boundary precompute completed: "
+                            f"{generated} scenario(s) generated, {reused} reused "
+                            f"for {target_label}. Ready races: {ready_count}.",
+                        )
                     )
                     errors = precompute_summary.get("errors", [])
                     if isinstance(errors, list) and errors:
-                        st.warning(
-                            "Some precompute scenarios failed: "
-                            + "; ".join(str(error) for error in errors[:3])
+                        runtime_messages.append(
+                            (
+                                "warning",
+                                "Some precompute scenarios failed: "
+                                + "; ".join(str(error) for error in errors[:3]),
+                            )
                         )
+
+                _render_collapsible_runtime_messages(runtime_messages)
 
                 if pipeline_timing:
                     timing_parts = [
@@ -924,13 +997,14 @@ def render_about_page() -> None:
 
 
 def render_page(page: str, enable_logging: bool) -> None:
+    """Route the selected dashboard page to its renderer."""
     if page in {"Prediction", "Live Prediction"}:
         render_live_prediction_page(enable_logging)
     elif page in {"Model & Learning", "Model Insights"}:
         render_model_insights_page()
     elif page == "Team Comparison":
         render_team_comparison_page()
-    elif page == "Prediction Accuracy":
+    elif page == "Prediction Accuracy" and ENABLE_PREDICTION_ACCURACY_TAB:
         render_prediction_accuracy_page()
     elif page in {"Contact", "About"}:
         render_contact_page()

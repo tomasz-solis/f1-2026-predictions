@@ -22,7 +22,7 @@ BRAND_DISCLAIMER = "Independent analytics project • not affiliated with any ra
 BRAND_HEADER_ALIGNMENT = "left"
 BRAND_MODEL_VERSION = "v1.3"
 BRAND_LAST_UPDATED = "2026-03-04"
-ENABLE_PREDICTION_ACCURACY_TAB = True
+ENABLE_PREDICTION_ACCURACY_TAB = False
 NAVIGATION_PAGES = ["Prediction", "Team Comparison"]
 if ENABLE_PREDICTION_ACCURACY_TAB:
     NAVIGATION_PAGES.append("Prediction Accuracy")
@@ -178,12 +178,5 @@ def render_sidebar() -> tuple[str, bool]:
             key="nav_tabs",
             label_visibility="collapsed",
         )
-
-    st.caption(
-        "Session checkpoint logging is always ON. One prediction is persisted per completed "
-        "practice/sprint checkpoint (FP1/FP2/FP3 or FP1/SQ/Sprint) for accuracy tracking."
-    )
-    st.markdown(f"**Model Version:** {BRAND_MODEL_VERSION}")
-    st.markdown(f"**Last Updated:** {BRAND_LAST_UPDATED}")
 
     return page, True

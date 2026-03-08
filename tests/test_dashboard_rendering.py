@@ -35,7 +35,12 @@ def _stub_streamlit(patcher):
     patcher.setattr(rendering.st, "progress", lambda *_args, **_kwargs: None)
     patcher.setattr(rendering.st, "write", lambda msg: calls.append(("write", str(msg))))
     patcher.setattr(rendering.st, "dataframe", lambda *_args, **_kwargs: None)
-    patcher.setattr(rendering.st, "columns", lambda n: [_Ctx() for _ in range(n)])
+    patcher.setattr(
+        rendering.st,
+        "plotly_chart",
+        lambda _fig, **_kwargs: calls.append(("plotly_chart", "rendered")),
+    )
+    patcher.setattr(rendering.st, "columns", lambda n, **_kwargs: [_Ctx() for _ in range(n)])
 
     def _expander(label, *_, **__):
         calls.append(("expander", str(label)))
@@ -153,8 +158,8 @@ def test_render_race_result_warns_on_high_dnf(patcher):
 
     rendering._render_race_result(df)
 
-    warning_messages = [value for kind, value in calls if kind == "warning"]
-    assert any("High DNF risk" in msg for msg in warning_messages)
+    markdown_messages = [value for kind, value in calls if kind == "markdown"]
+    assert any("High DNF risk" in msg for msg in markdown_messages)
 
 
 def test_render_race_result_explains_sorting_and_interval(patcher):
@@ -219,10 +224,9 @@ def test_render_race_result_warns_on_low_confidence_signals(patcher):
 
     rendering._render_race_result(df)
 
-    warnings = [value for kind, value in calls if kind == "warning"]
     details = [value for kind, value in calls if kind == "markdown"]
-    assert any("Low confidence run" in text for text in warnings)
-    assert any("(+1 more)" in text for text in warnings)
+    assert any("Low confidence run" in text for text in details)
+    assert any("(+1 more)" in text for text in details)
     assert any("Low confidence run" in text for text in details)
     assert any("Low input-data confidence" in text for text in details)
 
@@ -239,6 +243,56 @@ def test_render_qualifying_result_splits_grid_columns(patcher):
     assert any("Q1 Eliminated (Final Grid P17-P22)" in block for block in markdown_blocks)
     assert any("Q2 Eliminated (Final Grid P11-P16)" in block for block in markdown_blocks)
     assert any("Q3 Shootout (Final Grid P1-P10)" in block for block in markdown_blocks)
+
+
+def test_render_position_change_chart_shows_plot_for_starting_grid(patcher):
+    calls = _stub_streamlit(patcher)
+    finish_df = pd.DataFrame(
+        [
+            {"position": 1, "driver": "NOR", "team": "McLaren"},
+            {"position": 2, "driver": "VER", "team": "Red Bull Racing"},
+            {"position": 3, "driver": "LEC", "team": "Ferrari"},
+        ]
+    )
+
+    rendering._render_position_change_chart(
+        finish_df,
+        result={
+            "starting_grid": [
+                {"position": 3, "driver": "NOR", "team": "McLaren"},
+                {"position": 1, "driver": "VER", "team": "Red Bull Racing"},
+                {"position": 2, "driver": "LEC", "team": "Ferrari"},
+            ],
+            "starting_session_name": "Q",
+        },
+        prediction_name="Race Prediction",
+    )
+
+    assert calls.count(("plotly_chart", "rendered")) == 2
+    captions = [value for kind, value in calls if kind == "caption"]
+    assert any("Biggest projected gainers: NOR +2" in text for text in captions)
+    markdown_blocks = [value for kind, value in calls if kind == "markdown"]
+    assert any("Biggest Movers" in block for block in markdown_blocks)
+
+
+def test_render_prediction_hero_deck_uses_fixed_meta_grid(patcher):
+    calls = _stub_streamlit(patcher)
+
+    rendering.render_prediction_hero_deck(
+        title="Race Weekend Prediction",
+        summary="Practice-aware forecasts.",
+        eyebrow="Prediction lab",
+        cards=[
+            {"label": "Model", "value": "v1.3", "meta": "Current dashboard release."},
+            {"label": "Updated", "value": "2026-03-04", "meta": "Latest refresh stamp."},
+            {"label": "Logging", "value": "ON", "meta": "Saved after completed sessions."},
+            {"label": "Refresh", "value": "Automatic", "meta": "Checks rerun each prediction."},
+        ],
+    )
+
+    markdown_blocks = [value for kind, value in calls if kind == "markdown"]
+    assert any("ts-hero-deck" in block for block in markdown_blocks)
+    assert any("ts-stat-grid--hero" in block for block in markdown_blocks)
 
 
 def test_display_prediction_result_routes_race_sections(patcher):
@@ -290,13 +344,19 @@ def test_display_prediction_result_routes_race_sections(patcher):
                 "wind_speed_kph": 18.0,
                 "chaos_multiplier": 1.04,
             },
+            "starting_grid": [
+                {"position": 3, "driver": "VER", "team": "Red Bull Racing"},
+            ],
+            "starting_session_name": "Q",
         },
         prediction_name="Race Prediction",
         is_race=True,
     )
 
     assert routed == ["compound", "pit", "race"]
-    assert ("success", "Using ACTUAL grid from completed session") in calls
+    markdown_messages = [value for kind, value in calls if kind == "markdown"]
+    assert any("Grid source" in text and "Actual" in text for text in markdown_messages)
+    assert ("plotly_chart", "rendered") in calls
 
 
 def test_display_prediction_result_routes_qualifying_sections(patcher):
@@ -317,11 +377,8 @@ def test_display_prediction_result_routes_qualifying_sections(patcher):
     )
 
     assert routed == ["quali"]
-    warnings = [value for kind, value in calls if kind == "warning"]
     details = [value for kind, value in calls if kind == "markdown"]
-    assert any("Grid source: PREDICTED qualifying grid." in text for text in warnings)
-    assert any("(+1 more)" in text for text in warnings)
-    assert any("Grid source: PREDICTED qualifying grid." in text for text in details)
+    assert any("Grid source" in text and "Predicted" in text for text in details)
     assert any(
         "Data source: Short-stint blend (FP3 + FP2 + FP1) (70% practice data + 30% model)." in text
         for text in details
@@ -350,10 +407,11 @@ def test_display_prediction_result_routes_actual_qualifying_classification(patch
     )
 
     assert routed == ["No grid penalties are applied here."]
-    assert (
-        "success",
-        "Showing ACTUAL qualifying classification from the completed session.",
-    ) in calls
+    markdown_messages = [value for kind, value in calls if kind == "markdown"]
+    assert any(
+        "Showing ACTUAL qualifying classification from the completed session." in text
+        for text in markdown_messages
+    )
 
 
 def test_display_prediction_result_renders_teammate_head_to_head_probabilities(patcher):
