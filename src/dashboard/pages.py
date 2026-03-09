@@ -14,10 +14,10 @@ from src.utils.weekend import _get_schedule_rows, is_sprint_weekend
 
 from . import team_comparison as _team_comparison
 from .accuracy_view import (
-    render_checkpoint_accuracy_trend,
+    METRIC_OPTIONS,
     render_overall_accuracy_metrics,
-    render_per_race_breakdown,
     render_saved_predictions_summary,
+    render_target_sections,
 )
 from .cache import get_artifact_versions
 from .layout import BRAND_LAST_UPDATED, BRAND_MODEL_VERSION, ENABLE_PREDICTION_ACCURACY_TAB
@@ -942,9 +942,8 @@ def render_model_insights_page() -> None:
 
 
 def render_prediction_accuracy_page() -> None:
+    """Render the target-aware accuracy dashboard."""
     st.header("Prediction Accuracy Tracker")
-
-    from src.utils.prediction_metrics import PredictionMetrics
 
     from .accuracy import AccuracyPipeline
 
@@ -960,30 +959,37 @@ def render_prediction_accuracy_page() -> None:
         return
 
     st.success(f"Found {summary.n_predictions} saved prediction(s)")
+    if pipeline.actuals_reconciled > 0:
+        st.caption(
+            f"Reconciled actuals for {pipeline.actuals_reconciled} saved prediction(s) on load."
+        )
 
     if pipeline.has_actuals:
-        metrics_calculator = PredictionMetrics()
-        agg_metrics: dict = {}
-        if summary.qualifying_aggregate:
-            agg_metrics["qualifying"] = summary.qualifying_aggregate
-        if summary.race_aggregate:
-            agg_metrics["race"] = summary.race_aggregate
-        render_overall_accuracy_metrics(agg_metrics)
+        metric_name = st.selectbox(
+            "Metric",
+            options=list(METRIC_OPTIONS),
+            format_func=lambda key: METRIC_OPTIONS.get(key, key),
+            index=0,
+        )
+        show_secondary_sprint_targets = st.toggle(
+            "Show sprint-only targets",
+            value=False,
+        )
+        render_overall_accuracy_metrics(summary)
+        render_target_sections(summary, metric_name, show_secondary_sprint_targets)
 
-        predictions_with_actuals = [
-            p
-            for p in pipeline.all_predictions
-            if p.get("actuals") and (p["actuals"].get("qualifying") or p["actuals"].get("race"))
-        ]
-        render_checkpoint_accuracy_trend(predictions_with_actuals, metrics_calculator)
-        render_per_race_breakdown(predictions_with_actuals, metrics_calculator)
+        if summary.n_excluded_targets > 0:
+            st.caption(
+                f"{summary.n_excluded_targets} target save(s) were excluded because they were not "
+                "real forecasts at that checkpoint."
+            )
     else:
         st.info(
             "Predictions saved, but no actual results added yet. After each race, "
             "you can update predictions with actual results to calculate accuracy."
         )
 
-    render_saved_predictions_summary(pipeline.all_predictions)
+    render_saved_predictions_summary(pipeline.prediction_status_rows)
 
 
 def render_contact_page() -> None:

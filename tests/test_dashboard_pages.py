@@ -321,7 +321,7 @@ def test_save_prediction_if_enabled_saves_new_session(patcher):
     assert saved_payload["race_name"] == "Bahrain Grand Prix"
     assert saved_payload["session_name"] == "FP3"
     assert saved_payload["weather"] == "dry"
-    assert "Prediction saved for accuracy tracking (after FP3)" in info_messages
+    assert "Prediction saved for accuracy tracking (checkpoint FP3)" in info_messages
 
 
 def test_save_prediction_if_enabled_persists_checkpoint_summary_when_store_available(patcher):
@@ -383,7 +383,7 @@ def test_save_prediction_if_enabled_persists_checkpoint_summary_when_store_avail
     assert payload["metadata"]["session_name"] == "FP2"
     assert payload["qualifying"]["mean_confidence"] == 61.0
     assert payload["race"]["mean_confidence"] == 58.0
-    assert "Prediction saved for accuracy tracking (after FP2)" in info_messages
+    assert "Prediction saved for accuracy tracking (checkpoint FP2)" in info_messages
 
 
 def test_save_prediction_if_enabled_reports_existing_prediction(patcher):
@@ -421,6 +421,7 @@ def test_save_prediction_if_enabled_reports_existing_prediction(patcher):
 
 def test_save_prediction_if_enabled_handles_no_completed_sessions(patcher):
     info_messages: list[str] = []
+    saved_payload: dict = {}
 
     class _Detector:
         def get_latest_completed_session(self, year: int, race_name: str, is_sprint: bool):
@@ -428,17 +429,22 @@ def test_save_prediction_if_enabled_handles_no_completed_sessions(patcher):
 
     class _Logger:
         def has_prediction_for_session(self, year: int, race_name: str, session_name: str):
+            assert (year, race_name, session_name) == (2026, "Bahrain Grand Prix", "PRE")
             return False
+
+        def save_prediction(self, **kwargs):
+            saved_payload.update(kwargs)
 
     patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
     patcher.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
     patcher.setattr(pages.st, "info", lambda message: info_messages.append(str(message)))
+    patcher.setattr(pages.st, "warning", lambda _message: None)
 
     pages._save_prediction_if_enabled(
         enable_logging=True,
         prediction_results={
-            "qualifying": {"grid": []},
-            "race": {"finish_order": []},
+            "qualifying": {"grid": [{"position": 1, "driver": "VER", "team": "Red Bull"}]},
+            "race": {"finish_order": [{"position": 1, "driver": "VER", "team": "Red Bull"}]},
         },
         is_sprint=False,
         race_name="Bahrain Grand Prix",
@@ -446,7 +452,12 @@ def test_save_prediction_if_enabled_handles_no_completed_sessions(patcher):
         year=2026,
     )
 
-    assert "No completed sessions yet; prediction not saved" in info_messages[0]
+    assert saved_payload["session_name"] == "PRE"
+    assert set(saved_payload["target_predictions"]) == {
+        "main_qualifying",
+        "grand_prix_race",
+    }
+    assert "Prediction saved for accuracy tracking (checkpoint PRE)" in info_messages[0]
 
 
 def test_render_prediction_results_routes_normal_weekend(patcher):
@@ -598,7 +609,7 @@ def test_render_page_routes_by_selected_tab(patcher):
         "insights",
         "insights",
         "comparison",
-        "live",
+        "accuracy",
         "contact",
         "contact",
         "live",

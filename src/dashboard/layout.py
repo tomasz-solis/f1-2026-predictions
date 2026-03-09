@@ -22,7 +22,7 @@ BRAND_DISCLAIMER = "Independent analytics project • not affiliated with any ra
 BRAND_HEADER_ALIGNMENT = "left"
 BRAND_MODEL_VERSION = "v1.3"
 BRAND_LAST_UPDATED = "2026-03-04"
-ENABLE_PREDICTION_ACCURACY_TAB = False
+ENABLE_PREDICTION_ACCURACY_TAB = True
 NAVIGATION_PAGES = ["Prediction", "Team Comparison"]
 if ENABLE_PREDICTION_ACCURACY_TAB:
     NAVIGATION_PAGES.append("Prediction Accuracy")

@@ -1,222 +1,280 @@
-"""Rendering helpers for prediction-accuracy dashboard page."""
+"""Rendering helpers for the target-aware prediction-accuracy page."""
+
+from __future__ import annotations
 
 from typing import Any
 
-import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
-_SESSION_ORDER = {
-    "FP1": 1,
-    "FP2": 2,
-    "FP3": 3,
-    "SQ": 4,
-    "SPRINT": 5,
-    "Q": 6,
-    "R": 7,
+from src.dashboard.accuracy import SeasonAccuracySummary, TargetAccuracySummary
+from src.utils.accuracy_targets import (
+    PRIMARY_TARGET_KEYS,
+    SECONDARY_SPRINT_TARGET_KEYS,
+    target_checkpoint_sequence,
+)
+
+METRIC_OPTIONS = {
+    "overall_mae": "Overall MAE",
+    "top_3_pct": "Top 3 overlap %",
+    "top_10_pct": "Top 10 overlap %",
+    "exact_accuracy": "Exact accuracy %",
+    "within_1": "Within 1 position %",
+    "within_3": "Within 3 positions %",
+    "correlation": "Correlation",
 }
 
 
-def render_overall_accuracy_metrics(agg_metrics: dict[str, Any]) -> None:
-    """Render aggregate qualifying/race accuracy metrics."""
+def render_overall_accuracy_metrics(summary: SeasonAccuracySummary) -> None:
+    """Render headline KPI cards for the main qualifying and race targets."""
     st.markdown("---")
     st.subheader("Overall Accuracy")
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("**Qualifying Metrics**")
-        if "qualifying" in agg_metrics:
-            q_metrics = agg_metrics["qualifying"]
-            st.metric(
-                "Exact Position Accuracy",
-                f"{q_metrics['exact_accuracy']['mean']:.1f}%",
-                help="% of drivers predicted in exact correct position",
-            )
-            st.metric(
-                "Mean Position Error (MAE)",
-                f"{q_metrics['mae']['mean']:.2f} positions",
-                help="Average position error",
-            )
-            st.metric(
-                "Within ±3 Positions",
-                f"{q_metrics['within_3']['mean']:.1f}%",
-                help="% of predictions within 3 positions",
-            )
-            st.metric(
-                "Correlation",
-                f"{q_metrics['correlation']['mean']:.3f}",
-                help="Spearman correlation (-1 to 1, higher is better)",
-            )
-
-    with col2:
-        st.markdown("**Race Metrics**")
-        if "race" in agg_metrics:
-            r_metrics = agg_metrics["race"]
-            st.metric(
-                "Exact Position Accuracy",
-                f"{r_metrics['exact_accuracy']['mean']:.1f}%",
-                help="% of drivers predicted in exact correct position",
-            )
-            st.metric(
-                "Mean Position Error (MAE)",
-                f"{r_metrics['mae']['mean']:.2f} positions",
-                help="Average position error",
-            )
-            st.metric(
-                "Within ±3 Positions",
-                f"{r_metrics['within_3']['mean']:.1f}%",
-                help="% of predictions within 3 positions",
-            )
-            st.metric(
-                "Winner Prediction Accuracy",
-                f"{r_metrics['winner_accuracy']['percentage']:.1f}%",
-                help="% of races where winner was correctly predicted",
-            )
+    main_qualifying = summary.targets.get("main_qualifying")
+    grand_prix_race = summary.targets.get("grand_prix_race")
+    columns = st.columns(6)
+    _render_metric_card(columns[0], "Q MAE", main_qualifying, "overall_mae", "{:.2f}")
+    _render_metric_card(columns[1], "Q Top 3", main_qualifying, "top_3_pct", "{:.1f}%")
+    _render_metric_card(columns[2], "Q Top 10", main_qualifying, "top_10_pct", "{:.1f}%")
+    _render_metric_card(columns[3], "R MAE", grand_prix_race, "overall_mae", "{:.2f}")
+    _render_metric_card(columns[4], "R Top 3", grand_prix_race, "top_3_pct", "{:.1f}%")
+    _render_metric_card(columns[5], "R Top 10", grand_prix_race, "top_10_pct", "{:.1f}%")
 
 
-def render_per_race_breakdown(
-    predictions_with_actuals: list[dict[str, Any]],
-    metrics_calc: Any,
+def render_target_sections(
+    summary: SeasonAccuracySummary,
+    metric_name: str,
+    show_secondary_sprint_targets: bool,
 ) -> None:
-    """Render per-race detailed metrics for predictions with actual outcomes."""
-    st.markdown("---")
-    st.subheader("Per-Race Breakdown")
-
-    for prediction in predictions_with_actuals:
-        metrics = metrics_calc.calculate_all_metrics(prediction)
-        if not metrics:
-            continue
-
-        race_name = metrics["metadata"]["race_name"]
-        session_name = metrics["metadata"]["session_name"]
-
-        with st.expander(f"{race_name} (Predicted after {session_name})"):
-            col1, col2 = st.columns(2)
-
-            with col1:
-                if "qualifying" in metrics:
-                    qualifying_metrics = metrics["qualifying"]
-                    st.markdown("**Qualifying**")
-                    st.write(f"- Exact: {qualifying_metrics['exact_accuracy']:.1f}%")
-                    st.write(f"- MAE: {qualifying_metrics['mae']:.2f} positions")
-                    st.write(f"- Within ±1: {qualifying_metrics['within_1']:.1f}%")
-                    st.write(f"- Correlation: {qualifying_metrics['correlation']:.3f}")
-
-            with col2:
-                if "race" in metrics:
-                    race_metrics = metrics["race"]
-                    st.markdown("**Race**")
-                    st.write(f"- Exact: {race_metrics['exact_accuracy']:.1f}%")
-                    st.write(f"- MAE: {race_metrics['mae']:.2f} positions")
-                    st.write(f"- Within ±3: {race_metrics['within_3']:.1f}%")
-                    st.write(
-                        f"- Winner: {'Correct' if race_metrics['winner_correct'] else 'Incorrect'}"
-                    )
-                    st.write(
-                        f"- Podium: {race_metrics['podium']['correct_drivers']}/3 drivers correct"
-                    )
-
-
-def render_saved_predictions_summary(all_predictions: list[dict[str, Any]]) -> None:
-    """Render status list of all saved predictions."""
-    st.markdown("---")
-    st.subheader("All Saved Predictions")
-
-    for prediction in all_predictions:
-        metadata = prediction["metadata"]
-        race_name = metadata["race_name"]
-        session_name = metadata["session_name"]
-        has_actuals = bool(
-            prediction.get("actuals")
-            and (prediction["actuals"].get("qualifying") or prediction["actuals"].get("race"))
+    """Render weekend progression and season trend charts by target."""
+    primary_targets = [key for key in PRIMARY_TARGET_KEYS if key in summary.targets]
+    if primary_targets:
+        _render_target_tabs(
+            title="Main Targets",
+            target_keys=primary_targets,
+            summary=summary,
+            metric_name=metric_name,
         )
 
-        status_text = "Results added" if has_actuals else "Awaiting results"
-        st.write(f"**{race_name}** (after {session_name}) - {status_text}")
+    if show_secondary_sprint_targets:
+        secondary_targets = [key for key in SECONDARY_SPRINT_TARGET_KEYS if key in summary.targets]
+        if secondary_targets:
+            _render_target_tabs(
+                title="Sprint Targets",
+                target_keys=secondary_targets,
+                summary=summary,
+                metric_name=metric_name,
+            )
 
 
-def _average_prediction_confidence(entries: Any) -> float | None:
-    """Return mean confidence for prediction rows that expose a numeric confidence field."""
-    if not isinstance(entries, list):
-        return None
-    confidences: list[float] = []
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        raw_value = entry.get("confidence")
-        if raw_value is None:
-            continue
-        try:
-            confidences.append(float(raw_value))
-        except (TypeError, ValueError):
-            continue
-    if not confidences:
-        return None
-    return float(sum(confidences) / len(confidences))
-
-
-def render_checkpoint_accuracy_trend(
-    predictions_with_actuals: list[dict[str, Any]],
-    metrics_calc: Any,
-) -> None:
-    """Render checkpoint-level trend table for confidence and realized accuracy."""
-    rows: list[dict[str, Any]] = []
-
-    for prediction in predictions_with_actuals:
-        metrics = metrics_calc.calculate_all_metrics(prediction)
-        if not metrics:
-            continue
-
-        metadata = prediction.get("metadata", {})
-        race_name = str(metadata.get("race_name", "")).strip()
-        checkpoint = str(metadata.get("session_name", "")).strip().upper()
-        if not race_name or not checkpoint:
-            continue
-
-        quali_prediction = (prediction.get("qualifying") or {}).get("predicted_grid", [])
-        race_prediction = (prediction.get("race") or {}).get("predicted_results", [])
-        qualifying_metrics = metrics.get("qualifying") or {}
-        race_metrics = metrics.get("race") or {}
-
-        rows.append(
-            {
-                "Race": race_name,
-                "Checkpoint": checkpoint,
-                "Quali Confidence %": _average_prediction_confidence(quali_prediction),
-                "Race Confidence %": _average_prediction_confidence(race_prediction),
-                "Quali Exact %": qualifying_metrics.get("exact_accuracy"),
-                "Race Exact %": race_metrics.get("exact_accuracy"),
-                "_order": _SESSION_ORDER.get(checkpoint, 99),
-            }
-        )
-
-    if not rows:
+def render_saved_predictions_summary(status_rows: list[dict[str, Any]]) -> None:
+    """Render the saved checkpoint list with target-aware status text."""
+    st.markdown("---")
+    st.subheader("Saved Predictions")
+    if not status_rows:
+        st.info("No saved checkpoints yet.")
         return
 
-    details_df = pd.DataFrame(rows).sort_values(["_order", "Race"]).drop(columns=["_order"])
-    stage_df = (
-        pd.DataFrame(rows)
-        .groupby(["Checkpoint", "_order"], as_index=False)[
-            [
-                "Quali Confidence %",
-                "Race Confidence %",
-                "Quali Exact %",
-                "Race Exact %",
-            ]
-        ]
-        .mean(numeric_only=True)
-        .sort_values("_order")
-        .drop(columns=["_order"])
-    )
-    stage_df = stage_df.round(2)
+    for row in status_rows:
+        race_name = str(row.get("race_name", "")).strip()
+        checkpoint_session = str(row.get("checkpoint_session", "")).strip().upper()
+        weekend_format = str(row.get("weekend_format", "")).strip().title()
+        target_labels = row.get("target_labels", [])
+        targets_text = (
+            ", ".join(str(label) for label in target_labels) if target_labels else "No targets"
+        )
+        status_text = str(row.get("status_text", "")).strip() or "No scoreable targets"
+        st.write(
+            f"**{race_name}** ({checkpoint_session}, {weekend_format}) "
+            f"- {status_text} - {targets_text}"
+        )
 
+
+def _render_metric_card(
+    container: Any,
+    label: str,
+    summary: TargetAccuracySummary | None,
+    metric_name: str,
+    template: str,
+) -> None:
+    """Render one KPI card when the metric is available."""
+    value = None
+    if summary is not None:
+        metric_payload = summary.aggregate.get(metric_name)
+        if isinstance(metric_payload, dict):
+            value = metric_payload.get("mean")
+    with container:
+        if isinstance(value, int | float):
+            st.metric(label, template.format(float(value)))
+        else:
+            st.metric(label, "N/A")
+
+
+def _render_target_tabs(
+    *,
+    title: str,
+    target_keys: list[str],
+    summary: SeasonAccuracySummary,
+    metric_name: str,
+) -> None:
+    """Render a tabbed section for a group of targets."""
     st.markdown("---")
-    st.subheader("Checkpoint Trend")
-    st.caption(
-        "Mean values by prediction checkpoint. Use this view to track how confidence and "
-        "realized accuracy move from early sessions to qualifying/race."
-    )
-    st.dataframe(stage_df, width="stretch", hide_index=True)
+    st.subheader(title)
+    tabs = st.tabs([summary.targets[key].label for key in target_keys])
+    for tab, target_key in zip(tabs, target_keys, strict=False):
+        target_summary = summary.targets.get(
+            target_key, TargetAccuracySummary(target_key, target_key)
+        )
+        with tab:
+            _render_progression_charts(target_summary, metric_name)
+            _render_trend_charts(target_summary, metric_name)
 
-    with st.expander("Per-race checkpoint details"):
-        st.dataframe(details_df.round(2), width="stretch", hide_index=True)
+
+def _render_progression_charts(target_summary: TargetAccuracySummary, metric_name: str) -> None:
+    """Render weekend progression charts for normal and sprint weekends."""
+    st.markdown("**Weekend Progression**")
+    left_col, right_col = st.columns(2)
+    for container, weekend_format in ((left_col, "normal"), (right_col, "sprint")):
+        checkpoint_labels, metric_values, race_counts, missing_checkpoints = (
+            build_progression_series(
+                target_summary=target_summary,
+                metric_name=metric_name,
+                weekend_format=weekend_format,
+            )
+        )
+        with container:
+            st.caption(f"{weekend_format.title()} weekends")
+            if not checkpoint_labels:
+                st.info("No data for this format yet.")
+                continue
+
+            figure = go.Figure()
+            figure.add_trace(
+                go.Scatter(
+                    x=checkpoint_labels,
+                    y=metric_values,
+                    mode="lines+markers",
+                    name=target_summary.label,
+                    customdata=[[count] for count in race_counts],
+                    hovertemplate=(
+                        "Checkpoint: %{x}<br>"
+                        "Value: %{y:.2f}<br>"
+                        "Races: %{customdata[0]}<extra></extra>"
+                    ),
+                    connectgaps=False,
+                )
+            )
+            figure.update_layout(
+                margin={"l": 12, "r": 12, "t": 12, "b": 12},
+                xaxis_title="Checkpoint",
+                yaxis_title=METRIC_OPTIONS.get(metric_name, metric_name),
+                showlegend=False,
+            )
+            figure.update_xaxes(
+                type="category",
+                categoryorder="array",
+                categoryarray=checkpoint_labels,
+            )
+            st.plotly_chart(figure, width="stretch")
+            if missing_checkpoints:
+                st.caption(f"Missing saved checkpoints: {', '.join(missing_checkpoints)}")
+
+
+def _render_trend_charts(target_summary: TargetAccuracySummary, metric_name: str) -> None:
+    """Render season trend charts for normal and sprint weekends."""
+    st.markdown("**Season Trend**")
+    left_col, right_col = st.columns(2)
+    for container, weekend_format in ((left_col, "normal"), (right_col, "sprint")):
+        points = [
+            point
+            for point in target_summary.season_trend
+            if point.weekend_format == weekend_format and metric_name in point.metrics
+        ]
+        with container:
+            st.caption(f"{weekend_format.title()} weekends")
+            if not points:
+                st.info("No data for this format yet.")
+                continue
+
+            ordered_races = sorted(
+                {(point.race_order, point.race_name) for point in points},
+                key=lambda item: item[0],
+            )
+            race_names = [race_name for _, race_name in ordered_races]
+            figure = go.Figure()
+            checkpoint_sessions = sorted(
+                {point.checkpoint_session for point in points},
+                key=lambda session_name: min(
+                    point.checkpoint_index
+                    for point in points
+                    if point.checkpoint_session == session_name
+                ),
+            )
+            for checkpoint_session in checkpoint_sessions:
+                lookup = {
+                    point.race_name: point.metrics[metric_name]
+                    for point in points
+                    if point.checkpoint_session == checkpoint_session
+                }
+                figure.add_trace(
+                    go.Scatter(
+                        x=race_names,
+                        y=[lookup.get(race_name) for race_name in race_names],
+                        mode="lines+markers",
+                        name=checkpoint_session,
+                        connectgaps=False,
+                    )
+                )
+
+            figure.update_layout(
+                margin={"l": 12, "r": 12, "t": 12, "b": 12},
+                xaxis_title="Race",
+                yaxis_title=METRIC_OPTIONS.get(metric_name, metric_name),
+                legend_title="Checkpoint",
+            )
+            st.plotly_chart(figure, width="stretch")
+
+
+def build_progression_series(
+    *,
+    target_summary: TargetAccuracySummary,
+    metric_name: str,
+    weekend_format: str,
+) -> tuple[list[str], list[float | None], list[int], list[str]]:
+    """Return an ordered checkpoint series with explicit gaps for missing saves."""
+    points = [
+        point
+        for point in target_summary.checkpoint_progression
+        if point.weekend_format == weekend_format and metric_name in point.metrics
+    ]
+    if not points:
+        return [], [], [], []
+
+    point_by_session = {point.checkpoint_session: point for point in points}
+    expected_sessions = list(target_checkpoint_sequence(target_summary.target_key, weekend_format))
+    observed_sessions = [
+        point.checkpoint_session
+        for point in sorted(points, key=lambda item: item.checkpoint_index)
+        if point.checkpoint_session not in expected_sessions
+    ]
+    ordered_sessions = expected_sessions + observed_sessions
+    if not ordered_sessions:
+        ordered_sessions = [
+            point.checkpoint_session
+            for point in sorted(points, key=lambda item: item.checkpoint_index)
+        ]
+
+    metric_values: list[float | None] = []
+    race_counts: list[int] = []
+    missing_checkpoints: list[str] = []
+    for checkpoint_session in ordered_sessions:
+        point = point_by_session.get(checkpoint_session)
+        if point is None:
+            metric_values.append(None)
+            race_counts.append(0)
+            missing_checkpoints.append(checkpoint_session)
+            continue
+        metric_values.append(float(point.metrics[metric_name]))
+        race_counts.append(int(point.race_count))
+
+    return ordered_sessions, metric_values, race_counts, missing_checkpoints

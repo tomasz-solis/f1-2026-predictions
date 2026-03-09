@@ -1,9 +1,4 @@
-"""Prediction-accuracy data pipeline for the dashboard.
-
-Centralises metric computation, season-level aggregation, and
-trend analysis so that the accuracy page and any future API
-consumers can share the same logic.
-"""
+"""Prediction-accuracy pipeline for target-aware dashboard views."""
 
 from __future__ import annotations
 
@@ -11,22 +6,69 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+import numpy as np
+
+from src.utils.accuracy_snapshots import accuracy_snapshot_artifact_key, calculate_target_metric_map
+from src.utils.accuracy_targets import (
+    PRIMARY_TARGET_KEYS,
+    explicit_target_actuals,
+    explicit_target_predictions,
+    synthesize_legacy_actuals,
+    synthesize_legacy_targets,
+    target_checkpoint_index,
+    target_label,
+    weekend_format_name,
+)
+
 logger = logging.getLogger(__name__)
 
 
-# ------------------------------------------------------------------
-# Data containers
-# ------------------------------------------------------------------
+@dataclass
+class CheckpointAccuracyPoint:
+    """Season-average metric values for one checkpoint in one target view."""
+
+    target_key: str
+    weekend_format: str
+    checkpoint_session: str
+    checkpoint_index: int
+    metrics: dict[str, float]
+    race_count: int
+
+
+@dataclass
+class SeasonTrendPoint:
+    """One race-level point for a target checkpoint trend line."""
+
+    target_key: str
+    weekend_format: str
+    race_name: str
+    race_order: int
+    checkpoint_session: str
+    checkpoint_index: int
+    metrics: dict[str, float]
+
+
+@dataclass
+class TargetAccuracySummary:
+    """Aggregated accuracy summary for one canonical target."""
+
+    target_key: str
+    label: str
+    aggregate: dict[str, dict[str, float]] = field(default_factory=dict)
+    checkpoint_progression: list[CheckpointAccuracyPoint] = field(default_factory=list)
+    season_trend: list[SeasonTrendPoint] = field(default_factory=list)
+    n_scored_predictions: int = 0
 
 
 @dataclass
 class RaceAccuracySnapshot:
-    """Accuracy metrics for a single race prediction."""
+    """Compatibility container for per-race accuracy details."""
 
     race_name: str
     session_name: str
     qualifying: dict[str, float] | None = None
     race: dict[str, Any] | None = None
+    targets: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 @dataclass
@@ -38,90 +80,461 @@ class SeasonAccuracySummary:
     qualifying_aggregate: dict[str, Any] = field(default_factory=dict)
     race_aggregate: dict[str, Any] = field(default_factory=dict)
     per_race: list[RaceAccuracySnapshot] = field(default_factory=list)
+    targets: dict[str, TargetAccuracySummary] = field(default_factory=dict)
+    n_excluded_predictions: int = 0
+    n_excluded_targets: int = 0
 
 
-# ------------------------------------------------------------------
-# Pipeline
-# ------------------------------------------------------------------
+@dataclass
+class _TargetAccuracyRecord:
+    """Internal normalized target record used to build dashboard summaries."""
+
+    race_name: str
+    checkpoint_session: str
+    weekend_format: str
+    target_key: str
+    metrics: dict[str, float]
+    predicted_at: str
 
 
 class AccuracyPipeline:
-    """Load, compute, and structure accuracy data for a given season.
-
-    Usage::
-
-        pipeline = AccuracyPipeline(year=2026)
-        summary = pipeline.build_summary()
-    """
+    """Load, compute, and structure target-aware accuracy data for one season."""
 
     def __init__(self, year: int = 2026):
-        self.year = year
+        """Create a pipeline for one season."""
+        self.year = int(year)
         self._predictions: list[dict[str, Any]] = []
         self._metrics_calculator: Any = None
-
-    # -- lazy imports to avoid heavyweight deps at module level ----------
+        self._artifact_store: Any = None
+        self._actuals_reconciled = 0
+        self._initialized = False
+        self._prediction_status_rows: list[dict[str, Any]] = []
+        self._excluded_predictions: list[dict[str, Any]] = []
+        self._excluded_target_keys: set[str] = set()
 
     def _ensure_deps(self) -> None:
-        """Lazily import PredictionLogger and PredictionMetrics."""
-        if self._metrics_calculator is not None:
+        """Lazily initialize storage, logger, and metrics dependencies."""
+        if self._initialized:
             return
 
+        from src.persistence.artifact_store import ArtifactStore
         from src.utils.prediction_logger import PredictionLogger
         from src.utils.prediction_metrics import PredictionMetrics
 
         logger_inst = PredictionLogger()
-        self._predictions = logger_inst.get_all_predictions(self.year)
         self._metrics_calculator = PredictionMetrics()
-
-    # -- public API ------------------------------------------------------
+        self._artifact_store = ArtifactStore(data_root="data")
+        try:
+            self._actuals_reconciled = logger_inst.reconcile_completed_prediction_actuals(self.year)
+        except Exception as exc:
+            logger.warning(
+                "Could not reconcile completed prediction actuals for %s: %s", self.year, exc
+            )
+            self._actuals_reconciled = 0
+        self._predictions = logger_inst.get_all_predictions(self.year)
+        self._initialized = True
 
     def build_summary(self) -> SeasonAccuracySummary:
-        """Return a :class:`SeasonAccuracySummary` for the configured year."""
+        """Return a target-aware season summary for the configured year."""
         self._ensure_deps()
 
-        summary = SeasonAccuracySummary(year=self.year)
-
+        summary = SeasonAccuracySummary(year=self.year, n_predictions=len(self._predictions))
         if not self._predictions:
+            self._prediction_status_rows = []
+            self._excluded_predictions = []
+            self._excluded_target_keys = set()
             return summary
 
-        predictions_with_actuals = [
-            p
-            for p in self._predictions
-            if p.get("actuals") and (p["actuals"].get("qualifying") or p["actuals"].get("race"))
+        snapshot_map = self._load_snapshot_map()
+        records, status_rows, excluded_target_count = self._collect_target_records(snapshot_map)
+        self._prediction_status_rows = status_rows
+        self._excluded_predictions = [
+            row for row in status_rows if int(row.get("scored_target_count", 0)) <= 0
         ]
+        self._excluded_target_keys = {
+            str(row["artifact_key"])
+            for row in status_rows
+            if int(row.get("excluded_target_count", 0)) > 0
+        }
 
-        summary.n_predictions = len(self._predictions)
-
-        for pred in predictions_with_actuals:
-            metrics = self._metrics_calculator.calculate_all_metrics(pred)
-            if metrics is None:
-                continue
-            snapshot = RaceAccuracySnapshot(
-                race_name=metrics["metadata"]["race_name"],
-                session_name=metrics["metadata"]["session_name"],
-                qualifying=metrics.get("qualifying"),
-                race=metrics.get("race"),
-            )
-            summary.per_race.append(snapshot)
-
-        if predictions_with_actuals:
-            agg = self._metrics_calculator.aggregate_metrics(predictions_with_actuals)
-            summary.qualifying_aggregate = agg.get("qualifying", {})
-            summary.race_aggregate = agg.get("race", {})
-
+        summary.n_excluded_predictions = len(self._excluded_predictions)
+        summary.n_excluded_targets = excluded_target_count
+        summary.targets = self._build_target_summaries(records)
+        summary.qualifying_aggregate = summary.targets.get(
+            "main_qualifying", TargetAccuracySummary("main_qualifying", "")
+        ).aggregate
+        summary.race_aggregate = summary.targets.get(
+            "grand_prix_race", TargetAccuracySummary("grand_prix_race", "")
+        ).aggregate
+        summary.per_race = self._build_per_race_snapshots(records)
         return summary
 
     @property
     def all_predictions(self) -> list[dict[str, Any]]:
-        """Raw prediction dicts (useful for the saved-predictions list)."""
+        """Return all saved predictions for the configured season."""
         self._ensure_deps()
         return self._predictions
 
     @property
-    def has_actuals(self) -> bool:
-        """True when at least one prediction has actual results attached."""
+    def predictions_with_actuals(self) -> list[dict[str, Any]]:
+        """Return predictions that already have at least one scored target."""
         self._ensure_deps()
-        return any(
-            p.get("actuals") and (p["actuals"].get("qualifying") or p["actuals"].get("race"))
-            for p in self._predictions
+        return [
+            prediction
+            for prediction in self._predictions
+            if any(
+                (
+                    explicit_target_actuals(prediction)
+                    or synthesize_legacy_actuals(
+                        prediction,
+                        is_sprint=self._prediction_is_sprint(prediction),
+                    )
+                ).values()
+            )
+        ]
+
+    @property
+    def has_actuals(self) -> bool:
+        """Return True when at least one saved prediction has actuals attached."""
+        return bool(self.predictions_with_actuals)
+
+    @property
+    def actuals_reconciled(self) -> int:
+        """Return the number of predictions reconciled during page load."""
+        self._ensure_deps()
+        return self._actuals_reconciled
+
+    @property
+    def excluded_predictions(self) -> list[dict[str, Any]]:
+        """Return saved prediction rows that produced no scored targets."""
+        self._ensure_deps()
+        return self._excluded_predictions
+
+    @property
+    def prediction_status_rows(self) -> list[dict[str, Any]]:
+        """Return user-facing status rows for the saved-prediction list."""
+        self._ensure_deps()
+        if not self._prediction_status_rows:
+            self.build_summary()
+        return self._prediction_status_rows
+
+    @property
+    def excluded_target_keys(self) -> set[str]:
+        """Return artifact keys for checkpoints with excluded targets."""
+        self._ensure_deps()
+        if not self._prediction_status_rows:
+            self.build_summary()
+        return self._excluded_target_keys
+
+    def _load_snapshot_map(self) -> dict[str, dict[str, Any]]:
+        """Load persisted accuracy snapshots keyed by artifact key."""
+        if self._artifact_store is None:
+            return {}
+        try:
+            snapshot_rows = self._artifact_store.list_artifacts(
+                "accuracy_snapshot",
+                key_prefix=f"{self.year}::",
+                limit=8192,
+            )
+        except Exception as exc:
+            logger.warning("Could not list accuracy snapshots for %s: %s", self.year, exc)
+            return {}
+
+        snapshot_map: dict[str, dict[str, Any]] = {}
+        for row in snapshot_rows:
+            artifact_key = str(row.get("artifact_key", "")).strip()
+            payload = row.get("data")
+            if artifact_key and isinstance(payload, dict):
+                snapshot_map[artifact_key] = payload
+        return snapshot_map
+
+    def _collect_target_records(
+        self,
+        snapshot_map: dict[str, dict[str, Any]],
+    ) -> tuple[list[_TargetAccuracyRecord], list[dict[str, Any]], int]:
+        """Collect normalized target records and status rows from saved predictions."""
+        records: list[_TargetAccuracyRecord] = []
+        status_rows: list[dict[str, Any]] = []
+        excluded_targets = 0
+
+        for prediction in self._predictions:
+            metadata = prediction.get("metadata", {})
+            race_name = str(metadata.get("race_name", "")).strip()
+            checkpoint_session = str(metadata.get("session_name", "")).strip().upper()
+            predicted_at = str(metadata.get("predicted_at", "")).strip()
+            if not race_name or not checkpoint_session:
+                continue
+
+            is_sprint = self._prediction_is_sprint(prediction)
+            weekend_format = str(metadata.get("weekend_format", "")).strip().lower()
+            if weekend_format not in {"normal", "sprint"}:
+                weekend_format = weekend_format_name(is_sprint)
+
+            target_predictions = explicit_target_predictions(prediction)
+            if not target_predictions:
+                target_predictions = synthesize_legacy_targets(prediction, is_sprint=is_sprint)
+            target_actuals = explicit_target_actuals(prediction)
+            if not target_actuals:
+                target_actuals = synthesize_legacy_actuals(prediction, is_sprint=is_sprint)
+
+            scored_target_count = 0
+            pending_target_count = 0
+            excluded_target_count = 0
+            target_labels: list[str] = []
+
+            fallback_metrics = calculate_target_metric_map(
+                metrics_calculator=self._metrics_calculator,
+                prediction_data=prediction,
+                is_sprint=is_sprint,
+            )
+            checkpoint_records: list[_TargetAccuracyRecord] = []
+            for target_key, target_payload in target_predictions.items():
+                target_labels.append(target_label(target_key))
+                if not bool(target_payload.get("eligible_at_save", True)):
+                    excluded_target_count += 1
+                    excluded_targets += 1
+                    continue
+
+                artifact_key = accuracy_snapshot_artifact_key(
+                    year=self.year,
+                    race_name=race_name,
+                    checkpoint_session=checkpoint_session,
+                    target_key=target_key,
+                )
+                snapshot_payload = snapshot_map.get(artifact_key, {})
+                metrics = {}
+                if isinstance(snapshot_payload, dict):
+                    metrics_payload = snapshot_payload.get("metrics")
+                    if isinstance(metrics_payload, dict):
+                        metrics = metrics_payload
+                if not metrics:
+                    metrics = fallback_metrics.get(target_key, {})
+
+                if metrics:
+                    checkpoint_records.append(
+                        _TargetAccuracyRecord(
+                            race_name=race_name,
+                            checkpoint_session=checkpoint_session,
+                            weekend_format=weekend_format,
+                            target_key=target_key,
+                            metrics={
+                                key: float(value)
+                                for key, value in metrics.items()
+                                if isinstance(value, int | float) and np.isfinite(float(value))
+                            },
+                            predicted_at=predicted_at,
+                        )
+                    )
+                    scored_target_count += 1
+                    continue
+
+                if target_actuals.get(target_key):
+                    excluded_target_count += 1
+                    excluded_targets += 1
+                else:
+                    pending_target_count += 1
+
+            records.extend(checkpoint_records)
+            status_rows.append(
+                {
+                    "artifact_key": f"{self.year}::{race_name}::{checkpoint_session}",
+                    "race_name": race_name,
+                    "checkpoint_session": checkpoint_session,
+                    "weekend_format": weekend_format,
+                    "target_labels": sorted(set(target_labels)),
+                    "scored_target_count": scored_target_count,
+                    "pending_target_count": pending_target_count,
+                    "excluded_target_count": excluded_target_count,
+                    "status_text": self._status_text(
+                        scored_target_count=scored_target_count,
+                        pending_target_count=pending_target_count,
+                        excluded_target_count=excluded_target_count,
+                    ),
+                }
+            )
+
+        status_rows.sort(
+            key=lambda row: (
+                str(row.get("race_name", "")),
+                str(row.get("checkpoint_session", "")),
+            )
         )
+        return records, status_rows, excluded_targets
+
+    def _build_target_summaries(
+        self,
+        records: list[_TargetAccuracyRecord],
+    ) -> dict[str, TargetAccuracySummary]:
+        """Build target summaries from normalized score records."""
+        race_order: dict[str, int] = {}
+        for record in records:
+            race_order.setdefault(record.race_name, len(race_order))
+
+        grouped: dict[str, list[_TargetAccuracyRecord]] = {}
+        for record in records:
+            grouped.setdefault(record.target_key, []).append(record)
+
+        summaries: dict[str, TargetAccuracySummary] = {}
+        for target_key, target_records in grouped.items():
+            aggregate = self._aggregate_metric_rows([record.metrics for record in target_records])
+            checkpoint_progression = self._build_checkpoint_progression(target_key, target_records)
+            season_trend = [
+                SeasonTrendPoint(
+                    target_key=target_key,
+                    weekend_format=record.weekend_format,
+                    race_name=record.race_name,
+                    race_order=race_order[record.race_name],
+                    checkpoint_session=record.checkpoint_session,
+                    checkpoint_index=target_checkpoint_index(
+                        target_key,
+                        record.weekend_format,
+                        record.checkpoint_session,
+                    ),
+                    metrics=record.metrics,
+                )
+                for record in sorted(
+                    target_records,
+                    key=lambda item: (
+                        race_order[item.race_name],
+                        target_checkpoint_index(
+                            target_key,
+                            item.weekend_format,
+                            item.checkpoint_session,
+                        ),
+                    ),
+                )
+            ]
+            summaries[target_key] = TargetAccuracySummary(
+                target_key=target_key,
+                label=target_label(target_key),
+                aggregate=aggregate,
+                checkpoint_progression=checkpoint_progression,
+                season_trend=season_trend,
+                n_scored_predictions=len(target_records),
+            )
+
+        return summaries
+
+    def _build_checkpoint_progression(
+        self,
+        target_key: str,
+        records: list[_TargetAccuracyRecord],
+    ) -> list[CheckpointAccuracyPoint]:
+        """Aggregate one target into weekend-progression points."""
+        grouped: dict[tuple[str, str], list[dict[str, float]]] = {}
+        for record in records:
+            grouped.setdefault(
+                (record.weekend_format, record.checkpoint_session),
+                [],
+            ).append(record.metrics)
+
+        points: list[CheckpointAccuracyPoint] = []
+        for (weekend_format, checkpoint_session), metric_rows in grouped.items():
+            points.append(
+                CheckpointAccuracyPoint(
+                    target_key=target_key,
+                    weekend_format=weekend_format,
+                    checkpoint_session=checkpoint_session,
+                    checkpoint_index=target_checkpoint_index(
+                        target_key,
+                        weekend_format,
+                        checkpoint_session,
+                    ),
+                    metrics={
+                        key: values["mean"]
+                        for key, values in self._aggregate_metric_rows(metric_rows).items()
+                    },
+                    race_count=len(metric_rows),
+                )
+            )
+
+        return sorted(
+            points,
+            key=lambda point: (point.weekend_format, point.checkpoint_index),
+        )
+
+    def _build_per_race_snapshots(
+        self,
+        records: list[_TargetAccuracyRecord],
+    ) -> list[RaceAccuracySnapshot]:
+        """Build compatibility per-race snapshots from target records."""
+        grouped: dict[tuple[str, str], RaceAccuracySnapshot] = {}
+        for record in records:
+            key = (record.race_name, record.checkpoint_session)
+            snapshot = grouped.setdefault(
+                key,
+                RaceAccuracySnapshot(
+                    race_name=record.race_name,
+                    session_name=record.checkpoint_session,
+                ),
+            )
+            snapshot.targets[record.target_key] = record.metrics
+            if record.target_key == "main_qualifying":
+                snapshot.qualifying = record.metrics
+            if record.target_key == "grand_prix_race":
+                snapshot.race = record.metrics
+        return list(grouped.values())
+
+    @staticmethod
+    def _aggregate_metric_rows(metric_rows: list[dict[str, float]]) -> dict[str, dict[str, float]]:
+        """Aggregate metric rows into mean and standard deviation by metric name."""
+        aggregate: dict[str, dict[str, float]] = {}
+        if not metric_rows:
+            return aggregate
+        keys = sorted({key for row in metric_rows for key in row})
+        for key in keys:
+            values = [
+                float(row[key])
+                for row in metric_rows
+                if isinstance(row.get(key), int | float) and np.isfinite(float(row[key]))
+            ]
+            if not values:
+                continue
+            aggregate[key] = {
+                "mean": float(np.mean(values)),
+                "std": float(np.std(values)),
+            }
+        return aggregate
+
+    @staticmethod
+    def _status_text(
+        *,
+        scored_target_count: int,
+        pending_target_count: int,
+        excluded_target_count: int,
+    ) -> str:
+        """Build a compact status line for one saved checkpoint."""
+        parts: list[str] = []
+        if scored_target_count > 0:
+            parts.append(f"{scored_target_count} scored")
+        if pending_target_count > 0:
+            parts.append(f"{pending_target_count} pending")
+        if excluded_target_count > 0:
+            parts.append(f"{excluded_target_count} excluded")
+        return ", ".join(parts) if parts else "No scoreable targets"
+
+    @staticmethod
+    def _prediction_is_sprint(prediction: dict[str, Any]) -> bool:
+        """Infer weekend format from saved metadata with a legacy fallback."""
+        metadata = prediction.get("metadata", {})
+        weekend_format = str(metadata.get("weekend_format", "")).strip().lower()
+        if weekend_format in {"normal", "sprint"}:
+            return weekend_format == "sprint"
+
+        target_predictions = explicit_target_predictions(prediction)
+        if any("sprint" in target_key for target_key in target_predictions):
+            return True
+
+        checkpoint_session = str(metadata.get("session_name", "")).strip().upper()
+        if checkpoint_session in {"SQ", "SPRINT"}:
+            return True
+        if checkpoint_session in {"FP2", "FP3"}:
+            return False
+        qualifying_target = str(metadata.get("top_level_qualifying_target", "")).strip()
+        race_target = str(metadata.get("top_level_race_target", "")).strip()
+        if qualifying_target or race_target:
+            return (
+                qualifying_target not in PRIMARY_TARGET_KEYS
+                or race_target not in PRIMARY_TARGET_KEYS
+            )
+        return False
