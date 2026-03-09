@@ -12,7 +12,10 @@ from typing import Any
 import fastf1
 
 from src.dashboard.cache import get_artifact_versions
-from src.dashboard.live_prediction_flow import prediction_payload_for_session
+from src.dashboard.live_prediction_flow import (
+    prediction_payload_for_session,
+    prediction_targets_for_checkpoint,
+)
 from src.dashboard.prediction_flow import run_prediction
 from src.dashboard.update_flow import (
     auto_update_practice_characteristics_if_needed,
@@ -21,6 +24,14 @@ from src.dashboard.update_flow import (
 from src.persistence.artifact_store import ArtifactStore
 from src.persistence.config import should_read_db_first, should_write_to_db, should_write_to_file
 from src.persistence.runtime_state_store import RuntimeStateStore
+from src.utils.accuracy_snapshots import build_accuracy_snapshot_records
+from src.utils.accuracy_targets import (
+    explicit_target_predictions,
+    fastf1_session_name,
+    legacy_target_keys_for_prediction,
+    synthesize_legacy_targets,
+    weekend_format_name,
+)
 from src.utils.actual_results_fetcher import fetch_actual_session_results
 from src.utils.auto_updater import auto_update_from_races, needs_update
 from src.utils.prediction_logger import PredictionLogger
@@ -274,6 +285,17 @@ def _generate_prediction_for_latest_session(
         is_sprint=is_sprint,
         session_name=latest_session,
     )
+    target_predictions = prediction_targets_for_checkpoint(
+        prediction_results=prediction_results,
+        is_sprint=is_sprint,
+        session_name=latest_session,
+    )
+    if not target_predictions:
+        return False
+    qualifying_target, race_target = legacy_target_keys_for_prediction(
+        latest_session,
+        is_sprint=is_sprint,
+    )
     prediction_logger.save_prediction(
         year=year,
         race_name=race_name,
@@ -282,9 +304,15 @@ def _generate_prediction_for_latest_session(
         race_prediction=race_prediction,
         weather=weather,
         fp_blend_info=fp_blend_info,
+        target_predictions=target_predictions,
         metadata={
             "source": "session_automation",
             "latest_session": latest_session,
+            "weekend_format": weekend_format_name(is_sprint),
+            "top_level_qualifying_target": qualifying_target,
+            "top_level_race_target": race_target,
+            "top_level_qualifying_eligible_at_save": qualifying_target in target_predictions,
+            "top_level_race_eligible_at_save": race_target in target_predictions,
         },
     )
     return True
@@ -303,7 +331,7 @@ def _actual_sessions_for_prediction(
     """
     checkpoint_upper = str(checkpoint_session).strip().upper()
     if is_sprint and checkpoint_upper in {"FP1", "SQ", "SPRINT"}:
-        return "SQ", "Sprint"
+        return "SQ", "SPRINT"
     return "Q", "R"
 
 
@@ -312,39 +340,30 @@ def _store_accuracy_snapshot(
     year: int,
     race_name: str,
     session_name: str,
-    qualifying_actual_session: str,
-    race_actual_session: str,
+    is_sprint: bool,
     prediction_logger: PredictionLogger,
     metrics_calculator: PredictionMetrics,
     artifact_store: ArtifactStore,
-) -> bool:
-    """Compute and persist an accuracy snapshot for one prediction checkpoint."""
+) -> int:
+    """Compute and persist accuracy snapshots for one prediction checkpoint."""
     prediction = prediction_logger.load_prediction(year, race_name, session_name)
     if prediction is None:
-        return False
+        return 0
 
-    metrics = metrics_calculator.calculate_all_metrics(prediction)
-    if metrics is None:
-        return False
-
-    artifact_store.save_artifact(
-        artifact_type="accuracy_snapshot",
-        artifact_key=f"{year}::{race_name}::{session_name}",
-        version=1,
-        data={
-            "metadata": {
-                "year": year,
-                "race_name": race_name,
-                "session_name": session_name,
-                "qualifying_actual_session": qualifying_actual_session,
-                "race_actual_session": race_actual_session,
-                "generated_by": "session_automation",
-                "updated_at": datetime.now(UTC).isoformat(),
-            },
-            "metrics": metrics,
-        },
+    snapshot_records = build_accuracy_snapshot_records(
+        prediction_data=prediction,
+        is_sprint=is_sprint,
+        metrics_calculator=metrics_calculator,
+        generated_by="session_automation",
     )
-    return True
+    for record in snapshot_records:
+        artifact_store.save_artifact(
+            artifact_type="accuracy_snapshot",
+            artifact_key=record["artifact_key"],
+            version=1,
+            data=record["data"],
+        )
+    return len(snapshot_records)
 
 
 def _reconcile_prediction_actuals(
@@ -362,38 +381,57 @@ def _reconcile_prediction_actuals(
     Returns:
         Tuple ``(predictions_reconciled, accuracy_snapshots_written)``.
     """
-    sessions_to_reconcile = ["FP1", "FP2", "FP3", "Q", "R"]
-    if is_sprint:
-        sessions_to_reconcile = ["FP1", "SQ", "Sprint", "Q", "R"]
-
     actual_cache: dict[str, list[Any] | None] = {}
     reconciled = 0
     snapshots = 0
 
-    for session_name in sessions_to_reconcile:
-        if not prediction_logger.has_prediction_for_session(year, race_name, session_name):
+    race_predictions = [
+        prediction
+        for prediction in prediction_logger.get_all_predictions(year)
+        if str((prediction.get("metadata") or {}).get("race_name", "")).strip() == race_name
+    ]
+
+    for prediction in race_predictions:
+        metadata = prediction.get("metadata", {})
+        session_name = str(metadata.get("session_name", "")).strip().upper()
+        if not session_name:
             continue
 
-        quali_actual_session, race_actual_session = _actual_sessions_for_prediction(
+        qualifying_actual_session, race_actual_session = _actual_sessions_for_prediction(
             checkpoint_session=session_name,
             is_sprint=is_sprint,
         )
-        if quali_actual_session not in actual_cache:
-            actual_cache[quali_actual_session] = fetch_actual_session_results(
-                year,
-                race_name,
-                quali_actual_session,
-            )
-        if race_actual_session not in actual_cache:
-            actual_cache[race_actual_session] = fetch_actual_session_results(
-                year,
-                race_name,
-                race_actual_session,
-            )
+        for actual_session in {qualifying_actual_session, race_actual_session}:
+            if actual_session not in actual_cache:
+                actual_cache[actual_session] = fetch_actual_session_results(
+                    year,
+                    race_name,
+                    fastf1_session_name(actual_session),
+                )
 
-        qualifying_results = actual_cache.get(quali_actual_session)
+        target_predictions = explicit_target_predictions(prediction)
+        if not target_predictions:
+            target_predictions = synthesize_legacy_targets(prediction, is_sprint=is_sprint)
+        target_actual_results: dict[str, list[Any] | None] = {}
+        for target_key, payload in target_predictions.items():
+            target_session = str(payload.get("target_session", ""))
+            if not target_session:
+                continue
+            if target_session not in actual_cache:
+                actual_cache[target_session] = fetch_actual_session_results(
+                    year,
+                    race_name,
+                    fastf1_session_name(target_session),
+                )
+            target_actual_results[target_key] = actual_cache.get(target_session)
+
+        qualifying_results = actual_cache.get(qualifying_actual_session)
         race_results = actual_cache.get(race_actual_session)
-        if qualifying_results is None and race_results is None:
+        if (
+            qualifying_results is None
+            and race_results is None
+            and not any(rows is not None for rows in target_actual_results.values())
+        ):
             continue
 
         updated = prediction_logger.update_actuals(
@@ -402,23 +440,21 @@ def _reconcile_prediction_actuals(
             session_name=session_name,
             qualifying_results=qualifying_results,
             race_results=race_results,
+            target_actual_results=target_actual_results,
         )
         if not updated:
             continue
 
         reconciled += 1
-        snapshot_written = _store_accuracy_snapshot(
+        snapshots += _store_accuracy_snapshot(
             year=year,
             race_name=race_name,
             session_name=session_name,
-            qualifying_actual_session=quali_actual_session,
-            race_actual_session=race_actual_session,
+            is_sprint=is_sprint,
             prediction_logger=prediction_logger,
             metrics_calculator=metrics_calculator,
             artifact_store=artifact_store,
         )
-        if snapshot_written:
-            snapshots += 1
 
     return reconciled, snapshots
 

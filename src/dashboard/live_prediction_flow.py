@@ -21,6 +21,17 @@ from src.dashboard.precomputed_predictions import (
     save_precomputed_prediction,
 )
 from src.dashboard.update_flow import _boundary_signature, _build_event_boundary_snapshot
+from src.utils.accuracy_targets import (
+    TARGET_GRAND_PRIX_RACE,
+    TARGET_MAIN_QUALIFYING,
+    TARGET_SPRINT_QUALIFYING,
+    TARGET_SPRINT_RACE,
+    eligible_target_keys,
+    legacy_target_keys_for_prediction,
+    mean_confidence_from_rows,
+    target_session_name,
+    weekend_format_name,
+)
 from src.utils.operational_observability import (
     drain_recent_alerts,
     record_alert,
@@ -90,6 +101,18 @@ logger = logging.getLogger(__name__)
 _PREDICTION_RESULT_CACHE_MAX_ENTRIES = 24
 _prediction_result_cache: OrderedDict[str, PredictionResults] = OrderedDict()
 _prediction_result_cache_lock = RLock()
+_TARGET_SECTION_BINDINGS = {
+    False: {
+        TARGET_MAIN_QUALIFYING: ("qualifying", "grid"),
+        TARGET_GRAND_PRIX_RACE: ("race", "finish_order"),
+    },
+    True: {
+        TARGET_SPRINT_QUALIFYING: ("sprint_quali", "grid"),
+        TARGET_SPRINT_RACE: ("sprint_race", "finish_order"),
+        TARGET_MAIN_QUALIFYING: ("main_quali", "grid"),
+        TARGET_GRAND_PRIX_RACE: ("main_race", "finish_order"),
+    },
+}
 
 
 def clear_prediction_result_cache() -> None:
@@ -289,43 +312,87 @@ def save_prediction_if_enabled_core(
     detector = detector_factory()
     logger_inst = prediction_logger_factory()
     latest_session = detector.get_latest_completed_session(year, race_name, is_sprint)
+    checkpoint_session = _resolve_prediction_checkpoint_session(latest_session)
 
-    if latest_session:
-        if not logger_inst.has_prediction_for_session(year, race_name, latest_session):
-            try:
-                quali_grid, race_finish, fp_blend_info = prediction_payload_for_session(
-                    prediction_results=prediction_results,
-                    is_sprint=is_sprint,
-                    session_name=str(latest_session),
-                )
+    if logger_inst.has_prediction_for_session(year, race_name, checkpoint_session):
+        st_module.info(f"Prediction for {checkpoint_session} already saved (max 1 per session)")
+        return
 
-                logger_inst.save_prediction(
-                    year=year,
-                    race_name=race_name,
-                    session_name=latest_session,
-                    qualifying_prediction=quali_grid,
-                    race_prediction=race_finish,
-                    weather=weather,
-                    fp_blend_info=fp_blend_info,
-                )
-                _persist_prediction_checkpoint_summary(
-                    logger_instance=logger_inst,
-                    prediction_results=prediction_results,
-                    year=year,
-                    race_name=race_name,
-                    session_name=str(latest_session),
-                    weather=weather,
-                    is_sprint=is_sprint,
-                )
-                st_module.info(f"Prediction saved for accuracy tracking (after {latest_session})")
-            except Exception as exc:
-                st_module.warning(f"Could not save prediction: {exc}")
-        else:
-            st_module.info(f"Prediction for {latest_session} already saved (max 1 per session)")
-    else:
+    target_predictions = prediction_targets_for_checkpoint(
+        prediction_results=prediction_results,
+        is_sprint=is_sprint,
+        session_name=checkpoint_session,
+    )
+    if not target_predictions:
         st_module.info(
-            "No completed sessions yet; prediction not saved (will save after FP1/FP2/FP3/SQ)"
+            f"Skipped saving {checkpoint_session} checkpoint because every tracked target "
+            "already has completed-session results. Accuracy requires a forecast saved before "
+            "that target finishes."
         )
+        return
+
+    try:
+        quali_grid, race_finish, fp_blend_info = prediction_payload_for_session(
+            prediction_results=prediction_results,
+            is_sprint=is_sprint,
+            session_name=checkpoint_session,
+        )
+        qualifying_section, race_section = _prediction_sections_for_session(
+            prediction_results=prediction_results,
+            is_sprint=is_sprint,
+            session_name=checkpoint_session,
+        )
+        qualifying_target, race_target = legacy_target_keys_for_prediction(
+            checkpoint_session,
+            is_sprint=is_sprint,
+        )
+
+        logger_inst.save_prediction(
+            year=year,
+            race_name=race_name,
+            session_name=checkpoint_session,
+            qualifying_prediction=quali_grid,
+            race_prediction=race_finish,
+            weather=weather,
+            fp_blend_info=fp_blend_info,
+            target_predictions=target_predictions,
+            metadata={
+                "source": "dashboard_live_prediction",
+                "weekend_format": weekend_format_name(is_sprint),
+                "top_level_qualifying_target": qualifying_target,
+                "top_level_race_target": race_target,
+                "top_level_qualifying_eligible_at_save": (
+                    str(qualifying_section.get("result_mode", "PREDICTED")).strip().upper()
+                    != "ACTUAL"
+                ),
+                "top_level_race_eligible_at_save": (
+                    str(race_section.get("result_mode", "PREDICTED")).strip().upper() != "ACTUAL"
+                ),
+                "top_level_qualifying_result_mode": qualifying_section.get(
+                    "result_mode",
+                    "PREDICTED",
+                ),
+                "top_level_race_result_mode": race_section.get("result_mode", "PREDICTED"),
+                "top_level_qualifying_grid_source": qualifying_section.get(
+                    "grid_source",
+                    "PREDICTED",
+                ),
+                "top_level_race_grid_source": race_section.get("grid_source", "PREDICTED"),
+            },
+        )
+        _persist_prediction_checkpoint_summary(
+            logger_instance=logger_inst,
+            prediction_results=prediction_results,
+            year=year,
+            race_name=race_name,
+            session_name=checkpoint_session,
+            weather=weather,
+            is_sprint=is_sprint,
+            target_predictions=target_predictions,
+        )
+        st_module.info(f"Prediction saved for accuracy tracking (checkpoint {checkpoint_session})")
+    except Exception as exc:
+        st_module.warning(f"Could not save prediction: {exc}")
 
 
 def prediction_payload_for_session(
@@ -348,7 +415,7 @@ def prediction_payload_for_session(
         )
 
     session_name_upper = str(session_name).strip().upper()
-    sprint_phase_sessions = {"FP1", "SQ", "SPRINT"}
+    sprint_phase_sessions = {"PRE", "FP1", "SQ", "SPRINT"}
     if session_name_upper in sprint_phase_sessions:
         return (
             prediction_results["sprint_quali"]["grid"],
@@ -377,7 +444,7 @@ def _prediction_sections_for_session(
         )
 
     session_name_upper = str(session_name).strip().upper()
-    if session_name_upper in {"FP1", "SQ", "SPRINT"}:
+    if session_name_upper in {"PRE", "FP1", "SQ", "SPRINT"}:
         return (
             prediction_results.get("sprint_quali", {}),
             prediction_results.get("sprint_race", {}),
@@ -389,24 +456,50 @@ def _prediction_sections_for_session(
     )
 
 
+def _resolve_prediction_checkpoint_session(latest_session: Any) -> str:
+    """Map the latest completed session into the stored checkpoint key."""
+    normalized = str(latest_session or "").strip().upper()
+    return normalized if normalized else "PRE"
+
+
+def prediction_targets_for_checkpoint(
+    *,
+    prediction_results: PredictionResults,
+    is_sprint: bool,
+    session_name: str,
+) -> dict[str, dict[str, Any]]:
+    """Extract every forecastable target payload for a checkpoint save."""
+    checkpoint_session = _resolve_prediction_checkpoint_session(session_name)
+    target_predictions: dict[str, dict[str, Any]] = {}
+    section_bindings = _TARGET_SECTION_BINDINGS[bool(is_sprint)]
+
+    for target_key in eligible_target_keys(checkpoint_session, is_sprint):
+        section_name, rows_key = section_bindings[target_key]
+        section = prediction_results.get(section_name, {})
+        if not isinstance(section, dict):
+            continue
+        predicted_order = section.get(rows_key, [])
+        if not isinstance(predicted_order, list) or not predicted_order:
+            continue
+        result_mode = str(section.get("result_mode", "PREDICTED")).strip().upper()
+        if result_mode == "ACTUAL":
+            continue
+        fp_blend_info = section.get("fp_blend_info")
+        target_predictions[target_key] = {
+            "target_session": target_session_name(target_key),
+            "predicted_order": predicted_order,
+            "result_mode": result_mode,
+            "grid_source": str(section.get("grid_source", "PREDICTED")).strip().upper(),
+            "fp_blend_info": fp_blend_info if isinstance(fp_blend_info, dict) else {},
+            "mean_confidence": mean_confidence_from_rows(predicted_order),
+            "eligible_at_save": True,
+        }
+    return target_predictions
+
+
 def _mean_confidence(entries: Any) -> float | None:
     """Compute mean confidence across prediction rows when values are present."""
-    if not isinstance(entries, list):
-        return None
-    values: list[float] = []
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        raw_confidence = entry.get("confidence")
-        if raw_confidence is None:
-            continue
-        try:
-            values.append(float(raw_confidence))
-        except (TypeError, ValueError):
-            continue
-    if not values:
-        return None
-    return float(sum(values) / len(values))
+    return mean_confidence_from_rows(entries)
 
 
 def _persist_prediction_checkpoint_summary(
@@ -418,6 +511,7 @@ def _persist_prediction_checkpoint_summary(
     session_name: str,
     weather: str,
     is_sprint: bool,
+    target_predictions: dict[str, dict[str, Any]],
 ) -> None:
     """Persist compact checkpoint metadata for session-by-session trend analysis."""
     artifact_store = getattr(logger_instance, "artifact_store", None)
@@ -443,6 +537,7 @@ def _persist_prediction_checkpoint_summary(
             "session_name": str(session_name).strip().upper(),
             "weather": str(weather).strip().lower(),
             "is_sprint_weekend": bool(is_sprint),
+            "weekend_format": weekend_format_name(is_sprint),
             "generated_at": datetime.now(UTC).isoformat(),
             "source": "dashboard_live_prediction",
         },
@@ -460,6 +555,16 @@ def _persist_prediction_checkpoint_summary(
             "driver_count": len(race_finish_order) if isinstance(race_finish_order, list) else 0,
         },
         "fp_blend_info": qualifying_section.get("fp_blend_info", {}),
+        "targets": {
+            target_key: {
+                "target_session": target_payload.get("target_session"),
+                "result_mode": target_payload.get("result_mode"),
+                "grid_source": target_payload.get("grid_source"),
+                "mean_confidence": target_payload.get("mean_confidence"),
+                "driver_count": len(target_payload.get("predicted_order", [])),
+            }
+            for target_key, target_payload in target_predictions.items()
+        },
     }
 
     try:

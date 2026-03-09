@@ -123,10 +123,96 @@ def test_run_cycle_reconciles_sprint_actuals_and_writes_accuracy_snapshots(patch
                         "year": 2026,
                         "race_name": "Chinese Grand Prix",
                         "session_name": session,
+                        "weekend_format": "sprint",
                     },
-                    "qualifying": {"predicted_grid": []},
-                    "race": {"predicted_results": []},
-                    "actuals": {"qualifying": None, "race": None},
+                    "qualifying": {
+                        "predicted_grid": [{"position": 1, "driver": "VER", "team": "Red Bull"}]
+                    },
+                    "race": {
+                        "predicted_results": [{"position": 1, "driver": "VER", "team": "Red Bull"}]
+                    },
+                    "targets": {
+                        "FP1": {
+                            "sprint_qualifying": {
+                                "target_session": "SQ",
+                                "predicted_order": [
+                                    {"position": 1, "driver": "VER", "team": "Red Bull"}
+                                ],
+                                "eligible_at_save": True,
+                            },
+                            "sprint_race": {
+                                "target_session": "SPRINT",
+                                "predicted_order": [
+                                    {"position": 1, "driver": "VER", "team": "Red Bull"}
+                                ],
+                                "eligible_at_save": True,
+                            },
+                            "main_qualifying": {
+                                "target_session": "Q",
+                                "predicted_order": [
+                                    {"position": 1, "driver": "VER", "team": "Red Bull"}
+                                ],
+                                "eligible_at_save": True,
+                            },
+                            "grand_prix_race": {
+                                "target_session": "R",
+                                "predicted_order": [
+                                    {"position": 1, "driver": "VER", "team": "Red Bull"}
+                                ],
+                                "eligible_at_save": True,
+                            },
+                        },
+                        "SQ": {
+                            "sprint_race": {
+                                "target_session": "SPRINT",
+                                "predicted_order": [
+                                    {"position": 1, "driver": "VER", "team": "Red Bull"}
+                                ],
+                                "eligible_at_save": True,
+                            },
+                            "main_qualifying": {
+                                "target_session": "Q",
+                                "predicted_order": [
+                                    {"position": 1, "driver": "VER", "team": "Red Bull"}
+                                ],
+                                "eligible_at_save": True,
+                            },
+                            "grand_prix_race": {
+                                "target_session": "R",
+                                "predicted_order": [
+                                    {"position": 1, "driver": "VER", "team": "Red Bull"}
+                                ],
+                                "eligible_at_save": True,
+                            },
+                        },
+                        "Sprint": {
+                            "main_qualifying": {
+                                "target_session": "Q",
+                                "predicted_order": [
+                                    {"position": 1, "driver": "VER", "team": "Red Bull"}
+                                ],
+                                "eligible_at_save": True,
+                            },
+                            "grand_prix_race": {
+                                "target_session": "R",
+                                "predicted_order": [
+                                    {"position": 1, "driver": "VER", "team": "Red Bull"}
+                                ],
+                                "eligible_at_save": True,
+                            },
+                        },
+                        "Q": {
+                            "grand_prix_race": {
+                                "target_session": "R",
+                                "predicted_order": [
+                                    {"position": 1, "driver": "VER", "team": "Red Bull"}
+                                ],
+                                "eligible_at_save": True,
+                            },
+                        },
+                        "R": {},
+                    }.get(session, {}),
+                    "actuals": {"qualifying": None, "race": None, "targets": {}},
                 }
                 for session in ["FP1", "SQ", "Sprint", "Q", "R"]
             }
@@ -147,17 +233,25 @@ def test_run_cycle_reconciles_sprint_actuals_and_writes_accuracy_snapshots(patch
             qualifying_results=None,
             race_results=None,
             run_id=None,
+            target_actual_results=None,
         ) -> bool:
             del year, race_name, run_id
-            if session_name not in self._records:
+            record_key = "Sprint" if session_name == "SPRINT" else session_name
+            if record_key not in self._records:
                 return False
-            self._records[session_name]["actuals"]["qualifying"] = qualifying_results
-            self._records[session_name]["actuals"]["race"] = race_results
+            self._records[record_key]["actuals"]["qualifying"] = qualifying_results
+            self._records[record_key]["actuals"]["race"] = race_results
+            self._records[record_key]["actuals"]["targets"] = target_actual_results or {}
             return True
 
         def load_prediction(self, year: int, race_name: str, session_name: str):
             del year, race_name
-            return self._records.get(session_name)
+            record_key = "Sprint" if session_name == "SPRINT" else session_name
+            return self._records.get(record_key)
+
+        def get_all_predictions(self, year: int):
+            del year
+            return list(self._records.values())
 
     class _Detector:
         def get_session_completion_state(self, year: int, race_name: str, session_name: str) -> str:
@@ -167,6 +261,24 @@ def test_run_cycle_reconciles_sprint_actuals_and_writes_accuracy_snapshots(patch
             return "incomplete"
 
     class _Metrics:
+        def calculate_prediction_target_metrics(self, prediction, *, is_sprint):
+            del is_sprint
+            return {
+                target_key: {
+                    "field_size": 1.0,
+                    "overall_mae": 0.0,
+                    "top_3_hits": 1.0,
+                    "top_3_pct": 100.0,
+                    "top_10_hits": 1.0,
+                    "top_10_pct": 100.0,
+                    "exact_accuracy": 100.0,
+                    "within_1": 100.0,
+                    "within_3": 100.0,
+                    "correlation": 1.0,
+                }
+                for target_key in prediction.get("targets", {})
+            }
+
         def calculate_all_metrics(self, prediction):
             return {"metadata": prediction["metadata"], "qualifying": {}, "race": {}}
 
@@ -223,6 +335,6 @@ def test_run_cycle_reconciles_sprint_actuals_and_writes_accuracy_snapshots(patch
     assert summary.checked_events == 1
     assert summary.generated_predictions == []
     assert summary.reconciled_actuals == ["Chinese Grand Prix::5"]
-    assert summary.accuracy_snapshots == 5
+    assert summary.accuracy_snapshots == 10
     assert sorted(set(fetch_calls)) == ["Q", "R", "SQ", "Sprint"]
-    assert len(accuracy_saves) == 5
+    assert len(accuracy_saves) == 10

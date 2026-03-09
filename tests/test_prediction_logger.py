@@ -180,6 +180,58 @@ def test_update_actuals(temp_predictions_dir, sample_quali_prediction, sample_ra
     assert len(prediction["actuals"]["race"]) == 3
 
 
+def test_save_prediction_and_update_actuals_with_targets(
+    temp_predictions_dir,
+    sample_quali_prediction,
+    sample_race_prediction,
+):
+    """Target payloads and target actuals should persist alongside legacy fields."""
+    logger = PredictionLogger(predictions_dir=temp_predictions_dir)
+
+    logger.save_prediction(
+        year=2026,
+        race_name="Chinese Grand Prix",
+        session_name="FP1",
+        qualifying_prediction=sample_quali_prediction,
+        race_prediction=sample_race_prediction,
+        weather="dry",
+        metadata={"weekend_format": "sprint"},
+        target_predictions={
+            "sprint_qualifying": {
+                "target_session": "SQ",
+                "predicted_order": [
+                    {"position": 1, "driver": "VER", "team": "Red Bull", "confidence": 0.8}
+                ],
+                "eligible_at_save": True,
+            },
+            "grand_prix_race": {
+                "target_session": "R",
+                "predicted_order": [
+                    {"position": 1, "driver": "VER", "team": "Red Bull", "confidence": 0.8}
+                ],
+                "eligible_at_save": True,
+            },
+        },
+    )
+
+    logger.update_actuals(
+        year=2026,
+        race_name="Chinese Grand Prix",
+        session_name="FP1",
+        target_actual_results={
+            "sprint_qualifying": [{"position": 1, "driver": "VER", "team": "Red Bull"}],
+            "grand_prix_race": [{"position": 1, "driver": "VER", "team": "Red Bull"}],
+        },
+    )
+
+    prediction = logger.load_prediction(2026, "Chinese Grand Prix", "FP1")
+
+    assert prediction is not None
+    assert set(prediction["targets"]) == {"sprint_qualifying", "grand_prix_race"}
+    assert prediction["actuals"]["targets"]["sprint_qualifying"][0]["driver"] == "VER"
+    assert prediction["actuals"]["targets"]["grand_prix_race"][0]["driver"] == "VER"
+
+
 def test_update_actuals_triggers_systematic_learning(
     temp_predictions_dir, sample_quali_prediction, sample_race_prediction
 ):

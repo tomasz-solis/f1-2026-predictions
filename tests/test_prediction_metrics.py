@@ -149,6 +149,15 @@ def test_winner_accuracy_wrong(partially_correct):
     assert winner_correct is False  # Predicted Verstappen, actual Norris
 
 
+def test_top_k_overlap_counts_driver_hits(partially_correct):
+    """Top-k overlap should count driver-set hits, not exact order."""
+    predicted, actual = partially_correct
+    overlap = PredictionMetrics.top_k_overlap(predicted, actual, k=3)
+
+    assert overlap["hits"] == 3.0
+    assert overlap["pct"] == 100.0
+
+
 def test_empty_predictions():
     """Test metrics with empty predictions."""
     metrics = PredictionMetrics()
@@ -224,3 +233,46 @@ def test_calculate_all_metrics_no_actuals():
     metrics = PredictionMetrics.calculate_all_metrics(prediction_data)
 
     assert metrics is None
+
+
+def test_calculate_prediction_target_metrics_uses_explicit_targets():
+    """Target-aware metrics should read the canonical target payloads first."""
+    prediction_data = {
+        "metadata": {
+            "race_name": "Chinese Grand Prix",
+            "session_name": "FP1",
+            "weekend_format": "sprint",
+        },
+        "qualifying": {"predicted_grid": []},
+        "race": {"predicted_results": []},
+        "targets": {
+            "sprint_qualifying": {
+                "target_session": "SQ",
+                "predicted_order": [
+                    {"position": 1, "driver": "Verstappen", "team": "Red Bull"},
+                    {"position": 2, "driver": "Norris", "team": "McLaren"},
+                    {"position": 3, "driver": "Leclerc", "team": "Ferrari"},
+                ],
+                "eligible_at_save": True,
+            }
+        },
+        "actuals": {
+            "qualifying": None,
+            "race": None,
+            "targets": {
+                "sprint_qualifying": [
+                    {"position": 1, "driver": "Verstappen", "team": "Red Bull"},
+                    {"position": 2, "driver": "Leclerc", "team": "Ferrari"},
+                    {"position": 3, "driver": "Norris", "team": "McLaren"},
+                ]
+            },
+        },
+    }
+
+    metrics = PredictionMetrics.calculate_prediction_target_metrics(
+        prediction_data,
+        is_sprint=True,
+    )
+
+    assert "sprint_qualifying" in metrics
+    assert metrics["sprint_qualifying"]["top_3_hits"] == 3.0
