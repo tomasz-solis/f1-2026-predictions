@@ -24,6 +24,16 @@ Process:
 - If qualifying session is already complete and results are available, replace predicted grid with ACTUAL qualifying results.
 - Predict race from that grid.
 
+Tracked accuracy targets on a normal weekend:
+
+- `main_qualifying`
+- `grand_prix_race`
+
+Checkpoint coverage:
+
+- `main_qualifying`: `PRE -> FP1 -> FP2 -> FP3`
+- `grand_prix_race`: `PRE -> FP1 -> FP2 -> FP3 -> Q`
+
 ## Sprint Weekend
 
 Flow:
@@ -39,6 +49,20 @@ Process:
 - Sprint Race uses Sprint Qualifying grid (ACTUAL if available, otherwise predicted).
 - Predict Main Qualifying.
 - Main Race uses Main Qualifying grid (ACTUAL if available, otherwise predicted).
+
+Tracked accuracy targets on a sprint weekend:
+
+- `sprint_qualifying`
+- `sprint_race`
+- `main_qualifying`
+- `grand_prix_race`
+
+Checkpoint coverage:
+
+- `sprint_qualifying`: `PRE -> FP1`
+- `sprint_race`: `PRE -> FP1 -> SQ`
+- `main_qualifying`: `PRE -> FP1 -> SQ -> Sprint`
+- `grand_prix_race`: `PRE -> FP1 -> SQ -> Sprint -> Q`
 
 ## ACTUAL vs PREDICTED Grid Source
 
@@ -92,14 +116,44 @@ When tracking is enabled in the **Settings** expander:
 
 - one prediction artifact is saved per detected completed session,
 - dashboard flow enforces max one save per race/session key,
-- sprint weekends save sprint outputs for `FP1`/`SQ`/`Sprint` checkpoints, then main outputs for later checkpoints.
+- each saved checkpoint can persist multiple forecastable targets,
+- later-session ACTUAL results only exclude the contaminated target, not every target by default,
+- sprint weekends can carry sprint-target and main-weekend-target forecasts side by side.
 
 Storage backend depends on `USE_DB_STORAGE` (`file_only`, `db_only`, `fallback`, `dual_write`).
 
 See `docs/PREDICTION_TRACKING.md` for file structure and update workflow.
+
+## Accuracy Outputs
+
+The dashboard **Prediction Accuracy** page now separates two questions that used to be mixed together:
+
+- how accuracy changes over the weekend
+- how accuracy changes over the season
+
+Weekend progression charts:
+
+- split by target
+- split again into normal weekends and sprint weekends
+- x-axis is checkpoint order for that target
+
+Season trend charts:
+
+- split by target
+- split again into normal weekends and sprint weekends
+- x-axis is race round or date through the season
+- one line per checkpoint
+
+Headline charts focus on:
+
+- `main_qualifying`
+- `grand_prix_race`
+
+Sprint-only targets remain available as secondary drilldowns.
 
 ## Known Limits
 
 1. ACTUAL grid replacement depends on FastF1 data availability.
 2. If completion status is unknown, prediction generation for that session is blocked until status can be resolved.
 3. Weekend format detection depends on FastF1 event schedule (with local fallback in utilities).
+4. Historic sprint weekends may have genuine gaps for early main `Q/R` targets if those target forecasts were never stored at the time.

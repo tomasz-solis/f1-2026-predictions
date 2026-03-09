@@ -1,20 +1,25 @@
 # Prediction Tracking
 
-This page explains how session checkpoints are stored and how actual results are attached later for accuracy analysis.
+This page explains how prediction checkpoints are stored, how actual results are attached later, and how target-aware accuracy snapshots are derived.
 
 ## Where It Lives
 
 - Logger: `src/utils/prediction_logger.py`
 - Session detection: `src/utils/session_detector.py`
+- Target mapping: `src/utils/accuracy_targets.py`
 - Metrics: `src/utils/prediction_metrics.py`
+- Snapshot helpers: `src/utils/accuracy_snapshots.py`
 - Update script: `scripts/update_prediction_actuals.py`
+- Snapshot backfill: `scripts/backfill_accuracy_snapshots.py`
 - Dashboard usage: `src/dashboard/pages.py` (Prediction page + Accuracy page; entrypoint: `app.py`)
 
 ## How Saving Works
 
 1. Click **Predict**.
 2. App detects the latest completed session for the weekend type.
-3. If no prediction exists yet for that race/session key, it writes one prediction artifact through `ArtifactStore`.
+3. If no completed session exists yet, the checkpoint is saved as `PRE`.
+4. The save path extracts every tracked target that is still a real forecast at that checkpoint.
+5. If no prediction exists yet for that race/session key, it writes one prediction artifact through `ArtifactStore`.
 
 In dashboard flow, this is still max one saved prediction per race/session key.
 
@@ -39,26 +44,56 @@ Example file names:
 - `chinese_grand_prix_sq.json`
 - `chinese_grand_prix_sprint.json`
 
-## Session Detection Rules
+## Checkpoints And Targets
 
-Normal weekend tracked sessions:
+Stored checkpoints:
 
-- `FP1`, `FP2`, `FP3`
+- `PRE`
+- `FP1`, `FP2`, `FP3`, `Q` on normal weekends
+- `FP1`, `SQ`, `Sprint`, `Q` on sprint weekends
 
-Sprint weekend tracked sessions:
+Canonical tracked targets:
 
-- `FP1`, `SQ`, `Sprint`
+- `main_qualifying`
+- `grand_prix_race`
+- `sprint_qualifying`
+- `sprint_race`
+
+Eligible checkpoints by target:
+
+- Normal `main_qualifying`: `PRE`, `FP1`, `FP2`, `FP3`
+- Normal `grand_prix_race`: `PRE`, `FP1`, `FP2`, `FP3`, `Q`
+- Sprint `sprint_qualifying`: `PRE`, `FP1`
+- Sprint `sprint_race`: `PRE`, `FP1`, `SQ`
+- Sprint `main_qualifying`: `PRE`, `FP1`, `SQ`, `Sprint`
+- Sprint `grand_prix_race`: `PRE`, `FP1`, `SQ`, `Sprint`, `Q`
 
 The detector uses scheduled session time plus buffer duration to decide whether a session is completed.
+`PRE` is the synthetic pre-weekend checkpoint used when no sessions have finished yet.
 
 ## Saved Payload (Current Shape)
 
 Each file contains:
 
-- `metadata` (year, race, session, timestamp, weather, optional blend info, run_id)
+- `metadata` (year, race, session, timestamp, weather, optional blend info, run_id, `weekend_format`)
 - `qualifying.predicted_grid`
 - `race.predicted_results`
-- `actuals` placeholder (`qualifying`, `race`)
+- `targets.<target_key>`
+- `actuals.qualifying`
+- `actuals.race`
+- `actuals.targets.<target_key>`
+
+Each target payload stores:
+
+- `target_session`
+- `predicted_order`
+- `result_mode`
+- `grid_source`
+- `fp_blend_info`
+- `mean_confidence`
+- `eligible_at_save`
+
+The top-level `qualifying` and `race` fields remain for backward compatibility. New accuracy code reads `targets` first and falls back to the legacy shape only when needed.
 
 ## Add Actual Results Later
 
@@ -66,7 +101,18 @@ Each file contains:
 python scripts/update_prediction_actuals.py "Bahrain Grand Prix" FP1 --year 2026
 ```
 
-This script fetches `Q` and `R` results from FastF1 and writes them into the matching prediction file.
+This script now fetches actual results per stored target session and writes them into the matching prediction artifact.
+
+The dashboard accuracy pipeline also reconciles completed prediction actuals on load, and session automation writes target-aware accuracy snapshots after reconciliation.
+
+To backfill missing snapshot artifacts from already stored prediction truth:
+
+```bash
+python scripts/backfill_accuracy_snapshots.py --year 2026 --dry-run
+python scripts/backfill_accuracy_snapshots.py --year 2026
+```
+
+Backfill only writes snapshots for targets that already have stored actuals. It does not invent missing historic sprint targets.
 
 ## Learning Update Side Effect
 
@@ -80,20 +126,35 @@ These learned adjustments are consumed by qualifying/race scoring in the baselin
 
 ## Accuracy View
 
-In the dashboard **Prediction Accuracy** page, metrics are computed only for predictions that already include actual results.
+In the dashboard **Prediction Accuracy** page, metrics are computed per target.
 
-Typical metrics shown:
+Primary metrics:
 
-- exact accuracy,
-- MAE,
-- within-band accuracy,
-- correlation,
-- winner/podium checks.
+- `overall_mae`
+- `top_3_hits`
+- `top_3_pct`
+- `top_10_hits`
+- `top_10_pct`
+
+Supporting metrics kept in the payload and UI:
+
+- `exact_accuracy`
+- `within_1`
+- `within_3`
+- `correlation`
+- `field_size`
+
+The dashboard shows:
+
+- KPI cards for main qualifying and Grand Prix race
+- Weekend progression charts, split into normal and sprint weekends
+- Season trend charts, split into normal and sprint weekends
+- Optional drilldowns for `sprint_qualifying` and `sprint_race`
+- A saved-predictions list with target-aware completion status
 
 ## Known Limits
 
-1. Session labels must match saved keys (`FP1`, `FP2`, `FP3`, `SQ`, `Sprint`).
-2. Actuals update depends on FastF1 availability for qualifying and race sessions.
-3. If no session has completed yet, nothing is saved.
-4. Dashboard accuracy history currently scans local files, so pure `db_only`/`fallback` mode may not show saved history unless files also exist.
-5. Learning updates require matching driver identifiers between predicted payloads and actual results.
+1. Session labels must match saved keys exactly.
+2. Actuals updates still depend on FastF1 availability for the needed target session.
+3. Historic sprint weekends can have genuine gaps for early main `Q/R` targets if those forecasts were never stored.
+4. Learning updates still depend on matching driver identifiers between predicted payloads and actual results.
