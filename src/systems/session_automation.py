@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -43,6 +44,7 @@ logger = logging.getLogger(__name__)
 
 _SCHEDULE_NAMESPACE = "session_automation_schedule"
 _SCHEDULE_STATE_FILE = Path("data/systems/session_automation_schedule.json")
+ActualResultRows = Sequence[Mapping[str, Any]]
 
 
 @dataclass
@@ -381,7 +383,7 @@ def _reconcile_prediction_actuals(
     Returns:
         Tuple ``(predictions_reconciled, accuracy_snapshots_written)``.
     """
-    actual_cache: dict[str, list[Any] | None] = {}
+    actual_cache: dict[str, ActualResultRows | None] = {}
     reconciled = 0
     snapshots = 0
 
@@ -412,7 +414,7 @@ def _reconcile_prediction_actuals(
         target_predictions = explicit_target_predictions(prediction)
         if not target_predictions:
             target_predictions = synthesize_legacy_targets(prediction, is_sprint=is_sprint)
-        target_actual_results: dict[str, list[Any] | None] = {}
+        target_actual_results: dict[str, ActualResultRows | None] = {}
         for target_key, payload in target_predictions.items():
             target_session = str(payload.get("target_session", ""))
             if not target_session:

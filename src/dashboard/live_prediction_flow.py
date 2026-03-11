@@ -21,6 +21,7 @@ from src.dashboard.precomputed_predictions import (
     save_precomputed_prediction,
 )
 from src.dashboard.update_flow import _boundary_signature, _build_event_boundary_snapshot
+from src.persistence.config import should_read_db_first
 from src.utils.accuracy_targets import (
     TARGET_GRAND_PRIX_RACE,
     TARGET_MAIN_QUALIFYING,
@@ -42,6 +43,10 @@ from src.utils.operational_observability import (
 PredictionResults = dict[str, Any]
 ArtifactVersion = tuple[int, str]
 ArtifactVersions = dict[str, ArtifactVersion]
+
+
+class PrecomputedPredictionUnavailableError(RuntimeError):
+    """Raised when the dashboard is configured to load persisted predictions only."""
 
 
 class PredictionRunFn(Protocol):
@@ -727,6 +732,19 @@ def _get_prediction_precompute_settings() -> dict[str, Any]:
     return settings
 
 
+def _require_persisted_predictions(precompute_settings: Mapping[str, Any]) -> bool:
+    """
+    Return True when interactive requests must not compute new predictions.
+
+    In DB-backed deployments we want the dashboard request path to stay read-only
+    when inline precompute is disabled. That keeps latency stable and avoids
+    silent divergence from the persisted warmup horizon.
+    """
+    if not should_read_db_first():
+        return False
+    return not bool(precompute_settings.get("inline_enabled", True))
+
+
 def _resolve_precompute_targets(
     *,
     year: int,
@@ -913,6 +931,7 @@ def execute_live_prediction_pipeline_core(
         "skipped_reason": "",
     }
     precompute_settings = _get_prediction_precompute_settings()
+    require_persisted_predictions = _require_persisted_predictions(precompute_settings)
 
     artifact_versions = get_artifact_versions_fn(year=year)
     artifact_hash = compute_artifact_hash(artifact_versions)
@@ -992,30 +1011,70 @@ def execute_live_prediction_pipeline_core(
                 prediction_cache_hit = True
                 _notify("Reusing cached prediction (no new sessions or input changes)...")
             else:
-                _notify("Competitive results changed; regenerating prediction...")
-                prediction_results = run_prediction_fn(
-                    race_name,
-                    weather,
-                    artifact_versions,
-                    is_sprint=is_sprint,
-                    year=year,
-                )
-                _store_cached_prediction(prediction_cache_key, prediction_results)
-                save_precomputed_prediction(
-                    year=year,
-                    race_name=race_name,
-                    weather=weather,
-                    artifact_hash=artifact_hash,
-                    boundary_signature=boundary_signature,
-                    is_sprint=is_sprint,
-                    prediction_results=prediction_results,
-                    metadata={
-                        "source_race_name": race_name,
-                        "boundary_session_name": boundary_session_name,
-                    },
-                    max_file_entries=int(precompute_settings["max_file_entries"]),
-                )
+                if require_persisted_predictions:
+                    refreshed_prediction = load_precomputed_prediction(
+                        year=year,
+                        race_name=race_name,
+                        weather=weather,
+                        artifact_hash=artifact_hash,
+                        boundary_signature=boundary_signature,
+                    )
+                    if refreshed_prediction is not None:
+                        refreshed_reason = _cache_hit_requires_competitive_refresh(
+                            prediction_results=refreshed_prediction,
+                            is_sprint=is_sprint,
+                            year=year,
+                            race_name=race_name,
+                        )
+                        if refreshed_reason is None:
+                            prediction_results = refreshed_prediction
+                            prediction_cache_hit = True
+                            _store_cached_prediction(prediction_cache_key, refreshed_prediction)
+                            _notify(
+                                "Reloaded updated prediction from persisted store after cache validation..."
+                            )
+                        else:
+                            raise PrecomputedPredictionUnavailableError(
+                                "Persisted prediction is stale for the current boundary. "
+                                f"Warmup must refresh {race_name} {year} [{weather_normalized}] "
+                                f"before the dashboard can serve it ({refreshed_reason})."
+                            )
+                    else:
+                        raise PrecomputedPredictionUnavailableError(
+                            "Persisted prediction is missing for the current boundary after cache "
+                            f"validation: {race_name} {year} [{weather_normalized}]."
+                        )
+                else:
+                    _notify("Competitive results changed; regenerating prediction...")
+                    prediction_results = run_prediction_fn(
+                        race_name,
+                        weather,
+                        artifact_versions,
+                        is_sprint=is_sprint,
+                        year=year,
+                    )
+                    _store_cached_prediction(prediction_cache_key, prediction_results)
+                    save_precomputed_prediction(
+                        year=year,
+                        race_name=race_name,
+                        weather=weather,
+                        artifact_hash=artifact_hash,
+                        boundary_signature=boundary_signature,
+                        is_sprint=is_sprint,
+                        prediction_results=prediction_results,
+                        metadata={
+                            "source_race_name": race_name,
+                            "boundary_session_name": boundary_session_name,
+                        },
+                        max_file_entries=int(precompute_settings["max_file_entries"]),
+                    )
         else:
+            if require_persisted_predictions:
+                raise PrecomputedPredictionUnavailableError(
+                    "Persisted prediction is not available for "
+                    f"{race_name} {year} [{weather_normalized}] at checkpoint {boundary_session_name}. "
+                    "Warm the horizon in the configured storage backend before using the dashboard."
+                )
             _notify("Running qualifying and race simulations...")
             prediction_results = run_prediction_fn(
                 race_name,
@@ -1040,6 +1099,11 @@ def execute_live_prediction_pipeline_core(
                 max_file_entries=int(precompute_settings["max_file_entries"]),
             )
     else:
+        if require_persisted_predictions:
+            raise PrecomputedPredictionUnavailableError(
+                "Forced refresh requested while dashboard is running in persisted-prediction mode. "
+                "Warmup must populate the store before the dashboard can serve this race."
+            )
         _notify("Running qualifying and race simulations...")
         prediction_results = run_prediction_fn(
             race_name,

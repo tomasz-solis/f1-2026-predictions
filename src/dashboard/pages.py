@@ -22,6 +22,9 @@ from .accuracy_view import (
 from .cache import get_artifact_versions
 from .layout import BRAND_LAST_UPDATED, BRAND_MODEL_VERSION, ENABLE_PREDICTION_ACCURACY_TAB
 from .live_prediction_flow import (
+    PrecomputedPredictionUnavailableError,
+)
+from .live_prediction_flow import (
     execute_live_prediction_pipeline_core as _execute_live_prediction_pipeline_core,
 )
 from .live_prediction_flow import (
@@ -36,7 +39,12 @@ from .page_content import (
     QUALIFYING_HYPERPARAMETERS_MARKDOWN,
     RACE_HYPERPARAMETERS_MARKDOWN,
 )
-from .precomputed_predictions import compute_artifact_hash, load_precompute_horizon_index
+from .precomputed_predictions import (
+    compute_artifact_hash,
+    get_prediction_precompute_config,
+    load_precompute_horizon_index,
+    load_precomputed_prediction,
+)
 from .prediction_flow import CompetitiveSessionStatusUnavailableError, run_prediction
 from .rendering import (
     display_prediction_result,
@@ -265,6 +273,97 @@ def _load_race_options(year: int = DEFAULT_SEASON) -> list[str]:
     return race_options
 
 
+@st.cache_data(ttl=900, show_spinner=False)
+def _load_schedule_event_rows_cached(year: int) -> tuple[tuple[str, str, str], ...]:
+    """Load cached schedule rows with serialized event dates for horizon filtering."""
+    rows: list[tuple[str, str, str]] = []
+
+    try:
+        schedule = fastf1.get_event_schedule(year)
+        if "EventName" in schedule.columns and "EventFormat" in schedule.columns:
+            for _, event in schedule.iterrows():
+                event_name = str(event.get("EventName", "")).strip()
+                event_format = str(event.get("EventFormat", "")).strip()
+                if not event_name:
+                    continue
+                event_date = event.get("EventDate")
+                if hasattr(event_date, "to_pydatetime"):
+                    try:
+                        event_date = event_date.to_pydatetime()
+                    except Exception:
+                        event_date = None
+                if isinstance(event_date, datetime):
+                    if event_date.tzinfo is None:
+                        event_date = event_date.replace(tzinfo=UTC)
+                    else:
+                        event_date = event_date.astimezone(UTC)
+                    event_date_iso = event_date.isoformat()
+                else:
+                    event_date_iso = ""
+                rows.append((event_name, event_format, event_date_iso))
+    except Exception as exc:
+        logger.warning("Could not load dated schedule rows for %s: %s", year, exc)
+
+    if rows:
+        return tuple(rows)
+
+    return tuple(
+        (str(event_name).strip(), str(event_format).strip(), "")
+        for event_name, event_format in _get_schedule_rows(year)
+        if str(event_name).strip()
+    )
+
+
+def _resolve_dashboard_race_horizon(year: int, horizon_races: int) -> list[str]:
+    """Return the next configured race window from the live schedule when dates are available."""
+    schedule_rows = _load_schedule_event_rows_cached(year)
+    if not schedule_rows:
+        return []
+
+    competitive_rows: list[tuple[str, datetime | None]] = []
+    for event_name, event_format, event_date_iso in schedule_rows:
+        normalized_name = str(event_name).strip()
+        normalized_format = str(event_format).strip().lower()
+        if not normalized_name:
+            continue
+        if "testing" in normalized_name.lower() or "testing" in normalized_format:
+            continue
+        event_date: datetime | None = None
+        candidate = str(event_date_iso).strip()
+        if candidate:
+            try:
+                parsed = datetime.fromisoformat(candidate)
+            except ValueError:
+                parsed = None
+            if parsed is not None:
+                if parsed.tzinfo is None:
+                    event_date = parsed.replace(tzinfo=UTC)
+                else:
+                    event_date = parsed.astimezone(UTC)
+        competitive_rows.append((normalized_name, event_date))
+
+    if not competitive_rows:
+        return []
+
+    horizon_size = max(1, int(horizon_races))
+    now_utc = datetime.now(UTC)
+    anchor_index: int | None = None
+    for index, (_, event_date) in enumerate(competitive_rows):
+        if event_date is None:
+            continue
+        if event_date >= now_utc:
+            anchor_index = index
+            break
+
+    if anchor_index is None:
+        return []
+
+    return [
+        race_name
+        for race_name, _event_date in competitive_rows[anchor_index : anchor_index + horizon_size]
+    ]
+
+
 @st.cache_data(show_spinner=False, ttl=120)
 def _current_anchor_boundary_signature(year: int, anchor_race_name: str) -> str | None:
     """
@@ -307,6 +406,43 @@ def _current_anchor_boundary_signature(year: int, anchor_race_name: str) -> str 
     return _boundary_signature(snapshot)
 
 
+def _load_ready_races_from_current_store(
+    *,
+    year: int,
+    race_names: list[str],
+    artifact_hash: str,
+    weather_scenarios: list[str],
+) -> list[str]:
+    """Return races that already have full persisted weather coverage for the current boundary."""
+    ready_races: list[str] = []
+    expected_weather = [
+        str(weather).strip().lower() for weather in weather_scenarios if str(weather).strip()
+    ]
+    if not race_names or not expected_weather:
+        return ready_races
+
+    for race_name in race_names:
+        boundary_signature = _current_anchor_boundary_signature(year, race_name)
+        if not boundary_signature:
+            continue
+        has_full_coverage = True
+        for weather in expected_weather:
+            payload = load_precomputed_prediction(
+                year=year,
+                race_name=race_name,
+                weather=weather,
+                artifact_hash=artifact_hash,
+                boundary_signature=boundary_signature,
+            )
+            if payload is None:
+                has_full_coverage = False
+                break
+        if has_full_coverage:
+            ready_races.append(race_name)
+
+    return ready_races
+
+
 def _filter_race_options_to_precomputed_horizon(
     *,
     year: int,
@@ -322,38 +458,107 @@ def _filter_race_options_to_precomputed_horizon(
     if not race_options:
         return race_options, {"applied": False}
 
+    settings = get_prediction_precompute_config()
+    requested_horizon = max(1, int(settings.get("horizon_races", 3)))
+    planned_races = _resolve_dashboard_race_horizon(year, requested_horizon)
+    planned_set = {race_name.strip() for race_name in planned_races if race_name.strip()}
+    scoped_race_options = (
+        [
+            option
+            for option in race_options
+            if option.replace(" (Sprint)", "").strip() in planned_set
+        ]
+        if planned_set
+        else list(race_options)
+    )
+    scope_metadata: dict[str, Any] = {
+        "applied": False,
+        "scope_applied": bool(planned_set),
+        "planned_races": planned_races,
+        "requested_horizon": requested_horizon,
+    }
+
     try:
         artifact_versions = get_artifact_versions(year=year)
         artifact_hash = compute_artifact_hash(artifact_versions)
     except Exception as exc:
         logger.warning("Could not compute artifact hash for dropdown filtering: %s", exc)
-        return race_options, {"applied": False}
+        return scoped_race_options, scope_metadata
 
     index_payload = load_precompute_horizon_index(year=year, artifact_hash=artifact_hash)
     if not isinstance(index_payload, dict):
-        return race_options, {"applied": False, "artifact_hash": artifact_hash}
+        ready_races = _load_ready_races_from_current_store(
+            year=year,
+            race_names=planned_races,
+            artifact_hash=artifact_hash,
+            weather_scenarios=list(settings.get("weather_scenarios", ["dry", "mixed", "rain"])),
+        )
+        if ready_races:
+            ready_set = set(ready_races)
+            filtered_options = [
+                option
+                for option in scoped_race_options
+                if option.replace(" (Sprint)", "").strip() in ready_set
+            ]
+            if filtered_options:
+                return filtered_options, {
+                    **scope_metadata,
+                    "applied": True,
+                    "artifact_hash": artifact_hash,
+                    "ready_races": ready_races,
+                    "expected_targets": planned_races,
+                    "source": "storage_scan",
+                }
+        return scoped_race_options, {
+            **scope_metadata,
+            "artifact_hash": artifact_hash,
+            "stale_reason": "missing_horizon_index",
+        }
 
     anchor_race_name = str(index_payload.get("anchor_race_name", "")).strip()
     indexed_boundary = str(index_payload.get("boundary_signature", "")).strip()
     if not anchor_race_name or not indexed_boundary:
-        return race_options, {
-            "applied": False,
+        return scoped_race_options, {
+            **scope_metadata,
             "artifact_hash": artifact_hash,
             "stale_reason": "missing_anchor_or_boundary",
         }
 
     current_boundary = _current_anchor_boundary_signature(year, anchor_race_name)
     if not current_boundary:
-        return race_options, {
-            "applied": False,
+        return scoped_race_options, {
+            **scope_metadata,
             "artifact_hash": artifact_hash,
             "stale_reason": "boundary_unavailable",
             "anchor_race_name": anchor_race_name,
             "indexed_boundary_signature": indexed_boundary,
         }
     if current_boundary != indexed_boundary:
-        return race_options, {
-            "applied": False,
+        ready_races = _load_ready_races_from_current_store(
+            year=year,
+            race_names=planned_races,
+            artifact_hash=artifact_hash,
+            weather_scenarios=list(settings.get("weather_scenarios", ["dry", "mixed", "rain"])),
+        )
+        if ready_races:
+            ready_set = set(ready_races)
+            filtered_options = [
+                option
+                for option in scoped_race_options
+                if option.replace(" (Sprint)", "").strip() in ready_set
+            ]
+            if filtered_options:
+                return filtered_options, {
+                    **scope_metadata,
+                    "applied": True,
+                    "artifact_hash": artifact_hash,
+                    "anchor_race_name": anchor_race_name,
+                    "ready_races": ready_races,
+                    "expected_targets": planned_races,
+                    "source": "storage_scan",
+                }
+        return scoped_race_options, {
+            **scope_metadata,
             "artifact_hash": artifact_hash,
             "stale_reason": "boundary_mismatch",
             "anchor_race_name": anchor_race_name,
@@ -363,19 +568,31 @@ def _filter_race_options_to_precomputed_horizon(
 
     ready_races_raw = index_payload.get("ready_races", [])
     if not isinstance(ready_races_raw, list):
-        return race_options, {"applied": False, "artifact_hash": artifact_hash}
+        return scoped_race_options, {
+            **scope_metadata,
+            "artifact_hash": artifact_hash,
+        }
     ready_races = [str(race).strip() for race in ready_races_raw if str(race).strip()]
     if not ready_races:
-        return race_options, {"applied": False, "artifact_hash": artifact_hash}
+        return scoped_race_options, {
+            **scope_metadata,
+            "artifact_hash": artifact_hash,
+        }
 
     ready_set = set(ready_races)
     filtered_options = [
-        option for option in race_options if option.replace(" (Sprint)", "").strip() in ready_set
+        option
+        for option in scoped_race_options
+        if option.replace(" (Sprint)", "").strip() in ready_set
     ]
     if not filtered_options:
-        return race_options, {"applied": False, "artifact_hash": artifact_hash}
+        return scoped_race_options, {
+            **scope_metadata,
+            "artifact_hash": artifact_hash,
+        }
 
     return filtered_options, {
+        **scope_metadata,
         "applied": True,
         "artifact_hash": artifact_hash,
         "anchor_race_name": anchor_race_name,
@@ -597,6 +814,14 @@ def _prediction_failure_hint(error: Exception) -> str | None:
             " (prefer a background job or local shell on Render; web-shell runs can hit memory limits)."
         )
 
+    if isinstance(error, PrecomputedPredictionUnavailableError):
+        return (
+            "The dashboard is currently in persisted-prediction mode, so it will not simulate on demand. "
+            "Warm the 3-race horizon first with "
+            "`python scripts/warmup_precompute.py --year 2026 --require-db`, "
+            "and confirm the app is not running in `file_only` mode."
+        )
+
     return None
 
 
@@ -701,6 +926,14 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                 f"Showing {ready_count} precomputed races. "
                 "Hidden races will appear after the horizon is warmed."
             )
+    elif bool(precompute_filter_meta.get("scope_applied")):
+        planned_races = precompute_filter_meta.get("planned_races", [])
+        visible_count = len(race_options)
+        planned_count = len(planned_races) if isinstance(planned_races, list) else visible_count
+        precompute_message = (
+            f"Showing the next {visible_count}/{planned_count} scheduled races only. "
+            "Persisted horizon metadata is not ready for this boundary yet."
+        )
     else:
         precompute_message = (
             "No warmed precompute horizon yet. First run builds checkpoint snapshots for the "
@@ -722,7 +955,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
     if predict_clicked:
         status_placeholder = st.empty()
 
-        with st.spinner("Running simulation pipeline..."):
+        with st.spinner("Loading prediction data..."):
             try:
 
                 def update_status(message: str) -> None:

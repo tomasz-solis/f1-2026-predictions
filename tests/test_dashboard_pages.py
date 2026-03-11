@@ -1,8 +1,11 @@
 """Tests for dashboard page helpers and routing."""
 
+from datetime import UTC, datetime, timedelta
+
 import pandas as pd
 
 from src.dashboard import pages
+from src.dashboard.live_prediction_flow import PrecomputedPredictionUnavailableError
 from src.dashboard.prediction_flow import CompetitiveSessionStatusUnavailableError
 
 
@@ -149,6 +152,70 @@ def test_filter_race_options_to_precomputed_horizon_keeps_full_calendar_when_ind
     assert metadata["applied"] is False
 
 
+def test_filter_race_options_to_precomputed_horizon_limits_to_upcoming_window_when_index_missing(
+    patcher,
+):
+    pages._load_schedule_event_rows_cached.clear()
+
+    now_utc = datetime.now(UTC)
+    schedule = pd.DataFrame(
+        {
+            "EventName": [
+                "Australian Grand Prix",
+                "Chinese Grand Prix",
+                "Japanese Grand Prix",
+                "Bahrain Grand Prix",
+                "Saudi Arabian Grand Prix",
+            ],
+            "EventFormat": [
+                "conventional",
+                "sprint",
+                "conventional",
+                "conventional",
+                "conventional",
+            ],
+            "EventDate": [
+                now_utc - timedelta(days=3),
+                now_utc + timedelta(days=4),
+                now_utc + timedelta(days=11),
+                now_utc + timedelta(days=18),
+                now_utc + timedelta(days=25),
+            ],
+        }
+    )
+
+    patcher.setattr(pages.fastf1, "get_event_schedule", lambda year: schedule)
+    patcher.setattr(pages, "get_artifact_versions", lambda year=2026: {"k": (1, "ts")})
+    patcher.setattr(pages, "compute_artifact_hash", lambda versions: "artifact_hash")
+    patcher.setattr(pages, "get_prediction_precompute_config", lambda: {"horizon_races": 3})
+    patcher.setattr(pages, "load_precompute_horizon_index", lambda year, artifact_hash: None)
+    patcher.setattr(pages, "load_precomputed_prediction", lambda **kwargs: None)
+
+    filtered, metadata = pages._filter_race_options_to_precomputed_horizon(
+        year=2026,
+        race_options=[
+            "Australian Grand Prix",
+            "Chinese Grand Prix (Sprint)",
+            "Japanese Grand Prix",
+            "Bahrain Grand Prix",
+            "Saudi Arabian Grand Prix",
+        ],
+    )
+
+    assert filtered == [
+        "Chinese Grand Prix (Sprint)",
+        "Japanese Grand Prix",
+        "Bahrain Grand Prix",
+    ]
+    assert metadata["applied"] is False
+    assert metadata["scope_applied"] is True
+    assert metadata["planned_races"] == [
+        "Chinese Grand Prix",
+        "Japanese Grand Prix",
+        "Bahrain Grand Prix",
+    ]
+
+
 def test_filter_race_options_to_precomputed_horizon_keeps_full_calendar_when_boundary_stale(
     patcher,
 ):
@@ -279,6 +346,16 @@ def test_prediction_failure_hint_uses_artifact_guidance_for_missing_data():
 
     assert hint is not None
     assert "extract_driver_characteristics.py" in hint
+
+
+def test_prediction_failure_hint_uses_precompute_guidance_when_db_prediction_missing():
+    hint = pages._prediction_failure_hint(
+        PrecomputedPredictionUnavailableError("Persisted prediction is not available")
+    )
+
+    assert hint is not None
+    assert "warmup_precompute.py" in hint
+    assert "file_only" in hint
 
 
 def test_save_prediction_if_enabled_saves_new_session(patcher):

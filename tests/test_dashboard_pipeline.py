@@ -843,6 +843,61 @@ def test_execute_live_prediction_pipeline_reuses_persisted_prediction_when_memor
     assert run_calls == {"direct": 0}
 
 
+def test_execute_live_prediction_pipeline_raises_when_db_mode_requires_persisted_prediction(
+    patcher,
+):
+    patcher.setattr(live_prediction_flow, "should_read_db_first", lambda: True)
+    patcher.setattr(
+        live_prediction_flow,
+        "_get_prediction_precompute_settings",
+        lambda: {
+            "enabled": True,
+            "inline_enabled": False,
+            "horizon_races": 3,
+            "weather_scenarios": ["dry", "mixed", "rain"],
+            "max_file_entries": 2048,
+        },
+    )
+    patcher.setattr(live_prediction_flow, "load_precomputed_prediction", lambda **kwargs: None)
+
+    with pytest.raises(
+        live_prediction_flow.PrecomputedPredictionUnavailableError,
+        match="Persisted prediction is not available",
+    ):
+        live_prediction_flow.execute_live_prediction_pipeline_core(
+            race_name="Chinese Grand Prix",
+            weather="dry",
+            year=2026,
+            force_refresh=False,
+            progress_callback=None,
+            clear_fastf1_race_cache_fn=lambda year, race_name: None,
+            auto_update_if_needed_fn=lambda force_recheck=False, year=2026: None,
+            is_sprint_weekend_fn=lambda year, race_name: True,
+            detect_event_boundary_refresh_if_needed_fn=lambda year,
+            race_name,
+            is_sprint,
+            session_detector=None: {
+                "refresh_needed": False,
+                "reason": "no_change",
+                "new_sessions": [],
+                "boundary_signature": "stable_sig",
+                "latest_elapsed_session": None,
+            },
+            auto_update_practice_characteristics_if_needed_fn=(
+                lambda year, race_name, is_sprint, force_recheck=False, session_detector=None: {
+                    "updated": False,
+                    "completed_fp_sessions": [],
+                }
+            ),
+            clear_resource_cache_fn=lambda: None,
+            clear_data_cache_fn=lambda: None,
+            get_artifact_versions_fn=lambda year=2026: {"k": (1, "ts")},
+            run_prediction_fn=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("run_prediction should not execute in persisted-only mode")
+            ),
+        )
+
+
 def test_execute_live_prediction_pipeline_resolves_current_race_boundary_when_refresh_empty(
     patcher,
 ):
