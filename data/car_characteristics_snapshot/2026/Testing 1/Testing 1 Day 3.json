@@ -1,0 +1,416 @@
+{
+  "year": 2026,
+  "event_name": "Testing 1",
+  "session_name": "Testing 1 Day 3",
+  "session_order": 3,
+  "source": "testing_practice_extraction",
+  "captured_at": "2026-03-11T09:16:02.366956",
+  "teams": {
+    "Alpine": {
+      "profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.3428,
+          "medium_corner_performance": 0.6749,
+          "fast_corner_performance": 0.5974,
+          "top_speed": 0.7361,
+          "consistency": 0.9192,
+          "braking_performance": 0.3428,
+          "overall_pace": 0.6112,
+          "tire_deg_slope": 0.1363,
+          "tire_deg_performance": 0.8069
+        },
+        "short_run": {
+          "slow_corner_performance": 0.778,
+          "medium_corner_performance": 0.8827,
+          "fast_corner_performance": 0.8203,
+          "top_speed": 0.8362,
+          "consistency": 0.9469,
+          "braking_performance": 0.778,
+          "overall_pace": 0.8232,
+          "tire_deg_slope": 0.2091,
+          "tire_deg_performance": 0.2903
+        },
+        "long_run": {
+          "slow_corner_performance": 0.6088,
+          "medium_corner_performance": 0.6822,
+          "fast_corner_performance": 0.7509,
+          "top_speed": 0.3939,
+          "consistency": 0.0,
+          "braking_performance": 0.6088,
+          "overall_pace": 0.7004,
+          "tire_deg_slope": 0.1363,
+          "tire_deg_performance": 0.8069
+        }
+      }
+    },
+    "Aston Martin": {
+      "profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.0,
+          "medium_corner_performance": 0.2063,
+          "fast_corner_performance": 0.1783,
+          "top_speed": 0.5972,
+          "consistency": 0.8732,
+          "braking_performance": 0.0,
+          "overall_pace": 0.1145,
+          "tire_deg_slope": 0.2498,
+          "tire_deg_performance": 0.5197
+        },
+        "short_run": {
+          "slow_corner_performance": 0.7334,
+          "medium_corner_performance": 0.8244,
+          "fast_corner_performance": 0.7942,
+          "top_speed": 0.75,
+          "consistency": 0.9253,
+          "braking_performance": 0.7334,
+          "overall_pace": 0.781,
+          "tire_deg_slope": 0.2545,
+          "tire_deg_performance": 0.1652
+        },
+        "long_run": {
+          "slow_corner_performance": 0.0,
+          "medium_corner_performance": 0.0,
+          "fast_corner_performance": 0.0,
+          "top_speed": 0.0,
+          "braking_performance": 0.0,
+          "overall_pace": 0.0,
+          "tire_deg_slope": 0.2498,
+          "tire_deg_performance": 0.5197
+        }
+      }
+    },
+    "Audi": {
+      "profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.7447,
+          "medium_corner_performance": 0.8886,
+          "fast_corner_performance": 0.6124,
+          "top_speed": 0.1528,
+          "consistency": 0.3849,
+          "braking_performance": 0.7447,
+          "overall_pace": 0.8395
+        },
+        "short_run": {
+          "slow_corner_performance": 0.8373,
+          "medium_corner_performance": 0.8916,
+          "fast_corner_performance": 0.8603,
+          "top_speed": 0.4741,
+          "consistency": 0.5038,
+          "braking_performance": 0.8373,
+          "overall_pace": 0.8601,
+          "tire_deg_slope": -0.0484,
+          "tire_deg_performance": 1.0
+        },
+        "long_run": {
+          "slow_corner_performance": 0.9313,
+          "medium_corner_performance": 0.8974,
+          "fast_corner_performance": 0.7731,
+          "top_speed": 0.7576,
+          "consistency": 0.9089,
+          "braking_performance": 0.9313,
+          "overall_pace": 0.8886
+        }
+      }
+    },
+    "Cadillac F1": {
+      "profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.1852,
+          "medium_corner_performance": 0.2386,
+          "fast_corner_performance": 0.2369,
+          "top_speed": 0.7083,
+          "consistency": 0.984,
+          "braking_performance": 0.1852,
+          "overall_pace": 0.2621,
+          "tire_deg_slope": 0.0599,
+          "tire_deg_performance": 1.0
+        },
+        "short_run": {
+          "slow_corner_performance": 0.7579,
+          "medium_corner_performance": 0.8271,
+          "fast_corner_performance": 0.7848,
+          "top_speed": 0.6293,
+          "consistency": 0.9844,
+          "braking_performance": 0.7579,
+          "overall_pace": 0.7822,
+          "tire_deg_slope": 0.0599,
+          "tire_deg_performance": 0.7014
+        },
+        "long_run": {
+          "slow_corner_performance": 0.4966,
+          "medium_corner_performance": 0.2556,
+          "fast_corner_performance": 0.4889,
+          "top_speed": 0.3333,
+          "consistency": 0.4648,
+          "braking_performance": 0.4966,
+          "overall_pace": 0.4313,
+          "tire_deg_slope": 0.0599,
+          "tire_deg_performance": 1.0
+        }
+      }
+    },
+    "Ferrari": {
+      "profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.8075,
+          "medium_corner_performance": 0.8758,
+          "fast_corner_performance": 0.7704,
+          "top_speed": 0.7361,
+          "consistency": 0.2609,
+          "braking_performance": 0.8075,
+          "overall_pace": 0.9677,
+          "tire_deg_slope": 0.1304,
+          "tire_deg_performance": 0.8218
+        },
+        "short_run": {
+          "slow_corner_performance": 0.8647,
+          "medium_corner_performance": 0.9379,
+          "fast_corner_performance": 0.9182,
+          "top_speed": 0.8362,
+          "consistency": 0.4346,
+          "braking_performance": 0.8647,
+          "overall_pace": 0.9057,
+          "tire_deg_slope": 0.2948,
+          "tire_deg_performance": 0.0541
+        },
+        "long_run": {
+          "slow_corner_performance": 0.8872,
+          "medium_corner_performance": 0.7961,
+          "fast_corner_performance": 0.7201,
+          "top_speed": 0.7576,
+          "consistency": 0.6434,
+          "braking_performance": 0.8872,
+          "overall_pace": 0.8173,
+          "tire_deg_slope": 0.1304,
+          "tire_deg_performance": 0.8218
+        }
+      }
+    },
+    "Haas F1 Team": {
+      "profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.637,
+          "medium_corner_performance": 0.4686,
+          "fast_corner_performance": 0.4883,
+          "top_speed": 0.5972,
+          "consistency": 0.8829,
+          "braking_performance": 0.637,
+          "overall_pace": 0.4946,
+          "tire_deg_slope": 0.1203,
+          "tire_deg_performance": 0.8473
+        },
+        "short_run": {
+          "slow_corner_performance": 1.0,
+          "medium_corner_performance": 1.0,
+          "fast_corner_performance": 1.0,
+          "top_speed": 0.7241,
+          "consistency": 0.9263,
+          "braking_performance": 1.0,
+          "overall_pace": 1.0,
+          "tire_deg_slope": 0.1395,
+          "tire_deg_performance": 0.482
+        },
+        "long_run": {
+          "slow_corner_performance": 0.6554,
+          "medium_corner_performance": 0.4206,
+          "fast_corner_performance": 0.5866,
+          "top_speed": 1.0,
+          "consistency": 0.2713,
+          "braking_performance": 0.6554,
+          "overall_pace": 0.5349,
+          "tire_deg_slope": 0.1203,
+          "tire_deg_performance": 0.8473
+        }
+      }
+    },
+    "McLaren": {
+      "profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.5092,
+          "medium_corner_performance": 0.9258,
+          "fast_corner_performance": 0.768,
+          "top_speed": 0.6389,
+          "consistency": 0.5361,
+          "braking_performance": 0.5092,
+          "overall_pace": 0.8087,
+          "tire_deg_slope": 0.0739,
+          "tire_deg_performance": 0.9646
+        },
+        "short_run": {
+          "slow_corner_performance": 0.1414,
+          "medium_corner_performance": 0.6614,
+          "fast_corner_performance": 0.0,
+          "top_speed": 0.819,
+          "consistency": 0.5909,
+          "braking_performance": 0.1414,
+          "overall_pace": 0.3316,
+          "tire_deg_slope": 0.0582,
+          "tire_deg_performance": 0.706
+        },
+        "long_run": {
+          "slow_corner_performance": 0.8155,
+          "medium_corner_performance": 0.9299,
+          "fast_corner_performance": 0.8581,
+          "top_speed": 0.1818,
+          "consistency": 0.2647,
+          "braking_performance": 0.8155,
+          "overall_pace": 0.8689,
+          "tire_deg_slope": 0.0739,
+          "tire_deg_performance": 0.9646
+        }
+      }
+    },
+    "Mercedes": {
+      "profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.8836,
+          "medium_corner_performance": 0.7973,
+          "fast_corner_performance": 0.7259,
+          "top_speed": 0.6944,
+          "consistency": 0.0,
+          "braking_performance": 0.8836,
+          "overall_pace": 0.791,
+          "tire_deg_slope": 0.0906,
+          "tire_deg_performance": 0.9224
+        },
+        "short_run": {
+          "slow_corner_performance": 0.0,
+          "medium_corner_performance": 0.0,
+          "fast_corner_performance": 0.6036,
+          "top_speed": 0.8103,
+          "consistency": 0.0,
+          "braking_performance": 0.0,
+          "overall_pace": 0.0349,
+          "tire_deg_slope": 0.0924,
+          "tire_deg_performance": 0.6117
+        },
+        "long_run": {
+          "slow_corner_performance": 0.9638,
+          "medium_corner_performance": 0.8018,
+          "fast_corner_performance": 0.8165,
+          "top_speed": 0.7273,
+          "consistency": 0.401,
+          "braking_performance": 0.9638,
+          "overall_pace": 0.839,
+          "tire_deg_slope": 0.0906,
+          "tire_deg_performance": 0.9224
+        }
+      }
+    },
+    "RB": {
+      "profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.3863,
+          "medium_corner_performance": 0.3652,
+          "fast_corner_performance": 0.2502,
+          "top_speed": 0.7083,
+          "consistency": 0.4804,
+          "braking_performance": 0.3863,
+          "overall_pace": 0.2879,
+          "tire_deg_slope": 0.4554,
+          "tire_deg_performance": 0.0
+        },
+        "short_run": {
+          "slow_corner_performance": 0.8963,
+          "medium_corner_performance": 0.736,
+          "fast_corner_performance": 0.4107,
+          "top_speed": 0.931,
+          "consistency": 0.5639,
+          "braking_performance": 0.8963,
+          "overall_pace": 0.6164,
+          "tire_deg_slope": 0.3144,
+          "tire_deg_performance": 0.0
+        },
+        "long_run": {
+          "slow_corner_performance": 0.4678,
+          "medium_corner_performance": 0.3794,
+          "fast_corner_performance": 0.4978,
+          "top_speed": 0.3333,
+          "consistency": 0.9022,
+          "braking_performance": 0.4678,
+          "overall_pace": 0.4512,
+          "tire_deg_slope": 0.4554,
+          "tire_deg_performance": 0.0
+        }
+      }
+    },
+    "Red Bull Racing": {
+      "profiles": {
+        "balanced": {
+          "slow_corner_performance": 1.0,
+          "medium_corner_performance": 1.0,
+          "fast_corner_performance": 1.0,
+          "top_speed": 1.0,
+          "consistency": 1.0,
+          "braking_performance": 1.0,
+          "overall_pace": 1.0,
+          "tire_deg_slope": 0.2201,
+          "tire_deg_performance": 0.595
+        },
+        "short_run": {
+          "slow_corner_performance": 0.9209,
+          "medium_corner_performance": 0.9207,
+          "fast_corner_performance": 0.9606,
+          "top_speed": 1.0,
+          "consistency": 1.0,
+          "braking_performance": 0.9209,
+          "overall_pace": 0.9206,
+          "tire_deg_slope": 0.306,
+          "tire_deg_performance": 0.0232
+        },
+        "long_run": {
+          "slow_corner_performance": 1.0,
+          "medium_corner_performance": 1.0,
+          "fast_corner_performance": 1.0,
+          "top_speed": 0.9697,
+          "consistency": 1.0,
+          "braking_performance": 1.0,
+          "overall_pace": 1.0,
+          "tire_deg_slope": 0.2201,
+          "tire_deg_performance": 0.595
+        }
+      }
+    },
+    "Williams": {
+      "profiles": {
+        "balanced": {
+          "slow_corner_performance": 0.0183,
+          "medium_corner_performance": 0.0,
+          "fast_corner_performance": 0.0,
+          "top_speed": 0.0,
+          "consistency": 0.3432,
+          "braking_performance": 0.0183,
+          "overall_pace": 0.0,
+          "tire_deg_slope": 0.1577,
+          "tire_deg_performance": 0.7526
+        },
+        "short_run": {
+          "slow_corner_performance": 0.215,
+          "medium_corner_performance": 0.1201,
+          "fast_corner_performance": 0.1979,
+          "top_speed": 0.0,
+          "consistency": 0.8981,
+          "braking_performance": 0.215,
+          "overall_pace": 0.0,
+          "tire_deg_slope": 0.1577,
+          "tire_deg_performance": 0.4319
+        },
+        "long_run": {
+          "slow_corner_performance": 0.6763,
+          "medium_corner_performance": 0.6063,
+          "fast_corner_performance": 0.6465,
+          "top_speed": 0.6667,
+          "consistency": 0.1066,
+          "braking_performance": 0.6763,
+          "overall_pace": 0.6598,
+          "tire_deg_slope": 0.1577,
+          "tire_deg_performance": 0.7526
+        }
+      }
+    }
+  },
+  "version": 1,
+  "round_number": 0,
+  "session_started_at": "2026-02-13T07:00:00+00:00",
+  "season_characteristics_version": 29
+}
