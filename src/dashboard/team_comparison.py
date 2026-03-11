@@ -410,8 +410,11 @@ def _build_snapshot_history_dataframe(
             overall_pace = _coerce_unit_metric(metrics_payload.get("overall_pace"))
             if overall_pace is not None:
                 row["Overall Pace"] = overall_pace
-            if len(metric_values) == len(_TEAM_RADAR_METRICS):
-                row["Overall"] = float(sum(metric_values) / len(metric_values))
+            metric_count = len(metric_values)
+            if metric_count:
+                row["Overall"] = float(sum(metric_values) / metric_count)
+                row["Metric Count"] = metric_count
+                row["Metric Coverage"] = float(metric_count / len(_TEAM_RADAR_METRICS))
             if metric_values or overall_pace is not None:
                 rows.append(row)
 
@@ -517,14 +520,15 @@ def _render_development_history_section(
         )
         return
 
-    metric_options = ["Overall", *[label for _, label in _TEAM_RADAR_METRICS]]
+    metric_options = ["Overall", "Overall Pace", *[label for _, label in _TEAM_RADAR_METRICS]]
     metric_label = st.selectbox(
         "Development metric",
         options=metric_options,
         index=0,
         help=(
-            "Overall uses only snapshots that have all six radar metrics. "
-            "Other options show one feature at a time."
+            "Overall averages the radar metrics that are available in each snapshot. "
+            "Overall Pace tracks the stored pace score separately, and the other options show "
+            "one feature at a time."
         ),
     )
 
@@ -549,6 +553,18 @@ def _render_development_history_section(
             if team_frame.empty:
                 continue
             trace_color = _team_brand_color(team_name)
+            customdata = None
+            hovertemplate = f"{metric_label}: %{{y:.2f}}<extra>{team_name}</extra>"
+            if metric_label == "Overall":
+                coverage_frame = team_frame.reindex(
+                    columns=["Metric Count", "Metric Coverage"]
+                ).fillna({"Metric Count": 0, "Metric Coverage": 0.0})
+                customdata = coverage_frame.to_numpy()
+                hovertemplate = (
+                    "Overall: %{y:.2f}<br>"
+                    "Coverage: %{customdata[0]:.0f}/6 metrics (%{customdata[1]:.0%})"
+                    f"<extra>{team_name}</extra>"
+                )
             fig.add_trace(
                 go.Scatter(
                     x=list(team_frame["Snapshot"]),
@@ -557,7 +573,8 @@ def _render_development_history_section(
                     name=team_name,
                     line=dict(color=trace_color, width=3),
                     marker=dict(color=trace_color, size=8),
-                    hovertemplate=f"{metric_label}: %{{y:.2f}}<extra>{team_name}</extra>",
+                    customdata=customdata,
+                    hovertemplate=hovertemplate,
                 )
             )
 
@@ -595,9 +612,15 @@ def _render_development_history_section(
         st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
     except Exception as exc:
         st.info(f"Development chart unavailable ({exc}).")
-    st.caption(
-        "Each point is one session snapshot. Relative changes matter more than absolute levels."
-    )
+    if metric_label == "Overall":
+        st.caption(
+            "Each point is one session snapshot. Overall averages the available radar metrics, "
+            "and the hover shows how complete each session snapshot is."
+        )
+    else:
+        st.caption(
+            "Each point is one session snapshot. Relative changes matter more than absolute levels."
+        )
 
 
 @st.cache_data(ttl=300, show_spinner=False)

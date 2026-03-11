@@ -471,7 +471,7 @@ def test_build_snapshot_history_dataframe_and_summary():
     assert round(float(frame.iloc[0]["Overall"]), 3) == 0.605
 
 
-def test_build_snapshot_history_dataframe_skips_incomplete_overall_points():
+def test_build_snapshot_history_dataframe_keeps_partial_overall_points():
     snapshots = [
         {
             "event_name": "Bahrain Grand Prix",
@@ -517,7 +517,9 @@ def test_build_snapshot_history_dataframe_skips_incomplete_overall_points():
     )
 
     assert frame["Snapshot"].tolist() == ["Bahrain Grand Prix FP1", "Bahrain Grand Prix FP2"]
-    assert frame["Overall"].isna().tolist() == [False, True]
+    assert frame["Metric Count"].tolist() == [6, 5]
+    assert frame["Metric Coverage"].tolist() == [1.0, 5 / 6]
+    assert frame["Overall"].round(3).tolist() == [0.605, 0.7]
     assert round(float(frame.iloc[1]["Slow Corners"]), 2) == 0.70
 
 
