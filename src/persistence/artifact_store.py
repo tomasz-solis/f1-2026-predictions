@@ -162,7 +162,9 @@ class ArtifactStore:
         # Try DB first if configured
         if should_read_db_first():
             try:
-                return self._list_db(artifact_type, key_prefix, limit)
+                db_rows = self._list_db(artifact_type, key_prefix, limit)
+                if db_rows or self.storage_mode == "db_only":
+                    return db_rows
             except Exception as e:
                 logger.warning(f"DB list failed: {e}")
 

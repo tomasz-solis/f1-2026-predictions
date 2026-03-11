@@ -53,6 +53,12 @@ def patcher():
         helper.close()
 
 
+@pytest.fixture(autouse=True)
+def default_file_only_storage(monkeypatch):
+    """Run tests in file-only mode unless a test explicitly overrides persistence behavior."""
+    monkeypatch.setenv("USE_DB_STORAGE", "file_only")
+
+
 @pytest.fixture
 def sample_priors():
     """Standard set of driver priors for testing."""

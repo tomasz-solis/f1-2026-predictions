@@ -19,8 +19,8 @@ def test_get_supabase_client_raises_when_db_disabled(patcher):
 def test_get_supabase_client_raises_when_credentials_missing(patcher):
     patcher.setattr(db_module, "_supabase_client", None)
     patcher.setattr(db_module, "is_db_enabled", lambda: True)
-    patcher.setattr(db_module, "SUPABASE_URL", None)
-    patcher.setattr(db_module, "SUPABASE_KEY", None)
+    patcher.setattr(db_module, "get_supabase_url", lambda: None)
+    patcher.setattr(db_module, "get_supabase_key", lambda: None)
 
     with pytest.raises(RuntimeError, match="environment variables must be set"):
         db_module.get_supabase_client()
@@ -32,8 +32,8 @@ def test_get_supabase_client_initializes_once(patcher):
 
     patcher.setattr(db_module, "_supabase_client", None)
     patcher.setattr(db_module, "is_db_enabled", lambda: True)
-    patcher.setattr(db_module, "SUPABASE_URL", "https://example.supabase.co")
-    patcher.setattr(db_module, "SUPABASE_KEY", "secret")
+    patcher.setattr(db_module, "get_supabase_url", lambda: "https://example.supabase.co")
+    patcher.setattr(db_module, "get_supabase_key", lambda: "secret")
     patcher.setattr(db_module, "create_client", create_client)
 
     first = db_module.get_supabase_client()
@@ -47,8 +47,8 @@ def test_get_supabase_client_initializes_once(patcher):
 def test_get_supabase_client_wraps_creation_errors(patcher):
     patcher.setattr(db_module, "_supabase_client", None)
     patcher.setattr(db_module, "is_db_enabled", lambda: True)
-    patcher.setattr(db_module, "SUPABASE_URL", "https://example.supabase.co")
-    patcher.setattr(db_module, "SUPABASE_KEY", "secret")
+    patcher.setattr(db_module, "get_supabase_url", lambda: "https://example.supabase.co")
+    patcher.setattr(db_module, "get_supabase_key", lambda: "secret")
     patcher.setattr(
         db_module,
         "create_client",

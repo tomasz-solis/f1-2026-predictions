@@ -127,6 +127,19 @@ def test_list_artifacts_db_failure_falls_back_to_files(patcher, tmp_path):
     assert result == [{"artifact_key": "a"}]
 
 
+def test_list_artifacts_empty_db_result_falls_back_when_not_db_only(patcher, tmp_path):
+    store = ArtifactStore(data_root=tmp_path)
+    patcher.setattr(store, "storage_mode", "fallback")
+
+    patcher.setattr(artifact_store_module, "should_read_db_first", lambda: True)
+    patcher.setattr(store, "_list_db", MagicMock(return_value=[]))
+    patcher.setattr(store, "_list_files", MagicMock(return_value=[{"artifact_key": "from-file"}]))
+
+    result = store.list_artifacts("custom")
+
+    assert result == [{"artifact_key": "from-file"}]
+
+
 def test_get_latest_version_db_file_and_default(patcher, tmp_path):
     store = ArtifactStore(data_root=tmp_path)
     patcher.setattr(artifact_store_module, "should_read_db_first", lambda: True)

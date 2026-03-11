@@ -8,7 +8,7 @@ import logging
 
 from supabase import Client, create_client
 
-from .config import SUPABASE_KEY, SUPABASE_URL, is_db_enabled
+from .config import get_supabase_key, get_supabase_url, is_db_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -30,12 +30,14 @@ def get_supabase_client() -> Client:
         )
 
     if _supabase_client is None:
-        if not SUPABASE_URL or not SUPABASE_KEY:
+        supabase_url = get_supabase_url()
+        supabase_key = get_supabase_key()
+        if not supabase_url or not supabase_key:
             raise RuntimeError("SUPABASE_URL and SUPABASE_KEY environment variables must be set")
 
         try:
-            _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
-            logger.info(f"Supabase client initialized: {SUPABASE_URL}")
+            _supabase_client = create_client(supabase_url, supabase_key)
+            logger.info(f"Supabase client initialized: {supabase_url}")
         except Exception as e:
             logger.error(f"Failed to initialize Supabase client: {e}")
             raise RuntimeError(f"Failed to connect to Supabase: {e}") from e
