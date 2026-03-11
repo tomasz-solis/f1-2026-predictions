@@ -193,6 +193,137 @@ def _apply_low_confidence_interval_floor(
         row["p95"] = p95 + add_upper
 
 
+def _normalize_confidence_to_unit_interval(value: Any) -> float:
+    """Convert confidence values expressed as 0-1 or 0-100 into a 0-1 scale."""
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        return 1.0
+
+    if confidence > 1.0:
+        confidence /= 100.0
+    return float(np.clip(confidence, 0.0, 1.0))
+
+
+def _coerce_grid_position_metric(row: QualifyingGridEntry, key: str, fallback: int) -> int:
+    """Read an integer grid metric from a qualifying row with a safe fallback."""
+    raw_value: Any = row.get(key, fallback)
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        return int(fallback)
+
+
+def _prepare_grid_uncertainty_profile(
+    *,
+    validated_grid: list[QualifyingGridEntry],
+    input_confidence: float | None,
+    cfg: Any,
+) -> dict[str, dict[str, float]]:
+    """Build per-driver grid-sampling settings from qualifying uncertainty fields.
+
+    Predicted qualifying results already include uncertainty signals (`median_position`,
+    `p5`, `p95`, `confidence`), but a race simulation normally receives only one
+    ranked grid order. This profile lets each race Monte Carlo run sample a coherent
+    starting grid from those qualifying ranges instead of treating a forecast grid as
+    fully known.
+    """
+    if not validated_grid:
+        return {}
+
+    field_size = max(1, len(validated_grid))
+    input_uncertainty = 0.0
+    if input_confidence is not None:
+        input_uncertainty = float(1.0 - np.clip(input_confidence, 0.0, 1.0))
+
+    base_std = float(cfg.get("baseline_predictor.race.grid_uncertainty.base_std", 0.35))
+    interval_divisor = float(
+        max(
+            1e-6,
+            cfg.get("baseline_predictor.race.grid_uncertainty.interval_divisor", 3.29),
+        )
+    )
+    confidence_scale = float(
+        cfg.get("baseline_predictor.race.grid_uncertainty.confidence_scale", 0.90)
+    )
+    input_confidence_scale = float(
+        cfg.get("baseline_predictor.race.grid_uncertainty.input_confidence_scale", 0.60)
+    )
+    position_delta_scale = float(
+        cfg.get("baseline_predictor.race.grid_uncertainty.position_delta_scale", 0.35)
+    )
+    max_std = float(
+        cfg.get(
+            "baseline_predictor.race.grid_uncertainty.max_std",
+            max(1.0, field_size / 4.0),
+        )
+    )
+
+    profile: dict[str, dict[str, float]] = {}
+    has_probabilistic_signal = False
+
+    for row in validated_grid:
+        driver = str(row["driver"])
+        base_position = int(row["position"])
+        center_position = _coerce_grid_position_metric(row, "median_position", base_position)
+        p5 = _coerce_grid_position_metric(row, "p5", center_position)
+        p95 = _coerce_grid_position_metric(row, "p95", center_position)
+        interval_width = max(0, p95 - p5)
+        position_delta = abs(center_position - base_position)
+        row_confidence = _normalize_confidence_to_unit_interval(row.get("confidence", 1.0))
+        has_row_signal = any(key in row for key in ("median_position", "p5", "p95", "confidence"))
+
+        if not has_row_signal:
+            profile[driver] = {
+                "center": float(base_position),
+                "std": 0.0,
+            }
+            continue
+
+        std = max(base_std, interval_width / interval_divisor)
+        std += position_delta * position_delta_scale
+        std *= (
+            1.0
+            + ((1.0 - row_confidence) * confidence_scale)
+            + (input_uncertainty * input_confidence_scale)
+        )
+        std = float(np.clip(std, 0.0, max_std))
+        has_probabilistic_signal = has_probabilistic_signal or std > 0.0
+        profile[driver] = {
+            "center": float(center_position),
+            "std": std,
+        }
+
+    return profile if has_probabilistic_signal else {}
+
+
+def _sample_probabilistic_grid_positions(
+    *,
+    validated_grid: list[QualifyingGridEntry],
+    grid_uncertainty_profile: dict[str, dict[str, float]],
+    rng: np.random.Generator,
+) -> dict[str, int]:
+    """Sample one coherent starting-grid permutation from qualifying uncertainty."""
+    if not validated_grid:
+        return {}
+
+    if not grid_uncertainty_profile:
+        return {str(row["driver"]): int(row["position"]) for row in validated_grid}
+
+    latent_scores: list[tuple[str, float, int]] = []
+    for row in validated_grid:
+        driver = str(row["driver"])
+        fallback_position = int(row["position"])
+        uncertainty = grid_uncertainty_profile.get(driver, {})
+        center = float(uncertainty.get("center", fallback_position))
+        std = float(uncertainty.get("std", 0.0))
+        latent_position = center if std <= 0.0 else float(rng.normal(center, std))
+        latent_scores.append((driver, latent_position, fallback_position))
+
+    ranked = sorted(latent_scores, key=lambda item: (item[1], item[2], item[0]))
+    return {driver: index for index, (driver, _, _) in enumerate(ranked, start=1)}
+
+
 def predict_race_core(
     *,
     validated_grid: list[QualifyingGridEntry],
@@ -288,6 +419,14 @@ def predict_race_core(
     driver_info_map, teams_with_long_profile = prepare_driver_info_with_compounds(
         validated_grid, race_name
     )
+    grid_uncertainty_profile = _prepare_grid_uncertainty_profile(
+        validated_grid=validated_grid,
+        input_confidence=input_confidence,
+        cfg=cfg,
+    )
+    grid_position_samples_by_driver: dict[str, list[float]] = {
+        driver: [] for driver in driver_info_map.keys()
+    }
 
     race_distance = resolve_race_distance_laps(
         year=year,
@@ -554,6 +693,21 @@ def predict_race_core(
 
     for sim_idx in range(n_simulations):
         rng = np.random.default_rng(base_seed + sim_idx)
+        sampled_grid_positions = _sample_probabilistic_grid_positions(
+            validated_grid=validated_grid,
+            grid_uncertainty_profile=grid_uncertainty_profile,
+            rng=rng,
+        )
+        simulation_driver_info_map = {}
+        for driver_code, info in driver_info_map.items():
+            sampled_grid_pos = int(sampled_grid_positions.get(driver_code, info["grid_pos"]))
+            grid_position_samples_by_driver.setdefault(driver_code, []).append(
+                float(sampled_grid_pos)
+            )
+            simulation_driver_info_map[driver_code] = {
+                **info,
+                "grid_pos": sampled_grid_pos,
+            }
 
         strategies: dict[str, PitStrategy] = {}
         sprint_compound = (
@@ -561,7 +715,7 @@ def predict_race_core(
             if "SOFT" in available_compounds
             else (available_compounds[0] if available_compounds else "MEDIUM")
         )
-        for driver in driver_info_map.keys():
+        for driver in simulation_driver_info_map.keys():
             if is_sprint:
                 strategies[driver] = {
                     "num_stops": 0,
@@ -570,7 +724,7 @@ def predict_race_core(
                     "stint_lengths": [race_distance],
                 }
             else:
-                driver_info = driver_info_map.get(driver, {})
+                driver_info = simulation_driver_info_map.get(driver, {})
                 strategies[driver] = generate_pit_strategy(
                     race_distance=race_distance,
                     tire_stress_score=tire_stress_score,
@@ -583,7 +737,7 @@ def predict_race_core(
                 )
 
         sim_result = simulate_race_lap_by_lap(
-            driver_info_map=driver_info_map,
+            driver_info_map=simulation_driver_info_map,
             strategies=strategies,
             race_params=race_params,
             race_distance=race_distance,
@@ -698,10 +852,22 @@ def predict_race_core(
     learning_position_scale = float(
         cfg.get("baseline_predictor.race.learning.position_adjustment_scale", 0.70)
     )
+    grid_reference_positions = {
+        driver_code: (
+            float(np.mean(grid_position_samples_by_driver.get(driver_code, [])))
+            if grid_position_samples_by_driver.get(driver_code)
+            else float(info["grid_pos"])
+        )
+        for driver_code, info in driver_info_map.items()
+    }
 
     for driver_code, median_pos in aggregated["median_positions"].items():
         info = driver_info_map[driver_code]
         positions = aggregated["position_distributions"][driver_code]
+        reference_grid_pos = float(grid_reference_positions.get(driver_code, info["grid_pos"]))
+        grid_position_samples = list(grid_position_samples_by_driver.get(driver_code, []))
+        if len(grid_position_samples) != len(positions):
+            grid_position_samples = [reference_grid_pos for _ in positions]
 
         position_std = np.std(positions)
         confidence = max(
@@ -735,7 +901,7 @@ def predict_race_core(
         racecraft_adjustment *= racecraft_confidence_scale
 
         is_elite_driver = info["skill"] >= elite_skill_threshold
-        if info["grid_pos"] <= 3 and not is_elite_driver:
+        if reference_grid_pos <= 3.0 and not is_elite_driver:
             adjustment_cap_negative = max_driver_adjustment * 0.5
             adjustment_cap_positive = max_driver_adjustment
             racecraft_adjustment = np.clip(
@@ -758,11 +924,11 @@ def predict_race_core(
         )
         max_gain *= max_gain_confidence_scale
         max_gain = np.clip(max_gain, max_gain_floor, max_gain_ceiling)
-        min_position_score = max(1.0, info["grid_pos"] - max_gain)
+        min_position_score = max(1.0, reference_grid_pos - max_gain)
 
         position_blend_score = (
             ((1.0 - grid_anchor_weight) * median_pos)
-            + (grid_anchor_weight * info["grid_pos"])
+            + (grid_anchor_weight * reference_grid_pos)
             - racecraft_adjustment
         )
         learned_position_adjustment = get_learned_position_adjustment(
@@ -774,12 +940,23 @@ def predict_race_core(
         position_blend_score -= learned_position_adjustment * learning_position_scale
         position_blend_score = max(position_blend_score, min_position_score)
 
-        blended_position_samples = [
-            ((1.0 - grid_anchor_weight) * p)
-            + (grid_anchor_weight * info["grid_pos"])
-            - racecraft_adjustment
-            for p in positions
-        ]
+        blended_position_samples = []
+        for position_sample, grid_position_sample in zip(
+            positions,
+            grid_position_samples,
+            strict=False,
+        ):
+            min_sample_position_score = max(1.0, float(grid_position_sample) - max_gain)
+            blended_position_samples.append(
+                max(
+                    (
+                        ((1.0 - grid_anchor_weight) * position_sample)
+                        + (grid_anchor_weight * float(grid_position_sample))
+                        - racecraft_adjustment
+                    ),
+                    min_sample_position_score,
+                )
+            )
         if learned_position_adjustment:
             blended_position_samples = [
                 sample - (learned_position_adjustment * learning_position_scale)
@@ -896,7 +1073,10 @@ def predict_race_core(
                 info = driver_info_map.get(row["driver"])
                 if info is None:
                     continue
-                total_grid_change += abs(float(row["position"]) - float(info["grid_pos"]))
+                reference_grid_pos = float(
+                    grid_reference_positions.get(row["driver"], info["grid_pos"])
+                )
+                total_grid_change += abs(float(row["position"]) - reference_grid_pos)
                 total_drivers += 1
             return (total_grid_change / total_drivers) if total_drivers else 0.0
 
@@ -928,7 +1108,10 @@ def predict_race_core(
                 info = driver_info_map.get(row["driver"])
                 if info is None:
                     continue
-                total_grid_change += abs(float(idx) - float(info["grid_pos"]))
+                reference_grid_pos = float(
+                    grid_reference_positions.get(row["driver"], info["grid_pos"])
+                )
+                total_grid_change += abs(float(idx) - reference_grid_pos)
                 total_drivers += 1
             return (total_grid_change / total_drivers) if total_drivers else 0.0
 
@@ -1000,10 +1183,13 @@ def predict_race_core(
                     info = driver_info_map.get(driver_code)
                     if info is None:
                         continue
+                    reference_grid_pos = float(
+                        grid_reference_positions.get(driver_code, info["grid_pos"])
+                    )
                     candidate_ceiling_scores[driver_code] = (
                         keep_factor
                         * base_scores.get(driver_code, float(row["position_blend_score"]))
-                    ) + ((1.0 - keep_factor) * float(info["grid_pos"]))
+                    ) + ((1.0 - keep_factor) * reference_grid_pos)
 
                 candidate_avg = _avg_grid_change_for_scores(candidate_ceiling_scores)
                 if movement_floor <= candidate_avg <= movement_ceiling:

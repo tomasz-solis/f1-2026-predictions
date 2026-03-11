@@ -2,6 +2,8 @@
 
 from datetime import UTC, datetime
 
+import pytest
+
 from src.dashboard import warmup
 
 
@@ -590,3 +592,46 @@ def test_compute_weather_predictions_uses_actual_sprint_race_after_completion(pa
 
     assert result["sprint_race"]["result_mode"] == "ACTUAL"
     assert "no penalties applied" in result["sprint_race"]["starting_grid_note"].lower()
+
+
+def test_compute_weather_predictions_passes_sprint_race_input_confidence(patcher):
+    """Warmup sprint simulations should receive the stored sprint input confidence."""
+
+    class _Predictor:
+        def __init__(self):
+            self.sprint_kwargs = None
+
+        def predict_sprint_race(self, **kwargs):
+            self.sprint_kwargs = kwargs
+            return {"finish_order": [{"position": 1, "driver": "NOR", "team": "McLaren"}]}
+
+        def predict_race(self, **kwargs):
+            return {"finish_order": [{"position": 1, "driver": "NOR", "team": "McLaren"}]}
+
+    predictor = _Predictor()
+
+    patcher.setattr(
+        warmup,
+        "fetch_actual_competitive_results_if_completed",
+        lambda year, race_name, session_name: (None, "INCOMPLETE"),
+    )
+
+    warmup.compute_weather_predictions(
+        {
+            "is_sprint": True,
+            "sprint_quali": {"grid_source": "PREDICTED"},
+            "sprint_grid_for_race": [{"position": 1, "driver": "NOR", "team": "McLaren"}],
+            "sprint_race_input_confidence": 0.58,
+            "main_quali": {"grid_source": "PREDICTED"},
+            "main_grid_for_race": [{"position": 1, "driver": "NOR", "team": "McLaren"}],
+            "main_race_input_confidence": 0.72,
+            "timing": {"sprint_quali": 0.1, "main_quali": 0.1},
+        },
+        "dry",
+        predictor=predictor,
+        year=2026,
+        target_race="Chinese Grand Prix",
+    )
+
+    assert predictor.sprint_kwargs is not None
+    assert predictor.sprint_kwargs["input_confidence"] == pytest.approx(0.58)

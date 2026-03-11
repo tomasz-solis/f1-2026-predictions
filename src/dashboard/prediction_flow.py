@@ -178,6 +178,29 @@ def _predict_race_with_optional_confidence(
         return predictor.predict_race(**kwargs)
 
 
+def _predict_sprint_race_with_optional_confidence(
+    predictor: Any,
+    *,
+    sprint_quali_grid: list[QualifyingGridEntry],
+    weather: str,
+    race_name: str,
+    input_confidence: float,
+) -> dict[str, Any]:
+    """Call predictor.predict_sprint_race with graceful fallback for legacy signatures."""
+    kwargs = {
+        "sprint_quali_grid": sprint_quali_grid,
+        "weather": weather,
+        "race_name": race_name,
+        "n_simulations": 50,
+        "input_confidence": input_confidence,
+    }
+    try:
+        return predictor.predict_sprint_race(**kwargs)
+    except TypeError:
+        kwargs.pop("input_confidence", None)
+        return predictor.predict_sprint_race(**kwargs)
+
+
 def fetch_grid_if_available(
     year: int,
     race_name: str,
@@ -310,11 +333,12 @@ def _resolve_race_section(
         return actual_payload
 
     if str(session_name).strip().upper() == "SPRINT":
-        race_result = predictor.predict_sprint_race(
+        race_result = _predict_sprint_race_with_optional_confidence(
+            predictor,
             sprint_quali_grid=qualifying_grid,
             weather=weather,
             race_name=race_name,
-            n_simulations=50,
+            input_confidence=input_confidence,
         )
     else:
         race_result = _predict_race_with_optional_confidence(

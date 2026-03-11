@@ -1,5 +1,6 @@
 """Validation helpers for qualifying grid structures."""
 
+import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -56,6 +57,42 @@ def validate_qualifying_grid(
             "team": team,
             "position": int(position),
         }
+
+        if "median_position" in entry and entry["median_position"] is not None:
+            validate_position(entry["median_position"], "median_position", min_pos=1, max_pos=22)
+            validated_entry["median_position"] = int(entry["median_position"])
+
+        if "p5" in entry and entry["p5"] is not None:
+            validate_position(entry["p5"], "p5", min_pos=1, max_pos=22)
+            validated_entry["p5"] = int(entry["p5"])
+
+        if "p95" in entry and entry["p95"] is not None:
+            validate_position(entry["p95"], "p95", min_pos=1, max_pos=22)
+            validated_entry["p95"] = int(entry["p95"])
+
+        if "p5" in validated_entry and "p95" in validated_entry:
+            if int(validated_entry["p95"]) < int(validated_entry["p5"]):
+                raise ValueError(
+                    "Grid percentile positions must satisfy p5 <= p95 "
+                    f"(got p5={validated_entry['p5']}, p95={validated_entry['p95']})"
+                )
+
+        if "confidence" in entry and entry["confidence"] is not None:
+            try:
+                confidence = float(entry["confidence"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"Grid confidence must be numeric, got {entry['confidence']!r}"
+                ) from exc
+
+            if not math.isfinite(confidence) or confidence < 0.0:
+                raise ValueError(
+                    "Grid confidence must be a finite non-negative number "
+                    f"(got {entry['confidence']!r})"
+                )
+
+            validated_entry["confidence"] = confidence
+
         validated_grid.append(validated_entry)
 
     if len(validated_grid) < min_entries:

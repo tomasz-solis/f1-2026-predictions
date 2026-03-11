@@ -167,6 +167,7 @@ class Baseline2026Predictor:
         weather: str = "dry",
         race_name: str | None = None,
         n_simulations: int = 50,
+        input_confidence: float | None = None,
     ) -> dict[str, Any]:
         """Delegate sprint race prediction to the qualifying engine."""
         return self.qualifying_engine.predict_sprint_race(
@@ -174,6 +175,7 @@ class Baseline2026Predictor:
             weather=weather,
             race_name=race_name,
             n_simulations=n_simulations,
+            input_confidence=input_confidence,
         )
 
     def predict_race(

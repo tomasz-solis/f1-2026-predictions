@@ -27,6 +27,7 @@ from src.dashboard.precomputed_predictions import (
 from src.dashboard.prediction_flow import (
     _derive_race_input_confidence,
     _predict_race_with_optional_confidence,
+    _predict_sprint_race_with_optional_confidence,
     build_actual_qualifying_section,
     build_actual_race_section,
     build_starting_grid_note,
@@ -502,11 +503,12 @@ def compute_weather_predictions(
         if sprint_actual_results is not None:
             sprint_race = build_actual_race_section(sprint_actual_results, session_name="Sprint")
         else:
-            sprint_race = predictor.predict_sprint_race(
+            sprint_race = _predict_sprint_race_with_optional_confidence(
+                predictor,
                 sprint_quali_grid=deepcopy(base_features["sprint_grid_for_race"]),
                 weather=normalized_weather,
                 race_name=target_race,
-                n_simulations=50,
+                input_confidence=float(base_features.get("sprint_race_input_confidence", 0.0)),
             )
         sprint_race_elapsed = time.time() - sprint_race_start
         sprint_input_confidence = float(base_features.get("sprint_race_input_confidence", 0.0))

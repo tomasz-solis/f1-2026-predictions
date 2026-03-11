@@ -621,6 +621,141 @@ def test_predict_race_widens_top_interval_when_input_confidence_is_low():
     assert by_position[0]["p95"] >= 2
 
 
+def test_predict_race_samples_predicted_grid_uncertainty():
+    """Predicted grids should widen race outcomes instead of acting like actual starts."""
+
+    class GridUncertaintyPredictor(BaselineRacePredictionMixin):
+        seed = 57
+
+        def _load_race_params(self) -> dict:
+            return {}
+
+        def _prepare_driver_info_with_compounds(
+            self, qualifying_grid: list[dict], race_name: str | None
+        ) -> tuple[dict, int]:
+            _ = race_name
+            info_map = {}
+            for row in qualifying_grid:
+                info_map[row["driver"]] = {
+                    "driver": row["driver"],
+                    "team": row["team"],
+                    "grid_pos": row["position"],
+                    "team_strength": 0.5,
+                    "team_strength_by_compound": {"SOFT": 0.5, "MEDIUM": 0.5, "HARD": 0.5},
+                    "tire_deg_by_compound": {"SOFT": 0.1, "MEDIUM": 0.1, "HARD": 0.1},
+                    "skill": 0.5,
+                    "race_advantage": 0.0,
+                    "overtaking_skill": 0.5,
+                    "defensive_skill": 0.5,
+                    "dnf_probability": 0.0,
+                }
+            return info_map, 0
+
+    predictor = GridUncertaintyPredictor()
+    qualifying_grid = [
+        {
+            "driver": "A",
+            "team": "TeamA",
+            "position": 1,
+            "median_position": 2,
+            "p5": 1,
+            "p95": 6,
+            "confidence": 48.0,
+        },
+        {
+            "driver": "B",
+            "team": "TeamB",
+            "position": 2,
+            "median_position": 3,
+            "p5": 1,
+            "p95": 7,
+            "confidence": 47.5,
+        },
+        {
+            "driver": "C",
+            "team": "TeamC",
+            "position": 3,
+            "median_position": 4,
+            "p5": 2,
+            "p95": 8,
+            "confidence": 46.0,
+        },
+        {
+            "driver": "D",
+            "team": "TeamD",
+            "position": 4,
+            "median_position": 5,
+            "p5": 2,
+            "p95": 9,
+            "confidence": 45.0,
+        },
+    ]
+
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch.object(prediction_module, "load_track_specific_params", lambda _race_name: {})
+        )
+        stack.enter_context(
+            patch.object(prediction_module, "get_tire_stress_score", lambda _race_name: 3.0)
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "get_available_compounds",
+                lambda _race_name, weather="dry": ["SOFT", "MEDIUM", "HARD"],
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "resolve_race_distance_laps",
+                lambda year, race_name, is_sprint: 20,
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "generate_pit_strategy",
+                lambda **kwargs: {
+                    "num_stops": 0,
+                    "pit_laps": [],
+                    "compound_sequence": ["SOFT"],
+                    "stint_lengths": [20],
+                },
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "simulate_race_lap_by_lap",
+                lambda **kwargs: {
+                    "finish_order": [
+                        driver
+                        for driver, _info in sorted(
+                            kwargs["driver_info_map"].items(),
+                            key=lambda item: (item[1]["grid_pos"], item[0]),
+                        )
+                    ],
+                    "dnf_drivers": [],
+                    "strategies_used": kwargs["strategies"],
+                },
+            )
+        )
+
+        result = predictor.predict_race(
+            qualifying_grid=qualifying_grid,
+            weather="dry",
+            race_name="Chinese Grand Prix",
+            n_simulations=60,
+            is_sprint=True,
+            input_confidence=0.55,
+        )
+
+    by_driver = {entry["driver"]: entry for entry in result["finish_order"]}
+    assert by_driver["A"]["p95"] > 1
+    assert by_driver["A"]["position_blend_score"] > 1.1
+
+
 def test_predict_race_applies_learned_position_adjustment():
     class _CalibrationStub:
         def get_combined_position_adjustment(

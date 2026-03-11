@@ -82,6 +82,7 @@ class BaselineQualifyingEngine:
         weather: str = "dry",
         race_name: str | None = None,
         n_simulations: int = 50,
+        input_confidence: float | None = None,
     ) -> dict[str, Any]:
         """Predict sprint race results from sprint qualifying grid."""
         return BaselineQualifyingMixin.predict_sprint_race(
@@ -90,6 +91,7 @@ class BaselineQualifyingEngine:
             weather=weather,
             race_name=race_name,
             n_simulations=n_simulations,
+            input_confidence=input_confidence,
         )
 
 

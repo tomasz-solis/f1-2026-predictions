@@ -160,6 +160,52 @@ def test_run_prediction_passes_race_input_confidence_from_quali_context(patcher)
     assert called_kwargs["input_confidence"] == pytest.approx(1.0)
 
 
+def test_run_prediction_passes_sprint_race_input_confidence_from_sq_context(patcher):
+    """Sprint race predictions should receive the derived qualifying confidence."""
+    mock_predictor = MagicMock()
+    mock_predictor.predict_qualifying.side_effect = [
+        {
+            "grid": [{"driver": "NOR", "team": "McLaren", "position": 1}],
+            "data_confidence_score": 0.62,
+            "data_source": "FP1 short-stint",
+        },
+        {
+            "grid": [{"driver": "NOR", "team": "McLaren", "position": 2}],
+            "data_confidence_score": 0.88,
+            "data_source": "FP3 short-stint",
+        },
+    ]
+    mock_predictor.predict_sprint_race.return_value = {
+        "finish_order": [{"driver": "NOR", "team": "McLaren", "position": 1}]
+    }
+    mock_predictor.predict_race.return_value = {
+        "finish_order": [{"driver": "NOR", "team": "McLaren", "position": 1}]
+    }
+
+    patcher.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
+    patcher.setattr(
+        prediction_flow,
+        "fetch_actual_competitive_results_if_completed",
+        lambda year, race_name, session_name: (None, "INCOMPLETE"),
+    )
+    patcher.setattr(
+        prediction_flow,
+        "fetch_grid_if_available",
+        lambda year, race_name, session_name, predicted_grid: (predicted_grid, "PREDICTED"),
+    )
+
+    artifact_versions = {"car_characteristics::2026::car_characteristics": (1, "ts")}
+    prediction_flow.run_prediction(
+        "Chinese Grand Prix",
+        "dry",
+        artifact_versions,
+        is_sprint=True,
+    )
+
+    called_kwargs = mock_predictor.predict_sprint_race.call_args.kwargs
+    assert called_kwargs["input_confidence"] == pytest.approx(0.62)
+
+
 def test_run_prediction_falls_back_when_predict_race_signature_is_legacy(patcher):
     class _LegacyPredictor:
         def __init__(self):

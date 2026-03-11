@@ -30,3 +30,34 @@ def test_validate_qualifying_grid_accepts_valid_sequential_grid():
 
     validated = validate_qualifying_grid(grid, min_entries=2, require_sequential_positions=True)
     assert [entry["position"] for entry in validated] == [1, 2]
+
+
+def test_validate_qualifying_grid_preserves_uncertainty_fields():
+    """Predicted-grid uncertainty fields should survive validation."""
+    grid = [
+        {
+            "driver": "NOR",
+            "team": "McLaren",
+            "position": 1,
+            "median_position": 2,
+            "p5": 1,
+            "p95": 6,
+            "confidence": 48.5,
+        },
+        {
+            "driver": "RUS",
+            "team": "Mercedes",
+            "position": 2,
+            "median_position": 3,
+            "p5": 1,
+            "p95": 7,
+            "confidence": 47.9,
+        },
+    ]
+
+    validated = validate_qualifying_grid(grid, min_entries=2, require_sequential_positions=True)
+
+    assert validated[0]["median_position"] == 2
+    assert validated[0]["p5"] == 1
+    assert validated[0]["p95"] == 6
+    assert validated[0]["confidence"] == pytest.approx(48.5)

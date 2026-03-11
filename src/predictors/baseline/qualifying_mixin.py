@@ -542,6 +542,7 @@ class BaselineQualifyingMixin:
         weather: str = "dry",
         race_name: str | None = None,
         n_simulations: int = 50,
+        input_confidence: float | None = None,
     ) -> dict[str, Any]:
         """Predict Sprint Race with reduced chaos and increased grid influence."""
         validate_enum(weather, "weather", ["dry", "rain", "mixed"])
@@ -553,6 +554,7 @@ class BaselineQualifyingMixin:
             race_name=race_name,
             n_simulations=n_simulations,
             is_sprint=True,
+            input_confidence=input_confidence,
         )
 
         return result
