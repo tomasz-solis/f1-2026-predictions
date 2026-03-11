@@ -7,6 +7,33 @@ Extracts and normalizes team performance RELATIVE to each other.
 import numpy as np
 
 
+def _normalize_metric_range(
+    metric_values: dict[str, float],
+    *,
+    higher_is_better: bool,
+) -> dict[str, float]:
+    """Normalize one metric so the session leader lands at 1.0."""
+    if not metric_values:
+        return {}
+
+    best_value = max(metric_values.values()) if higher_is_better else min(metric_values.values())
+    worst_value = min(metric_values.values()) if higher_is_better else max(metric_values.values())
+
+    if np.isclose(best_value, worst_value):
+        return {team_name: 0.5 for team_name in metric_values}
+
+    normalized_scores: dict[str, float] = {}
+    value_range = worst_value - best_value
+    for team_name, value in metric_values.items():
+        if higher_is_better:
+            score = (value - worst_value) / (best_value - worst_value)
+        else:
+            score = 1.0 - ((value - best_value) / value_range)
+        normalized_scores[team_name] = float(np.clip(score, 0.0, 1.0))
+
+    return normalized_scores
+
+
 def extract_all_teams_performance(
     all_team_data: dict[str, dict], session_name: str = "fp1"
 ) -> dict[str, dict]:
@@ -93,60 +120,40 @@ def _extract_raw_metrics(session_data: dict) -> dict:
 
 
 def _normalize_relative(raw_metrics: dict[str, dict]) -> dict[str, dict]:
-    """Normalize team metrics relative to each other using z-scores into 0-1 range."""
-    # Collect all values per metric
-    all_values = {}
-    for _team, metrics in raw_metrics.items():
-        for metric, value in metrics.items():
-            if metric not in all_values:
-                all_values[metric] = []
-            all_values[metric].append(value)
+    """Normalize team metrics so each session metric spans the full 0-1 field range."""
+    metric_aliases = {
+        "s1": ("slow_corner_performance", False),
+        "s2": ("medium_corner_performance", False),
+        "s3": ("fast_corner_performance", False),
+        "top_speed": ("top_speed", True),
+        "std": ("consistency", False),
+    }
 
-    # Calculate stats
-    stats = {}
-    for metric, values in all_values.items():
-        stats[metric] = {
-            "mean": np.mean(values),
-            "std": np.std(values) if len(values) > 1 and np.std(values) > 0 else 1.0,
+    metric_scores: dict[str, dict[str, float]] = {}
+    for raw_metric_name, (_output_metric, higher_is_better) in metric_aliases.items():
+        metric_values = {
+            team_name: float(metrics[raw_metric_name])
+            for team_name, metrics in raw_metrics.items()
+            if raw_metric_name in metrics
         }
+        metric_scores[raw_metric_name] = _normalize_metric_range(
+            metric_values,
+            higher_is_better=higher_is_better,
+        )
 
-    # Normalize each team
-    normalized = {}
+    normalized: dict[str, dict[str, float]] = {}
+    for team_name in raw_metrics:
+        perf: dict[str, float] = {}
 
-    for _team, metrics in raw_metrics.items():
-        perf = {}
+        for raw_metric_name, (output_metric, _higher_is_better) in metric_aliases.items():
+            score = metric_scores.get(raw_metric_name, {}).get(team_name)
+            if score is None:
+                continue
+            perf[output_metric] = score
 
-        # S1 (lower is better, so negate z-score)
-        if "s1" in metrics:
-            z = -(metrics["s1"] - stats["s1"]["mean"]) / stats["s1"]["std"]
-            perf["slow_corner_performance"] = _sigmoid(z)
+        if "slow_corner_performance" in perf:
             perf["braking_performance"] = perf["slow_corner_performance"]
 
-        # S2 (lower is better)
-        if "s2" in metrics:
-            z = -(metrics["s2"] - stats["s2"]["mean"]) / stats["s2"]["std"]
-            perf["medium_corner_performance"] = _sigmoid(z)
-
-        # S3 (lower is better)
-        if "s3" in metrics:
-            z = -(metrics["s3"] - stats["s3"]["mean"]) / stats["s3"]["std"]
-            perf["fast_corner_performance"] = _sigmoid(z)
-
-        # Top speed (higher is better, don't negate)
-        if "top_speed" in metrics:
-            z = (metrics["top_speed"] - stats["top_speed"]["mean"]) / stats["top_speed"]["std"]
-            perf["top_speed"] = _sigmoid(z)
-
-        # Consistency (lower std is better, so negate)
-        if "std" in metrics:
-            z = -(metrics["std"] - stats["std"]["mean"]) / stats["std"]["std"]
-            perf["consistency"] = _sigmoid(z)
-
-        normalized[_team] = perf
+        normalized[team_name] = perf
 
     return normalized
-
-
-def _sigmoid(z: float) -> float:
-    """Convert z-score to 0-1 probability."""
-    return float(1.0 / (1.0 + np.exp(-z)))
