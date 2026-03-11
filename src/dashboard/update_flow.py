@@ -22,14 +22,17 @@ _STATE_NAMESPACE_EVENT_BOUNDARY = "event_boundary_refresh"
 _STATE_NAMESPACE_PRACTICE = "practice_characteristics"
 _PRACTICE_BACKLOG_LOCK_TTL_SECONDS = 900
 _PRACTICE_CAPTURE_SESSIONS_BY_WEEKEND: dict[bool, tuple[str, ...]] = {
-    False: ("FP1", "FP2", "FP3"),
-    True: ("FP1", "SQ"),
+    False: ("FP1", "FP2", "FP3", "Q", "R"),
+    True: ("FP1", "SQ", "Sprint", "Q", "R"),
 }
 _PRACTICE_CAPTURE_SESSION_ORDER = {
     "FP1": 1,
     "FP2": 2,
     "FP3": 3,
     "SQ": 4,
+    "Sprint": 5,
+    "Q": 6,
+    "R": 7,
 }
 
 logger = logging.getLogger(__name__)
@@ -474,6 +477,57 @@ def _iter_candidate_practice_events(
     return candidates
 
 
+def _practice_capture_cache_dirs() -> tuple[str, ...]:
+    """Return cache directories to try for competitive-weekend session extraction."""
+    from src.systems.testing_updater import _DEFAULT_RACE_CACHE_DIR, _DEFAULT_TESTING_CACHE_DIR
+
+    ordered_dirs = [str(_DEFAULT_RACE_CACHE_DIR), str(_DEFAULT_TESTING_CACHE_DIR)]
+    return tuple(
+        cache_dir
+        for index, cache_dir in enumerate(ordered_dirs)
+        if cache_dir and cache_dir not in ordered_dirs[:index]
+    )
+
+
+def _run_practice_capture_session_update(
+    *,
+    year: int,
+    event_name: str,
+    session_name: str,
+    practice_new_weight: float,
+    practice_directionality_scale: float,
+    practice_session_aggregation: str,
+    practice_run_profile: str,
+) -> dict:
+    """Update one completed weekend session, falling back across known cache roots."""
+    from src.systems.testing_updater import update_from_testing_sessions
+
+    last_value_error: ValueError | None = None
+    for cache_dir in _practice_capture_cache_dirs():
+        try:
+            return update_from_testing_sessions(
+                year=year,
+                characteristics_year=year,
+                events=[event_name],
+                sessions=[session_name],
+                testing_backend="auto",
+                cache_dir=cache_dir,
+                force_renew_cache=False,
+                # Lower weight than pre-season testing to avoid abrupt directionality swings.
+                new_weight=practice_new_weight,
+                directionality_scale=practice_directionality_scale,
+                session_aggregation=practice_session_aggregation,
+                run_profile=practice_run_profile,
+                dry_run=False,
+            )
+        except ValueError as exc:
+            last_value_error = exc
+
+    if last_value_error is not None:
+        raise last_value_error
+    raise ValueError(f"Could not update {event_name} {session_name} from any configured cache.")
+
+
 def auto_update_practice_characteristics_if_needed(
     year: int,
     race_name: str,
@@ -482,10 +536,10 @@ def auto_update_practice_characteristics_if_needed(
     session_detector=None,
 ) -> dict:
     """
-    Update car characteristics from completed checkpoint sessions.
+    Update car characteristics from completed weekend sessions.
 
-    Conventional weekends ingest FP1/FP2/FP3.
-    Sprint weekends ingest FP1/SQ.
+    Conventional weekends ingest FP1/FP2/FP3/Q/R.
+    Sprint weekends ingest FP1/SQ/Sprint/Q/R.
     Updates run incrementally only for newly completed sessions unless
     ``force_recheck`` is enabled.
 
@@ -496,7 +550,6 @@ def auto_update_practice_characteristics_if_needed(
         force_recheck: If True, ignores cached state and re-checks session completion
         session_detector: Optional pre-built detector instance for call-level memoization
     """
-    from src.systems.testing_updater import update_from_testing_sessions
     from src.utils import config_loader
     from src.utils.session_detector import SessionDetector
 
@@ -570,7 +623,7 @@ def auto_update_practice_characteristics_if_needed(
     focus_updated_teams: set[str] = set()
     retried_events: list[str] = []
     state_store = _get_runtime_state_store()
-    for event_name, full_completed_sessions, sessions_to_update in pending_updates:
+    for event_name, _full_completed_sessions, sessions_to_update in pending_updates:
         lock_owner = uuid4().hex
         lock_key = f"practice_backlog::{year}::{event_name}"
         lock_acquired = True
@@ -597,40 +650,52 @@ def auto_update_practice_characteristics_if_needed(
                 continue
 
         try:
-            summary = update_from_testing_sessions(
-                year=year,
-                characteristics_year=year,
-                events=[event_name],
-                sessions=sessions_to_update,
-                testing_backend="auto",
-                cache_dir="data/raw/.fastf1_cache_testing",
-                force_renew_cache=False,
-                # Lower weight than pre-season testing to avoid abrupt directionality swings.
-                new_weight=practice_new_weight,
-                directionality_scale=practice_directionality_scale,
-                session_aggregation=practice_session_aggregation,
-                run_profile=practice_run_profile,
-                dry_run=False,
-            )
+            event_processed_sessions = {
+                str(session)
+                for session in state["races"].get(f"{year}::{event_name}", {}).get("sessions", [])
+            }
+            event_updated_teams: set[str] = set()
+            event_had_update = False
+            for session_name in sessions_to_update:
+                summary = _run_practice_capture_session_update(
+                    year=year,
+                    event_name=event_name,
+                    session_name=session_name,
+                    practice_new_weight=practice_new_weight,
+                    practice_directionality_scale=practice_directionality_scale,
+                    practice_session_aggregation=practice_session_aggregation,
+                    practice_run_profile=practice_run_profile,
+                )
+
+                updated_teams = (
+                    summary.get("updated_teams", []) if isinstance(summary, dict) else []
+                )
+                normalized_updated = {str(team) for team in updated_teams}
+                event_updated_teams.update(normalized_updated)
+                all_updated_teams.update(normalized_updated)
+                if event_name == race_name:
+                    focus_updated_teams.update(normalized_updated)
+
+                event_processed_sessions.add(session_name)
+                ordered_processed_sessions = sorted(
+                    event_processed_sessions,
+                    key=lambda session: _PRACTICE_CAPTURE_SESSION_ORDER.get(session, 99),
+                )
+                state["races"][f"{year}::{event_name}"] = {
+                    "sessions": ordered_processed_sessions,
+                    "updated_at": datetime.now(UTC).isoformat(),
+                    "teams_updated": len(event_updated_teams),
+                }
+                _save_practice_update_state(state)
+                event_had_update = True
         finally:
             if should_write_to_db() and lock_acquired:
                 try:
                     state_store.release_lock(lock_key, lock_owner)
                 except Exception as exc:
                     logger.warning("Could not release practice backlog lock %s: %s", lock_key, exc)
-        updated_teams = summary.get("updated_teams", []) if isinstance(summary, dict) else []
-        normalized_updated = {str(team) for team in updated_teams}
-        all_updated_teams.update(normalized_updated)
-        if event_name == race_name:
-            focus_updated_teams.update(normalized_updated)
-        all_updated_events.append(event_name)
-
-        state["races"][f"{year}::{event_name}"] = {
-            "sessions": full_completed_sessions,
-            "updated_at": datetime.now(UTC).isoformat(),
-            "teams_updated": len(normalized_updated),
-        }
-        _save_practice_update_state(state)
+        if event_had_update:
+            all_updated_events.append(event_name)
 
     if not all_updated_events:
         return {

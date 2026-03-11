@@ -113,6 +113,38 @@ def test_load_sessions_for_non_testing_event_collects_errors(patcher):
     assert errors and "Bahrain Grand Prix::FP1" in errors[0]
 
 
+def test_load_sessions_for_non_testing_event_skips_incomplete_laps(patcher):
+    class BrokenSession:
+        def load(self, **_kwargs):
+            return None
+
+        @property
+        def laps(self):
+            raise RuntimeError("DataNotLoadedError")
+
+    good_session = SimpleNamespace(laps=pd.DataFrame({"LapTime": [pd.to_timedelta("0:01:30")]}))
+    good_session.load = lambda **kwargs: None
+
+    def _mock_get_session(year, event_name, session_name):
+        if session_name == "FP1":
+            return BrokenSession()
+        return good_session
+
+    patcher.setattr(tu.fastf1, "get_session", _mock_get_session)
+
+    errors = []
+    loaded = tu._load_sessions_for_event(
+        year=2026,
+        event_name="Australian Grand Prix",
+        session_candidates=["FP1", "FP2"],
+        error_messages=errors,
+    )
+
+    assert len(loaded) == 1
+    assert loaded[0][0] == "FP2"
+    assert errors and "Australian Grand Prix::FP1" in errors[0]
+
+
 def test_load_sessions_for_testing_event_skips_future_sessions(patcher):
     future_event = {
         "Session1DateUtc": datetime.now(UTC) + timedelta(hours=2),
@@ -427,6 +459,15 @@ def test_update_from_testing_sessions_writes_file_when_not_dry_run(tmp_path, pat
     written_payload = atomic_write.call_args.args[1]
     assert written_payload["version"] == 3
     assert written_payload["last_updated"] != original_last_updated
+    assert summary["snapshots_written"] == 1
+
+    snapshot_path = (
+        tmp_path / "car_characteristics_snapshot" / "2026" / "Bahrain Grand Prix" / "FP1.json"
+    )
+    snapshot_payload = json.loads(snapshot_path.read_text())
+    assert snapshot_payload["event_name"] == "Bahrain Grand Prix"
+    assert snapshot_payload["session_name"] == "FP1"
+    assert snapshot_payload["teams"]["Ferrari"]["profiles"]["balanced"]["overall_pace"] == 0.7
 
 
 def test_update_from_testing_sessions_persists_to_artifact_store_when_db_enabled(tmp_path, patcher):
@@ -485,8 +526,333 @@ def test_update_from_testing_sessions_persists_to_artifact_store_when_db_enabled
     store_instance.get_latest_version.assert_called_once_with(
         "car_characteristics", "2026::car_characteristics"
     )
-    store_instance.save_artifact.assert_called_once()
-    kwargs = store_instance.save_artifact.call_args.kwargs
-    assert kwargs["artifact_type"] == "car_characteristics"
-    assert kwargs["artifact_key"] == "2026::car_characteristics"
-    assert kwargs["version"] == 6
+    assert store_instance.save_artifact.call_count == 2
+    first_call = store_instance.save_artifact.call_args_list[0].kwargs
+    assert first_call["artifact_type"] == "car_characteristics"
+    assert first_call["artifact_key"] == "2026::car_characteristics"
+    assert first_call["version"] == 6
+
+    second_call = store_instance.save_artifact.call_args_list[1].kwargs
+    assert second_call["artifact_type"] == "car_characteristics_snapshot"
+    assert second_call["artifact_key"] == "2026::Bahrain Grand Prix::FP1"
+    assert second_call["version"] == 1
+
+
+def test_backfill_session_snapshot_history_writes_only_snapshots(tmp_path, patcher):
+    original_payload = {
+        "version": 7,
+        "last_updated": "2026-03-03T23:33:59",
+        "teams": {
+            "Ferrari": {
+                "directionality": {
+                    "max_speed": 0.0,
+                    "slow_corner_speed": 0.0,
+                    "medium_corner_speed": 0.0,
+                    "high_corner_speed": 0.0,
+                },
+                "testing_characteristics": {},
+            }
+        },
+    }
+    characteristics_file = _write_characteristics(tmp_path, original_payload)
+
+    session = SimpleNamespace(
+        laps=pd.DataFrame({"Team": ["Ferrari"], "LapTime": [pd.to_timedelta("0:01:30")]})
+    )
+    patcher.setattr(tu, "_load_sessions_for_event", lambda **kwargs: [("FP1", session)])
+    patcher.setattr(
+        tu, "_collect_session_metrics", lambda **kwargs: ({"Ferrari": {"overall_pace": 0.7}}, {})
+    )
+    patcher.setattr(
+        tu, "_count_team_selected_laps", lambda session, known_teams, run_profile: {"Ferrari": 10.0}
+    )
+    patcher.setattr(tu.fastf1.Cache, "enable_cache", lambda path, force_renew=False: None)
+
+    summary = tu.backfill_session_snapshot_history(
+        year=2026,
+        events=["Bahrain Grand Prix"],
+        data_dir=str(tmp_path / "processed"),
+        dry_run=False,
+    )
+
+    assert summary["snapshots_written"] == 1
+    reloaded_payload = json.loads(characteristics_file.read_text())
+    assert reloaded_payload == original_payload
+
+    snapshot_path = (
+        tmp_path / "car_characteristics_snapshot" / "2026" / "Bahrain Grand Prix" / "FP1.json"
+    )
+    assert snapshot_path.exists()
+
+
+def test_season_snapshot_plan_discovers_cached_events_in_calendar_order(tmp_path, patcher):
+    testing_cache = tmp_path / "cache-testing"
+    race_cache = tmp_path / "cache-race"
+
+    testing_session_dirs = [
+        testing_cache / "2026" / "2026-02-13_Pre-Season_Testing" / "2026-02-11_Day_1",
+        testing_cache / "2026" / "2026-02-20_Pre-Season_Testing" / "2026-02-18_Day_1",
+    ]
+    race_session_dirs = [
+        race_cache / "2026" / "2026-03-08_Australian_Grand_Prix" / "2026-03-06_Practice_1",
+        race_cache / "2026" / "2026-03-08_Australian_Grand_Prix" / "2026-03-07_Qualifying",
+        race_cache / "2026" / "2026-03-15_Chinese_Grand_Prix" / "2026-03-13_Practice_1",
+        race_cache / "2026" / "2026-03-15_Chinese_Grand_Prix" / "2026-03-13_Sprint_Qualifying",
+        race_cache / "2026" / "2026-03-15_Chinese_Grand_Prix" / "2026-03-14_Sprint",
+        race_cache / "2026" / "2026-03-15_Chinese_Grand_Prix" / "2026-03-14_Qualifying",
+        race_cache / "2026" / "2026-03-15_Chinese_Grand_Prix" / "2026-03-15_Race",
+    ]
+    empty_placeholder_dir = (
+        race_cache / "2026" / "2026-03-29_Japanese_Grand_Prix" / "2026-03-27_Practice_1"
+    )
+
+    for directory in [*testing_session_dirs, *race_session_dirs, empty_placeholder_dir]:
+        directory.mkdir(parents=True, exist_ok=True)
+    for directory in [*testing_session_dirs, *race_session_dirs]:
+        (directory / "session_info.ff1pkl").write_text("cached")
+
+    patcher.setattr(tu, "_DEFAULT_TESTING_CACHE_DIR", testing_cache)
+    patcher.setattr(tu, "_DEFAULT_RACE_CACHE_DIR", race_cache)
+
+    plan = tu._season_snapshot_plan(2026)
+
+    assert [entry["event_name"] for entry in plan[:4]] == [
+        "Testing 1",
+        "Testing 2",
+        "Australian Grand Prix",
+        "Chinese Grand Prix",
+    ]
+    assert plan[2]["sessions"] == ["FP1", "Q"]
+    assert plan[3]["sessions"] == ["FP1", "SQ", "Sprint", "Q", "R"]
+    assert all(entry["event_name"] != "Japanese Grand Prix" for entry in plan)
+
+
+def test_backfill_season_snapshot_history_builds_testing_and_race_plan(tmp_path, patcher):
+    _write_characteristics(
+        tmp_path,
+        {
+            "version": 7,
+            "teams": {
+                "Ferrari": {
+                    "directionality": {
+                        "max_speed": 0.0,
+                        "slow_corner_speed": 0.0,
+                        "medium_corner_speed": 0.0,
+                        "high_corner_speed": 0.0,
+                    },
+                    "testing_characteristics": {},
+                }
+            },
+        },
+    )
+
+    captured_calls = []
+
+    def _mock_backfill(**kwargs):
+        captured_calls.append(kwargs)
+        return {
+            "loaded_sessions": [
+                f"{kwargs['events'][0]}::{session}" for session in kwargs["sessions"]
+            ],
+            "snapshot_keys": [
+                f"2026::{kwargs['events'][0]}::{session}" for session in kwargs["sessions"]
+            ],
+        }
+
+    patcher.setattr(tu, "backfill_session_snapshot_history", _mock_backfill)
+    patcher.setattr(
+        tu,
+        "_season_snapshot_plan",
+        lambda year: [
+            {
+                "event_name": "Testing 1",
+                "sessions": ["Day 1", "Day 2", "Day 3"],
+                "cache_dirs": [str(tmp_path / "cache-a")],
+            },
+            {
+                "event_name": "Testing 2",
+                "sessions": ["Day 1", "Day 2", "Day 3"],
+                "cache_dirs": [str(tmp_path / "cache-a")],
+            },
+            {
+                "event_name": "Australian Grand Prix",
+                "sessions": ["FP1", "FP2", "FP3", "Q", "R"],
+                "cache_dirs": [str(tmp_path / "cache-a")],
+            },
+            {
+                "event_name": "Chinese Grand Prix",
+                "sessions": ["FP1", "SQ", "Sprint", "Q", "R"],
+                "cache_dirs": [str(tmp_path / "cache-a")],
+            },
+        ],
+    )
+
+    summary = tu.backfill_season_snapshot_history(
+        year=2026,
+        data_dir=str(tmp_path / "processed"),
+        dry_run=False,
+    )
+
+    assert "Testing 1" in summary["events_processed"]
+    assert "Testing 2" in summary["events_processed"]
+    assert "Australian Grand Prix" in summary["events_processed"]
+    assert "Chinese Grand Prix" in summary["events_processed"]
+    australian_calls = [
+        call for call in captured_calls if call["events"] == ["Australian Grand Prix"]
+    ]
+    chinese_calls = [call for call in captured_calls if call["events"] == ["Chinese Grand Prix"]]
+    assert australian_calls[0]["sessions"] == ["FP1", "FP2", "FP3", "Q", "R"]
+    assert chinese_calls[0]["sessions"] == ["FP1", "SQ", "Sprint", "Q", "R"]
+
+
+def test_replay_season_characteristics_from_cache_resets_then_replays_in_order(tmp_path, patcher):
+    characteristics_file = _write_characteristics(
+        tmp_path,
+        {
+            "version": 4,
+            "directionality_last_updated": "2026-03-03T23:33:59.825095",
+            "directionality_meta": {"events": ["Testing 1"]},
+            "teams": {
+                "Ferrari": {
+                    "overall_performance": 0.72,
+                    "directionality": {"max_speed": 0.03},
+                    "testing_characteristics": {"overall_pace": 0.81},
+                    "testing_characteristics_profiles": {"balanced": {"overall_pace": 0.81}},
+                    "compound_characteristics": {"SOFT": {"pace": 0.8}},
+                }
+            },
+        },
+    )
+
+    update_calls: list[tuple[list[str], list[str], str]] = []
+    persisted_state: dict[str, object] = {}
+
+    def _mock_update(**kwargs):
+        payload = json.loads(characteristics_file.read_text())
+        ferrari = payload["teams"]["Ferrari"]
+        assert "directionality" not in ferrari
+        assert "testing_characteristics" not in ferrari
+        assert "testing_characteristics_profiles" not in ferrari
+        assert "compound_characteristics" not in ferrari
+        update_calls.append(
+            (list(kwargs["events"]), list(kwargs["sessions"]), str(kwargs["cache_dir"]))
+        )
+        session_name = kwargs["sessions"][0]
+        event_name = kwargs["events"][0]
+        return {
+            "loaded_sessions": [f"{event_name}::{session_name}"],
+            "snapshot_keys": [f"2026::{event_name}::{session_name}"],
+            "updated_teams": ["Ferrari"],
+        }
+
+    patcher.setattr(
+        tu,
+        "_season_snapshot_plan",
+        lambda year: [
+            {
+                "event_name": "Testing 1",
+                "sessions": ["Day 1", "Day 2"],
+                "cache_dirs": [str(tmp_path / "cache-testing")],
+            },
+            {
+                "event_name": "Australian Grand Prix",
+                "sessions": ["FP1", "Q"],
+                "cache_dirs": [str(tmp_path / "cache-race")],
+            },
+        ],
+    )
+    patcher.setattr(tu, "update_from_testing_sessions", _mock_update)
+    patcher.setattr(
+        tu,
+        "_write_practice_replay_state",
+        lambda year, event_sessions, event_team_counts: persisted_state.update(
+            {
+                "year": year,
+                "event_sessions": event_sessions,
+                "event_team_counts": event_team_counts,
+            }
+        ),
+    )
+
+    summary = tu.replay_season_characteristics_from_cache(
+        year=2026,
+        data_dir=str(tmp_path / "processed"),
+        dry_run=False,
+    )
+
+    assert update_calls == [
+        (["Testing 1"], ["Day 1"], str(tmp_path / "cache-testing")),
+        (["Testing 1"], ["Day 2"], str(tmp_path / "cache-testing")),
+        (["Australian Grand Prix"], ["FP1"], str(tmp_path / "cache-race")),
+        (["Australian Grand Prix"], ["Q"], str(tmp_path / "cache-race")),
+    ]
+    assert persisted_state == {
+        "year": 2026,
+        "event_sessions": {
+            "Testing 1": ["Day 1", "Day 2"],
+            "Australian Grand Prix": ["FP1", "Q"],
+        },
+        "event_team_counts": {"Testing 1": 1, "Australian Grand Prix": 1},
+    }
+    assert summary["events_processed"] == ["Testing 1", "Australian Grand Prix"]
+    assert summary["sessions_applied"] == [
+        "Testing 1::Day 1",
+        "Testing 1::Day 2",
+        "Australian Grand Prix::FP1",
+        "Australian Grand Prix::Q",
+    ]
+    assert Path(summary["backup_path"]).exists()
+
+
+def test_replay_season_characteristics_from_cache_restores_backup_after_failure(tmp_path, patcher):
+    original_payload = {
+        "version": 4,
+        "directionality_last_updated": "2026-03-03T23:33:59.825095",
+        "directionality_meta": {"events": ["Testing 1"]},
+        "teams": {
+            "Ferrari": {
+                "overall_performance": 0.72,
+                "directionality": {"max_speed": 0.03},
+                "testing_characteristics": {"overall_pace": 0.81},
+                "testing_characteristics_profiles": {"balanced": {"overall_pace": 0.81}},
+                "compound_characteristics": {"SOFT": {"pace": 0.8}},
+            }
+        },
+    }
+    characteristics_file = _write_characteristics(tmp_path, original_payload)
+
+    patcher.setattr(
+        tu,
+        "_season_snapshot_plan",
+        lambda year: [
+            {
+                "event_name": "Australian Grand Prix",
+                "sessions": ["FP1", "Q"],
+                "cache_dirs": [str(tmp_path / "cache-race")],
+            }
+        ],
+    )
+
+    call_count = {"value": 0}
+
+    def _mock_update(**kwargs):
+        call_count["value"] += 1
+        if call_count["value"] == 1:
+            return {
+                "loaded_sessions": ["Australian Grand Prix::FP1"],
+                "snapshot_keys": ["2026::Australian Grand Prix::FP1"],
+                "updated_teams": ["Ferrari"],
+            }
+        raise RuntimeError("replay step failed")
+
+    patcher.setattr(tu, "update_from_testing_sessions", _mock_update)
+
+    with pytest.raises(RuntimeError, match="replay step failed"):
+        tu.replay_season_characteristics_from_cache(
+            year=2026,
+            data_dir=str(tmp_path / "processed"),
+            dry_run=False,
+        )
+
+    restored_payload = json.loads(characteristics_file.read_text())
+    assert restored_payload == original_payload

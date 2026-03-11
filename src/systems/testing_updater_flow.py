@@ -9,6 +9,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from src.utils.car_snapshot_history import (
+    merge_snapshot_team_metrics,
+    resolve_session_snapshot_metadata,
+)
+
 
 @dataclass
 class SessionCollectionResult:
@@ -31,6 +36,7 @@ class SessionCollectionResult:
     compound_metrics_by_session: dict[
         str, tuple[str, dict[str, dict[str, dict[str, float | str | None]]]]
     ] = field(default_factory=dict)
+    session_snapshot_records: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 def load_characteristics_payload(data_dir: str, target_year: int) -> tuple[Path, dict]:
@@ -111,6 +117,33 @@ def _record_profile_weighted_metrics(
                 team_profile_sessions_used[team][profile].add(session_id)
 
 
+def _build_session_snapshot_record(
+    *,
+    event_name: str,
+    session_name: str,
+    session: Any,
+    profile_results: dict[str, tuple[dict[str, dict[str, float]], dict[str, dict[str, float]]]],
+) -> dict[str, Any] | None:
+    """Build a raw session snapshot record from extracted per-profile metrics."""
+    team_profiles: dict[str, dict[str, dict[str, float]]] = {}
+
+    for profile_name, (perf_by_profile, tire_by_profile) in profile_results.items():
+        merged_metrics = merge_snapshot_team_metrics(perf_by_profile, tire_by_profile)
+        for team_name, team_metrics in merged_metrics.items():
+            team_profiles.setdefault(team_name, {})[profile_name] = team_metrics
+
+    if not team_profiles:
+        return None
+
+    metadata = resolve_session_snapshot_metadata(session=session, session_name=session_name)
+    return {
+        "event_name": event_name,
+        "session_name": session_name,
+        "team_profiles": team_profiles,
+        **metadata,
+    }
+
+
 def collect_sessions_for_events(
     *,
     year: int,
@@ -177,6 +210,15 @@ def collect_sessions_for_events(
                         perf_by_profile=perf_by_profile,
                         tire_by_profile=tire_by_profile,
                     )
+
+            snapshot_record = _build_session_snapshot_record(
+                event_name=event_name,
+                session_name=session_name,
+                session=session,
+                profile_results=profile_results,
+            )
+            if snapshot_record is not None:
+                result.session_snapshot_records[session_id] = snapshot_record
 
             normalized_perf, normalized_tire = profile_results.get(run_profile, ({}, {}))
             if not normalized_perf and not normalized_tire:

@@ -241,6 +241,11 @@ def load_sessions_for_event(
             try:
                 session = fastf1_get_session(year, event_name, session_name)
                 session.load(laps=True, telemetry=False, weather=False, messages=False)
+                laps = session.laps
+                if laps is None:
+                    raise ValueError("laps are None after session.load()")
+                # Access row count to force DataNotLoadedError if load is incomplete.
+                _ = len(laps)
                 loaded.append((session_name, session))
             except Exception as exc:
                 logger_obj.debug(

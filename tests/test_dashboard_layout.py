@@ -146,12 +146,12 @@ def test_render_sidebar_returns_page_and_logging_toggle(patcher):
 
 
 def test_navigation_pages_match_dashboard_order():
-    assert layout.NAVIGATION_PAGES == [
-        "Prediction",
-        "Team Comparison",
-        "Model & Learning",
-        "Contact",
-    ]
+    expected_pages = ["Prediction", "Team Comparison"]
+    if layout.ENABLE_PREDICTION_ACCURACY_TAB:
+        expected_pages.append("Prediction Accuracy")
+    expected_pages.extend(["Model & Learning", "Contact"])
+
+    assert layout.NAVIGATION_PAGES == expected_pages
 
 
 def test_custom_css_keeps_streamlit_spinner_visible():

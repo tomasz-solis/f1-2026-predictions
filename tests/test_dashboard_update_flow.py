@@ -309,10 +309,10 @@ def test_auto_update_practice_characteristics_updates_state(patcher, tmp_path):
         lambda key, default=None: config_values.get(key, default),
     )
 
-    captured_kwargs: dict = {}
+    update_calls: list[list[str]] = []
 
     def _update_from_testing_sessions(**kwargs):
-        captured_kwargs.update(kwargs)
+        update_calls.append(list(kwargs["sessions"]))
         return {"updated_teams": ["Ferrari", "McLaren", "Mercedes"]}
 
     patcher.setattr(
@@ -329,10 +329,7 @@ def test_auto_update_practice_characteristics_updates_state(patcher, tmp_path):
     assert result["updated"] is True
     assert result["completed_fp_sessions"] == ["FP1", "FP2"]
     assert result["teams_updated"] == 3
-    assert captured_kwargs["events"] == ["Bahrain Grand Prix"]
-    assert captured_kwargs["sessions"] == ["FP1", "FP2"]
-    assert captured_kwargs["new_weight"] == 0.4
-    assert captured_kwargs["directionality_scale"] == 0.09
+    assert update_calls == [["FP1"], ["FP2"]]
 
     persisted = json.loads(state_file.read_text())
     race_state = persisted["races"]["2026::Bahrain Grand Prix"]
@@ -376,6 +373,81 @@ def test_auto_update_practice_characteristics_updates_only_new_sessions(patcher,
     assert persisted["races"]["2026::Bahrain Grand Prix"]["sessions"] == ["FP1", "FP2"]
 
 
+def test_auto_update_practice_characteristics_includes_qualifying_and_race(patcher, tmp_path):
+    state_file = tmp_path / "practice_state.json"
+    patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
+
+    class _Detector:
+        def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool):
+            del year, race_name
+            assert is_sprint is False
+            return ["Q", "FP3", "R", "FP1"]
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+
+    update_calls: list[list[str]] = []
+
+    def _update_from_testing_sessions(**kwargs):
+        update_calls.append(list(kwargs["sessions"]))
+        return {"updated_teams": ["Ferrari"]}
+
+    patcher.setattr(
+        "src.systems.testing_updater.update_from_testing_sessions",
+        _update_from_testing_sessions,
+    )
+
+    result = update_flow.auto_update_practice_characteristics_if_needed(
+        year=2026,
+        race_name="Bahrain Grand Prix",
+        is_sprint=False,
+    )
+
+    assert result["updated"] is True
+    assert result["completed_fp_sessions"] == ["FP1", "FP3", "Q", "R"]
+    assert update_calls == [["FP1"], ["FP3"], ["Q"], ["R"]]
+
+
+def test_auto_update_practice_characteristics_falls_back_across_cache_dirs(patcher, tmp_path):
+    state_file = tmp_path / "practice_state.json"
+    patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
+    patcher.setattr(
+        update_flow,
+        "_practice_capture_cache_dirs",
+        lambda: ("race-cache", "testing-cache"),
+    )
+
+    class _Detector:
+        def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool):
+            del year, race_name, is_sprint
+            return ["Q"]
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+
+    update_calls: list[tuple[str, str]] = []
+
+    def _update_from_testing_sessions(**kwargs):
+        session_name = str(kwargs["sessions"][0])
+        cache_dir = str(kwargs["cache_dir"])
+        update_calls.append((session_name, cache_dir))
+        if cache_dir == "race-cache":
+            raise ValueError("session missing from race cache")
+        return {"updated_teams": ["Ferrari"]}
+
+    patcher.setattr(
+        "src.systems.testing_updater.update_from_testing_sessions",
+        _update_from_testing_sessions,
+    )
+
+    result = update_flow.auto_update_practice_characteristics_if_needed(
+        year=2026,
+        race_name="Australian Grand Prix",
+        is_sprint=False,
+    )
+
+    assert result["updated"] is True
+    assert update_calls == [("Q", "race-cache"), ("Q", "testing-cache")]
+
+
 def test_auto_update_practice_characteristics_force_recheck_processes_all_completed(
     patcher, tmp_path
 ):
@@ -391,10 +463,10 @@ def test_auto_update_practice_characteristics_force_recheck_processes_all_comple
 
     patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
 
-    captured_kwargs: dict = {}
+    update_calls: list[list[str]] = []
 
     def _update_from_testing_sessions(**kwargs):
-        captured_kwargs.update(kwargs)
+        update_calls.append(list(kwargs["sessions"]))
         return {"updated_teams": ["Ferrari"]}
 
     patcher.setattr(
@@ -410,10 +482,12 @@ def test_auto_update_practice_characteristics_force_recheck_processes_all_comple
     )
 
     assert result["updated"] is True
-    assert captured_kwargs["sessions"] == ["FP1", "FP2"]
+    assert update_calls == [["FP1"], ["FP2"]]
 
 
-def test_auto_update_practice_characteristics_sprint_updates_fp1_and_sq(patcher, tmp_path):
+def test_auto_update_practice_characteristics_sprint_updates_all_completed_sessions(
+    patcher, tmp_path
+):
     state_file = tmp_path / "practice_state.json"
     patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
 
@@ -425,10 +499,10 @@ def test_auto_update_practice_characteristics_sprint_updates_fp1_and_sq(patcher,
 
     patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
 
-    captured_kwargs: dict = {}
+    update_calls: list[list[str]] = []
 
     def _update_from_testing_sessions(**kwargs):
-        captured_kwargs.update(kwargs)
+        update_calls.append(list(kwargs["sessions"]))
         return {"updated_teams": ["McLaren"]}
 
     patcher.setattr(
@@ -443,8 +517,8 @@ def test_auto_update_practice_characteristics_sprint_updates_fp1_and_sq(patcher,
     )
 
     assert result["updated"] is True
-    assert result["completed_fp_sessions"] == ["FP1", "SQ"]
-    assert captured_kwargs["sessions"] == ["FP1", "SQ"]
+    assert result["completed_fp_sessions"] == ["FP1", "SQ", "Sprint"]
+    assert update_calls == [["FP1"], ["SQ"], ["Sprint"]]
 
 
 def test_auto_update_practice_characteristics_sprint_skips_when_fp1_sq_processed(patcher, tmp_path):

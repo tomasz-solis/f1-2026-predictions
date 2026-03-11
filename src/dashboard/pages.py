@@ -123,7 +123,7 @@ def render_team_comparison_page() -> None:
     """Render standalone team comparison tab."""
     st.header("Team Comparison")
     st.markdown(
-        "Compare team characteristic fingerprints from testing/practice inputs. "
+        "Compare team characteristic fingerprints from synced session inputs. "
         "Profile metrics and season-prior baseline are separate signals and can diverge."
     )
     _render_team_comparison_section(year=_get_selected_season())
