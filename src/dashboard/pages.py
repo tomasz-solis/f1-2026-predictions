@@ -273,6 +273,92 @@ def _load_race_options(year: int = DEFAULT_SEASON) -> list[str]:
     return race_options
 
 
+def _parse_refresh_timestamp(value: Any) -> datetime | None:
+    """Parse a persisted refresh timestamp into UTC when possible."""
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if not candidate:
+        return None
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _latest_dashboard_refresh_timestamp(year: int) -> datetime | None:
+    """
+    Return the newest dashboard data-refresh timestamp for a season.
+
+    The dashboard can run in DB-backed or local-file modes, so this resolver
+    combines persisted artifact timestamps, horizon-index timestamps, and local
+    file mtimes for the dashboard inputs that actually drive predictions.
+    """
+    timestamps: list[datetime] = []
+    artifact_hash = ""
+
+    try:
+        artifact_versions = get_artifact_versions(year=year)
+    except Exception as exc:
+        logger.warning("Could not load artifact versions for refresh stamp: %s", exc)
+        artifact_versions = {}
+
+    for version_payload in artifact_versions.values():
+        if not isinstance(version_payload, tuple) or len(version_payload) < 2:
+            continue
+        parsed = _parse_refresh_timestamp(version_payload[1])
+        if parsed is not None:
+            timestamps.append(parsed)
+
+    try:
+        artifact_hash = compute_artifact_hash(artifact_versions)
+    except Exception as exc:
+        logger.warning("Could not compute artifact hash for refresh stamp: %s", exc)
+
+    if artifact_hash:
+        try:
+            horizon_index = load_precompute_horizon_index(year=year, artifact_hash=artifact_hash)
+        except Exception as exc:
+            logger.warning("Could not load horizon index for refresh stamp: %s", exc)
+            horizon_index = None
+        if isinstance(horizon_index, dict):
+            parsed = _parse_refresh_timestamp(horizon_index.get("updated_at"))
+            if parsed is not None:
+                timestamps.append(parsed)
+
+    season_year = int(year)
+    refresh_paths = (
+        Path(f"data/processed/car_characteristics/{season_year}_car_characteristics.json"),
+        Path(f"data/processed/track_characteristics/{season_year}_track_characteristics.json"),
+        Path(f"data/processed/driver_characteristics/{season_year}_driver_characteristics.json"),
+        Path("data/processed/driver_characteristics.json"),
+        Path("data/systems/practice_characteristics_state.json"),
+        Path("data/systems/precompute_horizon_index.json"),
+        Path("data/systems/precomputed_predictions.json"),
+    )
+    for refresh_path in refresh_paths:
+        if not refresh_path.exists():
+            continue
+        try:
+            mtime = datetime.fromtimestamp(refresh_path.stat().st_mtime, tz=UTC)
+        except OSError:
+            continue
+        timestamps.append(mtime)
+
+    return max(timestamps) if timestamps else None
+
+
+def _dashboard_refresh_label(year: int) -> str:
+    """Format the latest dashboard refresh stamp for the hero card."""
+    latest_refresh = _latest_dashboard_refresh_timestamp(year)
+    if latest_refresh is None:
+        return BRAND_LAST_UPDATED
+    return latest_refresh.strftime("%Y-%m-%d %H:%M UTC")
+
+
 @st.cache_data(ttl=900, show_spinner=False)
 def _load_schedule_event_rows_cached(year: int) -> tuple[tuple[str, str, str], ...]:
     """Load cached schedule rows with serialized event dates for horizon filtering."""
@@ -826,6 +912,7 @@ def _prediction_failure_hint(error: Exception) -> str | None:
 
 
 def render_live_prediction_page(enable_logging: bool) -> None:
+    selected_season = _get_selected_season()
     render_prediction_hero_deck(
         title="Race Weekend Prediction",
         summary=(
@@ -843,8 +930,8 @@ def render_live_prediction_page(enable_logging: bool) -> None:
             },
             {
                 "label": "Updated",
-                "value": BRAND_LAST_UPDATED,
-                "meta": "Latest dashboard refresh stamp.",
+                "value": _dashboard_refresh_label(selected_season),
+                "meta": "Latest persisted data refresh stamp.",
                 "tone": "neutral",
             },
             {
@@ -864,7 +951,6 @@ def render_live_prediction_page(enable_logging: bool) -> None:
     )
 
     season_options = _available_seasons()
-    selected_season = _get_selected_season()
     if selected_season not in season_options:
         season_options = [selected_season, *season_options]
     season_index = season_options.index(selected_season)
@@ -875,6 +961,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                 "Season",
                 options=season_options,
                 index=season_index,
+                key="selected_season",
                 help=(
                     "Controls schedule lookup, update checks, artifacts, and prediction "
                     "execution year."

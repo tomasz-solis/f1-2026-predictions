@@ -358,6 +358,48 @@ def test_prediction_failure_hint_uses_precompute_guidance_when_db_prediction_mis
     assert "file_only" in hint
 
 
+def test_dashboard_refresh_label_prefers_newest_runtime_timestamp(patcher):
+    patcher.setattr(
+        pages,
+        "get_artifact_versions",
+        lambda year=2026: {
+            "car_characteristics::2026::car_characteristics": (3, "2026-03-10T08:15:00+00:00"),
+            "track_characteristics::2026::track_characteristics": (
+                2,
+                "2026-03-09T20:00:00+00:00",
+            ),
+        },
+    )
+    patcher.setattr(pages, "compute_artifact_hash", lambda versions: "artifact_hash")
+    patcher.setattr(
+        pages,
+        "load_precompute_horizon_index",
+        lambda year, artifact_hash: {
+            "updated_at": "2026-03-11T09:16:00+00:00",
+        },
+    )
+    patcher.setattr(
+        pages.Path,
+        "exists",
+        lambda self: False,
+    )
+
+    assert pages._dashboard_refresh_label(2026) == "2026-03-11 09:16 UTC"
+
+
+def test_dashboard_refresh_label_falls_back_when_no_runtime_timestamp_exists(patcher):
+    patcher.setattr(pages, "get_artifact_versions", lambda year=2026: {"k": (1, "not-a-date")})
+    patcher.setattr(pages, "compute_artifact_hash", lambda versions: "artifact_hash")
+    patcher.setattr(pages, "load_precompute_horizon_index", lambda year, artifact_hash: None)
+    patcher.setattr(
+        pages.Path,
+        "exists",
+        lambda self: False,
+    )
+
+    assert pages._dashboard_refresh_label(2026) == "Unavailable"
+
+
 def test_save_prediction_if_enabled_saves_new_session(patcher):
     saved_payload: dict = {}
     info_messages: list[str] = []
@@ -730,6 +772,7 @@ def _stub_page_streamlit(patcher):
     )
     patcher.setattr(pages.st, "container", lambda *_args, **_kwargs: _Ctx())
     patcher.setattr(pages.st, "expander", lambda _label: _Ctx())
+    patcher.setattr(pages, "_dashboard_refresh_label", lambda year: "2026-03-11 09:16 UTC")
 
 
 def test_render_model_insights_page_executes(patcher):
