@@ -2,31 +2,44 @@
 
 ## Runtime Overview
 
-Current runtime path in the dashboard:
+The dashboard shell starts in `app.py`, applies layout/navigation in `src/dashboard/layout.py`,
+and routes in `src/dashboard/pages.py`. The user-facing tab is named `Prediction`, but the
+implementation still runs through `render_live_prediction_page()` and
+`src/dashboard/live_prediction_flow.py`.
 
-```text
-Streamlit UI (app.py)
-  -> src/dashboard/layout.py
-  -> src/dashboard/pages.py
-       -> src/dashboard/update_flow.py
-       -> src/dashboard/live_prediction_flow.py
-       -> src/dashboard/prediction_flow.py
-            -> src/utils/session_detector.py
-            -> src/utils/actual_results_fetcher.py
-            -> src/utils/fastf1_resilience.py
-       -> Baseline2026Predictor
-            -> baseline/data_mixin.py
-            -> baseline/qualifying_mixin.py
-            -> baseline/race/*.py
-            -> weight_schedule.py
-            -> fp_blending.py (qualifying only)
-            -> systematic_learning.py (calibration state read/apply)
-       -> ArtifactStore (file/db mode by USE_DB_STORAGE)
-       -> RuntimeStateStore (Supabase runtime_state + runtime_processing_locks)
-       -> operational_observability (counters/alerts -> operational_events)
-       -> PredictionLogger.update_actuals() -> systematic_learning.py (calibration state update)
-       -> src/dashboard/rendering.py
-  -> qualifying + race outputs
+```mermaid
+flowchart TD
+    A["app.py"] --> B["src/dashboard/layout.py"]
+    A --> C["src/dashboard/pages.py"]
+
+    C --> D["Prediction tab"]
+    C --> E["Team Comparison tab"]
+    C --> F["Prediction Accuracy tab"]
+    C --> G["Model & Learning tab"]
+    C --> H["Contact tab"]
+
+    D --> I["src/dashboard/live_prediction_flow.py"]
+    I --> J["src/dashboard/update_flow.py"]
+    I --> K["src/dashboard/prediction_flow.py"]
+    I --> L["src/dashboard/precomputed_predictions.py"]
+    K --> M["src/utils/session_detector.py"]
+    K --> N["src/utils/actual_results_fetcher.py"]
+    K --> O["src/utils/fastf1_resilience.py"]
+    K --> P["Baseline2026Predictor"]
+    P --> P1["baseline/data_mixin.py"]
+    P --> P2["baseline/qualifying_mixin.py"]
+    P --> P3["baseline/race/*.py"]
+    P --> Q["src/systems/weight_schedule.py"]
+    P --> R["src/utils/fp_blending.py"]
+    P --> S["src/systems/systematic_learning.py"]
+    I --> T["ArtifactStore"]
+    I --> U["RuntimeStateStore"]
+    I --> V["operational_observability"]
+    I --> W["src/dashboard/rendering.py"]
+
+    E --> X["src/dashboard/team_comparison.py"]
+    F --> Y["src/dashboard/accuracy.py"]
+    F --> Z["src/dashboard/accuracy_view.py"]
 ```
 
 `src/predictors/qualifying.py` and `src/predictors/race.py` are compatibility wrappers; they call the baseline predictor internally.
@@ -35,11 +48,15 @@ Streamlit UI (app.py)
 
 - `src/dashboard/cache.py`: FastF1 cache setup, artifact version tracking, cached predictor loading.
 - `src/dashboard/layout.py`: page config, CSS/theme injection, header, sidebar controls.
-- `src/dashboard/pages.py`: per-page orchestration (`Live Prediction`, `Model & Learning`, `Prediction Accuracy`, `Contact`).
+- `src/dashboard/pages.py`: page routing for `Prediction`, `Team Comparison`, `Prediction Accuracy`, `Model & Learning`, and `Contact`.
 - `src/dashboard/live_prediction_flow.py`: refresh orchestration, boundary checks, cache-keying, cache-hit FastF1 rechecks.
 - `src/dashboard/prediction_flow.py`: cached weekend prediction cascade + ACTUAL/PREDICTED grid switching.
+- `src/dashboard/precomputed_predictions.py`: artifact keying and storage for warmed prediction payloads and base features.
 - `src/dashboard/rendering.py`: qualifying/race result tables and race-specific visual sections.
 - `src/dashboard/update_flow.py`: auto-update hooks for completed races and FP practice capture.
+- `src/dashboard/team_comparison.py`: standalone team profile comparison tab.
+- `src/dashboard/accuracy.py`: target-aware accuracy pipeline built from saved predictions and actuals.
+- `src/dashboard/accuracy_view.py`: charts, KPIs, and saved-prediction summaries for the accuracy tab.
 
 ## Core Components
 
@@ -84,7 +101,9 @@ Responsibilities:
 - Fall back to testing short-run profile blend when weekend practice pace is unavailable.
 - Fall back to model-only path when both practice and testing fallback are unavailable.
 
-Note: in the active baseline path, qualifying blend is fixed at 70/30.
+Note: the active baseline path does not use a fixed 70/30 split. `BaselineQualifyingMixin`
+scales the practice share by data confidence using
+`baseline_predictor.qualifying.fp_blend_weight*` bounds in `config/default.yaml`.
 
 ### 4. Auto Update From Completed Races
 

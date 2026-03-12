@@ -1,6 +1,6 @@
 # Dashboard Update Behavior
 
-This guide explains what the app updates automatically and what still requires an explicit script run.
+This guide shows what the app refreshes on a normal prediction click and what still needs an explicit script run.
 
 ## Automatic During `Predict`
 

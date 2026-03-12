@@ -1,6 +1,6 @@
 # Practice Session Blending
 
-This page explains the qualifying blend implemented in `src/utils/fp_blending.py` and consumed by `Baseline2026Predictor.predict_qualifying()`.
+This guide covers the qualifying-practice blend in `src/utils/fp_blending.py` and where `Baseline2026Predictor.predict_qualifying()` uses it.
 
 ## What It Does
 

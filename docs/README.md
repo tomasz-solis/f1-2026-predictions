@@ -1,6 +1,6 @@
 # Documentation Index
 
-Use this index to find docs that match the current code path.
+Start here if you want the docs that still match the current runtime.
 
 ## Start Here
 
@@ -36,11 +36,12 @@ Background warmup worker for checkpoint-aware precompute and ready-race horizon 
 
 ## Validation Notebooks
 
-- `../notebooks/validate_testing_predictions.ipynb`
-- `../notebooks/test_weight_schedules.ipynb`
+- `../notebooks/model_development/validate_testing_predictions.ipynb`
+- `../notebooks/model_development/test_weight_schedules.ipynb`
 
 Use these as supporting analysis, not as a substitute for checking runtime code.
 
 ## Scope Note
 
-If you see a mismatch between docs and code, code behavior is the source of truth. This documentation is intended to mirror the current runtime path and gets updated as logic changes.
+If docs and code disagree, trust the code first. This set is meant to mirror the
+current runtime path, not preserve old design notes.

@@ -1,6 +1,6 @@
 # Weekend Prediction Flow
 
-This page maps what the dashboard does when you run predictions from `src/dashboard/pages.py` (entrypoint: `app.py`).
+This is the dashboard prediction cascade behind `src/dashboard/pages.py` and `app.py`.
 
 ## Overview
 
@@ -10,6 +10,33 @@ The app produces a cascade of predictions based on weekend format.
 - Sprint weekend: 4 outputs
 
 The race model can use ACTUAL grids from completed competitive sessions when available.
+
+```mermaid
+flowchart TD
+    A["Predict click"] --> B{"Weekend format"}
+
+    B -->|Normal| N1["Predict Qualifying"]
+    N1 --> N2{"Q completed?"}
+    N2 -->|Yes| N3["Use ACTUAL qualifying classification"]
+    N2 -->|No| N4["Use predicted qualifying grid"]
+    N3 --> N5["Grand Prix race path"]
+    N4 --> N5
+
+    B -->|Sprint| S1["Predict Sprint Qualifying"]
+    S1 --> S2{"SQ completed?"}
+    S2 -->|Yes| S3["Use ACTUAL sprint qualifying classification"]
+    S2 -->|No| S4["Use predicted sprint qualifying grid"]
+    S3 --> S5["Sprint race path"]
+    S4 --> S5
+    S5 --> S6["Predict Main Qualifying"]
+    S6 --> S7{"Q completed?"}
+    S7 -->|Yes| S8["Use ACTUAL qualifying classification"]
+    S7 -->|No| S9["Use predicted qualifying grid"]
+    S8 --> S10["Grand Prix race path"]
+    S9 --> S10
+```
+
+If session completion state is unknown, the flow stops for that session instead of silently switching back to predicted data.
 
 ## Normal Weekend
 

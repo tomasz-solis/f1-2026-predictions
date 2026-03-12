@@ -4,36 +4,52 @@ This repository predicts F1 race weekends for the 2026 season using simulation-b
 
 ## What Runs In Production
 
-The Streamlit app and the main weekend flow use:
+The dashboard shell lives in:
 
-- `app.py` (entrypoint)
-- `src/dashboard/cache.py`
+- `app.py`
 - `src/dashboard/layout.py`
 - `src/dashboard/pages.py`
+
+The main `Prediction` tab then runs through:
+
+- `src/dashboard/live_prediction_flow.py`
 - `src/dashboard/prediction_flow.py`
-- `src/dashboard/rendering.py`
 - `src/dashboard/update_flow.py`
+- `src/dashboard/rendering.py`
+- `src/dashboard/cache.py`
+
+The other shipped tabs use:
+
+- `src/dashboard/team_comparison.py`
+- `src/dashboard/accuracy.py`
+- `src/dashboard/accuracy_view.py`
+
+Core prediction services on the active runtime path:
+
 - `src/predictors/baseline_2026.py` (`Baseline2026Predictor`)
 - `src/systems/systematic_learning.py`
 - `src/systems/weight_schedule.py`
 - `src/utils/fp_blending.py`
 
 `src/predictors/qualifying.py` and `src/predictors/race.py` are compatibility wrappers that delegate to `Baseline2026Predictor`.
+The user-facing tab is called `Prediction`, but the route is still handled by `render_live_prediction_page()` in code for backwards compatibility.
 
 Current dashboard tabs:
 
 - `Prediction`
 - `Team Comparison`
-- `Model & Learning`
 - `Prediction Accuracy`
+- `Model & Learning`
 - `Contact`
+
+If you want the component relationship map, see `ARCHITECTURE.md`.
 
 ## Predictor Structure
 
 `Baseline2026Predictor` is a composed class, split into focused modules.
 
 - `src/predictors/baseline/data_mixin.py`: artifact loading, blended team strength, compound selection helpers
-- `src/predictors/baseline/qualifying_mixin.py`: qualifying and sprint-quali flow
+- `src/predictors/baseline/qualifying_mixin.py`: qualifying, sprint-qualifying, and sprint-race entrypoints
 - `src/predictors/baseline/race/`: race prep, params, and lap-by-lap prediction mixins
 - `src/predictors/baseline_2026.py`: thin composition/entrypoint
 

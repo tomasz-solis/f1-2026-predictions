@@ -1,6 +1,6 @@
 # Persistence and Supabase
 
-This page documents how persistence works in the current runtime path, including target-aware prediction accuracy storage.
+This is the current persistence path: artifacts, runtime state, and target-aware accuracy storage.
 
 ## Current Runtime Integration
 

@@ -1,6 +1,6 @@
 # Prediction Tracking
 
-This page explains how prediction checkpoints are stored, how actual results are attached later, and how target-aware accuracy snapshots are derived.
+This is the storage path for checkpoint predictions, later actuals, and derived accuracy snapshots.
 
 ## Where It Lives
 

@@ -1,6 +1,6 @@
 # Compound Performance Analysis System
 
-This page explains how compound-specific performance is collected, normalized, and used in race predictions.
+This guide covers how compound-specific pace and degradation are extracted and then folded into race simulation.
 
 ## Overview
 
