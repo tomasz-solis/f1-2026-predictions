@@ -666,6 +666,91 @@ def test_build_snapshot_history_dataframe_keeps_partial_overall_points():
     assert round(float(frame.iloc[1]["Slow Corners"]), 2) == 0.70
 
 
+def test_latest_snapshot_payload_skips_competitive_sessions():
+    snapshots = [
+        {
+            "event_name": "Chinese Grand Prix",
+            "session_name": "FP1",
+            "teams": {
+                "McLaren": {
+                    "profiles": {
+                        "balanced": {
+                            "overall_pace": 0.64,
+                        }
+                    }
+                }
+            },
+        },
+        {
+            "event_name": "Chinese Grand Prix",
+            "session_name": "SQ",
+            "teams": {
+                "McLaren": {
+                    "profiles": {
+                        "balanced": {
+                            "overall_pace": 0.07,
+                        }
+                    }
+                }
+            },
+        },
+    ]
+
+    latest = team_comparison._latest_snapshot_payload(snapshots)
+
+    assert latest is not None
+    assert latest["session_name"] == "FP1"
+
+
+def test_build_snapshot_history_dataframe_skips_competitive_sessions():
+    snapshots = [
+        {
+            "event_name": "Chinese Grand Prix",
+            "session_name": "FP1",
+            "teams": {
+                "McLaren": {
+                    "profiles": {
+                        "balanced": {
+                            "slow_corner_performance": 0.60,
+                            "medium_corner_performance": 0.61,
+                            "fast_corner_performance": 0.62,
+                            "braking_performance": 0.59,
+                            "top_speed": 0.58,
+                            "tire_deg_performance": 0.63,
+                        }
+                    }
+                }
+            },
+        },
+        {
+            "event_name": "Chinese Grand Prix",
+            "session_name": "SQ",
+            "teams": {
+                "McLaren": {
+                    "profiles": {
+                        "balanced": {
+                            "slow_corner_performance": 0.10,
+                            "medium_corner_performance": 0.11,
+                            "fast_corner_performance": 0.12,
+                            "braking_performance": 0.09,
+                            "top_speed": 0.08,
+                            "tire_deg_performance": 0.13,
+                        }
+                    }
+                }
+            },
+        },
+    ]
+
+    frame = team_comparison._build_snapshot_history_dataframe(
+        snapshots=snapshots,
+        selected_teams=["McLaren"],
+        profile="balanced",
+    )
+
+    assert frame["Snapshot"].tolist() == ["Chinese Grand Prix FP1"]
+
+
 def test_render_team_comparison_section_renders_development_history(patcher, tmp_path):
     calls = _stub_streamlit_team(patcher)
     patcher.setattr(team_comparison.config_loader, "get", lambda key, default=None: str(tmp_path))
@@ -913,6 +998,5 @@ def test_render_team_comparison_section_orders_development_axis_chronologically(
     assert list(development_figure.layout.xaxis.categoryarray) == [
         "Australian Grand Prix FP1",
         "Australian Grand Prix FP2",
-        "Australian Grand Prix Q",
     ]
     assert list(development_figure.layout.yaxis.range) == [-0.02, 1.02]
