@@ -13,6 +13,7 @@ from src.persistence.artifact_store import ArtifactStore
 from src.utils import config_loader
 from src.utils.car_snapshot_history import (
     SNAPSHOT_ARTIFACT_TYPE,
+    session_order_index,
     snapshot_sort_timestamp,
     sort_snapshot_payloads,
 )
@@ -308,10 +309,12 @@ def _snapshot_label(snapshot_payload: dict[str, Any]) -> str:
     return f"{event_name} {session_name}"
 
 
-def _is_development_snapshot_session(session_name: str) -> bool:
-    """Return True for testing and practice sessions that suit car-development charts."""
+def _is_comparison_snapshot_session(session_name: str) -> bool:
+    """Return True for stored snapshots that belong in comparison charts and tables."""
     normalized = "".join(ch for ch in str(session_name).strip().upper() if ch.isalnum())
-    return normalized.startswith(("DAY1", "DAY2", "DAY3", "FP1", "FP2", "FP3", "P1", "P2", "P3"))
+    if not normalized:
+        return False
+    return session_order_index(normalized) in {1, 2, 3, 6, 7}
 
 
 def _run_characteristics_season_sync(year: int, payload: dict[str, Any]) -> dict[str, Any]:
@@ -363,10 +366,10 @@ def _load_team_snapshot_history(year: int) -> list[dict[str, Any]]:
 
 
 def _latest_snapshot_payload(snapshots: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """Return the latest stored development snapshot with team profile data, if any."""
+    """Return the latest stored comparison snapshot with team profile data, if any."""
     for snapshot_payload in reversed(snapshots):
         session_name = str(snapshot_payload.get("session_name", "")).strip()
-        if not _is_development_snapshot_session(session_name):
+        if not _is_comparison_snapshot_session(session_name):
             continue
         teams_payload = snapshot_payload.get("teams")
         if isinstance(teams_payload, dict) and teams_payload:
@@ -429,7 +432,7 @@ def _build_snapshot_history_dataframe(
 
     for index, snapshot_payload in enumerate(snapshots):
         session_name = str(snapshot_payload.get("session_name", "")).strip()
-        if not _is_development_snapshot_session(session_name):
+        if not _is_comparison_snapshot_session(session_name):
             continue
 
         label = _snapshot_label(snapshot_payload)
@@ -543,8 +546,8 @@ def _render_development_history_section(
 
     st.caption(
         "Sync rebuilds the stored session snapshot history from cached sessions without "
-        "changing the live prediction artifact. The chart focuses on testing and practice "
-        "sessions only."
+        "changing the live prediction artifact. The chart follows testing, practice, "
+        "qualifying, and race snapshots while skipping sprint-only checkpoints."
     )
     if st.button(
         "Sync Car Stats From Cache",
@@ -909,7 +912,7 @@ def _render_team_comparison_section(year: int = 2026) -> None:
 
     st.dataframe(display_df, hide_index=True, width="stretch")
     st.caption(
-        "Profile pace/radar come from the latest synced development snapshot; "
+        "Profile pace/radar come from the latest synced non-sprint snapshot; "
         "Season Prior Strength is a separate baseline signal."
     )
     st.caption(
