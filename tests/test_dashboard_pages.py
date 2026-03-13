@@ -216,7 +216,7 @@ def test_filter_race_options_to_precomputed_horizon_limits_to_upcoming_window_wh
     ]
 
 
-def test_filter_race_options_to_precomputed_horizon_keeps_full_calendar_when_boundary_stale(
+def test_filter_race_options_to_precomputed_horizon_falls_back_to_last_warmed_boundary(
     patcher,
 ):
     patcher.setattr(pages, "get_artifact_versions", lambda year=2026: {"k": (1, "ts")})
@@ -235,6 +235,7 @@ def test_filter_race_options_to_precomputed_horizon_keeps_full_calendar_when_bou
             "anchor_race_name": "Bahrain Grand Prix",
             "anchor_session_name": "FP1",
             "boundary_signature": "sig_old",
+            "race_boundaries": {"Bahrain Grand Prix": "sig_old"},
         },
     )
 
@@ -244,8 +245,10 @@ def test_filter_race_options_to_precomputed_horizon_keeps_full_calendar_when_bou
         race_options=options,
     )
 
-    assert filtered == options
-    assert metadata["applied"] is False
+    assert filtered == ["Bahrain Grand Prix"]
+    assert metadata["applied"] is True
+    assert metadata["fallback_boundary_active"] is True
+    assert metadata["anchor_session_name"] == "FP1"
     assert metadata["stale_reason"] == "boundary_mismatch"
 
 

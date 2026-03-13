@@ -898,6 +898,95 @@ def test_execute_live_prediction_pipeline_raises_when_db_mode_requires_persisted
         )
 
 
+def test_execute_live_prediction_pipeline_falls_back_to_last_warmed_boundary_when_current_missing(
+    patcher,
+):
+    load_calls: list[str] = []
+
+    patcher.setattr(live_prediction_flow, "should_read_db_first", lambda: True)
+    patcher.setattr(
+        live_prediction_flow,
+        "_get_prediction_precompute_settings",
+        lambda: {
+            "enabled": True,
+            "inline_enabled": False,
+            "horizon_races": 3,
+            "weather_scenarios": ["dry", "mixed", "rain"],
+            "max_file_entries": 2048,
+        },
+    )
+
+    def _load_precomputed(**kwargs):
+        load_calls.append(str(kwargs.get("boundary_signature", "")))
+        if str(kwargs.get("boundary_signature", "")) == "sig_fp1":
+            return {"sprint_quali": {"grid": []}, "sprint_race": {"finish_order": []}}
+        return None
+
+    patcher.setattr(live_prediction_flow, "load_precomputed_prediction", _load_precomputed)
+    patcher.setattr(
+        live_prediction_flow,
+        "load_precompute_horizon_index",
+        lambda **kwargs: {
+            "ready_races": ["Chinese Grand Prix", "Japanese Grand Prix", "Bahrain Grand Prix"],
+            "expected_targets": [
+                "Chinese Grand Prix",
+                "Japanese Grand Prix",
+                "Bahrain Grand Prix",
+            ],
+            "anchor_race_name": "Chinese Grand Prix",
+            "anchor_session_name": "FP1",
+            "boundary_signature": "sig_fp1",
+            "race_boundaries": {
+                "Chinese Grand Prix": "sig_fp1",
+                "Japanese Grand Prix": "sig_pre_jpn",
+                "Bahrain Grand Prix": "sig_pre_bhr",
+            },
+        },
+    )
+
+    output = live_prediction_flow.execute_live_prediction_pipeline_core(
+        race_name="Chinese Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+        progress_callback=None,
+        clear_fastf1_race_cache_fn=lambda year, race_name: None,
+        auto_update_if_needed_fn=lambda force_recheck=False, year=2026: None,
+        is_sprint_weekend_fn=lambda year, race_name: True,
+        detect_event_boundary_refresh_if_needed_fn=lambda year,
+        race_name,
+        is_sprint,
+        session_detector=None: {
+            "refresh_needed": False,
+            "reason": "no_change",
+            "new_sessions": [],
+            "boundary_signature": "sig_sq",
+            "latest_elapsed_session": "SQ",
+        },
+        auto_update_practice_characteristics_if_needed_fn=(
+            lambda year, race_name, is_sprint, force_recheck=False, session_detector=None: {
+                "updated": False,
+                "completed_fp_sessions": [],
+            }
+        ),
+        clear_resource_cache_fn=lambda: None,
+        clear_data_cache_fn=lambda: None,
+        get_artifact_versions_fn=lambda year=2026: {"k": (1, "ts")},
+        run_prediction_fn=lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("run_prediction should not execute in persisted-only mode")
+        ),
+    )
+
+    assert load_calls == ["sig_sq", "sig_fp1"]
+    assert output["prediction_cache_hit"] is True
+    assert output["boundary_fallback"] == {
+        "current_boundary_signature": "sig_sq",
+        "current_boundary_session_name": "SQ",
+        "served_boundary_signature": "sig_fp1",
+        "served_boundary_session_name": "FP1",
+    }
+
+
 def test_execute_live_prediction_pipeline_resolves_current_race_boundary_when_refresh_empty(
     patcher,
 ):

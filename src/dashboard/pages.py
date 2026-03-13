@@ -620,6 +620,39 @@ def _filter_race_options_to_precomputed_horizon(
             "indexed_boundary_signature": indexed_boundary,
         }
     if current_boundary != indexed_boundary:
+        ready_races_raw = index_payload.get("ready_races", [])
+        ready_races = (
+            [str(race).strip() for race in ready_races_raw if str(race).strip()]
+            if isinstance(ready_races_raw, list)
+            else []
+        )
+        ready_set = set(ready_races)
+        filtered_options = [
+            option
+            for option in scoped_race_options
+            if option.replace(" (Sprint)", "").strip() in ready_set
+        ]
+        if filtered_options:
+            return filtered_options, {
+                **scope_metadata,
+                "applied": True,
+                "artifact_hash": artifact_hash,
+                "anchor_race_name": anchor_race_name,
+                "anchor_session_name": str(index_payload.get("anchor_session_name", "")).strip(),
+                "boundary_signature": indexed_boundary,
+                "current_boundary_signature": current_boundary,
+                "expected_targets": [
+                    str(race).strip()
+                    for race in index_payload.get("expected_targets", [])
+                    if str(race).strip()
+                ]
+                if isinstance(index_payload.get("expected_targets"), list)
+                else [],
+                "ready_races": ready_races,
+                "fallback_boundary_active": True,
+                "stale_reason": "boundary_mismatch",
+            }
+
         ready_races = _load_ready_races_from_current_store(
             year=year,
             race_names=planned_races,
@@ -692,6 +725,37 @@ def _filter_race_options_to_precomputed_horizon(
         if isinstance(index_payload.get("expected_targets"), list)
         else [],
         "ready_races": ready_races,
+    }
+
+
+def _prediction_action_state(precompute_filter_meta: dict[str, Any]) -> dict[str, Any]:
+    """Resolve whether live prediction should be available for the current boundary."""
+    settings = get_prediction_precompute_config()
+    require_persisted_predictions = not bool(settings.get("inline_enabled", True))
+    if not require_persisted_predictions or bool(precompute_filter_meta.get("applied")):
+        return {"disabled": False, "pending_message": None}
+
+    stale_reason = str(precompute_filter_meta.get("stale_reason", "")).strip()
+    if stale_reason == "boundary_mismatch":
+        pending_message = (
+            "Current session boundary is ahead of the warmed horizon. Predictions will unlock "
+            "after the next hourly warmup persists this checkpoint."
+        )
+    elif bool(precompute_filter_meta.get("scope_applied")):
+        pending_message = (
+            "Persisted horizon metadata is still warming for the current checkpoint. "
+            "The dashboard will unlock after the next hourly warmup completes."
+        )
+    else:
+        pending_message = (
+            "Persisted-only mode is enabled and no warmed horizon is available yet. "
+            "Run warmup before using live predictions."
+        )
+
+    return {
+        "disabled": True,
+        "pending_message": pending_message,
+        "help": pending_message,
     }
 
 
@@ -1002,7 +1066,18 @@ def render_live_prediction_page(enable_logging: bool) -> None:
         horizon_count = len(expected_targets) if isinstance(expected_targets, list) else ready_count
         anchor_race = str(precompute_filter_meta.get("anchor_race_name", "")).strip()
         anchor_session = str(precompute_filter_meta.get("anchor_session_name", "")).strip()
-        if anchor_race and anchor_session:
+        if (
+            bool(precompute_filter_meta.get("fallback_boundary_active"))
+            and anchor_race
+            and anchor_session
+        ):
+            precompute_message = (
+                f"Showing {ready_count}/{horizon_count} precomputed races from "
+                f"{anchor_race} checkpoint {anchor_session}. "
+                "A newer checkpoint exists, but it is not warmed yet, so the dashboard is "
+                "serving the latest available persisted checkpoint."
+            )
+        elif anchor_race and anchor_session:
             precompute_message = (
                 f"Showing {ready_count}/{horizon_count} precomputed races from "
                 f"{anchor_race} checkpoint {anchor_session}. "
@@ -1033,10 +1108,22 @@ def render_live_prediction_page(enable_logging: bool) -> None:
         st_module=st,
     )
 
+    prediction_action_state = _prediction_action_state(precompute_filter_meta)
+    pending_message = prediction_action_state.get("pending_message")
+    if isinstance(pending_message, str) and pending_message.strip():
+        render_notice_banner(
+            pending_message,
+            tone="warning",
+            label="Warmup pending",
+            st_module=st,
+        )
+
     predict_clicked = st.button(
         "Predict sprint weekend" if race_selection.endswith("(Sprint)") else "Predict weekend",
         type="primary",
         width="stretch",
+        disabled=bool(prediction_action_state.get("disabled")),
+        help=str(prediction_action_state.get("help") or ""),
     )
 
     if predict_clicked:
@@ -1059,6 +1146,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                 is_sprint = bool(pipeline_output["is_sprint"])
                 practice_update = pipeline_output["practice_update"]
                 boundary_refresh = pipeline_output.get("boundary_refresh", {})
+                boundary_fallback = pipeline_output.get("boundary_fallback", {})
                 precompute_summary = pipeline_output.get("precompute_summary", {})
                 prediction_cache_hit = bool(pipeline_output.get("prediction_cache_hit", False))
                 pipeline_timing = pipeline_output.get("pipeline_timing", {})
@@ -1106,6 +1194,22 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                         (
                             "info",
                             "Prediction reused from cache (inputs unchanged, no new boundary data).",
+                        )
+                    )
+                if isinstance(boundary_fallback, dict) and boundary_fallback:
+                    current_checkpoint = str(
+                        boundary_fallback.get("current_boundary_session_name", "")
+                    ).strip()
+                    served_checkpoint = str(
+                        boundary_fallback.get("served_boundary_session_name", "")
+                    ).strip()
+                    runtime_messages.append(
+                        (
+                            "warning",
+                            "Latest completed checkpoint "
+                            f"{current_checkpoint or 'current'} is not warmed yet. "
+                            "Serving the latest available persisted checkpoint "
+                            f"{served_checkpoint or 'PRE'} instead.",
                         )
                     )
                 if practice_update.get("updated"):

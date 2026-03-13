@@ -205,6 +205,88 @@ def test_build_team_comparison_dataframe_uses_neutral_fallback_for_missing_profi
     assert neutral_fallbacks == 7
 
 
+def test_build_latest_snapshot_comparison_payload_prefers_snapshot_profiles():
+    base_teams_payload = {
+        "McLaren": {
+            "overall_performance": 0.82,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.41,
+                    "slow_corner_performance": 0.35,
+                    "medium_corner_performance": 0.36,
+                    "fast_corner_performance": 0.37,
+                    "braking_performance": 0.38,
+                    "top_speed": 0.39,
+                    "tire_deg_performance": 0.40,
+                }
+            },
+        }
+    }
+    latest_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "SQ",
+        "teams": {
+            "McLaren": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.74,
+                        "slow_corner_performance": 0.71,
+                        "medium_corner_performance": 0.72,
+                        "fast_corner_performance": 0.73,
+                        "braking_performance": 0.70,
+                        "top_speed": 0.69,
+                        "tire_deg_performance": 0.68,
+                    }
+                }
+            }
+        },
+    }
+
+    payload = team_comparison._build_latest_snapshot_comparison_payload(
+        base_teams_payload=base_teams_payload,
+        latest_snapshot=latest_snapshot,
+    )
+
+    assert payload["McLaren"]["overall_performance"] == 0.82
+    assert (
+        payload["McLaren"]["testing_characteristics_profiles"]["balanced"]["overall_pace"] == 0.74
+    )
+    assert payload["McLaren"]["testing_characteristics"]["slow_corner_performance"] == 0.71
+
+
+def test_run_characteristics_season_sync_backfills_snapshots_only(patcher):
+    import src.systems.testing_updater as testing_updater
+
+    captured_kwargs = {}
+
+    def _mock_backfill(**kwargs):
+        captured_kwargs.update(kwargs)
+        return {"loaded_sessions": ["Chinese Grand Prix::SQ"]}
+
+    patcher.setattr(testing_updater, "backfill_season_snapshot_history", _mock_backfill)
+
+    summary = team_comparison._run_characteristics_season_sync(
+        2027,
+        {
+            "directionality_meta": {
+                "testing_backend": "f1timing",
+                "force_renew_cache": True,
+                "run_profile": "short_run",
+            }
+        },
+    )
+
+    assert summary["loaded_sessions"] == ["Chinese Grand Prix::SQ"]
+    assert captured_kwargs == {
+        "year": 2027,
+        "characteristics_year": 2027,
+        "testing_backend": "f1timing",
+        "force_renew_cache": True,
+        "run_profile": "short_run",
+        "dry_run": False,
+    }
+
+
 def test_load_team_characteristics_payload_handles_missing_and_invalid(tmp_path, patcher):
     patcher.setattr(team_comparison.config_loader, "get", lambda key, default=None: str(tmp_path))
 
@@ -298,6 +380,67 @@ def test_render_team_comparison_section_renders_chart_and_table(patcher, tmp_pat
     assert calls["plotly"] == 1
     assert calls["dataframe"] == 1
     assert any("profile=`balanced`" in caption for caption in calls["captions"])
+
+
+def test_render_team_comparison_section_prefers_latest_snapshot_metrics(patcher, tmp_path):
+    calls = _stub_streamlit_team(patcher)
+    patcher.setattr(team_comparison.config_loader, "get", lambda key, default=None: str(tmp_path))
+
+    data_path = tmp_path / "car_characteristics" / "2027_car_characteristics.json"
+    data_path.parent.mkdir(parents=True, exist_ok=True)
+    data_path.write_text(
+        json.dumps(
+            {
+                "teams": {
+                    "McLaren": {
+                        "overall_performance": 0.82,
+                        "testing_characteristics_profiles": {
+                            "balanced": {
+                                "overall_pace": 0.32,
+                                "slow_corner_performance": 0.31,
+                                "medium_corner_performance": 0.30,
+                                "fast_corner_performance": 0.29,
+                                "braking_performance": 0.28,
+                                "top_speed": 0.27,
+                                "tire_deg_performance": 0.26,
+                            }
+                        },
+                    }
+                }
+            }
+        )
+    )
+    _write_snapshot(
+        tmp_path,
+        year=2027,
+        event_name="Bahrain Grand Prix",
+        session_name="FP1",
+        round_number=1,
+        session_order=1,
+        team_profiles={
+            "McLaren": {
+                "balanced": {
+                    "overall_pace": 0.68,
+                    "slow_corner_performance": 0.64,
+                    "medium_corner_performance": 0.67,
+                    "fast_corner_performance": 0.69,
+                    "braking_performance": 0.66,
+                    "top_speed": 0.70,
+                    "tire_deg_performance": 0.63,
+                }
+            }
+        },
+    )
+
+    team_comparison._load_team_characteristics_payload.clear()
+    team_comparison._load_team_snapshot_history.clear()
+    team_comparison._render_team_comparison_section(year=2027)
+
+    radar_figure = calls["plotly_figures"][0]
+    assert list(radar_figure.data[0].r[:3]) == [0.64, 0.67, 0.69]
+    assert any(
+        "latest snapshot `Bahrain Grand Prix FP1`" in caption for caption in calls["captions"]
+    )
 
 
 def test_render_team_comparison_section_handles_missing_profile_metrics(patcher, tmp_path):
@@ -579,6 +722,83 @@ def test_render_team_comparison_section_renders_development_history(patcher, tmp
 
     assert calls["plotly"] == 2
     assert calls["dataframe"] == 1
+
+
+def test_render_team_comparison_section_overall_hover_uses_real_metric_coverage(patcher, tmp_path):
+    calls = _stub_streamlit_team(patcher)
+    patcher.setattr(team_comparison.config_loader, "get", lambda key, default=None: str(tmp_path))
+
+    data_path = tmp_path / "car_characteristics" / "2027_car_characteristics.json"
+    data_path.parent.mkdir(parents=True, exist_ok=True)
+    data_path.write_text(
+        json.dumps(
+            {
+                "teams": {
+                    "McLaren": {
+                        "overall_performance": 0.82,
+                        "testing_characteristics_profiles": {
+                            "balanced": {
+                                "overall_pace": 0.78,
+                                "slow_corner_performance": 0.74,
+                                "medium_corner_performance": 0.77,
+                                "fast_corner_performance": 0.79,
+                                "braking_performance": 0.76,
+                                "top_speed": 0.80,
+                                "tire_deg_performance": 0.73,
+                            }
+                        },
+                    }
+                }
+            }
+        )
+    )
+    _write_snapshot(
+        tmp_path,
+        year=2027,
+        event_name="Bahrain Grand Prix",
+        session_name="FP1",
+        round_number=1,
+        session_order=1,
+        team_profiles={
+            "McLaren": {
+                "balanced": {
+                    "slow_corner_performance": 0.60,
+                    "medium_corner_performance": 0.61,
+                    "fast_corner_performance": 0.62,
+                    "braking_performance": 0.59,
+                    "top_speed": 0.58,
+                    "tire_deg_performance": 0.63,
+                }
+            }
+        },
+    )
+    _write_snapshot(
+        tmp_path,
+        year=2027,
+        event_name="Bahrain Grand Prix",
+        session_name="FP2",
+        round_number=1,
+        session_order=2,
+        team_profiles={
+            "McLaren": {
+                "balanced": {
+                    "slow_corner_performance": 0.70,
+                    "medium_corner_performance": 0.71,
+                    "fast_corner_performance": 0.72,
+                    "braking_performance": 0.69,
+                    "top_speed": 0.68,
+                }
+            }
+        },
+    )
+
+    team_comparison._load_team_characteristics_payload.clear()
+    team_comparison._load_team_snapshot_history.clear()
+    team_comparison._render_team_comparison_section(year=2027)
+
+    development_figure = calls["plotly_figures"][1]
+    customdata = development_figure.data[0].customdata.tolist()
+    assert customdata == [[6.0, 1.0], [5.0, 5 / 6]]
 
 
 def test_render_team_comparison_section_orders_development_axis_chronologically(patcher, tmp_path):

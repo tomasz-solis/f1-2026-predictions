@@ -309,32 +309,23 @@ def _snapshot_label(snapshot_payload: dict[str, Any]) -> str:
 
 
 def _run_characteristics_season_sync(year: int, payload: dict[str, Any]) -> dict[str, Any]:
-    """Rebuild live car stats and snapshot history from locally cached sessions."""
-    from src.systems.testing_updater import replay_season_characteristics_from_cache
+    """Refresh snapshot history from cached sessions without touching live artifacts."""
+    from src.systems.testing_updater import backfill_season_snapshot_history
 
     directionality_meta = payload.get("directionality_meta")
     testing_backend = "auto"
     force_renew_cache = False
-    new_weight = 0.7
-    directionality_scale = 0.10
-    session_aggregation = "laps_weighted"
     run_profile = "balanced"
     if isinstance(directionality_meta, dict):
         testing_backend = str(directionality_meta.get("testing_backend", "auto"))
         force_renew_cache = bool(directionality_meta.get("force_renew_cache", False))
-        new_weight = float(directionality_meta.get("new_weight", 0.7))
-        directionality_scale = float(directionality_meta.get("directionality_scale", 0.10))
-        session_aggregation = str(directionality_meta.get("session_aggregation", "laps_weighted"))
         run_profile = str(directionality_meta.get("run_profile", "balanced"))
 
-    return replay_season_characteristics_from_cache(
+    return backfill_season_snapshot_history(
         year=year,
         characteristics_year=year,
         testing_backend=testing_backend,
         force_renew_cache=force_renew_cache,
-        new_weight=new_weight,
-        directionality_scale=directionality_scale,
-        session_aggregation=session_aggregation,
         run_profile=run_profile,
         dry_run=False,
     )
@@ -363,6 +354,60 @@ def _load_team_snapshot_history(year: int) -> list[dict[str, Any]]:
         deduped.setdefault((event_name, session_name), payload)
 
     return sort_snapshot_payloads(list(deduped.values()))
+
+
+def _latest_snapshot_payload(snapshots: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Return the latest stored snapshot with team profile data, if any."""
+    for snapshot_payload in reversed(snapshots):
+        teams_payload = snapshot_payload.get("teams")
+        if isinstance(teams_payload, dict) and teams_payload:
+            return snapshot_payload
+    return None
+
+
+def _build_latest_snapshot_comparison_payload(
+    *,
+    base_teams_payload: dict[str, Any],
+    latest_snapshot: dict[str, Any] | None,
+) -> dict[str, dict[str, Any]]:
+    """Build comparison input from the newest snapshot while keeping season priors."""
+    if not isinstance(latest_snapshot, dict):
+        return {}
+
+    snapshot_teams_payload = latest_snapshot.get("teams")
+    if not isinstance(snapshot_teams_payload, dict):
+        return {}
+
+    canonical_base_payload = _canonicalize_teams_payload_for_comparison(base_teams_payload)
+    merged_payload: dict[str, dict[str, Any]] = {}
+
+    for raw_team_name, raw_team_payload in snapshot_teams_payload.items():
+        if not isinstance(raw_team_payload, dict):
+            continue
+
+        profiles = raw_team_payload.get("profiles")
+        if not isinstance(profiles, dict) or not profiles:
+            continue
+
+        mapped_name = map_team_to_characteristics(str(raw_team_name))
+        display_name = (
+            mapped_name if isinstance(mapped_name, str) and mapped_name else str(raw_team_name)
+        )
+        team_payload: dict[str, Any] = {"testing_characteristics_profiles": deepcopy(profiles)}
+
+        balanced_profile = profiles.get("balanced")
+        if isinstance(balanced_profile, dict):
+            team_payload["testing_characteristics"] = deepcopy(balanced_profile)
+
+        base_team_payload = canonical_base_payload.get(display_name)
+        if isinstance(base_team_payload, dict):
+            overall_performance = _coerce_unit_metric(base_team_payload.get("overall_performance"))
+            if overall_performance is not None:
+                team_payload["overall_performance"] = overall_performance
+
+        merged_payload[display_name] = team_payload
+
+    return _canonicalize_teams_payload_for_comparison(merged_payload)
 
 
 def _build_snapshot_history_dataframe(
@@ -484,8 +529,8 @@ def _render_development_history_section(
     st.subheader("Development Over Time")
 
     st.caption(
-        "Sync rebuilds the live car stats from cached sessions in season order and refreshes "
-        "the history chart from the same replay."
+        "Sync rebuilds the stored session snapshot history from cached sessions without "
+        "changing the live prediction artifact."
     )
     if st.button(
         "Sync Car Stats From Cache",
@@ -496,10 +541,9 @@ def _render_development_history_section(
         except Exception as exc:
             st.info(f"Car-stats sync failed ({exc}).")
         else:
-            _load_team_characteristics_payload.clear()
             _load_team_snapshot_history.clear()
             st.success(
-                f"Synced {len(summary.get('sessions_applied', []))} session update(s) from cache."
+                f"Synced {len(summary.get('loaded_sessions', []))} cached session snapshot(s)."
             )
             st.rerun()
 
@@ -536,7 +580,10 @@ def _render_development_history_section(
         st.info(f"No stored `{metric_label}` values are available for this selection yet.")
         return
 
-    metric_frame = history_df[["Snapshot Order", "Snapshot", "Team", metric_label]].dropna()
+    metric_frame_columns = ["Snapshot Order", "Snapshot", "Team", metric_label]
+    if metric_label == "Overall":
+        metric_frame_columns.extend(["Metric Count", "Metric Coverage"])
+    metric_frame = history_df[metric_frame_columns].dropna(subset=[metric_label])
     if metric_frame.empty:
         st.info(f"No stored `{metric_label}` values are available for this selection yet.")
         return
@@ -649,17 +696,29 @@ def _render_team_comparison_section(year: int = 2026) -> None:
     st.subheader("Latest Session Snapshot")
 
     payload, characteristics_path = _load_team_characteristics_payload(year)
-    if not payload:
-        st.info(f"Team characteristics unavailable at `{characteristics_path}`.")
-        return
+    base_teams_payload = payload.get("teams") if isinstance(payload, dict) else {}
+    if not isinstance(base_teams_payload, dict):
+        base_teams_payload = {}
 
-    raw_teams_payload = payload.get("teams")
-    if not isinstance(raw_teams_payload, dict) or not raw_teams_payload:
-        st.info("No team characteristics found for comparison.")
-        return
-    teams_payload = _canonicalize_teams_payload_for_comparison(raw_teams_payload)
+    snapshots = _load_team_snapshot_history(year)
+    latest_snapshot = _latest_snapshot_payload(snapshots)
+    latest_snapshot_label = _snapshot_label(latest_snapshot) if latest_snapshot else ""
+
+    teams_payload = _build_latest_snapshot_comparison_payload(
+        base_teams_payload=base_teams_payload if isinstance(base_teams_payload, dict) else {},
+        latest_snapshot=latest_snapshot,
+    )
+    source_label = f"latest snapshot `{latest_snapshot_label}`" if latest_snapshot_label else None
+
+    if not teams_payload and isinstance(base_teams_payload, dict) and base_teams_payload:
+        teams_payload = _canonicalize_teams_payload_for_comparison(base_teams_payload)
+        source_label = f"season file `{characteristics_path}`"
+
     if not teams_payload:
-        st.info("No team characteristics found for comparison.")
+        if not payload:
+            st.info(f"Team characteristics unavailable at `{characteristics_path}`.")
+        else:
+            st.info("No team characteristics found for comparison.")
         return
 
     profile_names = _collect_profile_names(teams_payload)
@@ -840,7 +899,7 @@ def _render_team_comparison_section(year: int = 2026) -> None:
         "Season Prior Strength is a separate baseline signal."
     )
     st.caption(
-        f"Source: `{characteristics_path}` | profile=`{profile}` | "
+        f"Source: {source_label or f'`{characteristics_path}`'} | profile=`{profile}` | "
         "values are normalized (0-100, higher is better)."
     )
     if neutral_fallbacks > 0:
@@ -852,5 +911,5 @@ def _render_team_comparison_section(year: int = 2026) -> None:
         year=year,
         selected_teams=selected_teams,
         profile=profile,
-        characteristics_payload=payload,
+        characteristics_payload=payload or {},
     )

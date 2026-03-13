@@ -819,6 +819,53 @@ def _resolve_race_boundary_context(
     return _boundary_signature(snapshot), checkpoint
 
 
+def _resolve_persisted_boundary_fallback(
+    *,
+    year: int,
+    race_name: str,
+    artifact_hash: str,
+    current_boundary_signature: str,
+    current_boundary_session_name: str,
+) -> dict[str, str] | None:
+    """Resolve the latest warmed boundary when the current checkpoint is not persisted yet."""
+    horizon_index = load_precompute_horizon_index(year=year, artifact_hash=artifact_hash)
+    if not isinstance(horizon_index, dict):
+        return None
+
+    ready_races_raw = horizon_index.get("ready_races", [])
+    ready_races = (
+        {str(race).strip() for race in ready_races_raw if str(race).strip()}
+        if isinstance(ready_races_raw, list)
+        else set()
+    )
+    if race_name not in ready_races:
+        return None
+
+    race_boundaries = horizon_index.get("race_boundaries", {})
+    fallback_boundary_signature = (
+        str(race_boundaries.get(race_name, "")).strip() if isinstance(race_boundaries, dict) else ""
+    )
+    if not fallback_boundary_signature:
+        fallback_boundary_signature = str(horizon_index.get("boundary_signature", "")).strip()
+    if not fallback_boundary_signature or fallback_boundary_signature == current_boundary_signature:
+        return None
+
+    anchor_race_name = str(horizon_index.get("anchor_race_name", "")).strip()
+    if race_name == anchor_race_name:
+        fallback_session_name = str(horizon_index.get("anchor_session_name", "")).strip().upper()
+    else:
+        fallback_session_name = "PRE"
+    if not fallback_session_name:
+        fallback_session_name = "PRE"
+
+    return {
+        "current_boundary_signature": current_boundary_signature,
+        "current_boundary_session_name": current_boundary_session_name,
+        "served_boundary_signature": fallback_boundary_signature,
+        "served_boundary_session_name": fallback_session_name,
+    }
+
+
 def execute_live_prediction_pipeline_core(
     *,
     race_name: str,
@@ -989,12 +1036,43 @@ def execute_live_prediction_pipeline_core(
         artifact_versions=artifact_versions,
         boundary_signature=boundary_signature,
     )
+    served_boundary_signature = boundary_signature
+    served_boundary_session_name = boundary_session_name
+    available_boundary_fallback: dict[str, str] | None = None
+    boundary_fallback: dict[str, str] | None = None
     prediction_cache_hit = False
 
     can_use_cached_prediction = not bool(force_refresh)
     cached_prediction = (
         _get_cached_prediction(prediction_cache_key) if can_use_cached_prediction else None
     )
+    if can_use_cached_prediction and cached_prediction is None and require_persisted_predictions:
+        available_boundary_fallback = _resolve_persisted_boundary_fallback(
+            year=year,
+            race_name=race_name,
+            artifact_hash=artifact_hash,
+            current_boundary_signature=boundary_signature,
+            current_boundary_session_name=boundary_session_name,
+        )
+        if available_boundary_fallback is not None:
+            fallback_cache_key = _prediction_cache_key(
+                year=year,
+                race_name=race_name,
+                weather=weather,
+                is_sprint=is_sprint,
+                artifact_versions=artifact_versions,
+                boundary_signature=available_boundary_fallback["served_boundary_signature"],
+            )
+            fallback_cached_prediction = _get_cached_prediction(fallback_cache_key)
+            if fallback_cached_prediction is not None:
+                cached_prediction = fallback_cached_prediction
+                prediction_cache_key = fallback_cache_key
+                served_boundary_signature = available_boundary_fallback["served_boundary_signature"]
+                served_boundary_session_name = available_boundary_fallback[
+                    "served_boundary_session_name"
+                ]
+                boundary_fallback = available_boundary_fallback
+
     if can_use_cached_prediction and cached_prediction is None:
         persisted_prediction = load_precomputed_prediction(
             year=year,
@@ -1006,6 +1084,31 @@ def execute_live_prediction_pipeline_core(
         if persisted_prediction is not None:
             _store_cached_prediction(prediction_cache_key, persisted_prediction)
             cached_prediction = persisted_prediction
+        elif require_persisted_predictions and available_boundary_fallback is not None:
+            fallback_cache_key = _prediction_cache_key(
+                year=year,
+                race_name=race_name,
+                weather=weather,
+                is_sprint=is_sprint,
+                artifact_versions=artifact_versions,
+                boundary_signature=available_boundary_fallback["served_boundary_signature"],
+            )
+            fallback_prediction = load_precomputed_prediction(
+                year=year,
+                race_name=race_name,
+                weather=weather,
+                artifact_hash=artifact_hash,
+                boundary_signature=available_boundary_fallback["served_boundary_signature"],
+            )
+            if fallback_prediction is not None:
+                _store_cached_prediction(fallback_cache_key, fallback_prediction)
+                cached_prediction = fallback_prediction
+                prediction_cache_key = fallback_cache_key
+                served_boundary_signature = available_boundary_fallback["served_boundary_signature"]
+                served_boundary_session_name = available_boundary_fallback[
+                    "served_boundary_session_name"
+                ]
+                boundary_fallback = available_boundary_fallback
 
     if can_use_cached_prediction:
         if cached_prediction is not None:
@@ -1020,6 +1123,11 @@ def execute_live_prediction_pipeline_core(
                 prediction_results = cached_prediction
                 prediction_cache_hit = True
                 _notify("Reusing cached prediction (no new sessions or input changes)...")
+                if boundary_fallback is not None:
+                    _notify(
+                        "Current checkpoint is not warmed yet; serving latest available "
+                        f"persisted checkpoint ({served_boundary_session_name})."
+                    )
             else:
                 if require_persisted_predictions:
                     refreshed_prediction = load_precomputed_prediction(
@@ -1027,7 +1135,7 @@ def execute_live_prediction_pipeline_core(
                         race_name=race_name,
                         weather=weather,
                         artifact_hash=artifact_hash,
-                        boundary_signature=boundary_signature,
+                        boundary_signature=served_boundary_signature,
                     )
                     if refreshed_prediction is not None:
                         refreshed_reason = _cache_hit_requires_competitive_refresh(
@@ -1045,13 +1153,13 @@ def execute_live_prediction_pipeline_core(
                             )
                         else:
                             raise PrecomputedPredictionUnavailableError(
-                                "Persisted prediction is stale for the current boundary. "
+                                "Persisted prediction is stale for the served boundary. "
                                 f"Warmup must refresh {race_name} {year} [{weather_normalized}] "
                                 f"before the dashboard can serve it ({refreshed_reason})."
                             )
                     else:
                         raise PrecomputedPredictionUnavailableError(
-                            "Persisted prediction is missing for the current boundary after cache "
+                            "Persisted prediction is missing for the served boundary after cache "
                             f"validation: {race_name} {year} [{weather_normalized}]."
                         )
                 else:
@@ -1346,4 +1454,5 @@ def execute_live_prediction_pipeline_core(
         "pipeline_timing": pipeline_timing,
         "practice_update_error": None,
         "observability": observability,
+        "boundary_fallback": boundary_fallback,
     }
