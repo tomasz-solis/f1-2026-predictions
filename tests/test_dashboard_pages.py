@@ -252,6 +252,25 @@ def test_filter_race_options_to_precomputed_horizon_falls_back_to_last_warmed_bo
     assert metadata["stale_reason"] == "boundary_mismatch"
 
 
+def test_prediction_action_state_keeps_current_race_enabled_during_boundary_lag(patcher):
+    patcher.setattr(
+        pages,
+        "get_prediction_precompute_config",
+        lambda: {"inline_enabled": False, "horizon_races": 3},
+    )
+
+    state = pages._prediction_action_state(
+        {
+            "applied": True,
+            "fallback_boundary_active": True,
+            "stale_reason": "boundary_mismatch",
+        }
+    )
+
+    assert state["disabled"] is False
+    assert "selected race can still run from live checkpoint data" in state["pending_message"]
+
+
 def test_cache_dir_race_matching_handles_date_prefixed_event_dirs():
     assert pages._cache_dir_matches_race(
         "2025-04-13_Bahrain_Grand_Prix",

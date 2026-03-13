@@ -898,10 +898,11 @@ def test_execute_live_prediction_pipeline_raises_when_db_mode_requires_persisted
         )
 
 
-def test_execute_live_prediction_pipeline_falls_back_to_last_warmed_boundary_when_current_missing(
+def test_execute_live_prediction_pipeline_runs_selected_race_inline_when_horizon_lags(
     patcher,
 ):
     load_calls: list[str] = []
+    run_calls = {"direct": 0}
 
     patcher.setattr(live_prediction_flow, "should_read_db_first", lambda: True)
     patcher.setattr(
@@ -972,18 +973,26 @@ def test_execute_live_prediction_pipeline_falls_back_to_last_warmed_boundary_whe
         clear_resource_cache_fn=lambda: None,
         clear_data_cache_fn=lambda: None,
         get_artifact_versions_fn=lambda year=2026: {"k": (1, "ts")},
-        run_prediction_fn=lambda *args, **kwargs: (_ for _ in ()).throw(
-            AssertionError("run_prediction should not execute in persisted-only mode")
-        ),
+        run_prediction_fn=lambda race_name, weather, versions, is_sprint=False, year=2026: (
+            run_calls.__setitem__("direct", run_calls["direct"] + 1),
+            {
+                "sprint_quali": {"grid": [], "source_session": "SQ"},
+                "sprint_race": {"finish_order": []},
+                "main_quali": {"grid": [], "source_session": "SQ"},
+                "main_race": {"finish_order": []},
+            },
+        )[1],
     )
 
-    assert load_calls == ["sig_sq", "sig_fp1"]
-    assert output["prediction_cache_hit"] is True
+    assert load_calls == ["sig_sq"]
+    assert run_calls == {"direct": 1}
+    assert output["prediction_cache_hit"] is False
     assert output["boundary_fallback"] == {
+        "mode": "inline_current_boundary",
         "current_boundary_signature": "sig_sq",
         "current_boundary_session_name": "SQ",
-        "served_boundary_signature": "sig_fp1",
-        "served_boundary_session_name": "FP1",
+        "warmed_boundary_signature": "sig_fp1",
+        "warmed_boundary_session_name": "FP1",
     }
 
 

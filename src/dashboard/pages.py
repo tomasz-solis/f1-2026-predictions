@@ -732,7 +732,22 @@ def _prediction_action_state(precompute_filter_meta: dict[str, Any]) -> dict[str
     """Resolve whether live prediction should be available for the current boundary."""
     settings = get_prediction_precompute_config()
     require_persisted_predictions = not bool(settings.get("inline_enabled", True))
-    if not require_persisted_predictions or bool(precompute_filter_meta.get("applied")):
+    if not require_persisted_predictions:
+        return {"disabled": False, "pending_message": None}
+
+    if bool(precompute_filter_meta.get("fallback_boundary_active")):
+        pending_message = (
+            "A newer checkpoint exists beyond the warmed horizon. The selected race can still "
+            "run from live checkpoint data, but future-race options stay pinned to the last "
+            "warmed horizon until the next hourly warmup."
+        )
+        return {
+            "disabled": False,
+            "pending_message": pending_message,
+            "help": pending_message,
+        }
+
+    if bool(precompute_filter_meta.get("applied")):
         return {"disabled": False, "pending_message": None}
 
     stale_reason = str(precompute_filter_meta.get("stale_reason", "")).strip()
@@ -1074,8 +1089,9 @@ def render_live_prediction_page(enable_logging: bool) -> None:
             precompute_message = (
                 f"Showing {ready_count}/{horizon_count} precomputed races from "
                 f"{anchor_race} checkpoint {anchor_session}. "
-                "A newer checkpoint exists, but it is not warmed yet, so the dashboard is "
-                "serving the latest available persisted checkpoint."
+                "A newer checkpoint exists, but it is not warmed yet. The selected race can "
+                "still run from live checkpoint data while future-race options stay on the "
+                "last warmed horizon."
             )
         elif anchor_race and anchor_session:
             precompute_message = (
@@ -1197,21 +1213,34 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                         )
                     )
                 if isinstance(boundary_fallback, dict) and boundary_fallback:
+                    fallback_mode = str(boundary_fallback.get("mode", "")).strip().lower()
                     current_checkpoint = str(
                         boundary_fallback.get("current_boundary_session_name", "")
                     ).strip()
-                    served_checkpoint = str(
-                        boundary_fallback.get("served_boundary_session_name", "")
+                    warmed_checkpoint = str(
+                        boundary_fallback.get("warmed_boundary_session_name", "")
                     ).strip()
-                    runtime_messages.append(
-                        (
-                            "warning",
-                            "Latest completed checkpoint "
-                            f"{current_checkpoint or 'current'} is not warmed yet. "
-                            "Serving the latest available persisted checkpoint "
-                            f"{served_checkpoint or 'PRE'} instead.",
+                    if fallback_mode == "inline_current_boundary":
+                        runtime_messages.append(
+                            (
+                                "warning",
+                                "Latest completed checkpoint "
+                                f"{current_checkpoint or 'current'} is ahead of the warmed "
+                                "horizon. This selected race was generated from live checkpoint "
+                                f"data, while future-race options remain pinned to "
+                                f"{warmed_checkpoint or 'PRE'} until the next hourly warmup.",
+                            )
                         )
-                    )
+                    else:
+                        runtime_messages.append(
+                            (
+                                "warning",
+                                "Latest completed checkpoint "
+                                f"{current_checkpoint or 'current'} is not warmed yet. "
+                                "Serving the latest available persisted checkpoint "
+                                f"{warmed_checkpoint or 'PRE'} instead.",
+                            )
+                        )
                 if practice_update.get("updated"):
                     runtime_messages.append(
                         (
