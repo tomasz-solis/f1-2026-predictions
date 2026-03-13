@@ -1256,6 +1256,74 @@ def test_execute_live_prediction_pipeline_skips_inline_precompute_when_disabled(
     assert output["precompute_summary"]["skipped_reason"] == "inline_precompute_disabled"
 
 
+def test_execute_live_prediction_pipeline_skips_artifact_updates_in_persisted_mode(patcher):
+    """Persisted-only mode should not mutate artifacts in the request path."""
+    persisted_prediction = {
+        "qualifying": {"grid": []},
+        "race": {"finish_order": []},
+    }
+    race_update_calls: list[bool] = []
+    practice_update_calls: list[bool] = []
+
+    patcher.setattr(
+        live_prediction_flow,
+        "_get_prediction_precompute_settings",
+        lambda: {
+            "enabled": True,
+            "inline_enabled": False,
+            "horizon_races": 3,
+            "weather_scenarios": ["dry", "mixed", "rain"],
+            "max_file_entries": 2048,
+        },
+    )
+    patcher.setattr(live_prediction_flow, "should_read_db_first", lambda: True)
+    patcher.setattr(
+        live_prediction_flow,
+        "load_precomputed_prediction",
+        lambda **kwargs: persisted_prediction,
+    )
+
+    output = live_prediction_flow.execute_live_prediction_pipeline_core(
+        race_name="Bahrain Grand Prix",
+        weather="dry",
+        year=2026,
+        force_refresh=False,
+        progress_callback=None,
+        clear_fastf1_race_cache_fn=lambda year, race_name: None,
+        auto_update_if_needed_fn=lambda force_recheck=False, year=2026: race_update_calls.append(
+            bool(force_recheck)
+        ),
+        is_sprint_weekend_fn=lambda year, race_name: False,
+        detect_event_boundary_refresh_if_needed_fn=lambda year,
+        race_name,
+        is_sprint,
+        session_detector=None: {
+            "refresh_needed": False,
+            "reason": "no_change",
+            "new_sessions": [],
+            "boundary_signature": "stable_sig",
+            "latest_elapsed_session": None,
+        },
+        auto_update_practice_characteristics_if_needed_fn=(
+            lambda year, race_name, is_sprint, force_recheck=False, session_detector=None: (
+                practice_update_calls.append(bool(force_recheck)),
+                {"updated": True, "completed_fp_sessions": ["FP1"], "teams_updated": 3},
+            )[1]
+        ),
+        clear_resource_cache_fn=lambda: None,
+        clear_data_cache_fn=lambda: None,
+        get_artifact_versions_fn=lambda year=2026: {"k": (1, "ts")},
+        run_prediction_fn=lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("run_prediction should not execute in persisted-only mode")
+        ),
+    )
+
+    assert race_update_calls == []
+    assert practice_update_calls == []
+    assert output["practice_update"] == {"updated": False, "completed_fp_sessions": []}
+    assert output["prediction_results"] == persisted_prediction
+
+
 def test_resolve_precompute_targets_skips_testing_by_event_format(patcher):
     """Precompute target resolution should ignore testing rows by EventFormat and name."""
     patcher.setattr(

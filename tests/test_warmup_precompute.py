@@ -11,6 +11,7 @@ def test_run_warmup_precompute_cycle_is_idempotent(patcher):
     """Second warmup run should reuse existing base/prediction payloads without recompute."""
     fixed_now = datetime(2026, 3, 5, 12, 0, tzinfo=UTC)
     patcher.setattr(warmup, "should_write_to_db", lambda: False)
+    patcher.setattr(warmup, "_refresh_anchor_practice_characteristics", lambda **kwargs: {})
     patcher.setattr(
         warmup,
         "get_prediction_precompute_config",
@@ -135,6 +136,117 @@ def test_run_warmup_precompute_cycle_is_idempotent(patcher):
     assert weather_calls == {"compute": 3}
     assert len(horizon_calls) == 2
     assert horizon_calls[0]["race_boundaries"] == {"Bahrain Grand Prix": "boundary_sig"}
+
+
+def test_run_warmup_precompute_cycle_refreshes_practice_before_hashing(patcher):
+    """Warmup should refresh practice artifacts before deriving the precompute hash."""
+    fixed_now = datetime(2026, 3, 13, 8, 0, tzinfo=UTC)
+    patcher.setattr(warmup, "should_write_to_db", lambda: False)
+    patcher.setattr(
+        warmup,
+        "get_prediction_precompute_config",
+        lambda: {
+            "enabled": True,
+            "horizon_races": 3,
+            "weather_scenarios": ["dry"],
+            "max_file_entries": 2048,
+        },
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_warmup_targets",
+        lambda year, now_utc, horizon_races: warmup.WarmupTargets(
+            anchor_race_name="Chinese Grand Prix",
+            anchor_is_sprint=True,
+            target_races=("Chinese Grand Prix",),
+        ),
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_checkpoint_context",
+        lambda year, race_name, is_sprint, now_utc, session_detector: warmup.CheckpointContext(
+            checkpoint="FP1",
+            expected_checkpoint="FP1",
+            latest_ready_checkpoint="FP1",
+            checkpoint_ready=True,
+            reason="ready",
+            boundary_signature="sig_fp1",
+        ),
+    )
+    patcher.setattr(warmup, "is_sprint_weekend", lambda year, race_name: True)
+
+    call_order: list[str] = []
+    artifact_versions = {"car_characteristics::2026::car_characteristics": (37, "before")}
+
+    def _refresh_anchor_practice_characteristics(**kwargs):
+        del kwargs
+        call_order.append("practice_refresh")
+        artifact_versions["car_characteristics::2026::car_characteristics"] = (38, "after")
+        return {
+            "updated": True,
+            "completed_fp_sessions": ["FP1"],
+            "teams_updated": 10,
+        }
+
+    patcher.setattr(
+        warmup,
+        "_refresh_anchor_practice_characteristics",
+        _refresh_anchor_practice_characteristics,
+    )
+    patcher.setattr(
+        warmup,
+        "get_artifact_versions",
+        lambda year=2026: (call_order.append("artifact_versions"), dict(artifact_versions))[1],
+    )
+    patcher.setattr(
+        warmup,
+        "compute_artifact_hash",
+        lambda versions: f"artifact_hash_v{versions['car_characteristics::2026::car_characteristics'][0]}",
+    )
+    patcher.setattr(warmup, "_load_predictor", lambda artifact_versions, year: object())
+    patcher.setattr(warmup, "load_precomputed_base_features", lambda **kwargs: None)
+    patcher.setattr(warmup, "load_precomputed_prediction", lambda **kwargs: None)
+    patcher.setattr(
+        warmup,
+        "compute_base_features",
+        lambda *args, **kwargs: {
+            "is_sprint": True,
+            "sprint_quali": {"grid": [], "grid_source": "PREDICTED"},
+            "sprint_grid_for_race": [],
+            "sprint_race_input_confidence": 0.7,
+            "main_quali": {"grid": [], "grid_source": "PREDICTED"},
+            "main_grid_for_race": [],
+            "main_race_input_confidence": 0.7,
+            "timing": {"sprint_quali": 0.1, "main_quali": 0.1},
+        },
+    )
+    saved_prediction_hashes: list[str] = []
+    patcher.setattr(
+        warmup,
+        "compute_weather_predictions",
+        lambda base_features, weather, predictor, year, target_race: {
+            "sprint_quali": {"grid": []},
+            "sprint_race": {"finish_order": []},
+            "main_quali": {"grid": []},
+            "main_race": {"finish_order": []},
+        },
+    )
+    patcher.setattr(warmup, "save_precomputed_base_features", lambda **kwargs: None)
+    patcher.setattr(
+        warmup,
+        "save_precomputed_prediction",
+        lambda **kwargs: saved_prediction_hashes.append(str(kwargs["artifact_hash"])),
+    )
+    patcher.setattr(warmup, "save_precompute_horizon_index", lambda **kwargs: None)
+
+    result = warmup.run_warmup_precompute_cycle(2026, now_utc=fixed_now)
+
+    assert result.status == "success"
+    assert call_order[:2] == ["practice_refresh", "artifact_versions"]
+    assert saved_prediction_hashes == ["artifact_hash_v38"]
+    assert result.practice_updated is True
+    assert result.practice_completed_sessions == ["FP1"]
+    assert result.practice_teams_updated == 10
 
 
 def test_run_warmup_precompute_cycle_returns_quickly_when_checkpoint_not_ready(patcher):
@@ -278,6 +390,7 @@ def test_run_warmup_precompute_cycle_uses_target_race_boundary_signatures(patche
     )
     patcher.setattr(warmup, "save_precomputed_base_features", lambda **kwargs: None)
     patcher.setattr(warmup, "save_precompute_horizon_index", lambda **kwargs: None)
+    patcher.setattr(warmup, "_refresh_anchor_practice_characteristics", lambda **kwargs: {})
 
     saved_prediction_keys: list[tuple[str, str]] = []
     patcher.setattr(
@@ -334,6 +447,13 @@ def test_run_warmup_precompute_cycle_dry_run_plans_without_writes(patcher):
     patcher.setattr(warmup, "compute_artifact_hash", lambda artifact_versions: "artifact_hash")
     patcher.setattr(warmup, "_load_predictor", lambda artifact_versions, year: object())
     patcher.setattr(warmup, "is_sprint_weekend", lambda year, race_name: False)
+    patcher.setattr(
+        warmup,
+        "_refresh_anchor_practice_characteristics",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("practice refresh should not run in dry-run")
+        ),
+    )
     patcher.setattr(warmup, "load_precomputed_base_features", lambda **kwargs: None)
     patcher.setattr(warmup, "load_precomputed_prediction", lambda **kwargs: None)
 
@@ -386,6 +506,7 @@ def test_run_warmup_precompute_cycle_reports_db_verification_warning_on_missing_
     """Warmup should report DB verification warning when read-back cannot find saved record."""
     fixed_now = datetime(2026, 3, 5, 12, 0, tzinfo=UTC)
     patcher.setattr(warmup, "should_write_to_db", lambda: False)
+    patcher.setattr(warmup, "_refresh_anchor_practice_characteristics", lambda **kwargs: {})
     patcher.setattr(
         warmup,
         "get_prediction_precompute_config",

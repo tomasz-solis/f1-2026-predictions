@@ -869,13 +869,20 @@ def execute_live_prediction_pipeline_core(
         clear_fastf1_race_cache_fn(year, race_name)
         pipeline_timing["cache_clear"] = time.time() - clear_start
 
-    update_start = time.time()
-    _notify("Checking completed races and model updates...")
-    auto_update_if_needed_fn(
-        year=year,
-        force_recheck=force_refresh,
-    )
-    pipeline_timing["race_update_check"] = time.time() - update_start
+    precompute_settings = _get_prediction_precompute_settings()
+    require_persisted_predictions = _require_persisted_predictions(precompute_settings)
+
+    if require_persisted_predictions:
+        _notify("Persisted-prediction mode active; skipping artifact updates in request path...")
+        pipeline_timing["race_update_check"] = 0.0
+    else:
+        update_start = time.time()
+        _notify("Checking completed races and model updates...")
+        auto_update_if_needed_fn(
+            year=year,
+            force_recheck=force_refresh,
+        )
+        pipeline_timing["race_update_check"] = time.time() - update_start
 
     weekend_start = time.time()
     _notify("Resolving weekend format...")
@@ -897,22 +904,27 @@ def execute_live_prediction_pipeline_core(
             clear_fastf1_race_cache_fn(year, race_name)
             should_clear_runtime_caches = True
 
-            update_start = time.time()
-            auto_update_if_needed_fn(
-                year=year,
-                force_recheck=False,
-            )
-            pipeline_timing["race_update_check"] += time.time() - update_start
+            if not require_persisted_predictions:
+                update_start = time.time()
+                auto_update_if_needed_fn(
+                    year=year,
+                    force_recheck=False,
+                )
+                pipeline_timing["race_update_check"] += time.time() - update_start
 
     practice_start = time.time()
-    _notify("Checking completed practice sessions...")
-    practice_update = auto_update_practice_characteristics_if_needed_fn(
-        year=year,
-        race_name=race_name,
-        is_sprint=is_sprint,
-        force_recheck=force_refresh,
-        session_detector=session_detector,
-    )
+    if require_persisted_predictions:
+        practice_update = {"updated": False, "completed_fp_sessions": []}
+        _notify("Persisted-prediction mode active; waiting for warmup to refresh practice data...")
+    else:
+        _notify("Checking completed practice sessions...")
+        practice_update = auto_update_practice_characteristics_if_needed_fn(
+            year=year,
+            race_name=race_name,
+            is_sprint=is_sprint,
+            force_recheck=force_refresh,
+            session_detector=session_detector,
+        )
     pipeline_timing["practice_update_check"] = time.time() - practice_start
 
     if practice_update.get("updated") or should_clear_runtime_caches:
@@ -930,8 +942,6 @@ def execute_live_prediction_pipeline_core(
         "errors": [],
         "skipped_reason": "",
     }
-    precompute_settings = _get_prediction_precompute_settings()
-    require_persisted_predictions = _require_persisted_predictions(precompute_settings)
 
     artifact_versions = get_artifact_versions_fn(year=year)
     artifact_hash = compute_artifact_hash(artifact_versions)

@@ -34,7 +34,11 @@ from src.dashboard.prediction_flow import (
     fetch_actual_competitive_results_if_completed,
     fetch_grid_if_available,
 )
-from src.dashboard.update_flow import _boundary_signature, _build_event_boundary_snapshot
+from src.dashboard.update_flow import (
+    _boundary_signature,
+    _build_event_boundary_snapshot,
+    auto_update_practice_characteristics_if_needed,
+)
 from src.persistence.config import should_read_db_first, should_write_to_db
 from src.persistence.runtime_state_store import RuntimeStateStore
 from src.utils.session_detector import SessionDetector
@@ -94,6 +98,10 @@ class WarmupSummary:
     predictions_generated: int = 0
     predictions_reused: int = 0
     ready_races: list[str] = field(default_factory=list)
+    practice_updated: bool = False
+    practice_completed_sessions: list[str] = field(default_factory=list)
+    practice_teams_updated: int = 0
+    practice_retried_events: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     target_contexts: list[dict[str, Any]] = field(default_factory=list)
     db_verification_warnings: list[str] = field(default_factory=list)
@@ -116,6 +124,10 @@ class WarmupSummary:
             "predictions_generated": int(self.predictions_generated),
             "predictions_reused": int(self.predictions_reused),
             "ready_races": list(self.ready_races),
+            "practice_updated": bool(self.practice_updated),
+            "practice_completed_sessions": list(self.practice_completed_sessions),
+            "practice_teams_updated": int(self.practice_teams_updated),
+            "practice_retried_events": list(self.practice_retried_events),
             "errors": list(self.errors),
             "target_contexts": list(self.target_contexts),
             "db_verification_warnings": list(self.db_verification_warnings),
@@ -320,6 +332,23 @@ def _load_predictor(artifact_versions: dict[str, tuple[int, str]], *, year: int)
         return get_predictor(artifact_versions, year=year)
     except TypeError:
         return get_predictor(artifact_versions)
+
+
+def _refresh_anchor_practice_characteristics(
+    *,
+    year: int,
+    targets: WarmupTargets,
+    session_detector: SessionDetector,
+) -> dict[str, Any]:
+    """Refresh practice-derived car characteristics for the anchor race when available."""
+    practice_update = auto_update_practice_characteristics_if_needed(
+        year=int(year),
+        race_name=targets.anchor_race_name,
+        is_sprint=targets.anchor_is_sprint,
+        force_recheck=False,
+        session_detector=session_detector,
+    )
+    return practice_update if isinstance(practice_update, dict) else {}
 
 
 def compute_base_features(
@@ -772,6 +801,27 @@ def run_warmup_precompute_cycle(
             return summary
 
     try:
+        if not dry_run:
+            practice_update = _refresh_anchor_practice_characteristics(
+                year=int(year),
+                targets=targets,
+                session_detector=detector,
+            )
+            summary.practice_updated = bool(practice_update.get("updated"))
+            completed_sessions = practice_update.get("completed_fp_sessions", [])
+            if isinstance(completed_sessions, list):
+                summary.practice_completed_sessions = [
+                    str(session).strip() for session in completed_sessions if str(session).strip()
+                ]
+            summary.practice_teams_updated = int(practice_update.get("teams_updated", 0) or 0)
+            retried_events = practice_update.get("retried_events", [])
+            if isinstance(retried_events, list):
+                summary.practice_retried_events = [
+                    str(event_name).strip()
+                    for event_name in retried_events
+                    if str(event_name).strip()
+                ]
+
         artifact_versions = get_artifact_versions(year=int(year))
         artifact_hash = compute_artifact_hash(artifact_versions)
         predictor = _load_predictor(artifact_versions, year=int(year))
