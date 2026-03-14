@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from src.dashboard import team_comparison
 
 
@@ -205,6 +207,176 @@ def test_build_team_comparison_dataframe_uses_neutral_fallback_for_missing_profi
     assert neutral_fallbacks == 7
 
 
+def test_build_team_comparison_dataframe_uses_slope_based_tire_deg_display_value():
+    payload = {
+        "Red Bull Racing": {
+            "overall_performance": 0.74,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.566,
+                    "slow_corner_performance": 0.462,
+                    "medium_corner_performance": 0.536,
+                    "fast_corner_performance": 0.577,
+                    "braking_performance": 0.462,
+                    "top_speed": 0.618,
+                    "tire_deg_performance": 0.0,
+                    "tire_deg_slope": 0.3651,
+                }
+            },
+        }
+    }
+
+    frame, neutral_fallbacks = team_comparison._build_team_comparison_dataframe(
+        teams_payload=payload,
+        selected_teams=["Red Bull Racing"],
+        profile="balanced",
+    )
+
+    assert neutral_fallbacks == 0
+    assert frame.iloc[0]["Tire Deg"] == pytest.approx(0.2043, abs=1e-4)
+
+
+def test_build_team_comparison_dataframe_prefers_raw_top_speed_display_value():
+    payload = {
+        "McLaren": {
+            "overall_performance": 0.85,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.887,
+                    "slow_corner_performance": 0.937,
+                    "medium_corner_performance": 0.938,
+                    "fast_corner_performance": 0.773,
+                    "braking_performance": 0.937,
+                    "top_speed": 0.294,
+                    "top_speed_kph": 310.0,
+                    "tire_deg_performance": 0.495,
+                }
+            },
+        },
+        "Ferrari": {
+            "overall_performance": 0.70,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.99,
+                    "slow_corner_performance": 0.988,
+                    "medium_corner_performance": 1.0,
+                    "fast_corner_performance": 0.903,
+                    "braking_performance": 0.988,
+                    "top_speed": 0.176,
+                    "top_speed_kph": 312.0,
+                    "tire_deg_performance": 0.471,
+                }
+            },
+        },
+        "Mercedes": {
+            "overall_performance": 0.75,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 1.0,
+                    "slow_corner_performance": 1.0,
+                    "medium_corner_performance": 0.961,
+                    "fast_corner_performance": 1.0,
+                    "braking_performance": 1.0,
+                    "top_speed": 0.588,
+                    "top_speed_kph": 317.0,
+                    "tire_deg_performance": 0.809,
+                }
+            },
+        },
+    }
+
+    frame, neutral_fallbacks = team_comparison._build_team_comparison_dataframe(
+        teams_payload=payload,
+        selected_teams=["McLaren", "Ferrari", "Mercedes"],
+        profile="balanced",
+    )
+
+    rows = frame.set_index("Team")
+    assert neutral_fallbacks == 0
+    assert rows.loc["McLaren", "Top Speed"] == pytest.approx(0.4265, abs=1e-4)
+    assert rows.loc["Ferrari", "Top Speed"] == pytest.approx(0.4971, abs=1e-4)
+    assert rows.loc["Mercedes", "Top Speed"] == pytest.approx(0.6735, abs=1e-4)
+
+
+def test_build_team_comparison_dataframe_prefers_raw_pace_and_corner_values():
+    payload = {
+        "Aston Martin": {
+            "overall_performance": 0.47,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.1687,
+                    "overall_pace_seconds": 90.40,
+                    "slow_corner_performance": 0.2907,
+                    "slow_corner_seconds": 30.12,
+                    "medium_corner_performance": 0.0716,
+                    "medium_corner_seconds": 28.03,
+                    "fast_corner_performance": 0.0,
+                    "fast_corner_seconds": 31.08,
+                    "braking_performance": 0.2907,
+                    "top_speed": 0.0,
+                    "top_speed_kph": 305.0,
+                    "tire_deg_performance": 0.795,
+                }
+            },
+        },
+        "Cadillac F1": {
+            "overall_performance": 0.35,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.0,
+                    "overall_pace_seconds": 90.72,
+                    "slow_corner_performance": 0.0,
+                    "slow_corner_seconds": 30.22,
+                    "medium_corner_performance": 0.0,
+                    "medium_corner_seconds": 28.11,
+                    "fast_corner_performance": 0.1111,
+                    "fast_corner_seconds": 31.02,
+                    "braking_performance": 0.0,
+                    "top_speed": 0.5294,
+                    "top_speed_kph": 312.6,
+                    "tire_deg_performance": 0.85,
+                }
+            },
+        },
+        "Mercedes": {
+            "overall_performance": 0.75,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 1.0,
+                    "overall_pace_seconds": 89.85,
+                    "slow_corner_performance": 1.0,
+                    "slow_corner_seconds": 29.84,
+                    "medium_corner_performance": 0.961,
+                    "medium_corner_seconds": 27.85,
+                    "fast_corner_performance": 1.0,
+                    "fast_corner_seconds": 30.60,
+                    "braking_performance": 1.0,
+                    "top_speed": 0.588,
+                    "top_speed_kph": 314.6,
+                    "tire_deg_performance": 0.809,
+                }
+            },
+        },
+    }
+
+    frame, neutral_fallbacks = team_comparison._build_team_comparison_dataframe(
+        teams_payload=payload,
+        selected_teams=["Aston Martin", "Cadillac F1", "Mercedes"],
+        profile="balanced",
+    )
+
+    rows = frame.set_index("Team")
+    assert neutral_fallbacks == 0
+    assert rows.loc["Aston Martin", "Overall Pace"] == pytest.approx(0.4222, abs=1e-3)
+    assert rows.loc["Aston Martin", "Slow Corners"] == pytest.approx(0.3607, abs=1e-3)
+    assert rows.loc["Aston Martin", "Medium Corners"] == pytest.approx(0.3878, abs=1e-3)
+    assert rows.loc["Aston Martin", "Fast Corners"] == pytest.approx(0.2059, abs=1e-3)
+    assert rows.loc["Cadillac F1", "Overall Pace"] == pytest.approx(0.2059, abs=1e-3)
+    assert rows.loc["Cadillac F1", "Slow Corners"] == pytest.approx(0.2062, abs=1e-3)
+    assert rows.loc["Cadillac F1", "Medium Corners"] == pytest.approx(0.2063, abs=1e-3)
+    assert rows.loc["Cadillac F1", "Fast Corners"] == pytest.approx(0.2794, abs=1e-3)
+
+
 def test_build_latest_snapshot_comparison_payload_prefers_snapshot_profiles():
     base_teams_payload = {
         "McLaren": {
@@ -252,6 +424,85 @@ def test_build_latest_snapshot_comparison_payload_prefers_snapshot_profiles():
         payload["McLaren"]["testing_characteristics_profiles"]["balanced"]["overall_pace"] == 0.74
     )
     assert payload["McLaren"]["testing_characteristics"]["slow_corner_performance"] == 0.71
+
+
+def test_build_latest_snapshot_comparison_payload_carries_forward_latest_long_run_tire_deg():
+    base_teams_payload = {
+        "Ferrari": {
+            "overall_performance": 0.84,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.81,
+                    "slow_corner_performance": 0.78,
+                    "medium_corner_performance": 0.79,
+                    "fast_corner_performance": 0.77,
+                    "braking_performance": 0.8,
+                    "top_speed": 0.76,
+                    "tire_deg_performance": 0.7,
+                }
+            },
+        }
+    }
+    prior_snapshot = {
+        "event_name": "Australian Grand Prix",
+        "session_name": "R",
+        "teams": {
+            "Ferrari": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.85,
+                        "tire_deg_performance": 0.66,
+                        "tire_deg_slope": 0.21,
+                    },
+                    "long_run": {
+                        "overall_pace": 0.79,
+                        "tire_deg_performance": 0.67,
+                        "tire_deg_slope": 0.19,
+                    },
+                }
+            }
+        },
+    }
+    latest_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "FP1",
+        "teams": {
+            "Ferrari": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.74,
+                        "slow_corner_performance": 0.71,
+                        "medium_corner_performance": 0.72,
+                        "fast_corner_performance": 0.73,
+                        "braking_performance": 0.70,
+                        "top_speed": 0.69,
+                        "tire_deg_performance": None,
+                        "tire_deg_slope": None,
+                    },
+                    "long_run": {
+                        "overall_pace": 0.72,
+                        "top_speed": 0.65,
+                        "tire_deg_performance": None,
+                        "tire_deg_slope": None,
+                    },
+                }
+            }
+        },
+    }
+
+    payload = team_comparison._build_latest_snapshot_comparison_payload(
+        base_teams_payload=base_teams_payload,
+        latest_snapshot=latest_snapshot,
+        snapshot_history=[prior_snapshot, latest_snapshot],
+    )
+
+    balanced = payload["Ferrari"]["testing_characteristics_profiles"]["balanced"]
+    long_run = payload["Ferrari"]["testing_characteristics_profiles"]["long_run"]
+    assert balanced["tire_deg_performance"] == 0.67
+    assert balanced["tire_deg_slope"] == 0.19
+    assert long_run["tire_deg_performance"] == 0.67
+    assert long_run["tire_deg_slope"] == 0.19
+    assert payload["Ferrari"]["testing_characteristics"]["tire_deg_performance"] == 0.67
 
 
 def test_run_characteristics_season_sync_backfills_snapshots_only(patcher):
@@ -576,11 +827,26 @@ def test_build_snapshot_history_dataframe_and_summary():
                             "fast_corner_performance": 0.62,
                             "braking_performance": 0.59,
                             "top_speed": 0.58,
+                            "top_speed_kph": 310.0,
                             "tire_deg_performance": 0.63,
                             "overall_pace": 0.64,
                         }
                     }
-                }
+                },
+                "Ferrari": {
+                    "profiles": {
+                        "balanced": {
+                            "slow_corner_performance": 0.61,
+                            "medium_corner_performance": 0.62,
+                            "fast_corner_performance": 0.63,
+                            "braking_performance": 0.60,
+                            "top_speed": 0.22,
+                            "top_speed_kph": 317.0,
+                            "tire_deg_performance": 0.62,
+                            "overall_pace": 0.63,
+                        }
+                    }
+                },
             },
         },
         {
@@ -595,11 +861,26 @@ def test_build_snapshot_history_dataframe_and_summary():
                             "fast_corner_performance": 0.72,
                             "braking_performance": 0.69,
                             "top_speed": 0.68,
+                            "top_speed_kph": 312.0,
                             "tire_deg_performance": 0.73,
                             "overall_pace": 0.74,
                         }
                     }
-                }
+                },
+                "Ferrari": {
+                    "profiles": {
+                        "balanced": {
+                            "slow_corner_performance": 0.69,
+                            "medium_corner_performance": 0.70,
+                            "fast_corner_performance": 0.71,
+                            "braking_performance": 0.68,
+                            "top_speed": 0.27,
+                            "top_speed_kph": 318.0,
+                            "tire_deg_performance": 0.72,
+                            "overall_pace": 0.73,
+                        }
+                    }
+                },
             },
         },
     ]
@@ -611,7 +892,8 @@ def test_build_snapshot_history_dataframe_and_summary():
     )
 
     assert list(frame["Snapshot"]) == ["Bahrain Grand Prix FP1", "Bahrain Grand Prix FP2"]
-    assert round(float(frame.iloc[0]["Overall"]), 3) == 0.605
+    assert frame.iloc[0]["Top Speed"] == pytest.approx(0.4265, abs=1e-4)
+    assert round(float(frame.iloc[0]["Overall"]), 3) == 0.579
 
 
 def test_build_snapshot_history_dataframe_keeps_partial_overall_points():

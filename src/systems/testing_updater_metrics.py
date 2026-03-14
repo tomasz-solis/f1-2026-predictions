@@ -32,6 +32,12 @@ _DIRECTIONALITY_KEYS = (
 _RUN_PROFILE_MODES = ("balanced", "all", "short_run", "long_run")
 _SHORT_STINT_MAX_LAPS = 5
 _LONG_STINT_MIN_LAPS = 8
+_STINT_OUTLIER_BUFFER_SECONDS = 5.0
+_RAW_TOP_SPEED_METRIC = "top_speed_kph"
+_RAW_OVERALL_PACE_METRIC = "overall_pace_seconds"
+_RAW_SLOW_CORNER_METRIC = "slow_corner_seconds"
+_RAW_MEDIUM_CORNER_METRIC = "medium_corner_seconds"
+_RAW_FAST_CORNER_METRIC = "fast_corner_seconds"
 
 
 def _canonicalize_team_name(raw_team: str, known_teams: set[str]) -> str | None:
@@ -143,14 +149,17 @@ def _select_stint_representative_laps(team_laps: pd.DataFrame) -> pd.DataFrame:
         if timed.empty:
             continue
 
-        lap_seconds = pd.to_timedelta(timed["LapTime"], errors="coerce").dt.total_seconds()
-        valid_idx = lap_seconds.dropna().index
-        if valid_idx.empty:
+        filtered = _filter_stint_outlier_laps(timed)
+        lap_seconds = _lap_seconds_series(filtered)
+        if lap_seconds.empty:
             continue
 
-        median_value = float(lap_seconds.loc[valid_idx].median())
-        representative_idx = (lap_seconds.loc[valid_idx] - median_value).abs().idxmin()
-        rows.append(timed.loc[representative_idx])
+        if len(lap_seconds) <= _SHORT_STINT_MAX_LAPS:
+            representative_idx = lap_seconds.idxmin()
+        else:
+            median_value = float(lap_seconds.median())
+            representative_idx = (lap_seconds - median_value).abs().idxmin()
+        rows.append(filtered.loc[representative_idx])
 
     if not rows:
         return team_laps
@@ -258,12 +267,42 @@ def _median_lap_seconds(team_laps: pd.DataFrame) -> float | None:
     if "LapTime" not in team_laps.columns or team_laps.empty:
         return None
 
-    lap_seconds = pd.to_timedelta(team_laps["LapTime"], errors="coerce").dt.total_seconds()
-    lap_seconds = lap_seconds.dropna()
+    lap_seconds = _lap_seconds_series(team_laps)
     if lap_seconds.empty:
         return None
 
     return float(lap_seconds.median())
+
+
+def _lap_seconds_series(team_laps: pd.DataFrame) -> pd.Series:
+    """Convert lap times into seconds while preserving the original row index."""
+    if "LapTime" not in team_laps.columns or team_laps.empty:
+        return pd.Series(dtype=float)
+
+    return pd.to_timedelta(team_laps["LapTime"], errors="coerce").dt.total_seconds().dropna()
+
+
+def _filter_stint_outlier_laps(
+    stint_laps: pd.DataFrame,
+    max_delta_seconds: float = _STINT_OUTLIER_BUFFER_SECONDS,
+) -> pd.DataFrame:
+    """
+    Drop obviously slow laps from a stint before extracting representative metrics.
+
+    Practice and qualifying runs often contain cooldown, traffic, or aborted laps
+    that are tens of seconds slower than the real push-lap pace. Keeping them
+    skews both representative-lap selection and tire-degradation estimates.
+    """
+    lap_seconds = _lap_seconds_series(stint_laps)
+    if lap_seconds.empty:
+        return stint_laps.iloc[0:0].copy()
+
+    threshold = float(lap_seconds.min()) + max(0.0, float(max_delta_seconds))
+    filtered_idx = lap_seconds[lap_seconds <= threshold].index
+    if filtered_idx.empty:
+        filtered_idx = lap_seconds.index
+
+    return stint_laps.loc[filtered_idx].copy()
 
 
 def _estimate_tire_deg_slope(team_laps: pd.DataFrame) -> float | None:
@@ -283,12 +322,13 @@ def _estimate_tire_deg_slope(team_laps: pd.DataFrame) -> float | None:
 
     slopes = []
     for _, stint_laps in team_laps.groupby(grouping_cols, dropna=False):
-        stint = stint_laps.sort_values("LapNumber")
+        stint = _filter_stint_outlier_laps(stint_laps.sort_values("LapNumber")).sort_values(
+            "LapNumber"
+        )
         if len(stint) < 3:
             continue
 
-        lap_seconds = pd.to_timedelta(stint["LapTime"], errors="coerce").dt.total_seconds()
-        lap_seconds = lap_seconds.dropna()
+        lap_seconds = _lap_seconds_series(stint)
         if len(lap_seconds) < 3:
             continue
 
@@ -348,6 +388,53 @@ def _normalize_lower_better(metric_values: dict[str, float]) -> dict[str, float]
     return normalized
 
 
+def _attach_raw_snapshot_metrics(
+    performance_by_team: dict[str, dict[str, float]],
+    per_team_payload: dict[str, dict[str, dict[str, dict[str, float]]]],
+    lap_pace_seconds: dict[str, float],
+    raw_top_speed_by_team: dict[str, float],
+) -> dict[str, dict[str, float]]:
+    """Attach raw session metrics to per-team payloads for snapshot consumers."""
+    if not raw_top_speed_by_team and not lap_pace_seconds and not per_team_payload:
+        return performance_by_team
+
+    merged = {
+        str(team_name): dict(metrics)
+        for team_name, metrics in performance_by_team.items()
+        if isinstance(metrics, dict)
+    }
+
+    for team_name, session_payloads in per_team_payload.items():
+        if not isinstance(session_payloads, dict) or not session_payloads:
+            continue
+
+        team_payload = merged.setdefault(str(team_name), {})
+        session_payload = next(iter(session_payloads.values()))
+        if not isinstance(session_payload, dict):
+            continue
+
+        sector_times = session_payload.get("sector_times")
+        if isinstance(sector_times, dict):
+            s1 = sector_times.get("s1")
+            s2 = sector_times.get("s2")
+            s3 = sector_times.get("s3")
+            if isinstance(s1, int | float):
+                team_payload[_RAW_SLOW_CORNER_METRIC] = float(s1)
+            if isinstance(s2, int | float):
+                team_payload[_RAW_MEDIUM_CORNER_METRIC] = float(s2)
+            if isinstance(s3, int | float):
+                team_payload[_RAW_FAST_CORNER_METRIC] = float(s3)
+
+    for team_name, lap_seconds in lap_pace_seconds.items():
+        team_payload = merged.setdefault(str(team_name), {})
+        team_payload[_RAW_OVERALL_PACE_METRIC] = float(lap_seconds)
+
+    for team_name, top_speed_kph in raw_top_speed_by_team.items():
+        team_payload = merged.setdefault(str(team_name), {})
+        team_payload[_RAW_TOP_SPEED_METRIC] = float(top_speed_kph)
+    return merged
+
+
 def _extract_team_payload(valid_laps: pd.DataFrame) -> dict:
     """Build payload expected by extract_all_teams_performance()."""
     payload = {}
@@ -368,22 +455,60 @@ def _extract_team_payload(valid_laps: pd.DataFrame) -> dict:
     if sector_times:
         payload["sector_times"] = sector_times
 
-    speed_columns = [
-        col for col in ("SpeedST", "SpeedFL", "SpeedI2", "SpeedI1") if col in valid_laps
-    ]
-    if speed_columns:
-        speed_values = []
-        for col in speed_columns:
-            speed_values.extend(valid_laps[col].dropna().tolist())
-        if speed_values:
-            payload["speed_profile"] = {"top_speed": float(np.nanmedian(speed_values))}
+    top_speed = _extract_top_speed_value(valid_laps)
+    if top_speed is not None:
+        payload["speed_profile"] = {"top_speed": top_speed}
 
-    lap_seconds = pd.to_timedelta(valid_laps["LapTime"], errors="coerce").dt.total_seconds()
-    lap_seconds = lap_seconds.dropna()
+    lap_seconds = _lap_seconds_series(valid_laps)
     if len(lap_seconds) >= 2:
         payload["consistency"] = {"std_lap_time": float(lap_seconds.std(ddof=0))}
 
     return payload
+
+
+def _extract_top_speed_value(valid_laps: pd.DataFrame) -> float | None:
+    """
+    Estimate top speed from the quickest trap reached on each selected lap.
+
+    `SpeedST` and `SpeedFL` are closer to true terminal-speed traps than the
+    intermediate speed points. Use those first, then fall back when necessary.
+    """
+    lap_top_speeds = _lap_top_speed_series(valid_laps)
+    if lap_top_speeds.empty:
+        return None
+
+    return float(lap_top_speeds.median())
+
+
+def _lap_top_speed_series(valid_laps: pd.DataFrame) -> pd.Series:
+    """Return one top-speed sample per lap from the best available trap columns."""
+    preferred_columns = [col for col in ("SpeedST", "SpeedFL") if col in valid_laps.columns]
+    fallback_columns = [col for col in ("SpeedI2", "SpeedI1") if col in valid_laps.columns]
+    speed_columns = preferred_columns or fallback_columns
+    if not speed_columns:
+        return pd.Series(dtype=float)
+
+    speed_frame = valid_laps[speed_columns].apply(pd.to_numeric, errors="coerce")
+    return speed_frame.max(axis=1, skipna=True).dropna()
+
+
+def _extract_top_speed_capability(valid_laps: pd.DataFrame, quantile: float = 0.90) -> float | None:
+    """
+    Estimate raw straight-line capability from the high end of a team's lap samples.
+
+    Median trap speed is too conservative for mixed programs because it is pulled
+    down by cooldown, traffic, and heavy-fuel running. The snapshot UI needs a
+    better "what can the car do here?" signal, so we use a high percentile of the
+    per-lap trap maxima instead.
+    """
+    lap_top_speeds = _lap_top_speed_series(valid_laps)
+    if lap_top_speeds.empty:
+        return None
+    if len(lap_top_speeds) < 4:
+        return float(lap_top_speeds.max())
+
+    bounded_quantile = min(max(float(quantile), 0.0), 1.0)
+    return float(lap_top_speeds.quantile(bounded_quantile))
 
 
 def _collect_session_metrics(
@@ -425,6 +550,7 @@ def _collect_session_metrics(
     per_team_payload = {}
     tire_deg_slopes = {}
     lap_pace_seconds = {}
+    raw_top_speed_by_team = {}
     raw_teams = laps["Team"].dropna().unique()
     mapped_team_count = 0
     selected_lap_count = 0
@@ -446,6 +572,10 @@ def _collect_session_metrics(
             representative_laps = valid_laps
         selected_lap_count += len(representative_laps)
 
+        raw_top_speed = _extract_top_speed_capability(valid_laps)
+        if raw_top_speed is not None:
+            raw_top_speed_by_team[canonical_team] = raw_top_speed
+
         median_lap_seconds = median_lap_seconds_fn(representative_laps)
         if median_lap_seconds is not None:
             lap_pace_seconds[canonical_team] = median_lap_seconds
@@ -454,17 +584,20 @@ def _collect_session_metrics(
         if payload:
             per_team_payload.setdefault(canonical_team, {})[session_key] = payload
 
-        if run_profile in ("balanced", "long_run"):
-            _, long_laps = classify_run_laps_fn(valid_laps)
-            tire_source = long_laps if not long_laps.empty else valid_laps
-        else:
-            tire_source = valid_laps
+        _, long_laps = classify_run_laps_fn(valid_laps)
+        tire_source = long_laps if not long_laps.empty else valid_laps.iloc[0:0].copy()
 
         slope = estimate_tire_deg_slope_fn(tire_source)
         if slope is not None:
             tire_deg_slopes[canonical_team] = slope
 
     normalized_perf = extract_all_teams_performance_fn(per_team_payload, session_name=session_key)
+    normalized_perf = _attach_raw_snapshot_metrics(
+        normalized_perf,
+        per_team_payload,
+        lap_pace_seconds,
+        raw_top_speed_by_team,
+    )
     normalized_pace = normalize_lower_better_fn(lap_pace_seconds)
     for team, pace_score in normalized_pace.items():
         normalized_perf.setdefault(team, {})["overall_pace"] = pace_score

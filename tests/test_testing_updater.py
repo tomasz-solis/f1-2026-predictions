@@ -4,6 +4,7 @@ import json
 from datetime import UTC, datetime, timedelta
 
 import pandas as pd
+import pytest
 
 from src.systems.testing_updater import (
     _aggregate_metric_samples,
@@ -14,6 +15,8 @@ from src.systems.testing_updater import (
     _coerce_utc_datetime,
     _count_team_selected_laps,
     _count_team_valid_laps,
+    _estimate_tire_deg_slope,
+    _extract_team_payload,
     _extract_testing_day,
     _extract_testing_number,
     _is_testing_event,
@@ -104,6 +107,29 @@ def test_normalize_tire_deg_scores_inverts_slope():
     assert normalized["Team B"]["tire_deg_performance"] == 0.0
 
 
+def test_estimate_tire_deg_slope_ignores_obvious_cooldown_outliers():
+    laps = pd.DataFrame(
+        {
+            "Driver": ["DRV"] * 6,
+            "Stint": [1] * 6,
+            "Compound": ["SOFT"] * 6,
+            "LapNumber": [1, 2, 3, 4, 5, 6],
+            "LapTime": [
+                pd.to_timedelta("0:01:20.000"),
+                pd.to_timedelta("0:01:20.500"),
+                pd.to_timedelta("0:01:21.000"),
+                pd.to_timedelta("0:01:50.000"),
+                pd.to_timedelta("0:01:51.000"),
+                pd.to_timedelta("0:01:52.000"),
+            ],
+        }
+    )
+
+    slope = _estimate_tire_deg_slope(laps)
+
+    assert slope == pytest.approx(0.5)
+
+
 def test_count_team_valid_laps_uses_canonical_mapping():
     class DummySession:
         def __init__(self, laps):
@@ -192,6 +218,151 @@ def test_select_program_aware_laps_balanced_prefers_representatives():
     selected = _select_program_aware_laps(laps, run_profile="balanced")
     # One representative per stint/compound slice.
     assert len(selected) == 2
+
+
+def test_select_program_aware_laps_uses_fastest_short_stint_lap():
+    laps = pd.DataFrame(
+        {
+            "Driver": ["DRV"] * 8,
+            "Stint": [1, 1, 1, 1, 2, 2, 2, 2],
+            "Compound": ["C3"] * 8,
+            "LapTime": [
+                pd.to_timedelta("0:01:35"),
+                pd.to_timedelta("0:01:30"),
+                pd.to_timedelta("0:01:55"),
+                pd.to_timedelta("0:01:31"),
+                pd.to_timedelta("0:01:42"),
+                pd.to_timedelta("0:01:40"),
+                pd.to_timedelta("0:01:41"),
+                pd.to_timedelta("0:01:43"),
+            ],
+            "PitOutTime": [pd.NaT] * 8,
+            "PitInTime": [pd.NaT] * 8,
+        }
+    )
+
+    selected = _select_program_aware_laps(laps, run_profile="short_run")
+    selected_seconds = (
+        pd.to_timedelta(selected["LapTime"], errors="coerce").dt.total_seconds().tolist()
+    )
+
+    assert selected_seconds == [90.0, 100.0]
+
+
+def test_extract_team_payload_uses_per_lap_top_speed_traps():
+    laps = pd.DataFrame(
+        {
+            "LapTime": [pd.to_timedelta("0:01:20"), pd.to_timedelta("0:01:21")],
+            "SpeedST": [310.0, 315.0],
+            "SpeedFL": [300.0, 301.0],
+            "SpeedI1": [260.0, 261.0],
+            "SpeedI2": [270.0, 271.0],
+        }
+    )
+
+    payload = _extract_team_payload(laps)
+
+    assert payload["speed_profile"]["top_speed"] == 312.5
+
+
+def test_collect_session_metrics_attaches_raw_top_speed_from_all_valid_laps(monkeypatch):
+    from src.systems import testing_updater as testing_updater
+
+    class DummySession:
+        def __init__(self, laps):
+            self.laps = laps
+
+    laps = pd.DataFrame(
+        {
+            "Team": ["Ferrari"] * 12,
+            "Driver": ["LEC"] * 12,
+            "Stint": [1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2],
+            "Compound": ["C3"] * 12,
+            "LapNumber": list(range(1, 13)),
+            "LapTime": [
+                pd.to_timedelta("0:01:32"),
+                pd.to_timedelta("0:01:30"),
+                pd.to_timedelta("0:01:48"),
+                pd.to_timedelta("0:01:31"),
+                pd.to_timedelta("0:01:39"),
+                pd.to_timedelta("0:01:40"),
+                pd.to_timedelta("0:01:41"),
+                pd.to_timedelta("0:01:42"),
+                pd.to_timedelta("0:01:43"),
+                pd.to_timedelta("0:01:44"),
+                pd.to_timedelta("0:01:45"),
+                pd.to_timedelta("0:01:46"),
+            ],
+            "SpeedST": [
+                299.0,
+                301.0,
+                280.0,
+                300.0,
+                316.0,
+                317.0,
+                318.0,
+                321.0,
+                320.0,
+                319.0,
+                318.0,
+                317.0,
+            ],
+            "PitOutTime": [pd.NaT] * 12,
+            "PitInTime": [pd.NaT] * 12,
+        }
+    )
+    session = DummySession(laps=laps)
+    captured_payload = {}
+
+    def _capture_extract(payload, session_name):
+        captured_payload.update(payload)
+        return {"Ferrari": {"top_speed": 0.12}}
+
+    monkeypatch.setattr(testing_updater, "extract_all_teams_performance", _capture_extract)
+
+    perf, tire = testing_updater._collect_session_metrics(
+        session=session,
+        session_key="FP1",
+        known_teams={"Ferrari"},
+        run_profile="short_run",
+    )
+
+    assert tire == {}
+    assert captured_payload["Ferrari"]["FP1"]["speed_profile"]["top_speed"] == 301.0
+    assert perf["Ferrari"]["top_speed"] == 0.12
+    assert perf["Ferrari"]["top_speed_kph"] == pytest.approx(319.9, abs=1e-4)
+    assert perf["Ferrari"]["overall_pace_seconds"] == 90.0
+
+
+def test_count_team_selected_laps_avoids_short_stint_cooldown_laps():
+    class DummySession:
+        def __init__(self, laps):
+            self.laps = laps
+
+    laps = pd.DataFrame(
+        {
+            "Team": ["McLaren"] * 8,
+            "Driver": ["NOR"] * 8,
+            "Stint": [1, 1, 1, 1, 2, 2, 2, 2],
+            "LapTime": [
+                pd.to_timedelta("0:01:35"),
+                pd.to_timedelta("0:01:30"),
+                pd.to_timedelta("0:01:55"),
+                pd.to_timedelta("0:01:31"),
+                pd.to_timedelta("0:01:42"),
+                pd.to_timedelta("0:01:40"),
+                pd.to_timedelta("0:01:41"),
+                pd.to_timedelta("0:01:43"),
+            ],
+            "PitOutTime": [pd.NaT] * 8,
+            "PitInTime": [pd.NaT] * 8,
+        }
+    )
+    session = DummySession(laps=laps)
+
+    counts = _count_team_selected_laps(session, {"McLaren"}, run_profile="short_run")
+
+    assert counts["McLaren"] == 2.0
 
 
 def test_testing_event_and_session_parsing():

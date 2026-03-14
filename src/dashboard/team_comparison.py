@@ -43,6 +43,21 @@ _TEAM_BRAND_COLORS: dict[str, str] = {
 _DEFAULT_TEAM_COLOR = "#B6BABD"
 _DEFAULT_BIG4_CANONICAL: tuple[str, ...] = ("MCLAREN", "MERCEDES", "FERRARI", "RED BULL")
 _UNIT_CHART_RANGE_PADDING = 0.02
+_TIRE_DEG_SLOPE_DISPLAY_RANGE: tuple[float, float] = (-0.05, 0.40)
+_TIRE_DEG_SCORE_DISPLAY_RANGE: tuple[float, float] = (0.15, 0.85)
+_TOP_SPEED_KPH_BUFFER = 5.0
+_TOP_SPEED_SCORE_DISPLAY_RANGE: tuple[float, float] = (0.25, 0.85)
+_RAW_TIME_PADDING_RATIO = 0.35
+_RAW_SECTOR_MIN_PADDING_SECONDS = 0.02
+_RAW_PACE_MIN_PADDING_SECONDS = 0.08
+_RAW_PACE_FIELD = "overall_pace_seconds"
+_RAW_METRIC_FIELDS: dict[str, tuple[str, bool, float]] = {
+    "overall_pace": (_RAW_PACE_FIELD, False, _RAW_PACE_MIN_PADDING_SECONDS),
+    "slow_corner_performance": ("slow_corner_seconds", False, _RAW_SECTOR_MIN_PADDING_SECONDS),
+    "medium_corner_performance": ("medium_corner_seconds", False, _RAW_SECTOR_MIN_PADDING_SECONDS),
+    "fast_corner_performance": ("fast_corner_seconds", False, _RAW_SECTOR_MIN_PADDING_SECONDS),
+    "braking_performance": ("slow_corner_seconds", False, _RAW_SECTOR_MIN_PADDING_SECONDS),
+}
 
 
 def _coerce_unit_metric(value: Any) -> float | None:
@@ -69,6 +84,179 @@ def _unit_chart_axis_range(padding: float = _UNIT_CHART_RANGE_PADDING) -> list[f
     """Return a slightly padded 0-1 range so endpoint markers are not clipped."""
     bounded_padding = max(0.0, float(padding))
     return [0.0 - bounded_padding, 1.0 + bounded_padding]
+
+
+def _normalize_tire_deg_slope_for_display(
+    slope: float,
+    *,
+    slope_range: tuple[float, float] = _TIRE_DEG_SLOPE_DISPLAY_RANGE,
+    score_range: tuple[float, float] = _TIRE_DEG_SCORE_DISPLAY_RANGE,
+) -> float:
+    """
+    Convert tire-deg slope into a display-friendly 0-1 score.
+
+    Session-local min/max normalization makes the worst sampled team collapse to
+    exactly 0.0, which reads as catastrophic in the radar even when the
+    absolute slope is merely "worst of this session". For the comparison UI we
+    therefore normalize slopes against a stable domain range and keep a small
+    floor/ceiling margin.
+    """
+    slope_lower, slope_upper = sorted((float(slope_range[0]), float(slope_range[1])))
+    score_lower, score_upper = sorted((float(score_range[0]), float(score_range[1])))
+    bounded_slope = min(max(float(slope), slope_lower), slope_upper)
+    if slope_upper <= slope_lower:
+        return 0.5
+
+    normalized = 1.0 - ((bounded_slope - slope_lower) / (slope_upper - slope_lower))
+    return float(score_lower + (max(0.0, min(1.0, normalized)) * (score_upper - score_lower)))
+
+
+def _normalize_top_speed_kph_for_display(
+    top_speed_kph: float,
+    *,
+    domain_range: tuple[float, float],
+    score_range: tuple[float, float] = _TOP_SPEED_SCORE_DISPLAY_RANGE,
+) -> float:
+    """
+    Convert raw top speed into a display score using a buffered session range.
+
+    Absolute km/h is strongly track-dependent, so a season-wide fixed range would
+    be misleading. Instead we use the current snapshot's raw spread plus a small
+    buffer so the slowest sampled team does not collapse to zero.
+    """
+    speed_lower, speed_upper = sorted((float(domain_range[0]), float(domain_range[1])))
+    score_lower, score_upper = sorted((float(score_range[0]), float(score_range[1])))
+    bounded_speed = min(max(float(top_speed_kph), speed_lower), speed_upper)
+    if speed_upper <= speed_lower:
+        return 0.5
+
+    normalized = (bounded_speed - speed_lower) / (speed_upper - speed_lower)
+    return float(score_lower + (max(0.0, min(1.0, normalized)) * (score_upper - score_lower)))
+
+
+def _normalize_buffered_metric_for_display(
+    metric_value: float,
+    *,
+    domain_range: tuple[float, float],
+    higher_is_better: bool,
+) -> float:
+    """Convert a raw metric into a buffered 0-1 display score."""
+    metric_lower, metric_upper = sorted((float(domain_range[0]), float(domain_range[1])))
+    bounded_value = min(max(float(metric_value), metric_lower), metric_upper)
+    if metric_upper <= metric_lower:
+        return 0.5
+
+    normalized = (bounded_value - metric_lower) / (metric_upper - metric_lower)
+    if not higher_is_better:
+        normalized = 1.0 - normalized
+    return float(max(0.0, min(1.0, normalized)))
+
+
+def _build_raw_metric_display_scale(
+    teams_payload: dict[str, Any],
+    profile: str,
+    *,
+    raw_metric_key: str,
+    padding_ratio: float = _RAW_TIME_PADDING_RATIO,
+    min_padding: float = _RAW_SECTOR_MIN_PADDING_SECONDS,
+) -> tuple[float, float] | None:
+    """Build a buffered raw-metric range from all teams in the current snapshot/profile."""
+    raw_values: list[float] = []
+    for team_data in teams_payload.values():
+        if not isinstance(team_data, dict):
+            continue
+        metrics_payload = _resolve_profile_metrics(team_data, profile)
+        raw_value = metrics_payload.get(raw_metric_key)
+        if not isinstance(raw_value, int | float):
+            continue
+        raw_value_float = float(raw_value)
+        if not isfinite(raw_value_float):
+            continue
+        raw_values.append(raw_value_float)
+
+    if not raw_values:
+        return None
+
+    observed_min = min(raw_values)
+    observed_max = max(raw_values)
+    observed_range = max(0.0, observed_max - observed_min)
+    padding = max(float(min_padding), observed_range * max(0.0, float(padding_ratio)))
+    return (observed_min - padding, observed_max + padding)
+
+
+def _build_top_speed_display_scale(
+    teams_payload: dict[str, Any],
+    profile: str,
+    *,
+    buffer_kph: float = _TOP_SPEED_KPH_BUFFER,
+) -> tuple[float, float] | None:
+    """Build a buffered raw-speed range from all teams in the current snapshot/profile."""
+    raw_top_speeds: list[float] = []
+    for team_data in teams_payload.values():
+        if not isinstance(team_data, dict):
+            continue
+        metrics_payload = _resolve_profile_metrics(team_data, profile)
+        raw_speed = metrics_payload.get("top_speed_kph")
+        if not isinstance(raw_speed, int | float):
+            continue
+        raw_speed_float = float(raw_speed)
+        if not isfinite(raw_speed_float):
+            continue
+        raw_top_speeds.append(raw_speed_float)
+
+    if not raw_top_speeds:
+        return None
+
+    buffer_value = max(0.0, float(buffer_kph))
+    return (min(raw_top_speeds) - buffer_value, max(raw_top_speeds) + buffer_value)
+
+
+def _resolve_top_speed_metric_value(
+    metrics_payload: dict[str, Any],
+    top_speed_display_scale: tuple[float, float] | None,
+) -> float | None:
+    """Resolve the top-speed value used in the comparison radar/table/history."""
+    raw_speed = metrics_payload.get("top_speed_kph")
+    if isinstance(raw_speed, int | float) and top_speed_display_scale is not None:
+        raw_speed_float = float(raw_speed)
+        if isfinite(raw_speed_float):
+            return _normalize_top_speed_kph_for_display(
+                raw_speed_float,
+                domain_range=top_speed_display_scale,
+            )
+
+    return _coerce_unit_metric(metrics_payload.get("top_speed"))
+
+
+def _resolve_raw_metric_value(
+    metrics_payload: dict[str, Any],
+    *,
+    raw_metric_key: str,
+    display_scale: tuple[float, float] | None,
+    higher_is_better: bool,
+    fallback_key: str,
+) -> float | None:
+    """Resolve one radar metric from raw session values when available."""
+    raw_value = metrics_payload.get(raw_metric_key)
+    if isinstance(raw_value, int | float) and display_scale is not None:
+        raw_value_float = float(raw_value)
+        if isfinite(raw_value_float):
+            return _normalize_buffered_metric_for_display(
+                raw_value_float,
+                domain_range=display_scale,
+                higher_is_better=higher_is_better,
+            )
+
+    return _coerce_unit_metric(metrics_payload.get(fallback_key))
+
+
+def _resolve_tire_deg_metric_value(metrics_payload: dict[str, Any]) -> float | None:
+    """Resolve the tire-deg value used in the comparison radar/table."""
+    raw_slope = metrics_payload.get("tire_deg_slope")
+    if isinstance(raw_slope, int | float):
+        return _normalize_tire_deg_slope_for_display(float(raw_slope))
+
+    return _coerce_unit_metric(metrics_payload.get("tire_deg_performance"))
 
 
 def _hex_to_rgba(hex_color: str, alpha: float) -> str:
@@ -234,8 +422,24 @@ def _has_profile_metrics(team_data: dict[str, Any], profile: str) -> bool:
     if overall_pace is not None:
         return True
 
+    raw_overall_pace = metrics_payload.get(_RAW_PACE_FIELD)
+    if isinstance(raw_overall_pace, int | float) and isfinite(float(raw_overall_pace)):
+        return True
+
+    raw_top_speed = metrics_payload.get("top_speed_kph")
+    if isinstance(raw_top_speed, int | float) and isfinite(float(raw_top_speed)):
+        return True
+
+    for raw_metric_key, _higher_is_better, _min_padding in _RAW_METRIC_FIELDS.values():
+        raw_metric_value = metrics_payload.get(raw_metric_key)
+        if isinstance(raw_metric_value, int | float) and isfinite(float(raw_metric_value)):
+            return True
+
     for payload_key, _label in _TEAM_RADAR_METRICS:
-        metric_value = _coerce_unit_metric(metrics_payload.get(payload_key))
+        if payload_key == "tire_deg_performance":
+            metric_value = _resolve_tire_deg_metric_value(metrics_payload)
+        else:
+            metric_value = _coerce_unit_metric(metrics_payload.get(payload_key))
         if metric_value is not None:
             return True
     return False
@@ -249,6 +453,20 @@ def _build_team_comparison_dataframe(
     """Build team comparison frame and return count of neutral fallbacks used."""
     rows: list[dict[str, Any]] = []
     neutral_fallback_count = 0
+    top_speed_display_scale = _build_top_speed_display_scale(teams_payload, profile)
+    raw_metric_display_scales = {
+        metric_key: _build_raw_metric_display_scale(
+            teams_payload,
+            profile,
+            raw_metric_key=raw_metric_key,
+            min_padding=min_padding,
+        )
+        for metric_key, (
+            raw_metric_key,
+            _higher_is_better,
+            min_padding,
+        ) in _RAW_METRIC_FIELDS.items()
+    }
 
     for team_name in selected_teams:
         team_data = teams_payload.get(team_name)
@@ -263,13 +481,36 @@ def _build_team_comparison_dataframe(
         if overall_perf is None:
             neutral_fallback_count += 1
 
-        overall_pace = _coerce_unit_metric(metrics_payload.get("overall_pace"))
+        overall_pace = _resolve_raw_metric_value(
+            metrics_payload,
+            raw_metric_key=_RAW_PACE_FIELD,
+            display_scale=raw_metric_display_scales.get("overall_pace"),
+            higher_is_better=False,
+            fallback_key="overall_pace",
+        )
         row["Overall Pace"] = overall_pace if overall_pace is not None else 0.5
         if overall_pace is None:
             neutral_fallback_count += 1
 
         for payload_key, label in _TEAM_RADAR_METRICS:
-            metric_value = _coerce_unit_metric(metrics_payload.get(payload_key))
+            if payload_key == "tire_deg_performance":
+                metric_value = _resolve_tire_deg_metric_value(metrics_payload)
+            elif payload_key == "top_speed":
+                metric_value = _resolve_top_speed_metric_value(
+                    metrics_payload,
+                    top_speed_display_scale,
+                )
+            elif payload_key in _RAW_METRIC_FIELDS:
+                raw_metric_key, higher_is_better, _min_padding = _RAW_METRIC_FIELDS[payload_key]
+                metric_value = _resolve_raw_metric_value(
+                    metrics_payload,
+                    raw_metric_key=raw_metric_key,
+                    display_scale=raw_metric_display_scales.get(payload_key),
+                    higher_is_better=higher_is_better,
+                    fallback_key=payload_key,
+                )
+            else:
+                metric_value = _coerce_unit_metric(metrics_payload.get(payload_key))
             row[label] = metric_value if metric_value is not None else 0.5
             if metric_value is None:
                 neutral_fallback_count += 1
@@ -381,6 +622,7 @@ def _build_latest_snapshot_comparison_payload(
     *,
     base_teams_payload: dict[str, Any],
     latest_snapshot: dict[str, Any] | None,
+    snapshot_history: list[dict[str, Any]] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Build comparison input from the newest snapshot while keeping season priors."""
     if not isinstance(latest_snapshot, dict):
@@ -405,9 +647,18 @@ def _build_latest_snapshot_comparison_payload(
         display_name = (
             mapped_name if isinstance(mapped_name, str) and mapped_name else str(raw_team_name)
         )
-        team_payload: dict[str, Any] = {"testing_characteristics_profiles": deepcopy(profiles)}
+        profiles_payload = deepcopy(profiles)
+        tire_deg_fallback = _resolve_latest_tire_deg_fallback(
+            snapshot_history=snapshot_history or [],
+            latest_snapshot=latest_snapshot,
+            team_name=display_name,
+        )
+        if tire_deg_fallback:
+            _apply_profile_tire_deg_fallbacks(profiles_payload, tire_deg_fallback)
 
-        balanced_profile = profiles.get("balanced")
+        team_payload: dict[str, Any] = {"testing_characteristics_profiles": profiles_payload}
+
+        balanced_profile = profiles_payload.get("balanced")
         if isinstance(balanced_profile, dict):
             team_payload["testing_characteristics"] = deepcopy(balanced_profile)
 
@@ -420,6 +671,120 @@ def _build_latest_snapshot_comparison_payload(
         merged_payload[display_name] = team_payload
 
     return _canonicalize_teams_payload_for_comparison(merged_payload)
+
+
+def _resolve_snapshot_team_profiles(
+    snapshot_payload: dict[str, Any],
+    team_name: str,
+) -> dict[str, Any]:
+    """Return stored profile payloads for one team label inside a snapshot."""
+    teams_payload = snapshot_payload.get("teams")
+    if not isinstance(teams_payload, dict):
+        return {}
+
+    target_canonical = canonicalize_team(team_name)
+    normalized_target = str(team_name).strip()
+    for raw_team_name, raw_team_payload in teams_payload.items():
+        if not isinstance(raw_team_payload, dict):
+            continue
+        mapped_name = map_team_to_characteristics(str(raw_team_name))
+        display_name = (
+            mapped_name if isinstance(mapped_name, str) and mapped_name else str(raw_team_name)
+        )
+        if (
+            display_name != normalized_target
+            and canonicalize_team(display_name) != target_canonical
+        ):
+            continue
+        profiles = raw_team_payload.get("profiles")
+        return profiles if isinstance(profiles, dict) else {}
+
+    return {}
+
+
+def _snapshot_identity(snapshot_payload: dict[str, Any]) -> tuple[str, str]:
+    """Build a stable `(event_name, session_name)` identity for one snapshot payload."""
+    return (
+        str(snapshot_payload.get("event_name", "")).strip(),
+        str(snapshot_payload.get("session_name", "")).strip(),
+    )
+
+
+def _resolve_latest_tire_deg_fallback(
+    *,
+    snapshot_history: list[dict[str, Any]],
+    latest_snapshot: dict[str, Any],
+    team_name: str,
+) -> dict[str, float]:
+    """
+    Resolve the newest usable tire-deg payload for a team from snapshot history.
+
+    The comparison chart can land on sessions like qualifying or sprint
+    qualifying where a real long-run deg signal does not exist. In that case,
+    fall back to the latest previously known long-run signal for the same team
+    instead of filling the chart with a neutral 0.5.
+    """
+    fallback_profiles = ("long_run", "balanced", "short_run")
+    latest_identity = _snapshot_identity(latest_snapshot)
+    seen_latest = False
+
+    for snapshot_payload in reversed(snapshot_history):
+        snapshot_identity = _snapshot_identity(snapshot_payload)
+        if not seen_latest:
+            if snapshot_identity != latest_identity:
+                continue
+            seen_latest = True
+            continue
+
+        team_profiles = _resolve_snapshot_team_profiles(snapshot_payload, team_name)
+        if not team_profiles:
+            continue
+
+        for profile_name in fallback_profiles:
+            metrics_payload = team_profiles.get(profile_name)
+            if not isinstance(metrics_payload, dict):
+                continue
+
+            tire_deg_performance = _coerce_unit_metric(metrics_payload.get("tire_deg_performance"))
+            tire_deg_slope = metrics_payload.get("tire_deg_slope")
+            if not isinstance(tire_deg_slope, int | float):
+                tire_deg_slope = None
+
+            if tire_deg_performance is None and tire_deg_slope is None:
+                continue
+
+            resolved: dict[str, float] = {}
+            if tire_deg_performance is not None:
+                resolved["tire_deg_performance"] = tire_deg_performance
+            if tire_deg_slope is not None:
+                resolved["tire_deg_slope"] = float(tire_deg_slope)
+            return resolved
+
+    return {}
+
+
+def _apply_profile_tire_deg_fallbacks(
+    profiles_payload: dict[str, Any],
+    tire_deg_fallback: dict[str, float],
+) -> None:
+    """Fill missing tire-deg fields in per-profile snapshot payloads."""
+    if not tire_deg_fallback:
+        return
+
+    fallback_tire_perf = tire_deg_fallback.get("tire_deg_performance")
+    fallback_tire_slope = tire_deg_fallback.get("tire_deg_slope")
+
+    for metrics_payload in profiles_payload.values():
+        if not isinstance(metrics_payload, dict):
+            continue
+        if (
+            _coerce_unit_metric(metrics_payload.get("tire_deg_performance")) is None
+            and fallback_tire_perf is not None
+        ):
+            metrics_payload["tire_deg_performance"] = fallback_tire_perf
+        raw_slope = metrics_payload.get("tire_deg_slope")
+        if not isinstance(raw_slope, int | float) and fallback_tire_slope is not None:
+            metrics_payload["tire_deg_slope"] = fallback_tire_slope
 
 
 def _build_snapshot_history_dataframe(
@@ -440,14 +805,39 @@ def _build_snapshot_history_dataframe(
         if not isinstance(teams_payload, dict):
             continue
 
-        for team_name in selected_teams:
-            team_payload = teams_payload.get(team_name)
-            if not isinstance(team_payload, dict):
+        snapshot_team_payload: dict[str, dict[str, Any]] = {}
+        for raw_team_name, raw_team_payload in teams_payload.items():
+            if not isinstance(raw_team_payload, dict):
                 continue
-            profiles = team_payload.get("profiles")
+            profiles = raw_team_payload.get("profiles")
             if not isinstance(profiles, dict):
                 continue
-            metrics_payload = profiles.get(profile)
+            mapped_name = map_team_to_characteristics(str(raw_team_name))
+            display_name = (
+                mapped_name if isinstance(mapped_name, str) and mapped_name else str(raw_team_name)
+            )
+            snapshot_team_payload[display_name] = {"testing_characteristics_profiles": profiles}
+
+        top_speed_display_scale = _build_top_speed_display_scale(snapshot_team_payload, profile)
+        raw_metric_display_scales = {
+            metric_key: _build_raw_metric_display_scale(
+                snapshot_team_payload,
+                profile,
+                raw_metric_key=raw_metric_key,
+                min_padding=min_padding,
+            )
+            for metric_key, (
+                raw_metric_key,
+                _higher_is_better,
+                min_padding,
+            ) in _RAW_METRIC_FIELDS.items()
+        }
+
+        for team_name in selected_teams:
+            team_payload = snapshot_team_payload.get(team_name)
+            if not isinstance(team_payload, dict):
+                continue
+            metrics_payload = _resolve_profile_metrics(team_payload, profile)
             if not isinstance(metrics_payload, dict):
                 continue
 
@@ -462,13 +852,36 @@ def _build_snapshot_history_dataframe(
 
             metric_values: list[float] = []
             for payload_key, label_name in _TEAM_RADAR_METRICS:
-                metric_value = _coerce_unit_metric(metrics_payload.get(payload_key))
+                if payload_key == "tire_deg_performance":
+                    metric_value = _resolve_tire_deg_metric_value(metrics_payload)
+                elif payload_key == "top_speed":
+                    metric_value = _resolve_top_speed_metric_value(
+                        metrics_payload,
+                        top_speed_display_scale,
+                    )
+                elif payload_key in _RAW_METRIC_FIELDS:
+                    raw_metric_key, higher_is_better, _min_padding = _RAW_METRIC_FIELDS[payload_key]
+                    metric_value = _resolve_raw_metric_value(
+                        metrics_payload,
+                        raw_metric_key=raw_metric_key,
+                        display_scale=raw_metric_display_scales.get(payload_key),
+                        higher_is_better=higher_is_better,
+                        fallback_key=payload_key,
+                    )
+                else:
+                    metric_value = _coerce_unit_metric(metrics_payload.get(payload_key))
                 if metric_value is None:
                     continue
                 row[label_name] = metric_value
                 metric_values.append(metric_value)
 
-            overall_pace = _coerce_unit_metric(metrics_payload.get("overall_pace"))
+            overall_pace = _resolve_raw_metric_value(
+                metrics_payload,
+                raw_metric_key=_RAW_PACE_FIELD,
+                display_scale=raw_metric_display_scales.get("overall_pace"),
+                higher_is_better=False,
+                fallback_key="overall_pace",
+            )
             if overall_pace is not None:
                 row["Overall Pace"] = overall_pace
             metric_count = len(metric_values)
@@ -724,6 +1137,7 @@ def _render_team_comparison_section(year: int = 2026) -> None:
     teams_payload = _build_latest_snapshot_comparison_payload(
         base_teams_payload=base_teams_payload if isinstance(base_teams_payload, dict) else {},
         latest_snapshot=latest_snapshot,
+        snapshot_history=snapshots,
     )
     source_label = f"latest snapshot `{latest_snapshot_label}`" if latest_snapshot_label else None
 
@@ -918,6 +1332,22 @@ def _render_team_comparison_section(year: int = 2026) -> None:
     st.caption(
         f"Source: {source_label or f'`{characteristics_path}`'} | profile=`{profile}` | "
         "values are normalized (0-100, higher is better)."
+    )
+    st.caption(
+        "When the latest snapshot lacks a usable tire-deg readout, the chart carries forward "
+        "the newest available long-run tire signal instead of defaulting to neutral."
+    )
+    st.caption(
+        "Tire-deg uses the stored slope when available and maps it through a stable display range, "
+        "so one session's worst sample does not collapse to a misleading zero."
+    )
+    st.caption(
+        "Top speed prefers raw trap-speed data when the snapshot has it and maps it through a "
+        "buffered session range, so one team's relative deficit does not look artificially extreme."
+    )
+    st.caption(
+        "Cornering and pace also prefer raw session times when the snapshot has them, using a "
+        "buffered range so the slowest team in one session is not forced to look like a total zero."
     )
     if neutral_fallbacks > 0:
         st.caption(
