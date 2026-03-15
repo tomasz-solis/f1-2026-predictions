@@ -29,6 +29,9 @@ class DriverRaceInfo(TypedDict):
     overtaking_skill: float
     defensive_skill: float
     dnf_probability: float
+    current_lineup_team: NotRequired[str]
+    portable_skill: NotRequired[float]
+    is_hypothetical_team_assignment: NotRequired[bool]
 
 
 class PitStrategy(TypedDict):

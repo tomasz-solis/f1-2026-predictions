@@ -24,6 +24,73 @@ logger = logging.getLogger("src.predictors.baseline_2026")
 class BaselineRacePreparationMixin:
     """Race preparation methods for Baseline2026Predictor."""
 
+    def _load_current_lineups_for_preparation(self) -> dict[str, list[str]]:
+        """Load and cache current lineups for custom-grid context checks."""
+        cached = getattr(self, "_current_lineups_cache", None)
+        if isinstance(cached, dict):
+            return cached
+
+        try:
+            from src.utils.lineups import load_current_lineups
+
+            current_lineups = load_current_lineups() or {}
+        except (FileNotFoundError, OSError, ValueError, TypeError) as e:
+            logger.warning(f"Could not load current lineups for race preparation: {e}")
+            current_lineups = {}
+
+        self._current_lineups_cache = current_lineups
+        return current_lineups
+
+    def _resolve_current_lineup_team(self, driver_code: str) -> str | None:
+        """Return the active-lineup team for a driver when it is known."""
+        current_lineups = self._load_current_lineups_for_preparation()
+        for team, drivers in current_lineups.items():
+            if driver_code in drivers:
+                return str(team)
+        return None
+
+    def _build_portable_skill_signal(self, driver_code: str, base_skill: float) -> float:
+        """Build a portable driver-skill signal for hypothetical team swaps."""
+        driver_data = self.drivers.get(driver_code, {})
+        if not isinstance(driver_data, dict):
+            return float(base_skill)
+
+        experience_tier = str(driver_data.get("experience", {}).get("tier", "")).strip().lower()
+        if experience_tier not in {"established", "veteran", "sunset"}:
+            return float(base_skill)
+
+        try:
+            normalized_skill = float(
+                driver_data.get("bayesian", {}).get("normalized_skill_score", base_skill)
+            )
+        except (TypeError, ValueError):
+            normalized_skill = float(base_skill)
+
+        if not (normalized_skill >= 0.0):
+            normalized_skill = float(base_skill)
+
+        portable_skill = max(float(base_skill), (float(base_skill) + normalized_skill) / 2.0)
+        return min(1.0, max(0.0, portable_skill))
+
+    def _annotate_driver_assignment_context(
+        self,
+        driver_info_map: dict[str, DriverRaceInfo],
+    ) -> dict[str, DriverRaceInfo]:
+        """Annotate race driver info with lineup-mismatch context for custom grids."""
+        for driver_code, info in driver_info_map.items():
+            assigned_team = str(info.get("team", "")).strip()
+            current_lineup_team = self._resolve_current_lineup_team(driver_code)
+            is_hypothetical_team_assignment = bool(
+                assigned_team and current_lineup_team and assigned_team != current_lineup_team
+            )
+            info["current_lineup_team"] = current_lineup_team or assigned_team
+            info["portable_skill"] = self._build_portable_skill_signal(
+                driver_code,
+                float(info.get("skill", 0.5)),
+            )
+            info["is_hypothetical_team_assignment"] = is_hypothetical_team_assignment
+        return driver_info_map
+
     def _resolve_effective_experience_tier_for_race(self, driver_data: dict) -> str:
         """Resolve experience tier for the current prediction year."""
         current_year = int(getattr(self, "year", 2026))
@@ -34,13 +101,7 @@ class BaselineRacePreparationMixin:
 
     def _is_known_lineup_driver(self, driver_code: str, team: str) -> bool:
         """Return True if driver is in configured active lineups."""
-        try:
-            from src.utils.lineups import load_current_lineups
-
-            current_lineups = load_current_lineups() or {}
-        except (FileNotFoundError, OSError, ValueError, TypeError) as e:
-            logger.warning(f"Could not load current lineups while checking {driver_code}: {e}")
-            return False
+        current_lineups = self._load_current_lineups_for_preparation()
 
         team_drivers = current_lineups.get(team, [])
         if driver_code in team_drivers:
@@ -62,15 +123,7 @@ class BaselineRacePreparationMixin:
 
     def _get_teammate_driver_data(self, driver_code: str, team: str) -> tuple[str, dict] | None:
         """Return teammate data from configured current lineups when available."""
-        try:
-            from src.utils.lineups import load_current_lineups
-
-            current_lineups = load_current_lineups() or {}
-        except (FileNotFoundError, OSError, ValueError, TypeError) as e:
-            logger.warning(
-                f"Could not load current lineups while building fallback for {driver_code}: {e}"
-            )
-            return None
+        current_lineups = self._load_current_lineups_for_preparation()
 
         team_drivers = current_lineups.get(team, [])
         for teammate_code in team_drivers:
@@ -182,7 +235,7 @@ class BaselineRacePreparationMixin:
         race_compound: str = "MEDIUM",
     ) -> tuple[dict[str, DriverRaceInfo], int]:
         """Build driver info map with team strength, profile modifiers, skills, and DNF probabilities."""
-        return prepare_driver_info_core(
+        driver_info_map, profile_count = prepare_driver_info_core(
             qualifying_grid=qualifying_grid,
             race_name=race_name,
             race_compound=race_compound,
@@ -193,6 +246,7 @@ class BaselineRacePreparationMixin:
             get_driver_data_or_fallback_fn=self._get_driver_data_or_fallback,
             resolve_effective_experience_tier_for_race_fn=self._resolve_effective_experience_tier_for_race,
         )
+        return self._annotate_driver_assignment_context(driver_info_map), profile_count
 
     def _prepare_driver_info_with_compounds(
         self,
@@ -202,7 +256,7 @@ class BaselineRacePreparationMixin:
         """Build driver info map with per-compound team strengths for lap-by-lap simulation."""
         from src.utils.compound_performance import get_compound_performance_modifier
 
-        return prepare_driver_info_with_compounds_core(
+        driver_info_map, profile_count = prepare_driver_info_with_compounds_core(
             qualifying_grid=qualifying_grid,
             race_name=race_name,
             teams=self.teams,
@@ -213,3 +267,4 @@ class BaselineRacePreparationMixin:
             resolve_effective_experience_tier_for_race_fn=self._resolve_effective_experience_tier_for_race,
             get_compound_performance_modifier_fn=get_compound_performance_modifier,
         )
+        return self._annotate_driver_assignment_context(driver_info_map), profile_count

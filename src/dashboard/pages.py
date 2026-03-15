@@ -529,6 +529,39 @@ def _load_ready_races_from_current_store(
     return ready_races
 
 
+def _maybe_scope_race_options_to_planned_horizon(
+    *,
+    race_options: list[str],
+    planned_races: list[str],
+    requested_horizon: int,
+) -> tuple[list[str], bool]:
+    """
+    Narrow broad calendar dropdowns to the live planned horizon.
+
+    The live page normally passes the full season calendar into this filter, but
+    tests and internal callers can also provide a curated subset. Those smaller
+    lists should stay intact so persisted ready-race metadata remains the source
+    of truth instead of being pre-trimmed by schedule-based fallback logic.
+    """
+    if not race_options:
+        return [], False
+
+    planned_set = {race_name.strip() for race_name in planned_races if race_name.strip()}
+    if not planned_set:
+        return list(race_options), False
+
+    if len(race_options) <= max(1, int(requested_horizon)):
+        return list(race_options), False
+
+    scoped_race_options = [
+        option for option in race_options if option.replace(" (Sprint)", "").strip() in planned_set
+    ]
+    if not scoped_race_options or len(scoped_race_options) == len(race_options):
+        return list(race_options), False
+
+    return scoped_race_options, True
+
+
 def _filter_race_options_to_precomputed_horizon(
     *,
     year: int,
@@ -547,19 +580,15 @@ def _filter_race_options_to_precomputed_horizon(
     settings = get_prediction_precompute_config()
     requested_horizon = max(1, int(settings.get("horizon_races", 3)))
     planned_races = _resolve_dashboard_race_horizon(year, requested_horizon)
-    planned_set = {race_name.strip() for race_name in planned_races if race_name.strip()}
-    scoped_race_options = (
-        [
-            option
-            for option in race_options
-            if option.replace(" (Sprint)", "").strip() in planned_set
-        ]
-        if planned_set
-        else list(race_options)
+    base_race_options = list(race_options)
+    scoped_race_options, scope_applied = _maybe_scope_race_options_to_planned_horizon(
+        race_options=base_race_options,
+        planned_races=planned_races,
+        requested_horizon=requested_horizon,
     )
     scope_metadata: dict[str, Any] = {
         "applied": False,
-        "scope_applied": bool(planned_set),
+        "scope_applied": scope_applied,
         "planned_races": planned_races,
         "requested_horizon": requested_horizon,
     }
@@ -629,7 +658,7 @@ def _filter_race_options_to_precomputed_horizon(
         ready_set = set(ready_races)
         filtered_options = [
             option
-            for option in scoped_race_options
+            for option in base_race_options
             if option.replace(" (Sprint)", "").strip() in ready_set
         ]
         if filtered_options:
@@ -701,7 +730,7 @@ def _filter_race_options_to_precomputed_horizon(
     ready_set = set(ready_races)
     filtered_options = [
         option
-        for option in scoped_race_options
+        for option in base_race_options
         if option.replace(" (Sprint)", "").strip() in ready_set
     ]
     if not filtered_options:

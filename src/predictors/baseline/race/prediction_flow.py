@@ -205,6 +205,74 @@ def _normalize_confidence_to_unit_interval(value: Any) -> float:
     return float(np.clip(confidence, 0.0, 1.0))
 
 
+def _apply_hypothetical_points_floor(
+    *,
+    info: dict[str, Any],
+    position_blend_score: float,
+    blended_position_samples: list[float],
+    reference_grid_pos: float,
+    field_size: int,
+    cfg: Any,
+) -> tuple[float, list[float]]:
+    """
+    Preserve points-finishing evidence for proven drivers in hypothetical team swaps.
+
+    Custom grids sometimes place a driver in a different team than the active
+    lineup. If that driver still qualifies inside the top 10, that grid result is
+    already strong evidence of weekend adaptation. This helper prevents the final
+    blend from immediately pushing those cases back out of the points purely from
+    team-prior anchoring.
+    """
+    if not bool(info.get("is_hypothetical_team_assignment")):
+        return position_blend_score, blended_position_samples
+
+    top_grid_limit = int(
+        cfg.get("baseline_predictor.race.final_blend.hypothetical_points_floor.top_grid_limit", 10)
+    )
+    if reference_grid_pos > top_grid_limit:
+        return position_blend_score, blended_position_samples
+
+    portable_skill = float(info.get("portable_skill", info.get("skill", 0.5)))
+    portable_skill_threshold = float(
+        cfg.get(
+            "baseline_predictor.race.final_blend.hypothetical_points_floor.portable_skill_threshold",
+            0.72,
+        )
+    )
+    if portable_skill < portable_skill_threshold:
+        return position_blend_score, blended_position_samples
+
+    team_strength_threshold = float(
+        cfg.get(
+            "baseline_predictor.race.final_blend.hypothetical_points_floor.team_strength_threshold",
+            0.50,
+        )
+    )
+    if float(info.get("team_strength", 0.0)) < team_strength_threshold:
+        return position_blend_score, blended_position_samples
+
+    dnf_probability_cap = float(
+        cfg.get(
+            "baseline_predictor.race.final_blend.hypothetical_points_floor.dnf_probability_cap",
+            0.12,
+        )
+    )
+    if float(info.get("dnf_probability", 1.0)) > dnf_probability_cap:
+        return position_blend_score, blended_position_samples
+
+    max_loss_positions = float(
+        cfg.get(
+            "baseline_predictor.race.final_blend.hypothetical_points_floor.max_loss_positions",
+            0.0,
+        )
+    )
+    capped_position = float(
+        np.clip(reference_grid_pos + max_loss_positions, 1.0, float(max(1, field_size)))
+    )
+    capped_samples = [min(sample, capped_position) for sample in blended_position_samples]
+    return min(position_blend_score, capped_position), capped_samples
+
+
 def _coerce_grid_position_metric(row: QualifyingGridEntry, key: str, fallback: int) -> int:
     """Read an integer grid metric from a qualifying row with a safe fallback."""
     raw_value: Any = row.get(key, fallback)
@@ -843,6 +911,8 @@ def predict_race_core(
             1.0,
         )
     )
+    dnf_probability_output_cap = float(cfg.get("baseline_predictor.race.dnf_rate_final_cap", 0.35))
+    field_size = len(driver_info_map)
 
     finish_order = []
     blended_samples_by_driver: dict[str, list[float]] = {}
@@ -965,6 +1035,14 @@ def predict_race_core(
         blended_position_samples = [
             max(sample_position, min_position_score) for sample_position in blended_position_samples
         ]
+        position_blend_score, blended_position_samples = _apply_hypothetical_points_floor(
+            info=info,
+            position_blend_score=float(position_blend_score),
+            blended_position_samples=blended_position_samples,
+            reference_grid_pos=reference_grid_pos,
+            field_size=field_size,
+            cfg=cfg,
+        )
         blended_samples_by_driver[driver_code] = blended_position_samples
 
         finish_order.append(
@@ -977,7 +1055,16 @@ def predict_race_core(
                 "p95": int(np.percentile(blended_position_samples, 95)),
                 "confidence": round(confidence, 1),
                 "podium_probability": 0.0,
-                "dnf_probability": round(aggregated["dnf_rates"].get(driver_code, 0.0), 3),
+                "dnf_probability": round(
+                    float(
+                        np.clip(
+                            aggregated["dnf_rates"].get(driver_code, 0.0),
+                            0.0,
+                            dnf_probability_output_cap,
+                        )
+                    ),
+                    3,
+                ),
             }
         )
 
