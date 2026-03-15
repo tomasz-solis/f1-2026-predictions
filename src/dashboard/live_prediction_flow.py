@@ -309,15 +309,20 @@ def save_prediction_if_enabled_core(
     detector_factory: Callable[[], Any],
     prediction_logger_factory: Callable[[], Any],
     st_module: Any,
+    checkpoint_session_override: str | None = None,
 ) -> None:
     """Persist prediction artifacts for later accuracy tracking."""
     if not enable_logging:
         return
 
-    detector = detector_factory()
     logger_inst = prediction_logger_factory()
-    latest_session = detector.get_latest_completed_session(year, race_name, is_sprint)
-    checkpoint_session = _resolve_prediction_checkpoint_session(latest_session)
+    checkpoint_override = str(checkpoint_session_override or "").strip().upper()
+    if checkpoint_override:
+        checkpoint_session = _resolve_prediction_checkpoint_session(checkpoint_override)
+    else:
+        detector = detector_factory()
+        latest_session = detector.get_latest_completed_session(year, race_name, is_sprint)
+        checkpoint_session = _resolve_prediction_checkpoint_session(latest_session)
 
     if logger_inst.has_prediction_for_session(year, race_name, checkpoint_session):
         st_module.info(f"Prediction for {checkpoint_session} already saved (max 1 per session)")
@@ -904,6 +909,38 @@ def _run_inline_current_boundary_recovery(
         "warmed_boundary_signature": warmed_boundary_signature,
         "warmed_boundary_session_name": warmed_boundary_session_name,
     }
+
+
+def _served_prediction_boundary_session_name(
+    *,
+    boundary_session_name: str,
+    boundary_fallback: dict[str, str] | None,
+) -> str:
+    """Return the checkpoint label that matches the prediction actually shown to the user."""
+    served_checkpoint = str(boundary_session_name).strip().upper() or "PRE"
+    if not isinstance(boundary_fallback, dict):
+        return served_checkpoint
+
+    fallback_mode = str(boundary_fallback.get("mode", "")).strip().lower()
+    if fallback_mode == "inline_current_boundary":
+        current_boundary = (
+            str(boundary_fallback.get("current_boundary_session_name", served_checkpoint))
+            .strip()
+            .upper()
+        )
+        return current_boundary or served_checkpoint
+
+    warmed_boundary = (
+        str(
+            boundary_fallback.get(
+                "warmed_boundary_session_name",
+                boundary_fallback.get("served_boundary_session_name", served_checkpoint),
+            )
+        )
+        .strip()
+        .upper()
+    )
+    return warmed_boundary or served_checkpoint
 
 
 def execute_live_prediction_pipeline_core(
@@ -1502,6 +1539,10 @@ def execute_live_prediction_pipeline_core(
         "is_sprint": is_sprint,
         "practice_update": practice_update,
         "boundary_refresh": boundary_refresh,
+        "boundary_session_name": _served_prediction_boundary_session_name(
+            boundary_session_name=boundary_session_name,
+            boundary_fallback=boundary_fallback,
+        ),
         "precompute_summary": precompute_summary,
         "prediction_cache_hit": prediction_cache_hit,
         "pipeline_timing": pipeline_timing,

@@ -100,13 +100,16 @@ class _TargetAccuracyRecord:
 class AccuracyPipeline:
     """Load, compute, and structure target-aware accuracy data for one season."""
 
-    def __init__(self, year: int = 2026):
+    def __init__(self, year: int = 2026, *, reconcile_actuals_on_load: bool = False):
         """Create a pipeline for one season."""
         self.year = int(year)
+        self.reconcile_actuals_on_load = bool(reconcile_actuals_on_load)
         self._predictions: list[dict[str, Any]] = []
+        self._prediction_logger: Any = None
         self._metrics_calculator: Any = None
         self._artifact_store: Any = None
         self._actuals_reconciled = 0
+        self._snapshots_written = 0
         self._initialized = False
         self._prediction_status_rows: list[dict[str, Any]] = []
         self._excluded_predictions: list[dict[str, Any]] = []
@@ -122,17 +125,27 @@ class AccuracyPipeline:
         from src.utils.prediction_metrics import PredictionMetrics
 
         logger_inst = PredictionLogger()
+        self._prediction_logger = logger_inst
         self._metrics_calculator = PredictionMetrics()
         self._artifact_store = ArtifactStore(data_root="data")
-        try:
-            self._actuals_reconciled = logger_inst.reconcile_completed_prediction_actuals(self.year)
-        except Exception as exc:
-            logger.warning(
-                "Could not reconcile completed prediction actuals for %s: %s", self.year, exc
-            )
-            self._actuals_reconciled = 0
+        self._actuals_reconciled = 0
+        self._snapshots_written = 0
+        if self.reconcile_actuals_on_load:
+            self._actuals_reconciled = self._run_actuals_reconciliation(logger_inst)
         self._predictions = logger_inst.get_all_predictions(self.year)
         self._initialized = True
+
+    def reconcile_actuals(self) -> int:
+        """Fetch actuals, rebuild snapshot artifacts, and refresh the in-memory season state."""
+        self._ensure_deps()
+        if self._prediction_logger is None:
+            return 0
+
+        self._actuals_reconciled = self._run_actuals_reconciliation(self._prediction_logger)
+        self._predictions = self._prediction_logger.get_all_predictions(self.year)
+        self._snapshots_written = self._sync_snapshot_artifacts()
+        self._clear_cached_summary_state()
+        return self._actuals_reconciled
 
     def build_summary(self) -> SeasonAccuracySummary:
         """Return a target-aware season summary for the configured year."""
@@ -205,6 +218,12 @@ class AccuracyPipeline:
         return self._actuals_reconciled
 
     @property
+    def snapshots_written(self) -> int:
+        """Return the number of snapshot artifacts written during the last refresh."""
+        self._ensure_deps()
+        return self._snapshots_written
+
+    @property
     def excluded_predictions(self) -> list[dict[str, Any]]:
         """Return saved prediction rows that produced no scored targets."""
         self._ensure_deps()
@@ -225,6 +244,58 @@ class AccuracyPipeline:
         if not self._prediction_status_rows:
             self.build_summary()
         return self._excluded_target_keys
+
+    def _clear_cached_summary_state(self) -> None:
+        """Reset cached derived summary state after underlying data changes."""
+        self._prediction_status_rows = []
+        self._excluded_predictions = []
+        self._excluded_target_keys = set()
+
+    def _run_actuals_reconciliation(self, logger_inst: Any) -> int:
+        """Reconcile stored predictions with completed-session actuals when requested."""
+        try:
+            return int(logger_inst.reconcile_completed_prediction_actuals(self.year))
+        except Exception as exc:
+            logger.warning(
+                "Could not reconcile completed prediction actuals for %s: %s", self.year, exc
+            )
+            return 0
+
+    def _sync_snapshot_artifacts(self) -> int:
+        """Persist fresh accuracy snapshots so dashboard cards and charts stay in sync."""
+        if self._artifact_store is None or self._metrics_calculator is None:
+            return 0
+
+        from src.utils.accuracy_snapshots import build_accuracy_snapshot_records
+
+        snapshots_written = 0
+        for prediction in self._predictions:
+            metadata = prediction.get("metadata", {})
+            snapshot_records = build_accuracy_snapshot_records(
+                prediction_data=prediction,
+                is_sprint=self._prediction_is_sprint(prediction),
+                metrics_calculator=self._metrics_calculator,
+                generated_by="dashboard_accuracy_refresh",
+            )
+            for record in snapshot_records:
+                try:
+                    self._artifact_store.save_artifact(
+                        artifact_type="accuracy_snapshot",
+                        artifact_key=record["artifact_key"],
+                        data=record["data"],
+                        version=1,
+                        run_id=metadata.get("run_id"),
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Could not save accuracy snapshot %s for %s: %s",
+                        record.get("artifact_key"),
+                        metadata.get("race_name"),
+                        exc,
+                    )
+                    continue
+                snapshots_written += 1
+        return snapshots_written
 
     def _load_snapshot_map(self) -> dict[str, dict[str, Any]]:
         """Load persisted accuracy snapshots keyed by artifact key."""

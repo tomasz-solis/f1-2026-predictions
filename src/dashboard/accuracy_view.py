@@ -49,7 +49,7 @@ def render_target_sections(
     """Render weekend progression and season trend charts by target."""
     primary_targets = [key for key in PRIMARY_TARGET_KEYS if key in summary.targets]
     if primary_targets:
-        _render_target_tabs(
+        _render_target_section(
             title="Main Targets",
             target_keys=primary_targets,
             summary=summary,
@@ -59,7 +59,7 @@ def render_target_sections(
     if show_secondary_sprint_targets:
         secondary_targets = [key for key in SECONDARY_SPRINT_TARGET_KEYS if key in summary.targets]
         if secondary_targets:
-            _render_target_tabs(
+            _render_target_section(
                 title="Sprint Targets",
                 target_keys=secondary_targets,
                 summary=summary,
@@ -110,24 +110,79 @@ def _render_metric_card(
             st.metric(label, "N/A")
 
 
-def _render_target_tabs(
+def _render_target_section(
     *,
     title: str,
     target_keys: list[str],
     summary: SeasonAccuracySummary,
     metric_name: str,
 ) -> None:
-    """Render a tabbed section for a group of targets."""
+    """Render one target group with a deterministic selector."""
     st.markdown("---")
     st.subheader(title)
-    tabs = st.tabs([summary.targets[key].label for key in target_keys])
-    for tab, target_key in zip(tabs, target_keys, strict=False):
-        target_summary = summary.targets.get(
-            target_key, TargetAccuracySummary(target_key, target_key)
+    selected_target_key = _select_target_key(
+        title=title,
+        target_keys=target_keys,
+        summary=summary,
+    )
+    target_summary = summary.targets.get(
+        selected_target_key,
+        TargetAccuracySummary(selected_target_key, selected_target_key),
+    )
+    _render_progression_charts(target_summary, metric_name)
+    _render_trend_charts(target_summary, metric_name)
+
+
+def _select_target_key(
+    *,
+    title: str,
+    target_keys: list[str],
+    summary: SeasonAccuracySummary,
+) -> str:
+    """Return the user-selected target key for one chart group."""
+    labels = {key: summary.targets[key].label for key in target_keys}
+    selector_key = f"accuracy_target_selector_{title.lower().replace(' ', '_')}"
+    segmented_control = getattr(st, "segmented_control", None)
+    selected_target_key: str | None = None
+    if callable(segmented_control):
+        try:
+            selected_target_key = segmented_control(
+                "Target",
+                options=target_keys,
+                selection_mode="single",
+                default=target_keys[0],
+                format_func=lambda key: labels.get(key, key),
+                key=selector_key,
+            )
+        except TypeError:
+            try:
+                selected_target_key = segmented_control(
+                    "Target",
+                    options=target_keys,
+                    default=target_keys[0],
+                    format_func=lambda key: labels.get(key, key),
+                    key=selector_key,
+                )
+            except TypeError:
+                selected_target_key = segmented_control(
+                    "Target",
+                    options=target_keys,
+                    default=target_keys[0],
+                    key=selector_key,
+                )
+
+    if selected_target_key not in target_keys:
+        selected_target_key = st.radio(
+            "Target",
+            options=target_keys,
+            index=0,
+            format_func=lambda key: labels.get(key, key),
+            horizontal=True,
+            key=f"{selector_key}_radio",
+            label_visibility="collapsed",
         )
-        with tab:
-            _render_progression_charts(target_summary, metric_name)
-            _render_trend_charts(target_summary, metric_name)
+
+    return selected_target_key if selected_target_key in target_keys else target_keys[0]
 
 
 def _render_progression_charts(target_summary: TargetAccuracySummary, metric_name: str) -> None:
@@ -147,23 +202,29 @@ def _render_progression_charts(target_summary: TargetAccuracySummary, metric_nam
             if not checkpoint_labels:
                 st.info("No data for this format yet.")
                 continue
+            observed_labels, observed_values, observed_counts = build_progression_line_series(
+                checkpoint_labels=checkpoint_labels,
+                metric_values=metric_values,
+                race_counts=race_counts,
+            )
 
             figure = go.Figure()
-            figure.add_trace(
-                go.Scatter(
-                    x=checkpoint_labels,
-                    y=metric_values,
-                    mode="lines+markers",
-                    name=target_summary.label,
-                    customdata=[[count] for count in race_counts],
-                    hovertemplate=(
-                        "Checkpoint: %{x}<br>"
-                        "Value: %{y:.2f}<br>"
-                        "Races: %{customdata[0]}<extra></extra>"
-                    ),
-                    connectgaps=False,
+            if observed_labels:
+                figure.add_trace(
+                    go.Scatter(
+                        x=observed_labels,
+                        y=observed_values,
+                        mode="lines+markers",
+                        name=target_summary.label,
+                        customdata=[[count] for count in observed_counts],
+                        hovertemplate=(
+                            "Checkpoint: %{x}<br>"
+                            "Value: %{y:.2f}<br>"
+                            "Races: %{customdata[0]}<extra></extra>"
+                        ),
+                        connectgaps=False,
+                    )
                 )
-            )
             figure.update_layout(
                 margin={"l": 12, "r": 12, "t": 12, "b": 12},
                 xaxis_title="Checkpoint",
@@ -176,8 +237,14 @@ def _render_progression_charts(target_summary: TargetAccuracySummary, metric_nam
                 categoryarray=checkpoint_labels,
             )
             st.plotly_chart(figure, width="stretch")
+            saved_checkpoints = ", ".join(observed_labels) if observed_labels else "None"
             if missing_checkpoints:
-                st.caption(f"Missing saved checkpoints: {', '.join(missing_checkpoints)}")
+                st.caption(
+                    f"Saved checkpoints: {saved_checkpoints}. "
+                    f"Missing saved checkpoints: {', '.join(missing_checkpoints)}"
+                )
+            else:
+                st.caption(f"Saved checkpoints: {saved_checkpoints}")
 
 
 def _render_trend_charts(target_summary: TargetAccuracySummary, metric_name: str) -> None:
@@ -233,6 +300,10 @@ def _render_trend_charts(target_summary: TargetAccuracySummary, metric_name: str
                 legend_title="Checkpoint",
             )
             st.plotly_chart(figure, width="stretch")
+            if len(race_names) < 2:
+                st.caption(
+                    "Trend lines need at least two races in this format; only points are available so far."
+                )
 
 
 def build_progression_series(
@@ -278,3 +349,24 @@ def build_progression_series(
         race_counts.append(int(point.race_count))
 
     return ordered_sessions, metric_values, race_counts, missing_checkpoints
+
+
+def build_progression_line_series(
+    *,
+    checkpoint_labels: list[str],
+    metric_values: list[float | None],
+    race_counts: list[int],
+) -> tuple[list[str], list[float], list[int]]:
+    """Return only observed checkpoints so progression lines stay visible across missing saves."""
+    observed_rows = [
+        (label, float(value), int(count))
+        for label, value, count in zip(checkpoint_labels, metric_values, race_counts, strict=False)
+        if isinstance(value, int | float)
+    ]
+    if not observed_rows:
+        return [], [], []
+
+    observed_labels = [label for label, _, _ in observed_rows]
+    observed_values = [value for _, value, _ in observed_rows]
+    observed_counts = [count for _, _, count in observed_rows]
+    return observed_labels, observed_values, observed_counts

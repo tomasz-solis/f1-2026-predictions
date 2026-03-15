@@ -781,6 +781,7 @@ def _save_prediction_if_enabled(
     race_name: str,
     weather: str,
     year: int = DEFAULT_SEASON,
+    checkpoint_session_override: str | None = None,
 ) -> None:
     """Persist prediction artifacts for later accuracy tracking."""
     from src.utils.prediction_logger import PredictionLogger
@@ -796,6 +797,7 @@ def _save_prediction_if_enabled(
         detector_factory=SessionDetector,
         prediction_logger_factory=PredictionLogger,
         st_module=st,
+        checkpoint_session_override=checkpoint_session_override,
     )
 
 
@@ -1167,6 +1169,9 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                 prediction_cache_hit = bool(pipeline_output.get("prediction_cache_hit", False))
                 pipeline_timing = pipeline_output.get("pipeline_timing", {})
                 observability = pipeline_output.get("observability", {})
+                prediction_checkpoint = (
+                    str(pipeline_output.get("boundary_session_name") or "").strip().upper()
+                )
                 status_placeholder.empty()
 
                 runtime_messages: list[tuple[str, str]] = []
@@ -1363,6 +1368,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                     race_name=race_name,
                     weather=weather,
                     year=selected_season,
+                    checkpoint_session_override=prediction_checkpoint or None,
                 )
 
                 _render_prediction_results(
@@ -1394,14 +1400,66 @@ def render_model_insights_page() -> None:
         st.markdown(RACE_HYPERPARAMETERS_MARKDOWN)
 
 
+def _render_accuracy_page_controls() -> tuple[int, bool]:
+    """Render season and refresh controls for the accuracy page."""
+    selected_season = _get_selected_season()
+    season_options = _available_seasons()
+    if selected_season not in season_options:
+        season_options = [selected_season, *season_options]
+    season_index = season_options.index(selected_season)
+
+    selected_season = int(
+        st.selectbox(
+            "Season",
+            options=season_options,
+            index=season_index,
+            key="selected_season",
+            help="Choose which season's saved predictions and snapshots to inspect.",
+        )
+    )
+    _set_selected_season(selected_season)
+
+    st.caption(
+        "Refresh completed qualifying, sprint, and race results, then rebuild the accuracy "
+        "cards and charts from the updated checkpoints."
+    )
+    refresh_requested = st.button(
+        "Refresh Actuals",
+        type="primary",
+        width="stretch",
+        help=(
+            "Fetch newly completed qualifying, sprint, and race results for saved "
+            "predictions. This can take a bit longer than a normal page load."
+        ),
+    )
+
+    return selected_season, refresh_requested
+
+
 def render_prediction_accuracy_page() -> None:
     """Render the target-aware accuracy dashboard."""
     st.header("Prediction Accuracy Tracker")
 
     from .accuracy import AccuracyPipeline
 
-    selected_season = _get_selected_season()
+    selected_season, refresh_requested = _render_accuracy_page_controls()
     pipeline = AccuracyPipeline(year=selected_season)
+    if refresh_requested:
+        with st.spinner("Refreshing completed weekends..."):
+            refreshed_predictions = pipeline.reconcile_actuals()
+        snapshots_written = pipeline.snapshots_written
+        if refreshed_predictions > 0 or snapshots_written > 0:
+            st.success(
+                "Refresh complete: "
+                f"{refreshed_predictions} saved prediction(s) updated, "
+                f"{snapshots_written} accuracy snapshot(s) rebuilt."
+            )
+            st.caption(
+                "Overall Accuracy and all charts below were rebuilt from the refreshed data."
+            )
+        else:
+            st.caption("No new completed weekends or snapshot updates were needed.")
+
     summary = pipeline.build_summary()
 
     if not pipeline.all_predictions:
@@ -1413,9 +1471,7 @@ def render_prediction_accuracy_page() -> None:
 
     st.success(f"Found {summary.n_predictions} saved prediction(s)")
     if pipeline.actuals_reconciled > 0:
-        st.caption(
-            f"Reconciled actuals for {pipeline.actuals_reconciled} saved prediction(s) on load."
-        )
+        st.caption(f"Reconciled actuals for {pipeline.actuals_reconciled} saved prediction(s).")
 
     if pipeline.has_actuals:
         metric_name = st.selectbox(

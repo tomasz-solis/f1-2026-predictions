@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "year": 2026,
+    "race_name": "Chinese Grand Prix",
+    "checkpoint_session": "FP1",
+    "weekend_format": "sprint",
+    "target_key": "sprint_qualifying",
+    "target_label": "Sprint Qualifying",
+    "target_session": "SQ",
+    "predicted_at": "2026-03-13T05:02:09.207228+00:00",
+    "generated_at": "2026-03-15T20:06:23.950367+00:00",
+    "source_run_id": "91782237-73d1-4daf-a181-7eb07dc2af72",
+    "eligible": true,
+    "generated_by": "dashboard_accuracy_refresh"
+  },
+  "metrics": {
+    "field_size": 22,
+    "overall_mae": 2.727272727272727,
+    "top_3_hits": 2.0,
+    "top_3_pct": 66.66666666666666,
+    "top_10_hits": 8.0,
+    "top_10_pct": 80.0,
+    "exact_accuracy": 31.818181818181817,
+    "within_1": 45.45454545454545,
+    "within_3": 68.18181818181817,
+    "correlation": 0.803500846979108
+  }
+}

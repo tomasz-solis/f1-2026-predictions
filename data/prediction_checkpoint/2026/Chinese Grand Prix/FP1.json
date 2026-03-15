@@ -1,0 +1,56 @@
+{
+  "metadata": {
+    "year": 2026,
+    "race_name": "Chinese Grand Prix",
+    "session_name": "FP1",
+    "weather": "dry",
+    "is_sprint_weekend": true,
+    "weekend_format": "sprint",
+    "generated_at": "2026-03-15T20:01:45.229846+00:00",
+    "source": "dashboard_live_prediction"
+  },
+  "qualifying": {
+    "data_source": "Testing short-run profile blend (no weekend practice data)",
+    "grid_source": "PREDICTED",
+    "data_confidence_score": 0.45,
+    "mean_confidence": 45.22272727272727,
+    "driver_count": 22
+  },
+  "race": {
+    "grid_source": "PREDICTED",
+    "input_confidence": 0.4,
+    "mean_confidence": 49.26363636363637,
+    "driver_count": 22
+  },
+  "fp_blend_info": {},
+  "targets": {
+    "main_qualifying": {
+      "target_session": "Q",
+      "result_mode": "PREDICTED",
+      "grid_source": "PREDICTED",
+      "mean_confidence": 44.21818181818182,
+      "driver_count": 22
+    },
+    "grand_prix_race": {
+      "target_session": "R",
+      "result_mode": "PREDICTED",
+      "grid_source": "PREDICTED",
+      "mean_confidence": 48.08636363636363,
+      "driver_count": 22
+    },
+    "sprint_qualifying": {
+      "target_session": "SQ",
+      "result_mode": "PREDICTED",
+      "grid_source": "PREDICTED",
+      "mean_confidence": 45.22272727272727,
+      "driver_count": 22
+    },
+    "sprint_race": {
+      "target_session": "SPRINT",
+      "result_mode": "PREDICTED",
+      "grid_source": "PREDICTED",
+      "mean_confidence": 49.26363636363637,
+      "driver_count": 22
+    }
+  }
+}

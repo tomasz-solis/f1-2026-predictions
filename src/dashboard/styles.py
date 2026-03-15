@@ -381,20 +381,30 @@ section[data-testid="stSidebar"] [data-baseweb="select"] svg {
   color: rgba(232,237,242,0.75) !important;
 }
 
-/* Primary button */
-.stButton > button {
+/* Primary buttons */
+.stButton > button[kind="primary"],
+.stButton > button[data-testid="stBaseButton-primary"],
+button[kind="primary"],
+[data-testid="stBaseButton-primary"] {
   background: linear-gradient(135deg, var(--ts-heat-soft), var(--ts-heat)) !important;
   color: #fff !important;
   border: 0 !important;
   border-radius: 11px !important;
   font-weight: 680 !important;
   padding: 0.55rem 1.05rem !important;
+  box-shadow: 0 10px 24px rgba(255,77,45,0.22) !important;
 }
-.stButton > button:hover {
+.stButton > button[kind="primary"]:hover,
+.stButton > button[data-testid="stBaseButton-primary"]:hover,
+button[kind="primary"]:hover,
+[data-testid="stBaseButton-primary"]:hover {
   background: linear-gradient(135deg, #ff8a73, #ff5535) !important;
-  box-shadow: 0 10px 24px rgba(255,77,45,0.28);
+  box-shadow: 0 12px 28px rgba(255,77,45,0.30) !important;
 }
-.stButton > button:focus-visible {
+.stButton > button[kind="primary"]:focus-visible,
+.stButton > button[data-testid="stBaseButton-primary"]:focus-visible,
+button[kind="primary"]:focus-visible,
+[data-testid="stBaseButton-primary"]:focus-visible {
   outline: 2px solid rgba(255,122,98,0.6);
   outline-offset: 2px;
 }

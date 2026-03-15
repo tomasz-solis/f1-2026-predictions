@@ -987,6 +987,7 @@ def test_execute_live_prediction_pipeline_runs_selected_race_inline_when_horizon
     assert load_calls == ["sig_sq"]
     assert run_calls == {"direct": 1}
     assert output["prediction_cache_hit"] is False
+    assert output["boundary_session_name"] == "SQ"
     assert output["boundary_fallback"] == {
         "mode": "inline_current_boundary",
         "current_boundary_signature": "sig_sq",
@@ -1052,6 +1053,7 @@ def test_execute_live_prediction_pipeline_resolves_current_race_boundary_when_re
 
     assert load_calls == ["sig_resolved"]
     assert output["prediction_cache_hit"] is True
+    assert output["boundary_session_name"] == "FP1"
     assert run_calls == {"direct": 0}
 
 

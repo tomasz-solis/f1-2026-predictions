@@ -560,6 +560,51 @@ def test_save_prediction_if_enabled_reports_existing_prediction(patcher):
     assert "Prediction for SQ already saved (max 1 per session)" in info_messages
 
 
+def test_save_prediction_if_enabled_uses_checkpoint_override(patcher):
+    info_messages: list[str] = []
+    saved_payload: dict = {}
+
+    class _Detector:
+        def get_latest_completed_session(self, year: int, race_name: str, is_sprint: bool):
+            assert (year, race_name, is_sprint) == (2026, "Chinese Grand Prix", True)
+            return "SQ"
+
+    class _Logger:
+        def has_prediction_for_session(self, year: int, race_name: str, session_name: str):
+            assert (year, race_name, session_name) == (2026, "Chinese Grand Prix", "FP1")
+            return False
+
+        def save_prediction(self, **kwargs):
+            saved_payload.update(kwargs)
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+    patcher.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
+    patcher.setattr(pages.st, "info", lambda message: info_messages.append(str(message)))
+    patcher.setattr(pages.st, "warning", lambda _message: None)
+
+    pages._save_prediction_if_enabled(
+        enable_logging=True,
+        prediction_results={
+            "sprint_quali": {"grid": [{"position": 1, "driver": "VER", "team": "Red Bull Racing"}]},
+            "sprint_race": {
+                "finish_order": [{"position": 1, "driver": "VER", "team": "Red Bull Racing"}]
+            },
+            "main_quali": {"grid": [{"position": 1, "driver": "VER", "team": "Red Bull Racing"}]},
+            "main_race": {
+                "finish_order": [{"position": 1, "driver": "VER", "team": "Red Bull Racing"}]
+            },
+        },
+        is_sprint=True,
+        race_name="Chinese Grand Prix",
+        weather="dry",
+        year=2026,
+        checkpoint_session_override="FP1",
+    )
+
+    assert saved_payload["session_name"] == "FP1"
+    assert "Prediction saved for accuracy tracking (checkpoint FP1)" in info_messages
+
+
 def test_save_prediction_if_enabled_handles_no_completed_sessions(patcher):
     info_messages: list[str] = []
     saved_payload: dict = {}
@@ -599,6 +644,46 @@ def test_save_prediction_if_enabled_handles_no_completed_sessions(patcher):
         "grand_prix_race",
     }
     assert "Prediction saved for accuracy tracking (checkpoint PRE)" in info_messages[0]
+
+
+def test_render_accuracy_page_controls_uses_full_width_primary_refresh_button(patcher):
+    button_calls: list[dict[str, object]] = []
+    captions: list[str] = []
+
+    patcher.setattr(pages, "_get_selected_season", lambda default=pages.DEFAULT_SEASON: 2026)
+    patcher.setattr(pages, "_available_seasons", lambda: [2026, 2025])
+    patcher.setattr(pages, "_set_selected_season", lambda year: None)
+    patcher.setattr(
+        pages.st,
+        "selectbox",
+        lambda label, options, index=0, **_kwargs: options[index],
+    )
+    patcher.setattr(pages.st, "caption", lambda message: captions.append(str(message)))
+    patcher.setattr(
+        pages.st,
+        "button",
+        lambda label, **kwargs: (button_calls.append({"label": label, **kwargs}), False)[1],
+    )
+
+    selected_season, refresh_requested = pages._render_accuracy_page_controls()
+
+    assert selected_season == 2026
+    assert refresh_requested is False
+    assert button_calls == [
+        {
+            "label": "Refresh Actuals",
+            "type": "primary",
+            "width": "stretch",
+            "help": (
+                "Fetch newly completed qualifying, sprint, and race results for saved "
+                "predictions. This can take a bit longer than a normal page load."
+            ),
+        }
+    ]
+    assert captions == [
+        "Refresh completed qualifying, sprint, and race results, then rebuild the accuracy "
+        "cards and charts from the updated checkpoints."
+    ]
 
 
 def test_render_prediction_results_routes_normal_weekend(patcher):
@@ -781,6 +866,8 @@ def _stub_page_streamlit(patcher):
         "selectbox",
         lambda _label, options, index=0, **_kwargs: options[index] if options else None,
     )
+    patcher.setattr(pages.st, "toggle", lambda *_args, value=False, **_kwargs: value)
+    patcher.setattr(pages.st, "button", lambda *_args, **_kwargs: False)
     patcher.setattr(
         pages.st,
         "multiselect",
@@ -792,6 +879,7 @@ def _stub_page_streamlit(patcher):
         "columns",
         lambda n, **_kwargs: [_Ctx() for _ in range(n if isinstance(n, int) else len(n))],
     )
+    patcher.setattr(pages.st, "spinner", lambda *_args, **_kwargs: _Ctx())
     patcher.setattr(pages.st, "container", lambda *_args, **_kwargs: _Ctx())
     patcher.setattr(pages.st, "expander", lambda _label: _Ctx())
     patcher.setattr(pages, "_dashboard_refresh_label", lambda year: "2026-03-11 09:16 UTC")
@@ -929,6 +1017,50 @@ def test_render_prediction_accuracy_page_with_actuals(patcher):
     assert any("Bahrain Grand Prix" in message for message in writes)
 
 
+def test_render_prediction_accuracy_page_refreshes_actuals_only_when_requested(patcher):
+    _stub_page_streamlit(patcher)
+    success_messages: list[str] = []
+    captions: list[str] = []
+    patcher.setattr(pages.st, "success", lambda message: success_messages.append(str(message)))
+    patcher.setattr(pages.st, "caption", lambda message: captions.append(str(message)))
+    patcher.setattr(pages.st, "button", lambda label, **_kwargs: label == "Refresh Actuals")
+
+    class _Pipeline:
+        def __init__(self, year: int = 2026, *, reconcile_actuals_on_load: bool = False):
+            assert year == 2026
+            assert reconcile_actuals_on_load is False
+            self.all_predictions = [{"metadata": {"race_name": "Bahrain Grand Prix"}}]
+            self.actuals_reconciled = 0
+            self.snapshots_written = 0
+            self.has_actuals = False
+            self.prediction_status_rows = []
+
+        def reconcile_actuals(self) -> int:
+            self.actuals_reconciled = 2
+            self.snapshots_written = 5
+            return 2
+
+        def build_summary(self):
+            class _Summary:
+                n_predictions = 1
+                n_excluded_targets = 0
+
+            return _Summary()
+
+    patcher.setattr(pages, "_get_selected_season", lambda default=pages.DEFAULT_SEASON: 2026)
+    patcher.setattr("src.dashboard.accuracy.AccuracyPipeline", _Pipeline)
+
+    pages.render_prediction_accuracy_page()
+
+    assert (
+        "Refresh complete: 2 saved prediction(s) updated, 5 accuracy snapshot(s) rebuilt."
+        in success_messages
+    )
+    assert "Found 1 saved prediction(s)" in success_messages
+    assert "Overall Accuracy and all charts below were rebuilt from the refreshed data." in captions
+    assert "Reconciled actuals for 2 saved prediction(s)." in captions
+
+
 def test_render_live_prediction_page_passes_selected_season_to_pipeline_and_save(patcher):
     _stub_page_streamlit(patcher)
 
@@ -977,6 +1109,7 @@ def test_render_live_prediction_page_passes_selected_season_to_pipeline_and_save
                     "race": {"finish_order": []},
                 },
                 "is_sprint": False,
+                "boundary_session_name": "FP2",
                 "practice_update": {"updated": False, "completed_fp_sessions": []},
                 "pipeline_timing": {},
             },
@@ -985,7 +1118,13 @@ def test_render_live_prediction_page_passes_selected_season_to_pipeline_and_save
     patcher.setattr(
         pages,
         "_save_prediction_if_enabled",
-        lambda **kwargs: selected_years.__setitem__("save", kwargs["year"]),
+        lambda **kwargs: (
+            selected_years.__setitem__("save", kwargs["year"]),
+            selected_years.__setitem__(
+                "checkpoint",
+                str(kwargs.get("checkpoint_session_override") or ""),
+            ),
+        ),
     )
     patcher.setattr(pages, "_render_prediction_results", lambda *_args, **_kwargs: None)
 
@@ -993,6 +1132,8 @@ def test_render_live_prediction_page_passes_selected_season_to_pipeline_and_save
 
     assert error_messages == []
     assert selected_years["pipeline"] == 2027
+    assert selected_years["save"] == 2027
+    assert selected_years["checkpoint"] == "FP2"
 
 
 def test_render_live_prediction_page_uses_filtered_precompute_race_options(patcher):
