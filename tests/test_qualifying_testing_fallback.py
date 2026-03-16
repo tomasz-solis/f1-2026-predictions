@@ -913,6 +913,107 @@ def test_model_only_teammate_gap_cap_respects_max_races_threshold():
     assert capped["ANT"][0] == uncapped["ANT"][0]
 
 
+def test_testing_fallback_teammate_gap_cap_can_cover_developing_driver_with_higher_race_count():
+    """Testing fallback should still protect developing drivers after ~70 race starts."""
+    all_drivers = [
+        {
+            "driver": "NOR",
+            "team": "McLaren",
+            "team_strength": 0.62,
+            "skill": 0.57,
+            "quali_pace": 0.77,
+            "experience_tier": "established",
+            "experience_total_races": 70,
+        },
+        {
+            "driver": "PIA",
+            "team": "McLaren",
+            "team_strength": 0.62,
+            "skill": 0.28,
+            "quali_pace": 0.58,
+            "experience_tier": "developing",
+            "experience_total_races": 70,
+        },
+        {
+            "driver": "OCO",
+            "team": "Haas F1 Team",
+            "team_strength": 0.56,
+            "skill": 0.53,
+            "quali_pace": 0.56,
+            "experience_tier": "established",
+            "experience_total_races": 160,
+        },
+        {
+            "driver": "ALB",
+            "team": "Williams",
+            "team_strength": 0.54,
+            "skill": 0.46,
+            "quali_pace": 0.77,
+            "experience_tier": "established",
+            "experience_total_races": 70,
+        },
+    ]
+
+    base_overrides = {
+        "baseline_predictor.qualifying.noise_std_normal": 0.018,
+        "baseline_predictor.qualifying.noise_std_sprint": 0.018,
+        "baseline_predictor.qualifying.teammate_setup_std": 0.008,
+        "baseline_predictor.qualifying.testing_fallback_driver_signal_shrink": 0.14,
+        "baseline_predictor.qualifying.testing_fallback_teammate_anchor_scale": 0.07,
+        "baseline_predictor.qualifying.testing_fallback_teammate_anchor_cap": 0.025,
+        "baseline_predictor.qualifying.testing_fallback_team_weight_multiplier": 1.0,
+        "baseline_predictor.qualifying.testing_fallback_skill_weight_multiplier": 1.0,
+    }
+
+    predictor_without_extended_threshold = DummyQualifyingPredictor(
+        {
+            **base_overrides,
+            "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_by_experience": {
+                "developing": 0.12
+            },
+            "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_max_races_by_experience": {
+                "developing": 55
+            },
+        }
+    )
+    predictor_with_extended_threshold = DummyQualifyingPredictor(
+        {
+            **base_overrides,
+            "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_by_experience": {
+                "developing": 0.12
+            },
+            "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_max_races_by_experience": {
+                "developing": 90
+            },
+        }
+    )
+
+    uncapped = predictor_without_extended_threshold._run_qualifying_simulations(
+        all_drivers=all_drivers,
+        n_simulations=4000,
+        is_sprint=False,
+        has_practice_data=False,
+        rng=np.random.default_rng(42),
+        has_testing_fallback_data=True,
+    )
+    capped = predictor_with_extended_threshold._run_qualifying_simulations(
+        all_drivers=all_drivers,
+        n_simulations=4000,
+        is_sprint=False,
+        has_practice_data=False,
+        rng=np.random.default_rng(42),
+        has_testing_fallback_data=True,
+    )
+
+    pia_mean_uncapped = sum(uncapped["PIA"]) / len(uncapped["PIA"])
+    pia_mean_capped = sum(capped["PIA"]) / len(capped["PIA"])
+    pia_top3_uncapped = sum(1 for pos in uncapped["PIA"] if pos <= 3) / len(uncapped["PIA"])
+    pia_top3_capped = sum(1 for pos in capped["PIA"] if pos <= 3) / len(capped["PIA"])
+
+    assert pia_mean_capped < pia_mean_uncapped
+    assert pia_top3_capped > pia_top3_uncapped
+
+
 def test_model_only_teammate_gap_cap_scales_with_sample_size():
     base_drivers = [
         {

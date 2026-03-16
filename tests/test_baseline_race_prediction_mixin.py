@@ -621,6 +621,129 @@ def test_predict_race_widens_top_interval_when_input_confidence_is_low():
     assert by_position[0]["p95"] >= 2
 
 
+def test_predict_race_low_confidence_blend_limits_optimistic_midfield_recovery():
+    """Low-confidence main-race blends should not treat P7-to-podium as the default."""
+
+    class RecoveryLimitPredictor(BaselineRacePredictionMixin):
+        seed = 33
+
+        def _load_race_params(self) -> dict:
+            return {}
+
+        def _prepare_driver_info_with_compounds(
+            self, qualifying_grid: list[dict], race_name: str | None
+        ) -> tuple[dict, int]:
+            _ = race_name
+            info_map = {}
+            for row in qualifying_grid:
+                info_map[row["driver"]] = {
+                    "driver": row["driver"],
+                    "team": row["team"],
+                    "grid_pos": row["position"],
+                    "team_strength": 0.5,
+                    "team_strength_by_compound": {"SOFT": 0.5, "MEDIUM": 0.5, "HARD": 0.5},
+                    "tire_deg_by_compound": {"SOFT": 0.1, "MEDIUM": 0.1, "HARD": 0.1},
+                    "skill": 0.5,
+                    "race_advantage": 0.0,
+                    "overtaking_skill": 0.5,
+                    "defensive_skill": 0.5,
+                    "dnf_probability": 0.0,
+                }
+            return info_map, 0
+
+    predictor = RecoveryLimitPredictor()
+    qualifying_grid = [
+        {"driver": driver, "team": f"Team{driver}", "position": position}
+        for position, driver in enumerate(("A", "B", "C", "D", "E", "F", "G"), start=1)
+    ]
+
+    aggregated = {
+        "median_positions": {"A": 1, "B": 2, "C": 3, "D": 4, "E": 5, "F": 6, "G": 3},
+        "position_distributions": {
+            "A": [1, 1, 2, 1],
+            "B": [2, 2, 3, 2],
+            "C": [3, 3, 4, 3],
+            "D": [4, 4, 5, 4],
+            "E": [5, 5, 6, 5],
+            "F": [6, 6, 7, 6],
+            "G": [2, 3, 2, 3],
+        },
+        "dnf_rates": {driver: 0.0 for driver in ("A", "B", "C", "D", "E", "F", "G")},
+        "compound_strategy_distribution": {"MEDIUM": 1.0},
+        "pit_lap_distribution": {},
+    }
+
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "load_track_specific_params",
+                lambda _race_name: {"track_overtaking": 0.5},
+            )
+        )
+        stack.enter_context(
+            patch.object(prediction_module, "get_tire_stress_score", lambda _race_name: 3.0)
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "get_available_compounds",
+                lambda _race_name, weather="dry": ["SOFT", "MEDIUM", "HARD"],
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "resolve_race_distance_laps",
+                lambda year, race_name, is_sprint: 60,
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "generate_pit_strategy",
+                lambda **kwargs: {
+                    "num_stops": 0,
+                    "pit_laps": [],
+                    "compound_sequence": ["MEDIUM"],
+                    "stint_lengths": [60],
+                },
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "simulate_race_lap_by_lap",
+                lambda **kwargs: {
+                    "finish_order": [
+                        entry["driver"] for entry in kwargs["driver_info_map"].values()
+                    ],
+                    "dnf_drivers": [],
+                    "strategies_used": kwargs["strategies"],
+                },
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                prediction_module,
+                "aggregate_simulation_results",
+                lambda _simulation_results: aggregated,
+            )
+        )
+
+        result = predictor.predict_race(
+            qualifying_grid=qualifying_grid,
+            weather="dry",
+            race_name="Japanese Grand Prix",
+            n_simulations=4,
+            input_confidence=0.45,
+        )
+
+    by_driver = {entry["driver"]: entry for entry in result["finish_order"]}
+    assert by_driver["G"]["position"] >= 5
+    assert by_driver["G"]["position_blend_score"] > by_driver["D"]["position_blend_score"]
+
+
 def test_predict_race_samples_predicted_grid_uncertainty():
     """Predicted grids should widen race outcomes instead of acting like actual starts."""
 

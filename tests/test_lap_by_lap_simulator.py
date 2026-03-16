@@ -40,6 +40,8 @@ def _base_race_params() -> dict:
         "sc_probability": 0.0,
         "safety_car_luck_range": 0.0,
         "teammate_variance_std": 0.0,
+        "teammate_setup_offset_ratio": 0.0,
+        "teammate_variance_lap_ratio": 0.0,
         "track_overtaking": 0.5,
         "overtake_model": {
             "dirty_air_window_s": 1.8,
@@ -172,6 +174,54 @@ def test_fast_car_can_pass_on_easy_overtaking_track():
     )
 
     assert result["finish_order"][0] == "B"
+
+
+def test_persistent_teammate_setup_offset_can_break_identical_teammates():
+    """Persistent teammate offsets should not wash out like per-lap white noise."""
+    race_params = _base_race_params()
+    race_params["start_grid_gap_seconds"] = 0.0
+    race_params["teammate_variance_std"] = 0.20
+    race_params["teammate_setup_offset_ratio"] = 1.0
+    race_params["teammate_variance_lap_ratio"] = 0.0
+    race_params["track_overtaking"] = 0.95
+    race_params["overtake_model"]["pass_probability_base"] = 0.0
+
+    driver_info_map = {
+        "A": {
+            "grid_pos": 1,
+            "team": "Teammates",
+            "dnf_probability": 0.0,
+            "team_strength": 0.60,
+            "team_strength_by_compound": {"MEDIUM": 0.60},
+            "tire_deg_by_compound": {"MEDIUM": 0.0},
+            "skill": 0.5,
+            "race_advantage": 0.0,
+            "overtaking_skill": 0.5,
+        },
+        "B": {
+            "grid_pos": 2,
+            "team": "Teammates",
+            "dnf_probability": 0.0,
+            "team_strength": 0.60,
+            "team_strength_by_compound": {"MEDIUM": 0.60},
+            "tire_deg_by_compound": {"MEDIUM": 0.0},
+            "skill": 0.5,
+            "race_advantage": 0.0,
+            "overtaking_skill": 0.5,
+        },
+    }
+
+    strategies = {"A": _strategy(), "B": _strategy()}
+    result = simulate_race_lap_by_lap(
+        driver_info_map=driver_info_map,
+        strategies=strategies,
+        race_params=race_params,
+        race_distance=12,
+        weather="dry",
+        rng=np.random.default_rng(seed=3),
+    )
+
+    assert result["finish_order"] == ["B", "A"]
 
 
 def test_strong_defender_reduces_overtake_success():

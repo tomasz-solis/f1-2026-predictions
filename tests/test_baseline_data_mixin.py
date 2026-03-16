@@ -103,6 +103,67 @@ def _write_baseline_files(
         )
 
 
+def _write_prediction_file(
+    predictions_dir: Path,
+    *,
+    year: int,
+    race_name: str,
+    session_name: str,
+    predicted_at: str,
+    actual_targets: dict[str, list[dict[str, object]]],
+) -> None:
+    """Write a minimal saved prediction file with attached actual target rows."""
+    safe_race_name = race_name.lower().replace(" ", "_").replace("'", "")
+    race_dir = predictions_dir / str(year) / safe_race_name
+    race_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "metadata": {
+            "year": year,
+            "race_name": race_name,
+            "session_name": session_name,
+            "predicted_at": predicted_at,
+            "weather": "dry",
+            "weekend_format": "normal",
+            "run_id": f"{safe_race_name}-{session_name.lower()}",
+            "fp_blend_info": {},
+        },
+        "qualifying": {
+            "predicted_grid": [
+                {"position": 1, "driver": "DRV1", "team": "McLaren"},
+                {"position": 2, "driver": "DRV2", "team": "Ferrari"},
+            ]
+        },
+        "race": {
+            "predicted_results": [
+                {"position": 1, "driver": "DRV1", "team": "McLaren"},
+                {"position": 2, "driver": "DRV2", "team": "Ferrari"},
+            ]
+        },
+        "targets": {
+            key: {
+                "target_session": "Q",
+                "predicted_order": rows,
+                "result_mode": "PREDICTED",
+                "grid_source": "PREDICTED",
+                "fp_blend_info": {},
+                "eligible_at_save": True,
+            }
+            for key, rows in actual_targets.items()
+        },
+        "actuals": {
+            "qualifying": None,
+            "race": None,
+            "targets": actual_targets,
+        },
+    }
+    (race_dir / f"{safe_race_name}_{session_name.lower()}.json").write_text(json.dumps(payload))
+
+
+def _patch_schedule_rows(patcher, rows: list[tuple[str, str]]) -> None:
+    """Patch weekend schedule rows for deterministic race-order tests."""
+    patcher.setattr("src.utils.weekend.get_schedule_rows", lambda year: tuple(rows))
+
+
 def test_load_data_falls_back_to_files(tmp_path, patcher, sample_payloads):
     car, drivers, tracks = sample_payloads
     data_dir = tmp_path / "processed"
@@ -248,6 +309,96 @@ def test_load_data_raises_for_invalid_team_schema(tmp_path, patcher, sample_payl
         predictor.load_data()
 
 
+def test_load_data_infers_current_season_form_from_saved_actuals(
+    tmp_path, patcher, sample_payloads
+):
+    car, drivers, tracks = sample_payloads
+    car["data_freshness"] = "BASELINE_PRESEASON"
+    car["races_completed"] = 0
+    car["teams"]["McLaren"]["current_season_performance"] = []
+    car["teams"]["Ferrari"] = {
+        "overall_performance": 0.70,
+        "current_season_performance": [],
+        "testing_characteristics": {"run_profile": "balanced", "overall_pace": 0.58},
+        "compound_characteristics": {},
+    }
+    data_dir = tmp_path / "processed"
+    _write_baseline_files(data_dir, car, drivers, tracks)
+
+    _write_prediction_file(
+        tmp_path / "predictions",
+        year=2026,
+        race_name="Australian Grand Prix",
+        session_name="FP3",
+        predicted_at="2026-03-01T09:00:00+00:00",
+        actual_targets={
+            "main_qualifying": [
+                {"position": 1, "driver": "NOR", "team": "McLaren"},
+                {"position": 2, "driver": "PIA", "team": "McLaren"},
+                {"position": 3, "driver": "LEC", "team": "Ferrari"},
+                {"position": 4, "driver": "HAM", "team": "Ferrari"},
+            ]
+        },
+    )
+    _write_prediction_file(
+        tmp_path / "predictions",
+        year=2026,
+        race_name="Chinese Grand Prix",
+        session_name="SQ",
+        predicted_at="2026-03-08T09:00:00+00:00",
+        actual_targets={
+            "main_qualifying": [
+                {"position": 1, "driver": "LEC", "team": "Ferrari"},
+                {"position": 2, "driver": "HAM", "team": "Ferrari"},
+                {"position": 3, "driver": "NOR", "team": "McLaren"},
+                {"position": 4, "driver": "PIA", "team": "McLaren"},
+            ]
+        },
+    )
+
+    _patch_schedule_rows(
+        patcher,
+        [
+            ("Australian Grand Prix", "conventional"),
+            ("Chinese Grand Prix", "sprint"),
+            ("Japanese Grand Prix", "conventional"),
+        ],
+    )
+    predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
+
+    predictor.load_data()
+
+    assert predictor.races_completed == 2
+    assert predictor.teams["McLaren"]["current_season_performance"] == []
+    assert predictor.teams["Ferrari"]["current_season_performance"] == []
+    assert (
+        predictor._get_current_season_observations(
+            team_name="McLaren",
+            team_data=predictor.teams["McLaren"],
+            race_name="Australian Grand Prix",
+        )
+        == []
+    )
+    assert predictor._get_current_season_observations(
+        team_name="McLaren",
+        team_data=predictor.teams["McLaren"],
+        race_name="Chinese Grand Prix",
+    ) == pytest.approx([5.0 / 6.0])
+    assert predictor._get_current_season_observations(
+        team_name="McLaren",
+        team_data=predictor.teams["McLaren"],
+        race_name="Japanese Grand Prix",
+    ) == pytest.approx([5.0 / 6.0, 1.0 / 6.0])
+    assert predictor._get_current_season_observations(
+        team_name="Ferrari",
+        team_data=predictor.teams["Ferrari"],
+        race_name="Japanese Grand Prix",
+    ) == pytest.approx([1.0 / 6.0, 5.0 / 6.0])
+
+
 def test_calculate_track_suitability_variants(tmp_path):
     predictor = DummyPredictor(data_dir=tmp_path)
     predictor.teams = {
@@ -288,6 +439,16 @@ def test_get_blended_team_strength_uses_current_fallback(tmp_path, patcher):
     predictor = DummyPredictor(data_dir=tmp_path)
     predictor.teams = {"McLaren": {"overall_performance": 0.82, "current_season_performance": []}}
     predictor.races_completed = 4
+    _patch_schedule_rows(
+        patcher,
+        [
+            ("Australian Grand Prix", "conventional"),
+            ("Chinese Grand Prix", "sprint"),
+            ("Japanese Grand Prix", "conventional"),
+            ("Bahrain Grand Prix", "conventional"),
+            ("Saudi Arabian Grand Prix", "conventional"),
+        ],
+    )
 
     patcher.setattr(predictor, "calculate_track_suitability", lambda team, race_name: 0.02)
 
@@ -307,7 +468,7 @@ def test_get_blended_team_strength_uses_current_fallback(tmp_path, patcher):
     assert result == 0.77
     assert captured["baseline_score"] == 0.82
     assert captured["current_score"] == 0.82
-    assert captured["race_number"] == 5
+    assert captured["race_number"] == 4
 
 
 def test_get_blended_team_strength_converts_track_modifier_to_absolute_testing_score(
@@ -367,6 +528,279 @@ def test_get_blended_team_strength_prefers_configured_schedule(tmp_path, patcher
     predictor.get_blended_team_strength("McLaren", "Bahrain Grand Prix")
 
     assert captured["schedule"] == "rapid_adaptive"
+
+
+def test_get_blended_team_strength_uses_recency_weighted_current_season_score(tmp_path, patcher):
+    predictor = DummyPredictor(data_dir=tmp_path)
+    predictor.teams = {
+        "Ferrari": {"overall_performance": 0.50, "current_season_performance": [0.20, 0.80]}
+    }
+    predictor.races_completed = 2
+    _patch_schedule_rows(
+        patcher,
+        [
+            ("Australian Grand Prix", "conventional"),
+            ("Chinese Grand Prix", "sprint"),
+            ("Japanese Grand Prix", "conventional"),
+        ],
+    )
+
+    class _ConfigStub:
+        @staticmethod
+        def get(key: str, default):
+            if key == "baseline_predictor.team_strength_schedule":
+                return "rapid_adaptive"
+            if key == "baseline_predictor.current_season_form.recency_exponent":
+                return 2.0
+            if key == "baseline_predictor.current_season_form.stabilization_strength":
+                return 0.0
+            return default
+
+    predictor.config = _ConfigStub()
+    patcher.setattr(predictor, "calculate_track_suitability", lambda team, race_name: 0.0)
+
+    captured = {}
+
+    def _fake_blend(**kwargs):
+        captured.update(kwargs)
+        return 0.61
+
+    patcher.setattr(data_mixin_module, "calculate_blended_performance", _fake_blend)
+    patcher.setattr(
+        data_mixin_module, "get_recommended_schedule", lambda is_regulation_change: "extreme"
+    )
+
+    predictor.get_blended_team_strength("Ferrari", "Japanese Grand Prix")
+
+    assert captured["current_score"] == pytest.approx((0.20 + (0.80 * 4.0)) / 5.0)
+
+
+def test_get_blended_team_strength_caps_live_observations_to_prior_races(tmp_path, patcher):
+    predictor = DummyPredictor(data_dir=tmp_path)
+    predictor.teams = {
+        "Ferrari": {"overall_performance": 0.50, "current_season_performance": [0.20, 0.80]}
+    }
+    predictor.races_completed = 2
+    _patch_schedule_rows(
+        patcher,
+        [
+            ("Australian Grand Prix", "conventional"),
+            ("Chinese Grand Prix", "sprint"),
+            ("Japanese Grand Prix", "conventional"),
+        ],
+    )
+
+    captured = {}
+
+    class _ConfigStub:
+        @staticmethod
+        def get(key: str, default):
+            if key == "baseline_predictor.current_season_form.stabilization_strength":
+                return 0.0
+            return default
+
+    predictor.config = _ConfigStub()
+
+    def _fake_blend(**kwargs):
+        captured.update(kwargs)
+        return 0.58
+
+    patcher.setattr(predictor, "calculate_track_suitability", lambda team, race_name: 0.0)
+    patcher.setattr(data_mixin_module, "calculate_blended_performance", _fake_blend)
+    patcher.setattr(
+        data_mixin_module, "get_recommended_schedule", lambda is_regulation_change: "extreme"
+    )
+
+    predictor.get_blended_team_strength("Ferrari", "Chinese Grand Prix")
+
+    assert captured["current_score"] == pytest.approx(0.20)
+    assert captured["race_number"] == 2
+
+
+def test_get_current_season_observations_prefers_full_saved_actual_history_over_partial_live_data(
+    tmp_path, patcher, sample_payloads
+):
+    car, drivers, tracks = sample_payloads
+    car["data_freshness"] = "LIVE_UPDATED"
+    car["races_completed"] = 2
+    car["teams"]["McLaren"]["current_season_performance"] = [0.86]
+    data_dir = tmp_path / "processed"
+    _write_baseline_files(data_dir, car, drivers, tracks)
+
+    _write_prediction_file(
+        tmp_path / "predictions",
+        year=2026,
+        race_name="Australian Grand Prix",
+        session_name="FP3",
+        predicted_at="2026-03-01T09:00:00+00:00",
+        actual_targets={
+            "main_qualifying": [
+                {"position": 1, "driver": "NOR", "team": "McLaren"},
+                {"position": 2, "driver": "PIA", "team": "McLaren"},
+                {"position": 5, "driver": "RUS", "team": "Mercedes"},
+                {"position": 6, "driver": "ANT", "team": "Mercedes"},
+            ]
+        },
+    )
+    _write_prediction_file(
+        tmp_path / "predictions",
+        year=2026,
+        race_name="Chinese Grand Prix",
+        session_name="SQ",
+        predicted_at="2026-03-08T09:00:00+00:00",
+        actual_targets={
+            "main_qualifying": [
+                {"position": 7, "driver": "NOR", "team": "McLaren"},
+                {"position": 8, "driver": "PIA", "team": "McLaren"},
+                {"position": 1, "driver": "RUS", "team": "Mercedes"},
+                {"position": 2, "driver": "ANT", "team": "Mercedes"},
+            ]
+        },
+    )
+
+    _patch_schedule_rows(
+        patcher,
+        [
+            ("Australian Grand Prix", "conventional"),
+            ("Chinese Grand Prix", "sprint"),
+            ("Japanese Grand Prix", "conventional"),
+        ],
+    )
+    predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
+
+    predictor.load_data()
+
+    assert predictor._get_current_season_observations(
+        team_name="McLaren",
+        team_data=predictor.teams["McLaren"],
+        race_name="Japanese Grand Prix",
+    ) == pytest.approx([0.9, 1.0 / 14.0])
+
+
+def test_get_current_season_observations_blends_saved_qualifying_and_race_actuals(
+    tmp_path, patcher, sample_payloads
+):
+    car, drivers, tracks = sample_payloads
+    car["data_freshness"] = "BASELINE_PRESEASON"
+    car["races_completed"] = 0
+    car["teams"]["McLaren"]["current_season_performance"] = []
+    data_dir = tmp_path / "processed"
+    _write_baseline_files(data_dir, car, drivers, tracks)
+
+    _write_prediction_file(
+        tmp_path / "predictions",
+        year=2026,
+        race_name="Australian Grand Prix",
+        session_name="FP3",
+        predicted_at="2026-03-01T09:00:00+00:00",
+        actual_targets={
+            "main_qualifying": [
+                {"position": 1, "driver": "NOR", "team": "McLaren"},
+                {"position": 2, "driver": "PIA", "team": "McLaren"},
+                {"position": 3, "driver": "RUS", "team": "Mercedes"},
+                {"position": 4, "driver": "ANT", "team": "Mercedes"},
+            ],
+            "grand_prix_race": [
+                {"position": 3, "driver": "NOR", "team": "McLaren"},
+                {"position": 4, "driver": "PIA", "team": "McLaren"},
+                {"position": 1, "driver": "RUS", "team": "Mercedes"},
+                {"position": 2, "driver": "ANT", "team": "Mercedes"},
+            ],
+        },
+    )
+    _write_prediction_file(
+        tmp_path / "predictions",
+        year=2026,
+        race_name="Chinese Grand Prix",
+        session_name="SQ",
+        predicted_at="2026-03-08T09:00:00+00:00",
+        actual_targets={
+            "main_qualifying": [
+                {"position": 3, "driver": "NOR", "team": "McLaren"},
+                {"position": 4, "driver": "PIA", "team": "McLaren"},
+                {"position": 1, "driver": "RUS", "team": "Mercedes"},
+                {"position": 2, "driver": "ANT", "team": "Mercedes"},
+            ],
+            "grand_prix_race": [
+                {"position": 1, "driver": "NOR", "team": "McLaren"},
+                {"position": 2, "driver": "PIA", "team": "McLaren"},
+                {"position": 3, "driver": "RUS", "team": "Mercedes"},
+                {"position": 4, "driver": "ANT", "team": "Mercedes"},
+            ],
+        },
+    )
+
+    _patch_schedule_rows(
+        patcher,
+        [
+            ("Australian Grand Prix", "conventional"),
+            ("Chinese Grand Prix", "sprint"),
+            ("Japanese Grand Prix", "conventional"),
+        ],
+    )
+
+    class _ConfigStub:
+        @staticmethod
+        def get(key: str, default):
+            if key == "baseline_predictor.current_season_form.saved_actual_race_weight":
+                return 0.75
+            return default
+
+    predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
+    predictor.config = _ConfigStub()
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
+
+    predictor.load_data()
+
+    assert predictor._get_current_season_observations(
+        team_name="McLaren",
+        team_data=predictor.teams["McLaren"],
+        race_name="Japanese Grand Prix",
+    ) == pytest.approx([1.0 / 3.0, 2.0 / 3.0])
+
+
+def test_get_blended_team_strength_stabilizes_current_score_for_tiny_samples(tmp_path, patcher):
+    predictor = DummyPredictor(data_dir=tmp_path)
+    predictor.teams = {
+        "Ferrari": {"overall_performance": 0.50, "current_season_performance": [0.80]}
+    }
+    predictor.races_completed = 1
+    _patch_schedule_rows(
+        patcher,
+        [
+            ("Australian Grand Prix", "conventional"),
+            ("Chinese Grand Prix", "sprint"),
+        ],
+    )
+
+    class _ConfigStub:
+        @staticmethod
+        def get(key: str, default):
+            if key == "baseline_predictor.current_season_form.stabilization_strength":
+                return 1.5
+            return default
+
+    predictor.config = _ConfigStub()
+    captured = {}
+
+    def _fake_blend(**kwargs):
+        captured.update(kwargs)
+        return 0.62
+
+    patcher.setattr(predictor, "calculate_track_suitability", lambda team, race_name: 0.0)
+    patcher.setattr(data_mixin_module, "calculate_blended_performance", _fake_blend)
+    patcher.setattr(
+        data_mixin_module, "get_recommended_schedule", lambda is_regulation_change: "extreme"
+    )
+
+    predictor.get_blended_team_strength("Ferrari", "Chinese Grand Prix")
+
+    assert captured["current_score"] == pytest.approx(0.62)
 
 
 def test_get_blended_team_strength_resolves_audi_to_sauber_payload(tmp_path, patcher):

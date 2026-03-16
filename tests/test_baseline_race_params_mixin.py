@@ -28,6 +28,8 @@ def _base_params() -> dict:
         "pace_weight_base": 0.5,
         "pace_weight_track_modifier": 0.1,
         "teammate_variance_std": 0.0,
+        "teammate_setup_offset_ratio": 0.0,
+        "teammate_variance_lap_ratio": 0.0,
         "grid_divisor": 21,
         "position_scaling_front_threshold": 3,
         "position_scaling_front_scale": 0.1,
@@ -134,10 +136,14 @@ def test_load_race_params_reads_expected_config_keys(patcher):
     assert "base_chaos_wet" in params
     assert "mixed_weather_chaos_blend" in params
     assert "teammate_variance_std" in params
+    assert "teammate_setup_offset_ratio" in params
+    assert "teammate_variance_lap_ratio" in params
     assert "grid_divisor" in params
     assert "position_scaling_front_threshold" in params
     assert "baseline_predictor.race.base_chaos.dry" in calls
     assert "baseline_predictor.race.base_chaos.mixed_blend" in calls
     assert "baseline_predictor.race.overtaking_skill_multiplier" in calls
     assert "baseline_predictor.race.teammate_variance_std" in calls
+    assert "baseline_predictor.race.teammate_setup_offset_ratio" in calls
+    assert "baseline_predictor.race.teammate_variance_lap_ratio" in calls
     assert "baseline_predictor.race.grid_divisor" in calls

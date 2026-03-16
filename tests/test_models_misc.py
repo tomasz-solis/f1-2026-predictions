@@ -1,10 +1,14 @@
 """Tests for model utility modules (car/regulations/scoring)."""
 
+import json
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
 from src.models.bayesian import DriverPrior
 from src.models.car import Car
+from src.models.priors_factory import PriorsFactory
 from src.models.regulations import apply_2026_regulations
 from src.models.scoring import (
     AbsoluteDifferenceScoring,
@@ -91,6 +95,39 @@ def test_apply_2026_regulations_adjusts_mu_and_sigma():
     assert adjusted["18"].mu == 10.5
     assert adjusted["44"].sigma == 3.0
     assert priors["44"].mu == 14.0
+
+
+def test_priors_factory_prefers_season_scoped_driver_characteristics(tmp_path):
+    processed_dir = Path(tmp_path)
+    driver_dir = processed_dir / "driver_characteristics"
+    car_dir = processed_dir / "car_characteristics"
+    driver_dir.mkdir(parents=True, exist_ok=True)
+    car_dir.mkdir(parents=True, exist_ok=True)
+
+    season_payload = {
+        "drivers": {
+            "NOR": {
+                "racecraft": {"skill_score": 0.91},
+                "pace": {"quali_pace": 0.80},
+            }
+        }
+    }
+    legacy_payload = {
+        "drivers": {
+            "NOR": {
+                "racecraft": {"skill_score": 0.20},
+                "pace": {"quali_pace": 0.20},
+            }
+        }
+    }
+    (driver_dir / "2026_driver_characteristics.json").write_text(json.dumps(season_payload))
+    (processed_dir / "driver_characteristics.json").write_text(json.dumps(legacy_payload))
+    (car_dir / "2026_car_characteristics.json").write_text(json.dumps({"teams": {}}))
+
+    factory = PriorsFactory(data_dir=processed_dir, season_year=2026)
+    factory.load_data()
+
+    assert factory.drivers["NOR"]["racecraft"]["skill_score"] == 0.91
 
 
 def test_performance_scoring_base_class_raises():

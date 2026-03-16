@@ -372,6 +372,8 @@ def compute_base_features(
         bool(is_sprint),
     )
     base_start = time.time()
+    precompute_settings = get_prediction_precompute_config()
+    qualifying_n_simulations = int(precompute_settings.get("qualifying_n_simulations", 100))
 
     if is_sprint:
         sprint_quali_start = time.time()
@@ -388,6 +390,7 @@ def compute_base_features(
                 year=year,
                 race_name=target_race,
                 qualifying_stage="sprint",
+                n_simulations=qualifying_n_simulations,
             )
             sprint_grid, sprint_grid_source = fetch_grid_if_available(
                 year,
@@ -423,6 +426,7 @@ def compute_base_features(
                 year=year,
                 race_name=target_race,
                 qualifying_stage="main",
+                n_simulations=qualifying_n_simulations,
             )
             main_grid, main_grid_source = fetch_grid_if_available(
                 year,
@@ -473,6 +477,7 @@ def compute_base_features(
             year=year,
             race_name=target_race,
             qualifying_stage="main",
+            n_simulations=qualifying_n_simulations,
         )
         qualifying_grid, grid_source = fetch_grid_if_available(
             year,

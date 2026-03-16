@@ -117,6 +117,37 @@ def simulate_race_lap_by_lap(
             1.35,
         )
     )
+    teammate_variance_std = max(0.0, float(race_params.get("teammate_variance_std", 0.15)))
+    teammate_setup_offset_ratio = float(
+        np.clip(race_params.get("teammate_setup_offset_ratio", 0.30), 0.0, 1.0)
+    )
+    teammate_lap_variance_ratio = float(
+        np.clip(race_params.get("teammate_variance_lap_ratio", 0.45), 0.0, 1.0)
+    )
+    teammate_setup_offset_std = (
+        teammate_variance_std * teammate_setup_offset_ratio * teammate_variance_multiplier
+    )
+    teammate_lap_variance_std = (
+        teammate_variance_std * teammate_lap_variance_ratio * teammate_variance_multiplier
+    )
+
+    team_to_drivers: dict[str, list[str]] = {}
+    for driver, info in driver_info_map.items():
+        team_to_drivers.setdefault(str(info.get("team", "")), []).append(driver)
+
+    persistent_setup_offset_by_driver: dict[str, float] = {}
+    for teammates in team_to_drivers.values():
+        if teammate_setup_offset_std <= 0.0 or len(teammates) <= 1:
+            for driver in teammates:
+                persistent_setup_offset_by_driver[driver] = 0.0
+            continue
+
+        raw_offsets = {
+            driver: float(rng.normal(0.0, teammate_setup_offset_std)) for driver in teammates
+        }
+        team_mean_offset = float(np.mean(list(raw_offsets.values())))
+        for driver, raw_offset in raw_offsets.items():
+            persistent_setup_offset_by_driver[driver] = raw_offset - team_mean_offset
 
     # Initialize driver states
     start_grid_gap_seconds = race_params.get("start_grid_gap_seconds", 0.32)
@@ -133,6 +164,7 @@ def simulate_race_lap_by_lap(
             "fuel_load": race_params["fuel"]["initial_load_kg"],
             "has_dnf": False,
             "base_pace": 90.0,  # Will be calculated on first lap
+            "teammate_setup_offset": persistent_setup_offset_by_driver.get(driver, 0.0),
         }
 
     # Lap-by-lap progression
@@ -281,10 +313,9 @@ def simulate_race_lap_by_lap(
                 sc_luck = rng.uniform(-sc_luck_range, sc_luck_range)
 
             # 9. Teammate variance (setup/strategy differences)
-            teammate_variance = rng.normal(
-                0,
-                race_params.get("teammate_variance_std", 0.15) * teammate_variance_multiplier,
-            )
+            teammate_variance = state.get("teammate_setup_offset", 0.0)
+            if teammate_lap_variance_std > 0.0:
+                teammate_variance += float(rng.normal(0.0, teammate_lap_variance_std))
 
             # 10.5 Traffic + overtaking effects
             traffic_overtake_effect = _get_traffic_overtake_effect(

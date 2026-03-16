@@ -7,6 +7,7 @@ from typing import Any
 from src.types.prediction_types import QualifyingGridEntry
 
 from .cache import get_predictor
+from .precomputed_predictions import get_prediction_precompute_config
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,14 @@ def _derive_race_input_confidence(
     return float(max(0.0, min(base_confidence + source_adjustment + grid_adjustment, 1.0)))
 
 
+def _resolve_dashboard_simulation_count(kind: str) -> int:
+    """Resolve dashboard simulation count for qualifying or race predictions."""
+    settings = get_prediction_precompute_config()
+    if str(kind).strip().lower() == "qualifying":
+        return int(settings.get("qualifying_n_simulations", 100))
+    return int(settings.get("race_n_simulations", 100))
+
+
 def fetch_actual_competitive_results_if_completed(
     year: int,
     race_name: str,
@@ -167,7 +176,7 @@ def _predict_race_with_optional_confidence(
         "qualifying_grid": qualifying_grid,
         "weather": weather,
         "race_name": race_name,
-        "n_simulations": 50,
+        "n_simulations": _resolve_dashboard_simulation_count("race"),
         "year": year,
         "input_confidence": input_confidence,
     }
@@ -191,7 +200,7 @@ def _predict_sprint_race_with_optional_confidence(
         "sprint_quali_grid": sprint_quali_grid,
         "weather": weather,
         "race_name": race_name,
-        "n_simulations": 50,
+        "n_simulations": _resolve_dashboard_simulation_count("race"),
         "input_confidence": input_confidence,
     }
     try:
@@ -289,6 +298,7 @@ def _resolve_qualifying_section(
         year=year,
         race_name=race_name,
         qualifying_stage=qualifying_stage,
+        n_simulations=_resolve_dashboard_simulation_count("qualifying"),
     )
     qualifying_grid, grid_source = fetch_grid_if_available(
         year,

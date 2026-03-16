@@ -19,6 +19,7 @@ from src.systems.weight_schedule import (
     get_recommended_schedule,
 )
 from src.utils import config_loader
+from src.utils.accuracy_targets import explicit_target_actuals, synthesize_legacy_actuals
 from src.utils.compound_performance import (
     get_compound_performance_modifier,
     should_use_compound_adjustments,
@@ -92,6 +93,96 @@ def _canonicalize_team_payload_keys(teams_payload: dict[str, object]) -> dict[st
     return canonical_payload
 
 
+def _sanitize_performance_observations(observations: object) -> list[float]:
+    """Return a finite 0-1 performance series from a raw observations payload."""
+    if not isinstance(observations, list):
+        return []
+
+    sanitized: list[float] = []
+    for value in observations:
+        try:
+            numeric_value = float(value)
+        except (TypeError, ValueError):
+            continue
+        if not np.isfinite(numeric_value):
+            continue
+        sanitized.append(float(np.clip(numeric_value, 0.0, 1.0)))
+    return sanitized
+
+
+def _extract_target_actual_rows(
+    prediction_data: dict[str, object],
+    *,
+    target_key: str,
+) -> list[dict[str, object]]:
+    """Return canonical actual rows for one target from a saved prediction payload."""
+    explicit_targets = explicit_target_actuals(prediction_data)
+    explicit_rows = explicit_targets.get(target_key)
+    if explicit_rows:
+        return explicit_rows
+
+    metadata = prediction_data.get("metadata", {})
+    weekend_format = ""
+    if isinstance(metadata, dict):
+        weekend_format = str(metadata.get("weekend_format", "")).strip().lower()
+    synthesized_targets = synthesize_legacy_actuals(
+        prediction_data,
+        is_sprint=weekend_format == "sprint",
+    )
+    return synthesized_targets.get(target_key, [])
+
+
+def _score_teams_from_actual_rows(
+    actual_rows: list[dict[str, object]],
+    *,
+    known_teams: set[str],
+) -> dict[str, float]:
+    """Convert actual classified positions into normalized team-form scores."""
+    team_positions: dict[str, list[int]] = {}
+    field_size = 0
+
+    for row in actual_rows:
+        raw_team = row.get("team")
+        if not isinstance(raw_team, str) or not raw_team.strip():
+            continue
+
+        canonical_team = map_team_to_characteristics(raw_team, known_teams=known_teams)
+        team_name = canonical_team if canonical_team else raw_team.strip()
+
+        try:
+            position = int(row.get("position"))
+        except (TypeError, ValueError):
+            continue
+        if position < 1:
+            continue
+
+        team_positions.setdefault(team_name, []).append(position)
+        field_size = max(field_size, position)
+
+    if field_size < 2:
+        return {}
+
+    scored_teams: dict[str, float] = {}
+    denominator = float(field_size - 1)
+    for team_name, positions in team_positions.items():
+        if not positions:
+            continue
+        average_position = float(np.mean(positions))
+        normalized_score = 1.0 - ((average_position - 1.0) / denominator)
+        scored_teams[team_name] = float(np.clip(normalized_score, 0.0, 1.0))
+
+    return scored_teams
+
+
+def _coerce_non_negative_int(value: object) -> int | None:
+    """Convert an int-like value into a non-negative integer when possible."""
+    try:
+        parsed = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    return max(parsed, 0)
+
+
 class BaselineDataMixin:
     """Shared data and team-strength methods for Baseline2026Predictor."""
 
@@ -99,6 +190,377 @@ class BaselineDataMixin:
         """Initialize data mixin with compound extraction cache."""
         if not hasattr(self, "_compound_cache"):
             self._compound_cache = {}
+
+    def _resolve_predictions_data_root(self) -> Path:
+        """Return the data root used when reading saved prediction artifacts."""
+        store = getattr(self, "artifact_store", None)
+        store_root = getattr(store, "data_root", None)
+        if isinstance(store_root, Path):
+            return store_root
+        if isinstance(store_root, str) and store_root:
+            return Path(store_root)
+        return self.data_dir.parent if self.data_dir.name == "processed" else self.data_dir
+
+    def _get_race_order_map(self, target_year: int) -> dict[str, int]:
+        """Return season race order for contextual current-form cutoffs."""
+        cache = getattr(self, "_race_order_map_cache", {})
+        if target_year in cache:
+            return cache[target_year]
+
+        try:
+            from src.utils.weekend import get_schedule_rows
+
+            schedule_rows = get_schedule_rows(target_year)
+        except Exception as exc:
+            logger.debug("Could not load schedule rows for %s: %s", target_year, exc)
+            schedule_rows = ()
+
+        race_order_map: dict[str, int] = {}
+        race_index = 0
+        for raw_race_name, raw_event_format in schedule_rows:
+            race_name = str(raw_race_name).strip()
+            event_format = str(raw_event_format).strip().lower()
+            if not race_name:
+                continue
+            if "testing" in race_name.lower() or "testing" in event_format:
+                continue
+            race_index += 1
+            race_order_map.setdefault(race_name, race_index)
+
+        cache[target_year] = race_order_map
+        self._race_order_map_cache = cache
+        return race_order_map
+
+    def _prediction_race_sort_key(
+        self,
+        prediction: dict[str, object],
+        *,
+        race_order_map: dict[str, int],
+    ) -> tuple[int, str, str]:
+        """Build a stable race ordering key for saved predictions."""
+        metadata = prediction.get("metadata", {})
+        if not isinstance(metadata, dict):
+            return (10_000, "", "")
+
+        race_name = str(metadata.get("race_name", "")).strip()
+        predicted_at = str(metadata.get("predicted_at", "")).strip()
+        return (race_order_map.get(race_name, 10_000), predicted_at, race_name)
+
+    def _blend_saved_actual_team_scores(
+        self,
+        *,
+        qualifying_rows: list[dict[str, object]],
+        race_rows: list[dict[str, object]],
+        known_teams: set[str],
+    ) -> dict[str, float]:
+        """Blend saved qualifying and race actuals into one team-form snapshot."""
+        qualifying_scores = (
+            _score_teams_from_actual_rows(qualifying_rows, known_teams=known_teams)
+            if qualifying_rows
+            else {}
+        )
+        race_scores = (
+            _score_teams_from_actual_rows(race_rows, known_teams=known_teams) if race_rows else {}
+        )
+        if race_scores and not qualifying_scores:
+            return race_scores
+        if qualifying_scores and not race_scores:
+            return qualifying_scores
+        if not qualifying_scores and not race_scores:
+            return {}
+
+        cfg = getattr(self, "config", config_loader)
+        race_weight = float(
+            cfg.get("baseline_predictor.current_season_form.saved_actual_race_weight", 0.70)
+        )
+        race_weight = float(np.clip(race_weight, 0.0, 1.0))
+        qualifying_weight = 1.0 - race_weight
+
+        blended_scores: dict[str, float] = {}
+        for team_name in set(qualifying_scores) | set(race_scores):
+            qualifying_score = qualifying_scores.get(team_name)
+            race_score = race_scores.get(team_name)
+            if qualifying_score is None:
+                blended_scores[team_name] = float(race_score)
+                continue
+            if race_score is None:
+                blended_scores[team_name] = float(qualifying_score)
+                continue
+            blended_scores[team_name] = float(
+                np.clip(
+                    (float(qualifying_score) * qualifying_weight)
+                    + (float(race_score) * race_weight),
+                    0.0,
+                    1.0,
+                )
+            )
+
+        return blended_scores
+
+    def _load_saved_actual_race_scores(
+        self,
+        target_year: int,
+    ) -> list[dict[str, object]]:
+        """Load one team-score snapshot per completed race from saved actuals."""
+        cache = getattr(self, "_saved_actual_race_scores_cache", {})
+        if target_year in cache:
+            cached_records = cache[target_year]
+            return cached_records if isinstance(cached_records, list) else []
+
+        cfg = getattr(self, "config", config_loader)
+        if not bool(
+            cfg.get("baseline_predictor.current_season_form.infer_from_saved_actuals", True)
+        ):
+            return []
+
+        try:
+            from src.utils.prediction_logger import PredictionLogger
+        except Exception as exc:
+            logger.debug("Could not import PredictionLogger for current-form inference: %s", exc)
+            return []
+
+        predictions_dir = self._resolve_predictions_data_root() / "predictions"
+        try:
+            prediction_logger = PredictionLogger(predictions_dir=str(predictions_dir))
+            predictions = prediction_logger.get_all_predictions(target_year)
+        except Exception as exc:
+            logger.debug("Could not load saved predictions for %s: %s", target_year, exc)
+            return []
+
+        if not predictions:
+            return []
+
+        known_teams = set(self.teams.keys())
+        race_order_map = self._get_race_order_map(target_year)
+        seen_races: set[str] = set()
+        race_records: list[dict[str, object]] = []
+
+        for prediction in sorted(
+            predictions,
+            key=lambda payload: self._prediction_race_sort_key(
+                payload,
+                race_order_map=race_order_map,
+            ),
+        ):
+            metadata = prediction.get("metadata", {})
+            if not isinstance(metadata, dict):
+                continue
+
+            race_name = str(metadata.get("race_name", "")).strip()
+            if not race_name or race_name in seen_races:
+                continue
+
+            qualifying_rows = _extract_target_actual_rows(
+                prediction,
+                target_key="main_qualifying",
+            )
+            race_rows = _extract_target_actual_rows(
+                prediction,
+                target_key="grand_prix_race",
+            )
+            team_scores = self._blend_saved_actual_team_scores(
+                qualifying_rows=qualifying_rows,
+                race_rows=race_rows,
+                known_teams=known_teams,
+            )
+            if not team_scores:
+                continue
+
+            seen_races.add(race_name)
+            race_records.append(
+                {
+                    "race_name": race_name,
+                    "team_scores": team_scores,
+                }
+            )
+
+        cache[target_year] = race_records
+        self._saved_actual_race_scores_cache = cache
+        return race_records
+
+    def _resolve_saved_actual_races_completed(
+        self,
+        *,
+        target_year: int,
+        data_freshness: str,
+        races_completed: int,
+    ) -> int:
+        """Resolve available completed-race count from live state or saved actuals."""
+        has_live_current_form = any(
+            _sanitize_performance_observations(team_data.get("current_season_performance"))
+            for team_data in self.teams.values()
+        )
+        if data_freshness == "LIVE_UPDATED" or has_live_current_form:
+            return races_completed
+
+        race_records = self._load_saved_actual_race_scores(target_year)
+        inferred_races = len(race_records)
+        if inferred_races <= 0:
+            return races_completed
+
+        teams_with_scores = {
+            str(team_name)
+            for record in race_records
+            for team_name in (record.get("team_scores", {}) or {}).keys()
+            if team_name in self.teams
+        }
+
+        logger.info(
+            "Recovered current-season team form from saved actuals: %s race(s), %s team(s)",
+            inferred_races,
+            len(teams_with_scores),
+        )
+        return max(races_completed, inferred_races)
+
+    def _count_known_prior_races(self, target_year: int, race_name: str | None) -> int | None:
+        """Return number of scheduled races before the target race when known."""
+        normalized_race_name = str(race_name or "").strip()
+        if not normalized_race_name:
+            return None
+
+        race_order_map = self._get_race_order_map(target_year)
+        target_order = race_order_map.get(normalized_race_name)
+        if target_order is None:
+            return None
+        return max(target_order - 1, 0)
+
+    def _race_precedes_target(
+        self,
+        *,
+        target_year: int,
+        candidate_race_name: str,
+        target_race_name: str | None,
+    ) -> bool:
+        """Return True when one race is known to be earlier than the target race."""
+        normalized_target = str(target_race_name or "").strip()
+        normalized_candidate = str(candidate_race_name).strip()
+        if not normalized_target:
+            return True
+        if normalized_candidate == normalized_target:
+            return False
+
+        race_order_map = self._get_race_order_map(target_year)
+        target_order = race_order_map.get(normalized_target)
+        candidate_order = race_order_map.get(normalized_candidate)
+        if target_order is None:
+            return normalized_candidate != normalized_target
+        if candidate_order is None:
+            return False
+        return candidate_order < target_order
+
+    def _get_saved_actual_observations(
+        self,
+        *,
+        team_name: str,
+        target_year: int,
+        race_name: str | None,
+    ) -> list[float]:
+        """Return saved-actual observations for one team before the target race."""
+        observations: list[float] = []
+        for race_record in self._load_saved_actual_race_scores(target_year):
+            candidate_race_name = str(race_record.get("race_name", "")).strip()
+            if not self._race_precedes_target(
+                target_year=target_year,
+                candidate_race_name=candidate_race_name,
+                target_race_name=race_name,
+            ):
+                continue
+            team_scores = race_record.get("team_scores", {})
+            if not isinstance(team_scores, dict):
+                continue
+            score = team_scores.get(team_name)
+            if score is None:
+                continue
+            observations.append(float(np.clip(float(score), 0.0, 1.0)))
+        return observations
+
+    def _get_current_season_observations(
+        self,
+        *,
+        team_name: str,
+        team_data: dict[str, object],
+        race_name: str | None,
+    ) -> list[float]:
+        """Return race-context-aware current-season observations for one team."""
+        target_year = int(getattr(self, "season_year", getattr(self, "year", 2026)))
+        live_observations = _sanitize_performance_observations(
+            team_data.get("current_season_performance")
+        )
+        prior_race_limit = _coerce_non_negative_int(
+            self._count_known_prior_races(target_year, race_name)
+        )
+        saved_actual_observations = self._get_saved_actual_observations(
+            team_name=team_name,
+            target_year=target_year,
+            race_name=race_name,
+        )
+        if prior_race_limit is not None:
+            saved_actual_observations = saved_actual_observations[:prior_race_limit]
+
+        if live_observations:
+            if prior_race_limit is None:
+                if len(saved_actual_observations) > len(live_observations):
+                    return saved_actual_observations
+                return live_observations
+            limited_live_observations = live_observations[:prior_race_limit]
+            if len(saved_actual_observations) > len(limited_live_observations):
+                return saved_actual_observations
+            return limited_live_observations
+
+        return saved_actual_observations
+
+    def _get_contextual_races_completed(self, race_name: str | None) -> int:
+        """Return completed-race count capped to what the target race could have known."""
+        target_year = int(getattr(self, "season_year", getattr(self, "year", 2026)))
+        available_races = max(
+            _coerce_non_negative_int(getattr(self, "races_completed", 0)) or 0,
+            len(self._load_saved_actual_race_scores(target_year)),
+        )
+        prior_race_limit = self._count_known_prior_races(target_year, race_name)
+        if prior_race_limit is None:
+            return available_races
+        return min(available_races, prior_race_limit)
+
+    def _get_current_season_score(
+        self,
+        team_name: str,
+        team_data: dict[str, object],
+        *,
+        fallback: float,
+        race_name: str | None,
+    ) -> float:
+        """Return the current-season score using a recency-weighted average."""
+        observations = self._get_current_season_observations(
+            team_name=team_name,
+            team_data=team_data,
+            race_name=race_name,
+        )
+        if not observations:
+            return float(fallback)
+
+        cfg = getattr(self, "config", config_loader)
+        recency_exponent = float(
+            cfg.get("baseline_predictor.current_season_form.recency_exponent", 1.5)
+        )
+        recency_exponent = max(0.0, recency_exponent)
+        if len(observations) == 1 or recency_exponent == 0.0:
+            weighted_score = float(np.mean(observations))
+        else:
+            weights = np.power(np.arange(1, len(observations) + 1, dtype=float), recency_exponent)
+            weighted_score = float(np.average(observations, weights=weights))
+
+        stabilization_strength = float(
+            cfg.get("baseline_predictor.current_season_form.stabilization_strength", 1.5)
+        )
+        stabilization_strength = max(0.0, stabilization_strength)
+        if stabilization_strength == 0.0:
+            return weighted_score
+
+        observation_weight = len(observations) / (len(observations) + stabilization_strength)
+        stabilized_score = float(fallback) + (
+            (weighted_score - float(fallback)) * observation_weight
+        )
+        return float(np.clip(stabilized_score, 0.0, 1.0))
 
     def load_data(self) -> None:
         """Load season data and driver characteristics with schema validation."""
@@ -147,6 +609,21 @@ class BaselineDataMixin:
         else:
             logger.warning(
                 f"Data freshness unknown ({data_freshness}); predictions may be outdated"
+            )
+
+        try:
+            races_completed_value = int(races_completed)
+        except (TypeError, ValueError):
+            races_completed_value = 0
+        races_completed = self._resolve_saved_actual_races_completed(
+            target_year=target_year,
+            data_freshness=str(data_freshness),
+            races_completed=max(0, races_completed_value),
+        )
+        if data_freshness == "BASELINE_PRESEASON" and races_completed > races_completed_value:
+            logger.info(
+                "Pre-season payload will use contextual saved-actual fallback from %s completed race(s).",
+                races_completed,
             )
 
         # Load and validate driver characteristics
@@ -221,7 +698,7 @@ class BaselineDataMixin:
             logger.info(f"Loaded track characteristics for {len(self.tracks)} circuits")
 
         # Store races completed and year for weight schedule (from car characteristics)
-        self.races_completed = data.get("races_completed", 0)
+        self.races_completed = races_completed
         self.year = data.get("year", target_year)
 
     def _resolve_team_data(self, team: str) -> dict:
@@ -284,7 +761,7 @@ class BaselineDataMixin:
         Combines:
         1. Baseline (2025 standings) - decreases over season
         2. Testing directionality (track suitability) - decreases over season
-        3. Current season (running average) - increases over season
+        3. Current season form (recency-weighted) - increases over season
         """
         team_data = self._resolve_team_data(team)
 
@@ -295,16 +772,16 @@ class BaselineDataMixin:
         testing_modifier = self.calculate_track_suitability(team, race_name)
         testing_score = float(np.clip(baseline + testing_modifier, 0.0, 1.0))
 
-        # 3. Current season running average
-        current_season_performance = team_data.get("current_season_performance", [])
-        if current_season_performance:
-            current = np.mean(current_season_performance)
-        else:
-            # Pre-season: use baseline as fallback for current
-            current = baseline
+        # 3. Current season form with a strong recency bias.
+        current = self._get_current_season_score(
+            team,
+            team_data,
+            fallback=baseline,
+            race_name=race_name,
+        )
 
         # 4. Apply weight schedule
-        race_number = self.races_completed + 1  # Next race
+        race_number = self._get_contextual_races_completed(race_name) + 1
 
         # Use configured schedule when provided; default to regulation-change recommendation.
         cfg = getattr(self, "config", config_loader)

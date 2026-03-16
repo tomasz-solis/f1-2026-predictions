@@ -21,11 +21,21 @@ from src.models.bayesian import DriverPrior
 logger = logging.getLogger(__name__)
 
 
+def _driver_characteristics_fallback_paths(data_dir: Path, season_year: int) -> tuple[Path, ...]:
+    """Return season-aware driver-characteristics fallbacks in preferred order."""
+    return (
+        data_dir / "driver_characteristics" / f"{int(season_year)}_driver_characteristics.json",
+        data_dir / "driver_characteristics.json",
+    )
+
+
 class PriorsFactory:
+    """Build Bayesian driver priors from persisted driver and car characteristics."""
+
     def __init__(self, data_dir="data/processed", season_year: int = 2026):
+        """Initialize the priors factory with season-aware artifact paths."""
         self.data_dir = Path(data_dir)
         self.season_year = int(season_year)
-        self.driver_file = self.data_dir / "driver_characteristics.json"
         self.car_file = (
             self.data_dir / "car_characteristics" / f"{self.season_year}_car_characteristics.json"
         )
@@ -33,9 +43,21 @@ class PriorsFactory:
     def load_data(self):
         """Load artifacts or initialize fallbacks."""
         # 1. Load Driver Data
-        if self.driver_file.exists():
-            with open(self.driver_file) as f:
-                self.drivers = json.load(f)["drivers"]
+        driver_payload = None
+        for driver_file in _driver_characteristics_fallback_paths(self.data_dir, self.season_year):
+            if not driver_file.exists():
+                continue
+            with open(driver_file) as f:
+                driver_payload = json.load(f)
+            logger.info(
+                "Loading driver characteristics from %s for season %s",
+                driver_file.name,
+                self.season_year,
+            )
+            break
+
+        if driver_payload is not None:
+            self.drivers = driver_payload.get("drivers", {})
         else:
             logger.warning("No driver characteristics found. Using an empty dictionary.")
             self.drivers = {}

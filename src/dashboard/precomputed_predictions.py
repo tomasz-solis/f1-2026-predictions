@@ -36,6 +36,14 @@ def _resolve_max_entries(max_file_entries: int | None) -> int:
         return _DEFAULT_MAX_FILE_ENTRIES
 
 
+def _resolve_simulation_count(value: Any, *, default: int) -> int:
+    """Resolve a configured dashboard simulation count with a safe lower bound."""
+    try:
+        return max(10, int(value))
+    except (TypeError, ValueError):
+        return int(default)
+
+
 def _is_db_only_mode() -> bool:
     """Return True when DB is the only configured writable backend."""
     return should_write_to_db() and not should_write_to_file()
@@ -118,6 +126,8 @@ def get_prediction_precompute_config() -> dict[str, Any]:
             horizon_races: int
             weather_scenarios: list[str]
             max_file_entries: int
+            qualifying_n_simulations: int
+            race_n_simulations: int
     """
     enabled = bool(config_loader.get("dashboard.prediction_precompute.enabled", True))
     raw_horizon_races = config_loader.get(
@@ -159,6 +169,14 @@ def get_prediction_precompute_config() -> dict[str, Any]:
         "horizon_races": horizon_races,
         "weather_scenarios": weather_scenarios,
         "max_file_entries": max_file_entries,
+        "qualifying_n_simulations": _resolve_simulation_count(
+            config_loader.get("dashboard.prediction_precompute.qualifying_n_simulations", 100),
+            default=100,
+        ),
+        "race_n_simulations": _resolve_simulation_count(
+            config_loader.get("dashboard.prediction_precompute.race_n_simulations", 100),
+            default=100,
+        ),
     }
 
 

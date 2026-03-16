@@ -174,6 +174,14 @@ class BaselineRaceParamsMixin:
                 "baseline_predictor.race.pace_weight_track_modifier", 0.10
             ),
             "teammate_variance_std": cfg.get("baseline_predictor.race.teammate_variance_std", 0.15),
+            "teammate_setup_offset_ratio": cfg.get(
+                "baseline_predictor.race.teammate_setup_offset_ratio",
+                0.30,
+            ),
+            "teammate_variance_lap_ratio": cfg.get(
+                "baseline_predictor.race.teammate_variance_lap_ratio",
+                0.45,
+            ),
             "grid_divisor": cfg.get("baseline_predictor.race.grid_divisor", 21),
             "position_scaling_front_threshold": cfg.get(
                 "baseline_predictor.race.position_scaling.front_threshold", 3
