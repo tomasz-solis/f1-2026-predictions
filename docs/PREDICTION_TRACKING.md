@@ -132,6 +132,19 @@ Add `--sync` to push the mismatched local rows to Supabase. Add
 `--include-auxiliary-targets` on sprint weekends if you also want `sprint_qualifying`
 and `sprint_race` snapshot rows.
 
+If Supabase still has warmup rows from older artifact hashes, clean those with:
+
+```bash
+uv run python scripts/prune_stale_precompute_state.py \
+  --env-file .env.local \
+  --year 2026 \
+  --require-db
+```
+
+Add `--apply` to delete the stale rows. This only prunes dashboard warmup cache
+state in `runtime_state`; it does not remove saved checkpoint predictions or
+accuracy snapshots.
+
 ## Learning Update Side Effect
 
 When actuals are attached (dashboard or script path calling `PredictionLogger.update_actuals()`):

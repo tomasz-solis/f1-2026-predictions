@@ -162,6 +162,18 @@ Cron example (Render preheat every 5 minutes):
 */5 * * * * cd /path/to/formula1-2026 && /path/to/formula1-2026/.venv/bin/python scripts/warmup_precompute.py --year 2026 --require-db >> /tmp/f1_warmup.log 2>&1
 ```
 
+If Supabase accumulates warmup rows from older artifact hashes, prune only the
+runtime-state precompute cache with:
+
+```bash
+python scripts/prune_stale_precompute_state.py --year 2026 --require-db
+python scripts/prune_stale_precompute_state.py --year 2026 --require-db --apply
+```
+
+This cleanup is intentionally narrow. It removes stale rows only from the
+runtime-state warmup namespaces and keeps saved checkpoint prediction artifacts
+used by the accuracy dashboard.
+
 ### 2. Manual race update
 
 ```bash

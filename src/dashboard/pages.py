@@ -492,6 +492,53 @@ def _current_anchor_boundary_signature(year: int, anchor_race_name: str) -> str 
     return _boundary_signature(snapshot)
 
 
+def _selected_race_persisted_prediction_available(
+    *,
+    year: int,
+    race_name: str,
+    weather: str,
+) -> bool:
+    """Return whether the selected race already has a persisted prediction at the live boundary.
+
+    The prediction page should only hard-block when the selected race itself cannot
+    be served. Full warmed-horizon metadata can lag behind without preventing the
+    current race from loading when an exact persisted prediction already exists.
+    """
+    try:
+        artifact_versions = get_artifact_versions(year=year)
+        artifact_hash = compute_artifact_hash(artifact_versions)
+    except Exception as exc:
+        logger.warning(
+            "Could not compute artifact hash while checking selected-race availability: %s",
+            exc,
+        )
+        return False
+
+    current_boundary_signature = _current_anchor_boundary_signature(year, race_name)
+    if not current_boundary_signature:
+        return False
+
+    try:
+        payload = load_precomputed_prediction(
+            year=year,
+            race_name=race_name,
+            weather=str(weather).strip().lower(),
+            artifact_hash=artifact_hash,
+            boundary_signature=current_boundary_signature,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Could not load persisted selected-race prediction for %s %s [%s]: %s",
+            year,
+            race_name,
+            weather,
+            exc,
+        )
+        return False
+
+    return isinstance(payload, dict)
+
+
 def _load_ready_races_from_current_store(
     *,
     year: int,
@@ -757,8 +804,12 @@ def _filter_race_options_to_precomputed_horizon(
     }
 
 
-def _prediction_action_state(precompute_filter_meta: dict[str, Any]) -> dict[str, Any]:
-    """Resolve whether live prediction should be available for the current boundary."""
+def _prediction_action_state(
+    precompute_filter_meta: dict[str, Any],
+    *,
+    selected_race_prediction_available: bool = False,
+) -> dict[str, Any]:
+    """Resolve whether live prediction should be available for the selected race."""
     settings = get_prediction_precompute_config()
     require_persisted_predictions = not bool(settings.get("inline_enabled", True))
     if not require_persisted_predictions:
@@ -777,6 +828,9 @@ def _prediction_action_state(precompute_filter_meta: dict[str, Any]) -> dict[str
         }
 
     if bool(precompute_filter_meta.get("applied")):
+        return {"disabled": False, "pending_message": None}
+
+    if selected_race_prediction_available:
         return {"disabled": False, "pending_message": None}
 
     stale_reason = str(precompute_filter_meta.get("stale_reason", "")).strip()
@@ -1092,6 +1146,11 @@ def render_live_prediction_page(enable_logging: bool) -> None:
 
     with control_col3:
         weather = st.selectbox("Weather", ["dry", "rain", "mixed"])
+    selected_race_prediction_available = _selected_race_persisted_prediction_available(
+        year=selected_season,
+        race_name=race_name,
+        weather=weather,
+    )
 
     selected_weekend_label = (
         "Sprint weekend" if race_selection.endswith("(Sprint)") else "Race weekend"
@@ -1139,10 +1198,17 @@ def render_live_prediction_page(enable_logging: bool) -> None:
         planned_races = precompute_filter_meta.get("planned_races", [])
         visible_count = len(race_options)
         planned_count = len(planned_races) if isinstance(planned_races, list) else visible_count
-        precompute_message = (
-            f"Showing the next {visible_count}/{planned_count} scheduled races only. "
-            "Persisted horizon metadata is not ready for this boundary yet."
-        )
+        if selected_race_prediction_available:
+            precompute_message = (
+                f"Showing the next {visible_count}/{planned_count} scheduled races only. "
+                "The selected race is ready at the current checkpoint, while future-race "
+                "horizon metadata is still catching up."
+            )
+        else:
+            precompute_message = (
+                f"Showing the next {visible_count}/{planned_count} scheduled races only. "
+                "Persisted horizon metadata is not ready for this boundary yet."
+            )
     else:
         precompute_message = (
             "No warmed precompute horizon yet. First run builds checkpoint snapshots for the "
@@ -1155,7 +1221,10 @@ def render_live_prediction_page(enable_logging: bool) -> None:
         st_module=st,
     )
 
-    prediction_action_state = _prediction_action_state(precompute_filter_meta)
+    prediction_action_state = _prediction_action_state(
+        precompute_filter_meta,
+        selected_race_prediction_available=selected_race_prediction_available,
+    )
     pending_message = prediction_action_state.get("pending_message")
     if isinstance(pending_message, str) and pending_message.strip():
         render_notice_banner(

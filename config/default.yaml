@@ -101,6 +101,9 @@ learning:
 
   # Min races before trusting a method
   min_samples: 3
+  driver_error_scale: 0.18
+  teammate_gap_scale: 0.10
+  max_adjustment: 2.5
 
 # Track Characteristics
 track_defaults:

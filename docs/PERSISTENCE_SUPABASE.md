@@ -46,6 +46,7 @@ like `ttps://...` now fail fast with an explicit error.
 - Connection test: `scripts/test_supabase_connection.py`
 - Backfill utility: `scripts/backfill_to_db.py` (migrates `driver_debuts.csv` too)
 - Targeted dashboard datapoint compare/sync: `scripts/sync_dashboard_datapoints_to_db.py`
+- Stale warmup-cache pruning: `scripts/prune_stale_precompute_state.py`
 - Snapshot backfill utility: `scripts/backfill_accuracy_snapshots.py`
 - Predictor + storage smoke test: `scripts/test_predictor_with_db.py`
 
@@ -91,6 +92,33 @@ The script always compares:
 
 This is the safer tool when your local repo has unrelated data changes and you
 do not want a broad Supabase backfill.
+
+## Prune Stale Warmup Cache Rows
+
+The prediction page warmup stores runtime-state rows keyed by artifact hash.
+Those rows are cache, not source-of-truth prediction history. If old hashes are
+left behind in Supabase, the deployed app can surface stale horizon metadata or
+mixed precompute state.
+
+Use `scripts/prune_stale_precompute_state.py` to remove stale warmup rows for
+one season year while keeping the current hash:
+
+```bash
+uv run python scripts/prune_stale_precompute_state.py \
+  --env-file .env.local \
+  --year 2026 \
+  --require-db
+```
+
+Add `--apply` to delete the stale rows after reviewing the dry-run report.
+
+The script only touches these runtime-state namespaces:
+
+- `precomputed_predictions`
+- `precomputed_prediction_base_features`
+- `prediction_precompute_horizon_index`
+
+It does not delete `prediction` or `accuracy_snapshot` artifacts.
 
 ## Prediction Accuracy Artifacts
 

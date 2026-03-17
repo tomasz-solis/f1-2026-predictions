@@ -73,10 +73,30 @@ class BaselineRacePredictionMixin:
             return 0.0
 
         cfg = getattr(self, "config", config_loader)
-        min_samples = int(cfg.get("baseline_predictor.learning.min_samples", 1))
-        driver_error_scale = float(cfg.get("baseline_predictor.learning.driver_error_scale", 0.18))
-        teammate_gap_scale = float(cfg.get("baseline_predictor.learning.teammate_gap_scale", 0.10))
-        max_adjustment = float(cfg.get("baseline_predictor.learning.max_adjustment", 2.5))
+        min_samples = int(
+            cfg.get(
+                "learning.min_samples",
+                cfg.get("baseline_predictor.learning.min_samples", 1),
+            )
+        )
+        driver_error_scale = float(
+            cfg.get(
+                "learning.driver_error_scale",
+                cfg.get("baseline_predictor.learning.driver_error_scale", 0.18),
+            )
+        )
+        teammate_gap_scale = float(
+            cfg.get(
+                "learning.teammate_gap_scale",
+                cfg.get("baseline_predictor.learning.teammate_gap_scale", 0.10),
+            )
+        )
+        max_adjustment = float(
+            cfg.get(
+                "learning.max_adjustment",
+                cfg.get("baseline_predictor.learning.max_adjustment", 2.5),
+            )
+        )
 
         try:
             return float(

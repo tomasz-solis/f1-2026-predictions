@@ -100,6 +100,14 @@ class SystematicLearningSystem:
         with open(self.state_file, "w") as f:
             json.dump(self.state, f, indent=2)
 
+    def reset_state(self, season: int | None = None) -> None:
+        """Reset learning state to a clean default payload for one season."""
+        next_state = self._default_state()
+        if season is not None:
+            next_state["season"] = int(season)
+        self.state = next_state
+        self.save_state()
+
     @staticmethod
     def _update_ema_slot(slot: dict[str, Any], value: float, alpha: float) -> None:
         count = int(slot.get("count", 0)) + 1
@@ -135,6 +143,78 @@ class SystematicLearningSystem:
         normalized = DriverNameMapper.normalize_driver_name(candidate)
         if isinstance(normalized, str) and normalized.strip():
             return normalized.strip()
+        return None
+
+    @staticmethod
+    def _parse_timestamp(value: Any) -> datetime | None:
+        """Parse an ISO-like timestamp into an aware UTC datetime when possible."""
+        if not isinstance(value, str):
+            return None
+
+        raw = value.strip()
+        if not raw:
+            return None
+
+        normalized = raw.replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError:
+            return None
+
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
+
+    def _has_processed_run_id(self, run_id: str | None) -> bool:
+        """Return whether one prediction run id already updated learning state."""
+        if not isinstance(run_id, str) or not run_id.strip():
+            return False
+
+        adaptive = self.state.get("adaptive_calibration", {})
+        if not isinstance(adaptive, dict):
+            return False
+
+        event_history = adaptive.get("event_history", [])
+        if not isinstance(event_history, list):
+            return False
+
+        normalized_run_id = run_id.strip()
+        for entry in event_history:
+            if not isinstance(entry, dict):
+                continue
+            if str(entry.get("run_id", "")).strip() == normalized_run_id:
+                return True
+        return False
+
+    def _learning_skip_reason(self, prediction_data: dict[str, Any]) -> str | None:
+        """Return a skip reason when a prediction should not train adaptive learning."""
+        metadata = prediction_data.get("metadata", {})
+        if not isinstance(metadata, dict):
+            return None
+
+        run_id = str(metadata.get("run_id", "")).strip()
+        if run_id and self._has_processed_run_id(run_id):
+            return "duplicate_run_id"
+
+        source = str(metadata.get("source", "")).strip().lower()
+        generated_by = str(metadata.get("generated_by", "")).strip().lower()
+        checkpoint_source = str(metadata.get("checkpoint_source", "")).strip().lower()
+        if source == "checkpoint_reconstruction":
+            return "retrospective_prediction"
+        if generated_by == "checkpoint_reconstruction":
+            return "retrospective_prediction"
+        if checkpoint_source == "retrospective":
+            return "retrospective_prediction"
+
+        predicted_at = self._parse_timestamp(metadata.get("predicted_at"))
+        information_cutoff_at = self._parse_timestamp(metadata.get("information_cutoff_at"))
+        if (
+            predicted_at is not None
+            and information_cutoff_at is not None
+            and predicted_at > information_cutoff_at
+        ):
+            return "retrospective_prediction"
+
         return None
 
     def _update_session_errors(
@@ -233,6 +313,17 @@ class SystematicLearningSystem:
         history_limit: int = 250,
     ) -> dict[str, Any]:
         """Update calibration from a saved prediction record with actual results."""
+        skip_reason = self._learning_skip_reason(prediction_data)
+        if skip_reason is not None:
+            return {
+                "sessions_updated": 0,
+                "driver_updates": 0,
+                "pair_updates": 0,
+                "details": [],
+                "skipped": True,
+                "skip_reason": skip_reason,
+            }
+
         actuals = prediction_data.get("actuals") or {}
         predicted_quali = (prediction_data.get("qualifying") or {}).get("predicted_grid") or []
         predicted_race = (prediction_data.get("race") or {}).get("predicted_results") or []
@@ -284,6 +375,8 @@ class SystematicLearningSystem:
             "driver_updates": total_driver_updates,
             "pair_updates": total_pair_updates,
             "details": updates,
+            "skipped": False,
+            "skip_reason": None,
         }
 
     @staticmethod

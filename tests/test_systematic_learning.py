@@ -88,3 +88,46 @@ def test_update_from_prediction_record_no_actuals_no_updates(tmp_path):
     assert summary["sessions_updated"] == 0
     assert summary["driver_updates"] == 0
     assert summary["pair_updates"] == 0
+
+
+def test_update_from_prediction_record_skips_retrospective_predictions(tmp_path):
+    state_file = tmp_path / "learning_state.json"
+    system = SystematicLearningSystem(state_file=state_file)
+
+    prediction = _sample_prediction_record()
+    prediction["metadata"].update(
+        {
+            "source": "checkpoint_reconstruction",
+            "predicted_at": "2026-03-17T10:26:25+00:00",
+            "information_cutoff_at": "2026-03-06T04:59:59+00:00",
+        }
+    )
+
+    summary = system.update_from_prediction_record(prediction)
+
+    assert summary["skipped"] is True
+    assert summary["skip_reason"] == "retrospective_prediction"
+    assert summary["sessions_updated"] == 0
+    assert (
+        system.get_combined_position_adjustment(
+            team="Red Bull Racing",
+            driver="VER",
+            teammates=["VER", "HAD"],
+            session="qualifying",
+            min_samples=1,
+        )
+        == 0.0
+    )
+
+
+def test_update_from_prediction_record_skips_duplicate_run_id(tmp_path):
+    state_file = tmp_path / "learning_state.json"
+    system = SystematicLearningSystem(state_file=state_file)
+
+    prediction = _sample_prediction_record()
+    first = system.update_from_prediction_record(prediction)
+    second = system.update_from_prediction_record(prediction)
+
+    assert first["skipped"] is False
+    assert second["skipped"] is True
+    assert second["skip_reason"] == "duplicate_run_id"

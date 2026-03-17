@@ -271,6 +271,62 @@ def test_prediction_action_state_keeps_current_race_enabled_during_boundary_lag(
     assert "selected race can still run from live checkpoint data" in state["pending_message"]
 
 
+def test_selected_race_persisted_prediction_available_uses_current_boundary_and_weather(patcher):
+    patcher.setattr(pages, "get_artifact_versions", lambda year=2026: {"k": (1, "ts")})
+    patcher.setattr(pages, "compute_artifact_hash", lambda versions: "artifact_hash")
+    patcher.setattr(
+        pages,
+        "_current_anchor_boundary_signature",
+        lambda year, anchor_race_name: "boundary_sig",
+    )
+
+    captured: dict[str, object] = {}
+
+    def _load_precomputed_prediction(**kwargs):
+        captured.update(kwargs)
+        return {"qualifying": {"grid": []}, "race": {"finish_order": []}}
+
+    patcher.setattr(pages, "load_precomputed_prediction", _load_precomputed_prediction)
+
+    assert (
+        pages._selected_race_persisted_prediction_available(
+            year=2026,
+            race_name="Japanese Grand Prix",
+            weather="Dry",
+        )
+        is True
+    )
+    assert captured == {
+        "year": 2026,
+        "race_name": "Japanese Grand Prix",
+        "weather": "dry",
+        "artifact_hash": "artifact_hash",
+        "boundary_signature": "boundary_sig",
+    }
+
+
+def test_prediction_action_state_keeps_selected_race_enabled_when_exact_prediction_exists(
+    patcher,
+):
+    patcher.setattr(
+        pages,
+        "get_prediction_precompute_config",
+        lambda: {"inline_enabled": False, "horizon_races": 3},
+    )
+
+    state = pages._prediction_action_state(
+        {
+            "applied": False,
+            "scope_applied": True,
+            "stale_reason": "missing_horizon_index",
+        },
+        selected_race_prediction_available=True,
+    )
+
+    assert state["disabled"] is False
+    assert state["pending_message"] is None
+
+
 def test_cache_dir_race_matching_handles_date_prefixed_event_dirs():
     assert pages._cache_dir_matches_race(
         "2025-04-13_Bahrain_Grand_Prix",
