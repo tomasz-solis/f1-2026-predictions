@@ -69,6 +69,7 @@ def test_strength_calculator_delegates_to_data_mixin(patcher):
 
 
 def test_engines_delegate_to_mixins(patcher):
+    """Facade engines should forward the full current mixin call contract."""
     predictor = object()
     qualifying_engine = BaselineQualifyingEngine(predictor)
     race_engine = BaselineRaceEngine(predictor)
@@ -121,6 +122,8 @@ def test_engines_delegate_to_mixins(patcher):
         "race_name": "Bahrain Grand Prix",
         "n_simulations": 5,
         "qualifying_stage": "main",
+        "practice_signal_mode": "auto",
+        "checkpoint_session_name": None,
     }
     assert calls["sprint_self"] is predictor
     assert calls["sprint_kwargs"]["race_name"] == "Chinese Grand Prix"

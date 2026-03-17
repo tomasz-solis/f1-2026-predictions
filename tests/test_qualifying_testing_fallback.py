@@ -500,6 +500,102 @@ def test_testing_fallback_teammate_guard_reduces_extreme_inversions():
     assert ratio_with_guard > 0.05
 
 
+def test_testing_fallback_driver_offset_multiplier_reduces_team_block_clustering():
+    """Fallback-only offset widening should allow more cross-team interleaving."""
+    base_overrides = {
+        "baseline_predictor.qualifying.noise_std_normal": 0.018,
+        "baseline_predictor.qualifying.teammate_setup_std": 0.008,
+        "baseline_predictor.qualifying.testing_fallback_teammate_guard_enabled": True,
+        "baseline_predictor.qualifying.testing_fallback_driver_signal_shrink": 0.10,
+    }
+    predictor_without_multiplier = DummyQualifyingPredictor(base_overrides)
+    predictor_with_multiplier = DummyQualifyingPredictor(
+        {
+            **base_overrides,
+            "baseline_predictor.qualifying.testing_fallback_driver_offset_cap_multiplier": 1.33,
+        }
+    )
+
+    all_drivers = [
+        {
+            "driver": "AAA",
+            "team": "Team A",
+            "team_strength": 0.60,
+            "skill": 0.95,
+            "quali_pace": 0.95,
+            "experience_tier": "veteran",
+            "experience_total_races": 200,
+        },
+        {
+            "driver": "BBB",
+            "team": "Team A",
+            "team_strength": 0.60,
+            "skill": 0.66,
+            "quali_pace": 0.68,
+            "experience_tier": "developing",
+            "experience_total_races": 35,
+        },
+        {
+            "driver": "CCC",
+            "team": "Team B",
+            "team_strength": 0.57,
+            "skill": 0.88,
+            "quali_pace": 0.87,
+            "experience_tier": "veteran",
+            "experience_total_races": 180,
+        },
+        {
+            "driver": "DDD",
+            "team": "Team B",
+            "team_strength": 0.57,
+            "skill": 0.60,
+            "quali_pace": 0.62,
+            "experience_tier": "developing",
+            "experience_total_races": 30,
+        },
+    ]
+
+    without_multiplier = predictor_without_multiplier._run_qualifying_simulations(
+        all_drivers=all_drivers,
+        n_simulations=4000,
+        is_sprint=False,
+        has_practice_data=False,
+        rng=np.random.default_rng(2026),
+        has_testing_fallback_data=True,
+    )
+    with_multiplier = predictor_with_multiplier._run_qualifying_simulations(
+        all_drivers=all_drivers,
+        n_simulations=4000,
+        is_sprint=False,
+        has_practice_data=False,
+        rng=np.random.default_rng(2026),
+        has_testing_fallback_data=True,
+    )
+
+    cross_team_interleave_without_multiplier = (
+        sum(
+            1
+            for team_a_second, team_b_first in zip(
+                without_multiplier["BBB"], without_multiplier["CCC"], strict=True
+            )
+            if team_b_first < team_a_second
+        )
+        / 4000
+    )
+    cross_team_interleave_with_multiplier = (
+        sum(
+            1
+            for team_a_second, team_b_first in zip(
+                with_multiplier["BBB"], with_multiplier["CCC"], strict=True
+            )
+            if team_b_first < team_a_second
+        )
+        / 4000
+    )
+
+    assert cross_team_interleave_with_multiplier > (cross_team_interleave_without_multiplier + 0.02)
+
+
 def test_run_qualifying_simulations_applies_learned_position_adjustments():
     predictor = DummyQualifyingPredictor(
         {

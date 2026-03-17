@@ -359,6 +359,12 @@ def run_qualifying_simulations(
             team_weight /= total_weight
             skill_weight /= total_weight
 
+        driver_offset_cap *= cfg.get(
+            "baseline_predictor.qualifying.testing_fallback_driver_offset_cap_multiplier",
+            1.0,
+        )
+        driver_offset_cap = float(np.clip(driver_offset_cap, 0.05, 0.30))
+
         noise_std *= cfg.get(
             "baseline_predictor.qualifying.testing_fallback_noise_multiplier", 0.95
         )
