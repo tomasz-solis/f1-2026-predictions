@@ -66,6 +66,8 @@ class BaselineQualifyingEngine:
         race_name: str,
         n_simulations: int = 50,
         qualifying_stage: str = "auto",
+        practice_signal_mode: str = "auto",
+        checkpoint_session_name: str | None = None,
     ) -> dict[str, Any]:
         """Predict qualifying grid and confidence ranges."""
         return BaselineQualifyingMixin.predict_qualifying(
@@ -74,6 +76,8 @@ class BaselineQualifyingEngine:
             race_name=race_name,
             n_simulations=n_simulations,
             qualifying_stage=qualifying_stage,
+            practice_signal_mode=practice_signal_mode,
+            checkpoint_session_name=checkpoint_session_name,
         )
 
     def predict_sprint_race(

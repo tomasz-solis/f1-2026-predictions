@@ -5,6 +5,7 @@ import time
 from typing import Any
 
 from src.types.prediction_types import QualifyingGridEntry
+from src.utils.race_input_confidence import cap_predicted_main_race_input_confidence
 
 from .cache import get_predictor
 from .precomputed_predictions import get_prediction_precompute_config
@@ -107,6 +108,24 @@ def _resolve_dashboard_simulation_count(kind: str) -> int:
     if str(kind).strip().lower() == "qualifying":
         return int(settings.get("qualifying_n_simulations", 100))
     return int(settings.get("race_n_simulations", 100))
+
+
+def _resolve_current_checkpoint_session(
+    *,
+    year: int,
+    race_name: str,
+    is_sprint: bool,
+) -> str:
+    """Return the latest completed weekend checkpoint or ``PRE`` when none exist."""
+    from src.utils.session_detector import SessionDetector
+
+    try:
+        latest_session = SessionDetector().get_latest_completed_session(year, race_name, is_sprint)
+    except Exception:
+        latest_session = None
+
+    checkpoint_session = str(latest_session or "").strip().upper()
+    return checkpoint_session or "PRE"
 
 
 def fetch_actual_competitive_results_if_completed(
@@ -280,6 +299,7 @@ def _resolve_qualifying_section(
     race_name: str,
     session_name: str,
     qualifying_stage: str,
+    checkpoint_session_name: str,
 ) -> tuple[dict[str, Any], list[QualifyingGridEntry], str]:
     """Return actual completed-session results or a predicted qualifying payload."""
     actual_results, result_source = fetch_actual_competitive_results_if_completed(
@@ -299,6 +319,8 @@ def _resolve_qualifying_section(
         race_name=race_name,
         qualifying_stage=qualifying_stage,
         n_simulations=_resolve_dashboard_simulation_count("qualifying"),
+        practice_signal_mode="stored_profiles",
+        checkpoint_session_name=checkpoint_session_name,
     )
     qualifying_grid, grid_source = fetch_grid_if_available(
         year,
@@ -389,6 +411,11 @@ def run_prediction(
     except TypeError:
         predictor = get_predictor(_artifact_versions)
     results = {}
+    checkpoint_session_name = _resolve_current_checkpoint_session(
+        year=year,
+        race_name=race_name,
+        is_sprint=is_sprint,
+    )
 
     if is_sprint:
         # SPRINT WEEKEND CASCADE: SQ -> Sprint -> Main Quali -> Main Race
@@ -400,6 +427,7 @@ def run_prediction(
             race_name=race_name,
             session_name="SQ",
             qualifying_stage="sprint",
+            checkpoint_session_name=checkpoint_session_name,
         )
         timing["sprint_quali"] = time.time() - sq_start
         results["sprint_quali"] = sq_result
@@ -433,6 +461,7 @@ def run_prediction(
             race_name=race_name,
             session_name="Q",
             qualifying_stage="main",
+            checkpoint_session_name=checkpoint_session_name,
         )
         timing["main_quali"] = time.time() - mq_start
         results["main_quali"] = mq_result
@@ -441,6 +470,13 @@ def run_prediction(
         main_race_input_confidence = _derive_race_input_confidence(
             mq_result,
             grid_source=main_grid_source,
+        )
+        main_race_input_confidence = cap_predicted_main_race_input_confidence(
+            main_race_input_confidence,
+            qualifying_result=mq_result,
+            grid_source=main_grid_source,
+            is_sprint_weekend=True,
+            boundary_session_name=checkpoint_session_name,
         )
 
         main_race_result = _resolve_race_section(
@@ -469,6 +505,7 @@ def run_prediction(
             race_name=race_name,
             session_name="Q",
             qualifying_stage="main",
+            checkpoint_session_name=checkpoint_session_name,
         )
         timing["qualifying"] = time.time() - quali_start
         results["qualifying"] = quali_result

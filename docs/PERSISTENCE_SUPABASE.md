@@ -45,10 +45,52 @@ like `ttps://...` now fail fast with an explicit error.
 - SQL migration: `migrations/003_harden_rls_policies.sql`
 - Connection test: `scripts/test_supabase_connection.py`
 - Backfill utility: `scripts/backfill_to_db.py` (migrates `driver_debuts.csv` too)
+- Targeted dashboard datapoint compare/sync: `scripts/sync_dashboard_datapoints_to_db.py`
 - Snapshot backfill utility: `scripts/backfill_accuracy_snapshots.py`
 - Predictor + storage smoke test: `scripts/test_predictor_with_db.py`
 
 No new Supabase tables or migrations are required for prediction accuracy. The existing generic `artifacts` table stores both raw prediction artifacts and derived accuracy snapshots.
+
+## Targeted Dashboard Datapoint Sync
+
+When you only need to compare or update the checkpoint rows that back dashboard
+charts, use `scripts/sync_dashboard_datapoints_to_db.py` instead of a full
+`backfill_to_db.py` run.
+
+Example compare-only run:
+
+```bash
+uv run python scripts/sync_dashboard_datapoints_to_db.py \
+  --env-file .env.local \
+  --year 2026 \
+  --race-name "Chinese Grand Prix" \
+  --checkpoint FP1 \
+  --checkpoint SQ \
+  --checkpoint SPRINT
+```
+
+Example compare + sync run, including sprint-only auxiliary targets:
+
+```bash
+uv run python scripts/sync_dashboard_datapoints_to_db.py \
+  --env-file .env.local \
+  --year 2026 \
+  --race-name "Chinese Grand Prix" \
+  --checkpoint FP1 \
+  --checkpoint SQ \
+  --checkpoint SPRINT \
+  --include-auxiliary-targets \
+  --sync
+```
+
+The script always compares:
+
+- `prediction` artifacts for the requested checkpoints
+- `accuracy_snapshot` rows for `main_qualifying` and `grand_prix_race`
+- optional extra checkpoint targets when `--include-auxiliary-targets` is set
+
+This is the safer tool when your local repo has unrelated data changes and you
+do not want a broad Supabase backfill.
 
 ## Prediction Accuracy Artifacts
 

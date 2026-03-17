@@ -204,6 +204,9 @@ baseline_predictor:
     testing_fallback_short_weight_min: 0.35
     testing_fallback_short_weight_max: 0.85
     testing_fallback_divergence_scale: 1.4
+    # After the sprint race, the balanced checkpoint profile contains more race-style signal.
+    # For main qualifying, keep fallback inference anchored to short-run pace only.
+    testing_fallback_after_sprint_main_short_weight: 1.0
     # Soft teammate guard for testing-fallback mode.
     # Keeps early-weekend teammate flips possible, but requires stronger signal.
     testing_fallback_teammate_guard_enabled: true
@@ -365,6 +368,12 @@ baseline_predictor:
     # Program-aware testing/practice modifier
     # Uses long-run profile characteristics to make a small team-strength adjustment.
     testing_long_run_modifier_scale: 0.05
+    # Sprint weekends still use a predicted Sunday grid until main qualifying actually runs.
+    # Cap confidence so the race model does not over-anchor to an inferred order.
+    main_race_predicted_grid_sprint_confidence_cap: 0.55
+    main_race_predicted_grid_sprint_confidence_caps_by_checkpoint:
+      SQ: 0.50
+      SPRINT: 0.65
     weekend_long_run_min_laps: 12     # Minimum stint length to treat laps as race-sim long run
     long_run_outlier_threshold: 1.5
     long_run_trim_ends: true

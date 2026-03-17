@@ -107,6 +107,8 @@ def build_testing_short_run_fallback(
     metric_weights: dict[str, float],
     cfg: Any,
     get_testing_characteristics_for_profile: Callable[[str, str], dict[str, float] | None],
+    checkpoint_session_name: str | None = None,
+    qualifying_stage: str = "auto",
 ) -> dict[str, float] | None:
     """Build a team-pace fallback from stored short-run testing profiles."""
     min_teams = int(cfg.get("baseline_predictor.qualifying.testing_fallback_min_teams", 8))
@@ -118,6 +120,18 @@ def build_testing_short_run_fallback(
     short_weight_max = float(
         cfg.get("baseline_predictor.qualifying.testing_fallback_short_weight_max", 0.85)
     )
+    checkpoint_name = str(checkpoint_session_name or "").strip().upper()
+    stage_name = str(qualifying_stage or "auto").strip().lower()
+    if checkpoint_name == "SPRINT" and stage_name == "main":
+        # After the sprint race, the balanced checkpoint profile has absorbed race-style signal.
+        # Main qualifying still targets one-lap pace, so lean fully on the short-run profile.
+        after_sprint_short_weight = cfg.get(
+            "baseline_predictor.qualifying.testing_fallback_after_sprint_main_short_weight",
+        )
+        if after_sprint_short_weight is not None:
+            pure_short_weight = float(np.clip(after_sprint_short_weight, 0.0, 1.0))
+            short_weight_min = pure_short_weight
+            short_weight_max = pure_short_weight
     divergence_scale = float(
         cfg.get("baseline_predictor.qualifying.testing_fallback_divergence_scale", 1.4)
     )

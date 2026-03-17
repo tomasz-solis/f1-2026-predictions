@@ -138,6 +138,88 @@ def test_predict_qualifying_uses_testing_short_run_fallback():
     assert all("experience_total_races" in driver for driver in captured["all_drivers"])
 
 
+def test_predict_qualifying_can_force_stored_checkpoint_profiles():
+    """Checkpoint mode should bypass raw practice extraction and use stored profiles directly."""
+    predictor = DummyQualifyingPredictor(
+        {
+            "baseline_predictor.qualifying.enable_driver_fp_adjustment": False,
+            "baseline_predictor.qualifying.testing_short_run_modifier_scale": 0.0,
+            "baseline_predictor.qualifying.testing_fallback_min_teams": 2,
+            "baseline_predictor.qualifying.testing_fallback_modifier_scale": 0.10,
+            "baseline_predictor.qualifying.testing_fallback_modifier_clip_range": [-0.05, 0.05],
+            "baseline_predictor.race.testing_profile_weights.short_run": {"overall_pace": 1.0},
+        }
+    )
+
+    captured: dict[str, object] = {}
+
+    def _fake_run(
+        all_drivers,
+        n_simulations,
+        is_sprint,
+        has_practice_data,
+        rng,
+        has_testing_fallback_data,
+    ):
+        _ = (n_simulations, is_sprint, rng, has_testing_fallback_data)
+        captured["has_practice_data"] = has_practice_data
+        captured["all_drivers"] = all_drivers
+        return {"AAA": [1], "BBB": [2]}
+
+    def _fake_aggregate(position_records, all_drivers, *, data_confidence_score=None):
+        _ = position_records
+        _ = data_confidence_score
+        ordered = sorted(all_drivers, key=lambda driver: driver["team_strength"], reverse=True)
+        return [
+            {
+                "position": index + 1,
+                "driver": driver_info["driver"],
+                "team": driver_info["team"],
+                "median_position": index + 1,
+                "position_distribution": [index + 1],
+            }
+            for index, driver_info in enumerate(ordered)
+        ]
+
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch.object(qualifying_module, "is_sprint_weekend", lambda year, race_name: False)
+        )
+        stack.enter_context(
+            patch.object(
+                qualifying_module,
+                "get_lineups",
+                lambda year, race_name: {"Team A": ["AAA"], "Team B": ["BBB"]},
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                qualifying_module,
+                "get_best_fp_performance_with_session_laps",
+                side_effect=AssertionError("raw practice extraction should be bypassed"),
+            )
+        )
+        with patch.object(predictor, "_run_qualifying_simulations", _fake_run):
+            with patch.object(predictor, "_aggregate_grid_results", _fake_aggregate):
+                result = predictor.predict_qualifying(
+                    2026,
+                    "Australian Grand Prix",
+                    n_simulations=1,
+                    practice_signal_mode="stored_profiles",
+                    checkpoint_session_name="FP2",
+                )
+
+    assert captured["has_practice_data"] is False
+    assert result["blend_used"] is False
+    assert result["testing_fallback_used"] is True
+    assert result["practice_signal_mode_used"] == "stored_profiles"
+    assert result["practice_signal_checkpoint"] == "FP2"
+    assert (
+        result["data_source"] == "FP2 testing short-run profile blend (stored checkpoint profiles)"
+    )
+    assert result["data_confidence_score"] == pytest.approx(0.5)
+
+
 def test_predict_qualifying_remains_model_only_without_testing_profiles():
     predictor = DummyQualifyingPredictor(
         {
@@ -500,6 +582,44 @@ def test_testing_short_run_fallback_blends_toward_balanced_on_profile_divergence
     assert fallback_scores["Team A"] < 0.60
     # Team B has low disagreement, so score should stay near short-run pace.
     assert fallback_scores["Team B"] > 0.55
+
+
+def test_testing_short_run_fallback_uses_short_run_only_after_sprint_for_main_qualifying():
+    """After Sprint, main qualifying fallback should ignore race-shaped balanced profiles."""
+    predictor = DummyQualifyingPredictor(
+        {
+            "baseline_predictor.qualifying.testing_fallback_min_teams": 2,
+            "baseline_predictor.qualifying.testing_fallback_short_weight_min": 0.35,
+            "baseline_predictor.qualifying.testing_fallback_short_weight_max": 0.85,
+            "baseline_predictor.qualifying.testing_fallback_after_sprint_main_short_weight": 1.0,
+            "baseline_predictor.qualifying.testing_fallback_divergence_scale": 1.4,
+        }
+    )
+    predictor.teams = {
+        "Team A": {
+            "testing_characteristics_profiles": {
+                "short_run": {"overall_pace": 0.90},
+                "balanced": {"overall_pace": 0.20},
+            }
+        },
+        "Team B": {
+            "testing_characteristics_profiles": {
+                "short_run": {"overall_pace": 0.60},
+                "balanced": {"overall_pace": 0.55},
+            }
+        },
+    }
+
+    fallback_scores = predictor._build_testing_short_run_fallback(
+        lineups={"Team A": ["AAA"], "Team B": ["BBB"]},
+        metric_weights={"overall_pace": 1.0},
+        checkpoint_session_name="SPRINT",
+        qualifying_stage="main",
+    )
+
+    assert fallback_scores is not None
+    assert fallback_scores["Team A"] == pytest.approx(0.90)
+    assert fallback_scores["Team B"] == pytest.approx(0.60)
 
 
 def test_model_only_negative_delta_shrink_prevents_extreme_rookie_drop():

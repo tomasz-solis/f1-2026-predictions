@@ -257,6 +257,7 @@ Supabase assets in the repo:
 - Migration: `migrations/003_harden_rls_policies.sql`
 - Connectivity check: `scripts/test_supabase_connection.py`
 - Backfill utility: `scripts/backfill_to_db.py` (includes `driver_debuts.csv` migration)
+- Targeted dashboard datapoint compare/sync: `scripts/sync_dashboard_datapoints_to_db.py`
 - Predictor/storage smoke test: `scripts/test_predictor_with_db.py`
 
 Rollout guidance:

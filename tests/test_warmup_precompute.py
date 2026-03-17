@@ -674,6 +674,49 @@ def test_compute_base_features_uses_actual_qualifying_section_after_completed_q(
     assert result["race_input_confidence"] == 1.0
 
 
+def test_compute_base_features_uses_stored_checkpoint_profiles_for_qualifying(patcher):
+    """Warmup should pin qualifying inference to the stored checkpoint profile state."""
+
+    class _Predictor:
+        def __init__(self):
+            self.qualifying_kwargs = None
+
+        def predict_qualifying(self, **kwargs):
+            self.qualifying_kwargs = kwargs
+            return {
+                "grid": [{"position": 1, "driver": "NOR", "team": "McLaren"}],
+                "data_confidence_score": 0.9,
+                "data_source": "FP3 short-stint",
+            }
+
+    predictor = _Predictor()
+
+    patcher.setattr(
+        warmup,
+        "fetch_actual_competitive_results_if_completed",
+        lambda year, race_name, session_name: (None, "INCOMPLETE"),
+    )
+    patcher.setattr(
+        warmup,
+        "fetch_grid_if_available",
+        lambda year, race_name, session_name, predicted_grid: (predicted_grid, "PREDICTED"),
+    )
+
+    warmup.compute_base_features(
+        2026,
+        "Australian Grand Prix",
+        "FP3",
+        "artifact_hash",
+        "boundary_signature",
+        predictor=predictor,
+        is_sprint=False,
+    )
+
+    assert predictor.qualifying_kwargs is not None
+    assert predictor.qualifying_kwargs["practice_signal_mode"] == "stored_profiles"
+    assert predictor.qualifying_kwargs["checkpoint_session_name"] == "FP3"
+
+
 def test_compute_weather_predictions_uses_actual_sprint_race_after_completion(patcher):
     """Warmup weather overlays should not regenerate completed sprint races."""
 

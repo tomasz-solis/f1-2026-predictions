@@ -450,13 +450,30 @@ def save_precomputed_base_features(
 
 
 def _extract_prediction_results(payload: Any) -> dict[str, Any] | None:
-    """Extract prediction results when payload has the expected shape."""
+    """
+    Extract prediction results when payload has the expected shape.
+
+    The returned mapping keeps a small context footer so downstream callers can
+    tell which boundary session produced the cached prediction. That matters
+    when a served prediction is later persisted for accuracy tracking.
+    """
     if not isinstance(payload, dict):
         return None
     raw_results = payload.get("prediction_results")
     if not isinstance(raw_results, dict):
         return None
-    return raw_results
+
+    extracted_results = dict(raw_results)
+    metadata = payload.get("metadata")
+    if isinstance(metadata, dict):
+        boundary_session_name = str(metadata.get("boundary_session_name", "")).strip().upper()
+        if boundary_session_name:
+            existing_context = extracted_results.get("_prediction_context")
+            context = dict(existing_context) if isinstance(existing_context, dict) else {}
+            context["boundary_session_name"] = boundary_session_name
+            extracted_results["_prediction_context"] = context
+
+    return extracted_results
 
 
 def _extract_base_features(payload: Any) -> dict[str, Any] | None:

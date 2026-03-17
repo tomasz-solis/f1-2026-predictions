@@ -1,7 +1,16 @@
 """Focused tests for the target-aware accuracy pipeline."""
 
-from src.dashboard.accuracy import AccuracyPipeline, CheckpointAccuracyPoint, TargetAccuracySummary
-from src.dashboard.accuracy_view import build_progression_line_series, build_progression_series
+from src.dashboard.accuracy import (
+    AccuracyPipeline,
+    CheckpointAccuracyPoint,
+    CheckpointStatusPoint,
+    TargetAccuracySummary,
+)
+from src.dashboard.accuracy_view import (
+    build_progression_checkpoint_state,
+    build_progression_line_series,
+    build_progression_series,
+)
 
 
 def test_accuracy_pipeline_prefers_persisted_snapshots(patcher):
@@ -207,6 +216,100 @@ def test_accuracy_pipeline_excludes_ineligible_target_but_keeps_race_target(patc
     assert summary.n_excluded_targets == 1
 
 
+def test_accuracy_pipeline_excludes_target_saved_after_next_checkpoint_start(patcher):
+    """Timestamp checks should drop targets that were saved after newer data became available."""
+
+    class _Logger:
+        def reconcile_completed_prediction_actuals(self, year: int) -> int:
+            del year
+            return 0
+
+        def get_all_predictions(self, year: int):
+            del year
+            return [
+                {
+                    "metadata": {
+                        "year": 2026,
+                        "race_name": "Chinese Grand Prix",
+                        "session_name": "SPRINT",
+                        "weekend_format": "sprint",
+                        "predicted_at": "2026-03-14T11:00:08+00:00",
+                    },
+                    "qualifying": {"predicted_grid": []},
+                    "race": {"predicted_results": []},
+                    "targets": {
+                        "grand_prix_race": {
+                            "target_session": "R",
+                            "predicted_order": [
+                                {"position": 1, "driver": "RUS", "team": "Mercedes"}
+                            ],
+                            "eligible_at_save": True,
+                        }
+                    },
+                    "actuals": {
+                        "qualifying": None,
+                        "race": None,
+                        "targets": {
+                            "grand_prix_race": [
+                                {"position": 1, "driver": "RUS", "team": "Mercedes"}
+                            ]
+                        },
+                    },
+                }
+            ]
+
+    class _Metrics:
+        def calculate_prediction_target_metrics(self, prediction_data, *, is_sprint):
+            del prediction_data, is_sprint
+            return {
+                "grand_prix_race": {
+                    "overall_mae": 0.0,
+                    "top_3_pct": 100.0,
+                    "top_10_pct": 100.0,
+                    "exact_accuracy": 100.0,
+                    "within_1": 100.0,
+                    "within_3": 100.0,
+                    "correlation": 1.0,
+                    "field_size": 1.0,
+                    "top_3_hits": 1.0,
+                    "top_10_hits": 1.0,
+                }
+            }
+
+    class _Store:
+        def __init__(self, data_root: str = "data"):
+            del data_root
+
+        def list_artifacts(self, artifact_type: str, key_prefix=None, limit: int = 100):
+            del artifact_type, key_prefix, limit
+            return []
+
+    patcher.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
+    patcher.setattr("src.utils.prediction_metrics.PredictionMetrics", _Metrics)
+    patcher.setattr("src.persistence.artifact_store.ArtifactStore", _Store)
+    patcher.setattr(
+        "src.utils.accuracy_targets._load_event_boundary_state",
+        lambda: {
+            "races": {
+                "2026::Chinese Grand Prix": {
+                    "session_schedule": {
+                        "FP1": "2026-03-13T03:30:00+00:00",
+                        "SQ": "2026-03-13T07:30:00+00:00",
+                        "Sprint": "2026-03-14T03:00:00+00:00",
+                        "Q": "2026-03-14T07:00:00+00:00",
+                        "R": "2026-03-15T07:00:00+00:00",
+                    }
+                }
+            }
+        },
+    )
+
+    summary = AccuracyPipeline(year=2026).build_summary()
+
+    assert "grand_prix_race" not in summary.targets
+    assert summary.n_excluded_targets == 1
+
+
 def test_accuracy_pipeline_reconcile_actuals_rebuilds_snapshots(patcher):
     """Manual refresh should rewrite accuracy snapshots so KPI cards stay current."""
     saved_snapshots: list[tuple[str, str]] = []
@@ -327,3 +430,74 @@ def test_build_progression_line_series_skips_missing_checkpoints_in_trace():
     assert labels == ["PRE", "SQ"]
     assert values == [2.8, 4.2]
     assert counts == [1, 1]
+
+
+def test_build_progression_series_does_not_mark_excluded_checkpoint_as_missing():
+    """Excluded checkpoints should be surfaced separately from truly missing saves."""
+    target_summary = TargetAccuracySummary(
+        target_key="main_qualifying",
+        label="Main Qualifying",
+        checkpoint_progression=[
+            CheckpointAccuracyPoint(
+                target_key="main_qualifying",
+                weekend_format="normal",
+                checkpoint_session="FP2",
+                checkpoint_index=2,
+                metrics={"overall_mae": 4.73},
+                race_count=1,
+            ),
+        ],
+        checkpoint_status=[
+            CheckpointStatusPoint(
+                target_key="main_qualifying",
+                weekend_format="normal",
+                checkpoint_session="FP3",
+                checkpoint_index=3,
+                excluded_count=1,
+            )
+        ],
+    )
+
+    checkpoint_labels, metric_values, race_counts, missing_checkpoints = build_progression_series(
+        target_summary=target_summary,
+        metric_name="overall_mae",
+        weekend_format="normal",
+    )
+
+    assert checkpoint_labels == ["PRE", "FP1", "FP2", "FP3"]
+    assert metric_values == [None, None, 4.73, None]
+    assert race_counts == [0, 0, 1, 0]
+    assert missing_checkpoints == ["PRE", "FP1"]
+
+
+def test_build_progression_checkpoint_state_returns_excluded_checkpoints():
+    """Checkpoint-state helper should classify excluded checkpoints separately."""
+    target_summary = TargetAccuracySummary(
+        target_key="grand_prix_race",
+        label="Grand Prix Race",
+        checkpoint_status=[
+            CheckpointStatusPoint(
+                target_key="grand_prix_race",
+                weekend_format="normal",
+                checkpoint_session="FP2",
+                checkpoint_index=2,
+                scored_count=1,
+            ),
+            CheckpointStatusPoint(
+                target_key="grand_prix_race",
+                weekend_format="normal",
+                checkpoint_session="FP3",
+                checkpoint_index=3,
+                excluded_count=1,
+            ),
+        ],
+    )
+
+    result = build_progression_checkpoint_state(
+        target_summary=target_summary,
+        weekend_format="normal",
+    )
+
+    assert result["scored_checkpoints"] == ["FP2"]
+    assert result["excluded_checkpoints"] == ["FP3"]
+    assert result["pending_checkpoints"] == []

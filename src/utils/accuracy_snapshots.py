@@ -58,6 +58,8 @@ def build_accuracy_snapshot_records(
         target_payload = target_predictions.get(target_key)
         if not isinstance(target_payload, dict):
             continue
+        if not bool(target_payload.get("eligible_at_save", True)):
+            continue
         records.append(
             {
                 "artifact_key": accuracy_snapshot_artifact_key(
@@ -76,6 +78,7 @@ def build_accuracy_snapshot_records(
                         "target_label": target_label(target_key),
                         "target_session": target_payload.get("target_session"),
                         "predicted_at": metadata.get("predicted_at"),
+                        "information_cutoff_at": metadata.get("information_cutoff_at"),
                         "generated_at": datetime.now(UTC).isoformat(),
                         "source_run_id": metadata.get("run_id"),
                         "eligible": bool(target_payload.get("eligible_at_save", True)),

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 TARGET_MAIN_QUALIFYING = "main_qualifying"
@@ -49,6 +52,7 @@ TARGET_CHECKPOINTS = {
     ("sprint", TARGET_MAIN_QUALIFYING): ("PRE", "FP1", "SQ", "SPRINT"),
     ("sprint", TARGET_GRAND_PRIX_RACE): ("PRE", "FP1", "SQ", "SPRINT", "Q"),
 }
+_EVENT_BOUNDARY_STATE_PATH = Path("data/systems/event_boundary_refresh_state.json")
 
 
 def normalize_checkpoint_session(session_name: str | None) -> str:
@@ -77,6 +81,172 @@ def fastf1_session_name(session_name: str) -> str:
     if normalized == "SPRINT":
         return "Sprint"
     return normalized
+
+
+def _parse_saved_datetime(value: Any) -> datetime | None:
+    """Parse saved timestamps into UTC-aware datetimes."""
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if not candidate:
+        return None
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _prediction_reference_datetime(metadata: dict[str, Any]) -> datetime | None:
+    """Return the timestamp used to judge whether a forecast is contaminated."""
+    information_cutoff = _parse_saved_datetime(metadata.get("information_cutoff_at"))
+    if information_cutoff is not None:
+        return information_cutoff
+    return _parse_saved_datetime(metadata.get("predicted_at"))
+
+
+def _prediction_is_sprint_weekend(prediction_data: dict[str, Any]) -> bool:
+    """Infer weekend format from metadata or explicit sprint targets."""
+    metadata = prediction_data.get("metadata", {})
+    weekend_format = str(metadata.get("weekend_format", "")).strip().lower()
+    if weekend_format in {"normal", "sprint"}:
+        return weekend_format == "sprint"
+
+    explicit_targets = prediction_data.get("targets", {})
+    if isinstance(explicit_targets, dict) and any(
+        "sprint" in str(target_key) for target_key in explicit_targets
+    ):
+        return True
+
+    checkpoint_session = normalize_checkpoint_session(metadata.get("session_name"))
+    return checkpoint_session in {"SQ", "SPRINT"}
+
+
+def _load_event_boundary_state() -> dict[str, Any]:
+    """Load the latest known event-boundary schedule snapshot from local storage."""
+    if not _EVENT_BOUNDARY_STATE_PATH.exists():
+        return {}
+    try:
+        with _EVENT_BOUNDARY_STATE_PATH.open() as file_handle:
+            payload = json.load(file_handle)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _scheduled_session_start(
+    *,
+    year: int,
+    race_name: str,
+    session_name: str,
+) -> datetime | None:
+    """Return scheduled session start from the locally persisted boundary snapshot."""
+    state = _load_event_boundary_state()
+    races = state.get("races", {})
+    if not isinstance(races, dict):
+        return None
+
+    race_state = races.get(f"{int(year)}::{str(race_name).strip()}")
+    if not isinstance(race_state, dict):
+        return None
+
+    session_schedule = race_state.get("session_schedule", {})
+    if not isinstance(session_schedule, dict):
+        return None
+
+    fastf1_name = fastf1_session_name(session_name)
+    raw_schedule = session_schedule.get(fastf1_name)
+    return _parse_saved_datetime(raw_schedule)
+
+
+def target_deadline_session(
+    target_key: str,
+    weekend_format: str,
+    checkpoint_session: str,
+) -> str | None:
+    """
+    Return the first session that would make a checkpoint-target forecast stale.
+
+    For example, a sprint-weekend Grand Prix race forecast saved at `SPRINT`
+    becomes contaminated once `Q` starts, while the same target saved at `Q`
+    remains valid until `R` starts.
+    """
+    checkpoints = target_checkpoint_sequence(target_key, weekend_format)
+    checkpoint = normalize_checkpoint_session(checkpoint_session)
+    if checkpoint not in checkpoints:
+        return None
+
+    checkpoint_index = checkpoints.index(checkpoint)
+    if checkpoint_index + 1 < len(checkpoints):
+        return checkpoints[checkpoint_index + 1]
+    return target_session_name(target_key)
+
+
+def timing_eligible_target(
+    prediction_data: dict[str, Any],
+    *,
+    target_key: str,
+    is_sprint: bool,
+) -> bool | None:
+    """
+    Return timestamp-based target eligibility when schedule data is available.
+
+    A checkpoint prediction is considered valid only if it was saved before the
+    next session that would reveal newer competitive information for that target.
+    """
+    metadata = prediction_data.get("metadata", {})
+    if not isinstance(metadata, dict):
+        return None
+
+    try:
+        year = int(metadata.get("year", 0) or 0)
+    except (TypeError, ValueError):
+        return None
+
+    race_name = str(metadata.get("race_name", "")).strip()
+    checkpoint_session = normalize_checkpoint_session(metadata.get("session_name"))
+    predicted_at = _prediction_reference_datetime(metadata)
+    if year <= 0 or not race_name or not checkpoint_session or predicted_at is None:
+        return None
+
+    weekend_format = weekend_format_name(is_sprint)
+    deadline_session = target_deadline_session(
+        target_key,
+        weekend_format,
+        checkpoint_session,
+    )
+    if not deadline_session:
+        return None
+
+    deadline_start = _scheduled_session_start(
+        year=year,
+        race_name=race_name,
+        session_name=deadline_session,
+    )
+    if deadline_start is None:
+        return None
+
+    return predicted_at < deadline_start
+
+
+def resolve_target_eligibility(
+    prediction_data: dict[str, Any],
+    *,
+    target_key: str,
+    stored_eligible: bool,
+    is_sprint: bool,
+) -> bool:
+    """Combine stored eligibility with timestamp-based contamination checks."""
+    time_eligible = timing_eligible_target(
+        prediction_data,
+        target_key=target_key,
+        is_sprint=is_sprint,
+    )
+    if time_eligible is None:
+        return bool(stored_eligible)
+    return bool(stored_eligible) and bool(time_eligible)
 
 
 def eligible_target_keys(checkpoint_session: str, is_sprint: bool) -> tuple[str, ...]:
@@ -176,6 +346,7 @@ def explicit_target_predictions(prediction_data: dict[str, Any]) -> dict[str, di
     targets = prediction_data.get("targets")
     if not isinstance(targets, dict):
         return {}
+    is_sprint = _prediction_is_sprint_weekend(prediction_data)
 
     normalized: dict[str, dict[str, Any]] = {}
     for target_key, payload in targets.items():
@@ -197,7 +368,12 @@ def explicit_target_predictions(prediction_data: dict[str, Any]) -> dict[str, di
                 else {}
             ),
             "mean_confidence": payload.get("mean_confidence"),
-            "eligible_at_save": bool(payload.get("eligible_at_save", True)),
+            "eligible_at_save": resolve_target_eligibility(
+                prediction_data,
+                target_key=target_key,
+                stored_eligible=bool(payload.get("eligible_at_save", True)),
+                is_sprint=is_sprint,
+            ),
         }
     return normalized
 
@@ -240,6 +416,7 @@ def synthesize_legacy_targets(
             (prediction_data.get("qualifying") or {}).get("predicted_grid")
         )
         if qualifying_rows:
+            stored_eligible = bool(metadata.get("top_level_qualifying_eligible_at_save", True))
             normalized[qualifying_target] = {
                 "target_session": target_session_name(qualifying_target),
                 "predicted_order": qualifying_rows,
@@ -255,8 +432,11 @@ def synthesize_legacy_targets(
                     else {}
                 ),
                 "mean_confidence": mean_confidence_from_rows(qualifying_rows),
-                "eligible_at_save": bool(
-                    metadata.get("top_level_qualifying_eligible_at_save", True)
+                "eligible_at_save": resolve_target_eligibility(
+                    prediction_data,
+                    target_key=qualifying_target,
+                    stored_eligible=stored_eligible,
+                    is_sprint=is_sprint,
                 ),
             }
 
@@ -265,6 +445,7 @@ def synthesize_legacy_targets(
             (prediction_data.get("race") or {}).get("predicted_results")
         )
         if race_rows:
+            stored_eligible = bool(metadata.get("top_level_race_eligible_at_save", True))
             normalized[race_target] = {
                 "target_session": target_session_name(race_target),
                 "predicted_order": race_rows,
@@ -276,7 +457,12 @@ def synthesize_legacy_targets(
                 .upper(),
                 "fp_blend_info": {},
                 "mean_confidence": mean_confidence_from_rows(race_rows),
-                "eligible_at_save": bool(metadata.get("top_level_race_eligible_at_save", True)),
+                "eligible_at_save": resolve_target_eligibility(
+                    prediction_data,
+                    target_key=race_target,
+                    stored_eligible=stored_eligible,
+                    is_sprint=is_sprint,
+                ),
             }
     return normalized
 

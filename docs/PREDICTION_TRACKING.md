@@ -11,6 +11,7 @@ This is the storage path for checkpoint predictions, later actuals, and derived 
 - Snapshot helpers: `src/utils/accuracy_snapshots.py`
 - Update script: `scripts/update_prediction_actuals.py`
 - Snapshot backfill: `scripts/backfill_accuracy_snapshots.py`
+- Datapoint compare/sync: `scripts/sync_dashboard_datapoints_to_db.py`
 - Dashboard usage: `src/dashboard/pages.py` (Prediction page + Accuracy page; entrypoint: `app.py`)
 
 ## How Saving Works
@@ -113,6 +114,23 @@ python scripts/backfill_accuracy_snapshots.py --year 2026
 ```
 
 Backfill only writes snapshots for targets that already have stored actuals. It does not invent missing historic sprint targets.
+
+To compare the local dashboard datapoints for one race against Supabase, and optionally
+sync only those checkpoint artifacts:
+
+```bash
+uv run python scripts/sync_dashboard_datapoints_to_db.py \
+  --env-file .env.local \
+  --year 2026 \
+  --race-name "Australian Grand Prix" \
+  --checkpoint FP1 \
+  --checkpoint FP2 \
+  --checkpoint FP3
+```
+
+Add `--sync` to push the mismatched local rows to Supabase. Add
+`--include-auxiliary-targets` on sprint weekends if you also want `sprint_qualifying`
+and `sprint_race` snapshot rows.
 
 ## Learning Update Side Effect
 

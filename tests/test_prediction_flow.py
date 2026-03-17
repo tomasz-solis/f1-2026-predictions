@@ -130,6 +130,44 @@ def test_run_prediction_uses_explicit_year_for_fastf1_refresh(patcher):
     assert mock_predictor.predict_qualifying.call_args.kwargs["year"] == 2027
 
 
+def test_run_prediction_uses_stored_checkpoint_profiles_for_qualifying(patcher):
+    """Dashboard qualifying should use the stored checkpoint profile path explicitly."""
+    mock_predictor = MagicMock()
+    mock_predictor.predict_qualifying.return_value = {
+        "grid": [{"driver": "VER", "team": "Red Bull Racing", "position": 1}]
+    }
+    mock_predictor.predict_race.return_value = {
+        "finish_order": [{"driver": "VER", "team": "Red Bull Racing", "position": 1}]
+    }
+
+    patcher.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
+    patcher.setattr(
+        prediction_flow,
+        "_resolve_current_checkpoint_session",
+        lambda year, race_name, is_sprint: "FP2",
+    )
+    patcher.setattr(
+        prediction_flow,
+        "fetch_actual_competitive_results_if_completed",
+        lambda year, race_name, session_name: (None, "INCOMPLETE"),
+    )
+    patcher.setattr(
+        prediction_flow,
+        "fetch_grid_if_available",
+        lambda year, race_name, session_name, predicted_grid: (predicted_grid, "PREDICTED"),
+    )
+
+    artifact_versions = {"car_characteristics::2026::car_characteristics": (1, "ts")}
+    prediction_flow.run_prediction(
+        "Australian Grand Prix", "dry", artifact_versions, is_sprint=False
+    )
+
+    assert mock_predictor.predict_qualifying.call_args.kwargs["practice_signal_mode"] == (
+        "stored_profiles"
+    )
+    assert mock_predictor.predict_qualifying.call_args.kwargs["checkpoint_session_name"] == "FP2"
+
+
 def test_run_prediction_passes_race_input_confidence_from_quali_context(patcher):
     mock_predictor = MagicMock()
     mock_predictor.predict_qualifying.return_value = {
@@ -229,6 +267,11 @@ def test_run_prediction_passes_sprint_race_input_confidence_from_sq_context(patc
         "fetch_grid_if_available",
         lambda year, race_name, session_name, predicted_grid: (predicted_grid, "PREDICTED"),
     )
+    patcher.setattr(
+        prediction_flow,
+        "_resolve_current_checkpoint_session",
+        lambda year, race_name, is_sprint: "SQ",
+    )
 
     artifact_versions = {"car_characteristics::2026::car_characteristics": (1, "ts")}
     prediction_flow.run_prediction(
@@ -240,6 +283,59 @@ def test_run_prediction_passes_sprint_race_input_confidence_from_sq_context(patc
 
     called_kwargs = mock_predictor.predict_sprint_race.call_args.kwargs
     assert called_kwargs["input_confidence"] == pytest.approx(0.62)
+
+
+def test_run_prediction_caps_main_race_input_confidence_by_sprint_checkpoint(patcher):
+    """Sprint weekends should cap Sunday race confidence more aggressively right after SQ."""
+    mock_predictor = MagicMock()
+    mock_predictor.predict_qualifying.side_effect = [
+        {
+            "grid": [{"driver": "NOR", "team": "McLaren", "position": 1}],
+            "data_confidence_score": 0.62,
+            "data_source": "FP1 short-stint",
+            "qualifying_stage": "sprint",
+        },
+        {
+            "grid": [{"driver": "NOR", "team": "McLaren", "position": 2}],
+            "data_confidence_score": 0.88,
+            "data_source": "SQ short-stint",
+            "qualifying_stage": "main",
+        },
+    ]
+    mock_predictor.predict_sprint_race.return_value = {
+        "finish_order": [{"driver": "NOR", "team": "McLaren", "position": 1}]
+    }
+    mock_predictor.predict_race.return_value = {
+        "finish_order": [{"driver": "NOR", "team": "McLaren", "position": 1}]
+    }
+
+    patcher.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
+    patcher.setattr(
+        prediction_flow,
+        "fetch_actual_competitive_results_if_completed",
+        lambda year, race_name, session_name: (None, "INCOMPLETE"),
+    )
+    patcher.setattr(
+        prediction_flow,
+        "fetch_grid_if_available",
+        lambda year, race_name, session_name, predicted_grid: (predicted_grid, "PREDICTED"),
+    )
+    patcher.setattr(
+        prediction_flow,
+        "_resolve_current_checkpoint_session",
+        lambda year, race_name, is_sprint: "SQ",
+    )
+
+    artifact_versions = {"car_characteristics::2026::car_characteristics": (1, "ts")}
+    prediction_flow.run_prediction(
+        "Chinese Grand Prix",
+        "dry",
+        artifact_versions,
+        is_sprint=True,
+    )
+
+    called_kwargs = mock_predictor.predict_race.call_args.kwargs
+    assert called_kwargs["input_confidence"] == pytest.approx(0.5)
 
 
 def test_run_prediction_falls_back_when_predict_race_signature_is_legacy(patcher):

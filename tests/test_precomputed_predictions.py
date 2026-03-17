@@ -44,6 +44,41 @@ def test_save_and_load_precompute_horizon_index_file_roundtrip(patcher, tmp_path
     }
 
 
+def test_load_precomputed_prediction_preserves_boundary_context(patcher, tmp_path):
+    """Loaded cached predictions should expose the boundary session that produced them."""
+    precompute_path = tmp_path / "precomputed_predictions.json"
+
+    patcher.setattr(store, "_PRECOMPUTED_PREDICTIONS_FILE", precompute_path)
+    patcher.setattr(store, "should_read_db_first", lambda: False)
+    patcher.setattr(store, "should_write_to_db", lambda: False)
+    patcher.setattr(store, "should_write_to_file", lambda: True)
+
+    store.save_precomputed_prediction(
+        year=2026,
+        race_name="Chinese Grand Prix",
+        weather="dry",
+        artifact_hash="artifact_hash",
+        boundary_signature="sig_q",
+        is_sprint=True,
+        prediction_results={"main_race": {"finish_order": []}},
+        metadata={
+            "source_race_name": "Chinese Grand Prix",
+            "boundary_session_name": "Q",
+        },
+    )
+
+    loaded = store.load_precomputed_prediction(
+        year=2026,
+        race_name="Chinese Grand Prix",
+        weather="dry",
+        artifact_hash="artifact_hash",
+        boundary_signature="sig_q",
+    )
+
+    assert loaded is not None
+    assert loaded["_prediction_context"] == {"boundary_session_name": "Q"}
+
+
 def test_list_precomputed_race_names_filters_by_year_hash_and_boundary(patcher, tmp_path):
     """Race listing should return only entries matching the requested key dimensions."""
     precompute_path = tmp_path / "precomputed_predictions.json"

@@ -316,8 +316,18 @@ def save_prediction_if_enabled_core(
         return
 
     logger_inst = prediction_logger_factory()
+    prediction_context = prediction_results.get("_prediction_context", {})
+    prediction_boundary_session = ""
+    if isinstance(prediction_context, dict):
+        prediction_boundary_session = str(
+            prediction_context.get("boundary_session_name", "")
+        ).strip()
     checkpoint_override = str(checkpoint_session_override or "").strip().upper()
-    if checkpoint_override:
+    if prediction_boundary_session:
+        # Trust the boundary that produced the shown prediction over an external
+        # checkpoint label, which may be stale when persisted predictions are reused.
+        checkpoint_session = _resolve_prediction_checkpoint_session(prediction_boundary_session)
+    elif checkpoint_override:
         checkpoint_session = _resolve_prediction_checkpoint_session(checkpoint_override)
     else:
         detector = detector_factory()

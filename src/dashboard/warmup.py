@@ -41,6 +41,7 @@ from src.dashboard.update_flow import (
 )
 from src.persistence.config import should_read_db_first, should_write_to_db
 from src.persistence.runtime_state_store import RuntimeStateStore
+from src.utils.race_input_confidence import cap_predicted_main_race_input_confidence
 from src.utils.session_detector import SessionDetector
 from src.utils.weekend import is_sprint_weekend
 
@@ -391,6 +392,8 @@ def compute_base_features(
                 race_name=target_race,
                 qualifying_stage="sprint",
                 n_simulations=qualifying_n_simulations,
+                practice_signal_mode="stored_profiles",
+                checkpoint_session_name=checkpoint,
             )
             sprint_grid, sprint_grid_source = fetch_grid_if_available(
                 year,
@@ -427,6 +430,8 @@ def compute_base_features(
                 race_name=target_race,
                 qualifying_stage="main",
                 n_simulations=qualifying_n_simulations,
+                practice_signal_mode="stored_profiles",
+                checkpoint_session_name=checkpoint,
             )
             main_grid, main_grid_source = fetch_grid_if_available(
                 year,
@@ -446,6 +451,13 @@ def compute_base_features(
         main_input_confidence = _derive_race_input_confidence(
             main_quali_payload,
             grid_source=main_grid_source,
+        )
+        main_input_confidence = cap_predicted_main_race_input_confidence(
+            main_input_confidence,
+            qualifying_result=main_quali_payload,
+            grid_source=main_grid_source,
+            is_sprint_weekend=True,
+            boundary_session_name=checkpoint,
         )
 
         return {
@@ -478,6 +490,8 @@ def compute_base_features(
             race_name=target_race,
             qualifying_stage="main",
             n_simulations=qualifying_n_simulations,
+            practice_signal_mode="stored_profiles",
+            checkpoint_session_name=checkpoint,
         )
         qualifying_grid, grid_source = fetch_grid_if_available(
             year,

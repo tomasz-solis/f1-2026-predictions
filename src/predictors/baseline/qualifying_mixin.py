@@ -47,10 +47,25 @@ _DEFAULT_TESTING_SHORT_RUN_WEIGHTS = {
     "medium_corner_performance": 0.15,
     "fast_corner_performance": 0.10,
 }
+_PRACTICE_SIGNAL_MODES = ("auto", "raw_sessions", "stored_profiles")
 
 
 class BaselineQualifyingMixin:
     """Shared qualifying and sprint-race methods for Baseline2026Predictor."""
+
+    def _checkpoint_profile_confidence_label(
+        self,
+        checkpoint_session_name: str | None,
+    ) -> str | None:
+        """Map a checkpoint code onto the confidence label used for stored profiles."""
+        checkpoint = str(checkpoint_session_name or "").strip().upper()
+        if checkpoint in {"FP1", "FP2", "FP3"}:
+            return checkpoint
+        if checkpoint == "SQ":
+            return "Sprint Qualifying"
+        if checkpoint == "SPRINT":
+            return "Sprint pace signal"
+        return None
 
     def _resolve_data_confidence_score(
         self,
@@ -144,6 +159,9 @@ class BaselineQualifyingMixin:
         self,
         lineups: dict[str, list[str]],
         metric_weights: dict[str, float],
+        *,
+        checkpoint_session_name: str | None = None,
+        qualifying_stage: str = "auto",
     ) -> dict[str, float] | None:
         """Build a team-pace fallback from stored short-run testing profiles."""
         cfg = getattr(self, "config", config_loader)
@@ -152,6 +170,8 @@ class BaselineQualifyingMixin:
             metric_weights=metric_weights,
             cfg=cfg,
             get_testing_characteristics_for_profile=self._get_testing_characteristics_for_profile,
+            checkpoint_session_name=checkpoint_session_name,
+            qualifying_stage=qualifying_stage,
         )
 
     def _apply_testing_fallback_adjustment(
@@ -412,6 +432,8 @@ class BaselineQualifyingMixin:
         race_name: str,
         n_simulations: int = 50,
         qualifying_stage: str = "auto",
+        practice_signal_mode: str = "auto",
+        checkpoint_session_name: str | None = None,
     ) -> dict[str, Any]:
         """Predict qualifying with Monte Carlo simulation (sprint/normal weekends)."""
         cfg = getattr(self, "config", config_loader)
@@ -419,6 +441,11 @@ class BaselineQualifyingMixin:
         validate_year(year, "year", min_year=2020, max_year=2030)
         validate_positive_int(n_simulations, "n_simulations", min_val=1)
         validate_enum(qualifying_stage, "qualifying_stage", ["auto", "sprint", "main"])
+        validate_enum(
+            practice_signal_mode,
+            "practice_signal_mode",
+            list(_PRACTICE_SIGNAL_MODES),
+        )
 
         try:
             is_sprint = is_sprint_weekend(year, race_name)
@@ -432,14 +459,21 @@ class BaselineQualifyingMixin:
 
         lineups = get_lineups(year, race_name)
 
-        session_name, fp_performance, session_laps, session_laps_by_type = (
-            get_best_fp_performance_with_session_laps(
-                year=year,
-                race_name=race_name,
-                is_sprint=is_sprint,
-                qualifying_stage=qualifying_stage,
+        normalized_practice_signal_mode = str(practice_signal_mode).strip().lower()
+        if normalized_practice_signal_mode == "stored_profiles":
+            session_name = None
+            fp_performance = None
+            session_laps = None
+            session_laps_by_type: dict[str, Any] = {}
+        else:
+            session_name, fp_performance, session_laps, session_laps_by_type = (
+                get_best_fp_performance_with_session_laps(
+                    year=year,
+                    race_name=race_name,
+                    is_sprint=is_sprint,
+                    qualifying_stage=qualifying_stage,
+                )
             )
-        )
 
         if session_laps is not None:
             self._update_compound_characteristics_from_session(
@@ -451,14 +485,23 @@ class BaselineQualifyingMixin:
             _DEFAULT_TESTING_SHORT_RUN_WEIGHTS,
         )
         testing_fallback_performance = None
-        if session_name is None and fp_performance is None:
+        if normalized_practice_signal_mode == "stored_profiles" or (
+            session_name is None and fp_performance is None
+        ):
             testing_fallback_performance = self._build_testing_short_run_fallback(
                 lineups=lineups,
                 metric_weights=short_profile_weights,
+                checkpoint_session_name=checkpoint_session_name,
+                qualifying_stage=qualifying_stage,
             )
         testing_fallback_used = testing_fallback_performance is not None
+        confidence_session_name = session_name
+        if normalized_practice_signal_mode == "stored_profiles" and testing_fallback_used:
+            confidence_session_name = self._checkpoint_profile_confidence_label(
+                checkpoint_session_name
+            )
         data_confidence_score = self._resolve_data_confidence_score(
-            session_name,
+            confidence_session_name,
             testing_fallback_used=testing_fallback_used,
         )
         effective_fp_blend_weight = self._resolve_fp_blend_weight(data_confidence_score)
@@ -511,10 +554,17 @@ class BaselineQualifyingMixin:
             data_confidence_score=data_confidence_score,
         )
 
+        checkpoint_label = str(checkpoint_session_name or "").strip().upper()
         if session_name is not None:
             data_source = session_name
         elif testing_fallback_used:
-            data_source = "Testing short-run profile blend (no weekend practice data)"
+            if normalized_practice_signal_mode == "stored_profiles" and checkpoint_label:
+                data_source = (
+                    f"{checkpoint_label} testing short-run profile blend "
+                    "(stored checkpoint profiles)"
+                )
+            else:
+                data_source = "Testing short-run profile blend (no weekend practice data)"
         else:
             data_source = "Model-only (no practice/testing data)"
 
@@ -531,6 +581,8 @@ class BaselineQualifyingMixin:
             "data_confidence_score": round(float(data_confidence_score), 3),
             "fp_blend_weight_used": round(float(effective_fp_blend_weight), 3),
             "qualifying_stage": qualifying_stage,
+            "practice_signal_mode_used": normalized_practice_signal_mode,
+            "practice_signal_checkpoint": checkpoint_label,
             "characteristics_profile_used": "short_run",
             "teams_with_characteristics_profile": teams_with_short_profile,
             "teammate_head_to_head": teammate_head_to_head,

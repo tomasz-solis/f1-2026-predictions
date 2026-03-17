@@ -36,6 +36,19 @@ class CheckpointAccuracyPoint:
 
 
 @dataclass
+class CheckpointStatusPoint:
+    """Aggregate save-status counts for one checkpoint in one target view."""
+
+    target_key: str
+    weekend_format: str
+    checkpoint_session: str
+    checkpoint_index: int
+    scored_count: int = 0
+    pending_count: int = 0
+    excluded_count: int = 0
+
+
+@dataclass
 class SeasonTrendPoint:
     """One race-level point for a target checkpoint trend line."""
 
@@ -56,6 +69,7 @@ class TargetAccuracySummary:
     label: str
     aggregate: dict[str, dict[str, float]] = field(default_factory=dict)
     checkpoint_progression: list[CheckpointAccuracyPoint] = field(default_factory=list)
+    checkpoint_status: list[CheckpointStatusPoint] = field(default_factory=list)
     season_trend: list[SeasonTrendPoint] = field(default_factory=list)
     n_scored_predictions: int = 0
 
@@ -95,6 +109,17 @@ class _TargetAccuracyRecord:
     target_key: str
     metrics: dict[str, float]
     predicted_at: str
+
+
+@dataclass
+class _TargetStatusRecord:
+    """Internal per-target checkpoint status used for chart annotations."""
+
+    race_name: str
+    checkpoint_session: str
+    weekend_format: str
+    target_key: str
+    status: str
 
 
 class AccuracyPipeline:
@@ -159,7 +184,9 @@ class AccuracyPipeline:
             return summary
 
         snapshot_map = self._load_snapshot_map()
-        records, status_rows, excluded_target_count = self._collect_target_records(snapshot_map)
+        records, target_status_records, status_rows, excluded_target_count = (
+            self._collect_target_records(snapshot_map)
+        )
         self._prediction_status_rows = status_rows
         self._excluded_predictions = [
             row for row in status_rows if int(row.get("scored_target_count", 0)) <= 0
@@ -172,7 +199,7 @@ class AccuracyPipeline:
 
         summary.n_excluded_predictions = len(self._excluded_predictions)
         summary.n_excluded_targets = excluded_target_count
-        summary.targets = self._build_target_summaries(records)
+        summary.targets = self._build_target_summaries(records, target_status_records)
         summary.qualifying_aggregate = summary.targets.get(
             "main_qualifying", TargetAccuracySummary("main_qualifying", "")
         ).aggregate
@@ -322,9 +349,10 @@ class AccuracyPipeline:
     def _collect_target_records(
         self,
         snapshot_map: dict[str, dict[str, Any]],
-    ) -> tuple[list[_TargetAccuracyRecord], list[dict[str, Any]], int]:
+    ) -> tuple[list[_TargetAccuracyRecord], list[_TargetStatusRecord], list[dict[str, Any]], int]:
         """Collect normalized target records and status rows from saved predictions."""
         records: list[_TargetAccuracyRecord] = []
+        target_status_records: list[_TargetStatusRecord] = []
         status_rows: list[dict[str, Any]] = []
         excluded_targets = 0
 
@@ -362,6 +390,15 @@ class AccuracyPipeline:
             for target_key, target_payload in target_predictions.items():
                 target_labels.append(target_label(target_key))
                 if not bool(target_payload.get("eligible_at_save", True)):
+                    target_status_records.append(
+                        _TargetStatusRecord(
+                            race_name=race_name,
+                            checkpoint_session=checkpoint_session,
+                            weekend_format=weekend_format,
+                            target_key=target_key,
+                            status="excluded",
+                        )
+                    )
                     excluded_target_count += 1
                     excluded_targets += 1
                     continue
@@ -397,12 +434,39 @@ class AccuracyPipeline:
                         )
                     )
                     scored_target_count += 1
+                    target_status_records.append(
+                        _TargetStatusRecord(
+                            race_name=race_name,
+                            checkpoint_session=checkpoint_session,
+                            weekend_format=weekend_format,
+                            target_key=target_key,
+                            status="scored",
+                        )
+                    )
                     continue
 
                 if target_actuals.get(target_key):
+                    target_status_records.append(
+                        _TargetStatusRecord(
+                            race_name=race_name,
+                            checkpoint_session=checkpoint_session,
+                            weekend_format=weekend_format,
+                            target_key=target_key,
+                            status="excluded",
+                        )
+                    )
                     excluded_target_count += 1
                     excluded_targets += 1
                 else:
+                    target_status_records.append(
+                        _TargetStatusRecord(
+                            race_name=race_name,
+                            checkpoint_session=checkpoint_session,
+                            weekend_format=weekend_format,
+                            target_key=target_key,
+                            status="pending",
+                        )
+                    )
                     pending_target_count += 1
 
             records.extend(checkpoint_records)
@@ -430,11 +494,12 @@ class AccuracyPipeline:
                 str(row.get("checkpoint_session", "")),
             )
         )
-        return records, status_rows, excluded_targets
+        return records, target_status_records, status_rows, excluded_targets
 
     def _build_target_summaries(
         self,
         records: list[_TargetAccuracyRecord],
+        target_status_records: list[_TargetStatusRecord],
     ) -> dict[str, TargetAccuracySummary]:
         """Build target summaries from normalized score records."""
         race_order: dict[str, int] = {}
@@ -445,10 +510,18 @@ class AccuracyPipeline:
         for record in records:
             grouped.setdefault(record.target_key, []).append(record)
 
+        grouped_status: dict[str, list[_TargetStatusRecord]] = {}
+        for status_record in target_status_records:
+            grouped_status.setdefault(status_record.target_key, []).append(status_record)
+
         summaries: dict[str, TargetAccuracySummary] = {}
         for target_key, target_records in grouped.items():
             aggregate = self._aggregate_metric_rows([record.metrics for record in target_records])
             checkpoint_progression = self._build_checkpoint_progression(target_key, target_records)
+            checkpoint_status = self._build_checkpoint_status(
+                target_key,
+                grouped_status.get(target_key, []),
+            )
             season_trend = [
                 SeasonTrendPoint(
                     target_key=target_key,
@@ -480,6 +553,7 @@ class AccuracyPipeline:
                 label=target_label(target_key),
                 aggregate=aggregate,
                 checkpoint_progression=checkpoint_progression,
+                checkpoint_status=checkpoint_status,
                 season_trend=season_trend,
                 n_scored_predictions=len(target_records),
             )
@@ -521,6 +595,40 @@ class AccuracyPipeline:
 
         return sorted(
             points,
+            key=lambda point: (point.weekend_format, point.checkpoint_index),
+        )
+
+    def _build_checkpoint_status(
+        self,
+        target_key: str,
+        status_records: list[_TargetStatusRecord],
+    ) -> list[CheckpointStatusPoint]:
+        """Aggregate one target into checkpoint save-status counts."""
+        grouped: dict[tuple[str, str], CheckpointStatusPoint] = {}
+        for record in status_records:
+            key = (record.weekend_format, record.checkpoint_session)
+            status_point = grouped.setdefault(
+                key,
+                CheckpointStatusPoint(
+                    target_key=target_key,
+                    weekend_format=record.weekend_format,
+                    checkpoint_session=record.checkpoint_session,
+                    checkpoint_index=target_checkpoint_index(
+                        target_key,
+                        record.weekend_format,
+                        record.checkpoint_session,
+                    ),
+                ),
+            )
+            if record.status == "scored":
+                status_point.scored_count += 1
+            elif record.status == "pending":
+                status_point.pending_count += 1
+            elif record.status == "excluded":
+                status_point.excluded_count += 1
+
+        return sorted(
+            grouped.values(),
             key=lambda point: (point.weekend_format, point.checkpoint_index),
         )
 

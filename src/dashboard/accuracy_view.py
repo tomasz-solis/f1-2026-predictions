@@ -202,6 +202,10 @@ def _render_progression_charts(target_summary: TargetAccuracySummary, metric_nam
             if not checkpoint_labels:
                 st.info("No data for this format yet.")
                 continue
+            checkpoint_state = build_progression_checkpoint_state(
+                target_summary=target_summary,
+                weekend_format=weekend_format,
+            )
             observed_labels, observed_values, observed_counts = build_progression_line_series(
                 checkpoint_labels=checkpoint_labels,
                 metric_values=metric_values,
@@ -237,14 +241,26 @@ def _render_progression_charts(target_summary: TargetAccuracySummary, metric_nam
                 categoryarray=checkpoint_labels,
             )
             st.plotly_chart(figure, width="stretch")
-            saved_checkpoints = ", ".join(observed_labels) if observed_labels else "None"
-            if missing_checkpoints:
-                st.caption(
-                    f"Saved checkpoints: {saved_checkpoints}. "
-                    f"Missing saved checkpoints: {', '.join(missing_checkpoints)}"
+            valid_checkpoints = ", ".join(observed_labels) if observed_labels else "None"
+            caption_parts = [f"Valid checkpoints: {valid_checkpoints}"]
+            excluded_checkpoints = checkpoint_state["excluded_checkpoints"]
+            pending_checkpoints = checkpoint_state["pending_checkpoints"]
+            if excluded_checkpoints:
+                caption_parts.append(
+                    "Excluded checkpoints: "
+                    + ", ".join(excluded_checkpoints)
+                    + " (contaminated or no longer a live forecast)"
                 )
-            else:
-                st.caption(f"Saved checkpoints: {saved_checkpoints}")
+            if pending_checkpoints:
+                caption_parts.append("Pending checkpoints: " + ", ".join(pending_checkpoints))
+            if missing_checkpoints:
+                caption_parts.append("Missing checkpoints: " + ", ".join(missing_checkpoints))
+            st.caption(". ".join(caption_parts))
+            if max(race_counts, default=0) <= 1:
+                st.caption(
+                    "Only one valid race contributes here, so this path is a single-weekend trace, "
+                    "not a stable average yet."
+                )
 
 
 def _render_trend_charts(target_summary: TargetAccuracySummary, metric_name: str) -> None:
@@ -318,10 +334,16 @@ def build_progression_series(
         for point in target_summary.checkpoint_progression
         if point.weekend_format == weekend_format and metric_name in point.metrics
     ]
-    if not points:
+    status_points = [
+        point
+        for point in target_summary.checkpoint_status
+        if point.weekend_format == weekend_format
+    ]
+    if not points and not status_points:
         return [], [], [], []
 
     point_by_session = {point.checkpoint_session: point for point in points}
+    status_by_session = {point.checkpoint_session: point for point in status_points}
     expected_sessions = list(target_checkpoint_sequence(target_summary.target_key, weekend_format))
     observed_sessions = [
         point.checkpoint_session
@@ -343,7 +365,9 @@ def build_progression_series(
         if point is None:
             metric_values.append(None)
             race_counts.append(0)
-            missing_checkpoints.append(checkpoint_session)
+            status_point = status_by_session.get(checkpoint_session)
+            if status_point is None:
+                missing_checkpoints.append(checkpoint_session)
             continue
         metric_values.append(float(point.metrics[metric_name]))
         race_counts.append(int(point.race_count))
@@ -370,3 +394,32 @@ def build_progression_line_series(
     observed_values = [value for _, value, _ in observed_rows]
     observed_counts = [count for _, _, count in observed_rows]
     return observed_labels, observed_values, observed_counts
+
+
+def build_progression_checkpoint_state(
+    *,
+    target_summary: TargetAccuracySummary,
+    weekend_format: str,
+) -> dict[str, list[str]]:
+    """Return scored, excluded, and pending checkpoint labels for one target format."""
+    status_points = [
+        point
+        for point in target_summary.checkpoint_status
+        if point.weekend_format == weekend_format
+    ]
+    scored_checkpoints: list[str] = []
+    excluded_checkpoints: list[str] = []
+    pending_checkpoints: list[str] = []
+    for point in sorted(status_points, key=lambda item: item.checkpoint_index):
+        if point.scored_count > 0:
+            scored_checkpoints.append(point.checkpoint_session)
+        elif point.excluded_count > 0:
+            excluded_checkpoints.append(point.checkpoint_session)
+        elif point.pending_count > 0:
+            pending_checkpoints.append(point.checkpoint_session)
+
+    return {
+        "scored_checkpoints": scored_checkpoints,
+        "excluded_checkpoints": excluded_checkpoints,
+        "pending_checkpoints": pending_checkpoints,
+    }
