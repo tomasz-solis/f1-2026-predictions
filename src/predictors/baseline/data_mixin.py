@@ -149,9 +149,8 @@ def _score_teams_from_actual_rows(
         canonical_team = map_team_to_characteristics(raw_team, known_teams=known_teams)
         team_name = canonical_team if canonical_team else raw_team.strip()
 
-        try:
-            position = int(row.get("position"))
-        except (TypeError, ValueError):
+        position = _coerce_non_negative_int(row.get("position"))
+        if position is None:
             continue
         if position < 1:
             continue
@@ -176,9 +175,19 @@ def _score_teams_from_actual_rows(
 
 def _coerce_non_negative_int(value: object) -> int | None:
     """Convert an int-like value into a non-negative integer when possible."""
-    try:
-        parsed = int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    if isinstance(value, bool):
+        parsed = int(value)
+    elif isinstance(value, int | float | np.integer | np.floating):
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+    elif isinstance(value, str | bytes | bytearray):
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return None
+    else:
         return None
     return max(parsed, 0)
 
@@ -280,16 +289,19 @@ class BaselineDataMixin:
         for team_name in set(qualifying_scores) | set(race_scores):
             qualifying_score = qualifying_scores.get(team_name)
             race_score = race_scores.get(team_name)
+            if qualifying_score is None and race_score is None:
+                continue
             if qualifying_score is None:
-                blended_scores[team_name] = float(race_score)
+                if race_score is None:
+                    continue
+                blended_scores[team_name] = race_score
                 continue
             if race_score is None:
-                blended_scores[team_name] = float(qualifying_score)
+                blended_scores[team_name] = qualifying_score
                 continue
             blended_scores[team_name] = float(
                 np.clip(
-                    (float(qualifying_score) * qualifying_weight)
-                    + (float(race_score) * race_weight),
+                    (qualifying_score * qualifying_weight) + (race_score * race_weight),
                     0.0,
                     1.0,
                 )

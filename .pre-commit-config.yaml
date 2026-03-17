@@ -10,8 +10,8 @@ repos:
   - repo: local
     hooks:
       - id: mypy-dashboard-utils
-        name: mypy (src/dashboard + src/utils)
-        entry: .venv/bin/mypy src/dashboard src/utils
+        name: mypy (dashboard/utils + predictor guard)
+        entry: .venv/bin/mypy --no-incremental src/dashboard src/utils src/predictors/baseline/data_mixin.py
         language: system
         pass_filenames: false
         require_serial: true
