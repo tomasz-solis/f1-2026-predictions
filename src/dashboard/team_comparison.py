@@ -2,6 +2,7 @@
 
 import json
 from copy import deepcopy
+from hashlib import sha1
 from math import isfinite
 from pathlib import Path
 from typing import Any
@@ -589,9 +590,61 @@ def _run_characteristics_season_sync(year: int, payload: dict[str, Any]) -> dict
     )
 
 
+def _snapshot_history_cache_token(year: int) -> str:
+    """
+    Return a freshness token for stored session snapshots.
+
+    Snapshot history can be updated outside the running dashboard via CLI syncs,
+    cron warmups, or manual backfills. This token lets the next Streamlit rerun
+    notice those writes immediately instead of serving a stale cached list until
+    the TTL expires.
+    """
+    _processed_path, data_root = _resolve_processed_and_data_roots()
+    snapshot_root = data_root / SNAPSHOT_ARTIFACT_TYPE / str(int(year))
+
+    if snapshot_root.exists():
+        file_count = 0
+        newest_mtime_ns = 0
+        total_size = 0
+        for path in snapshot_root.rglob("*.json"):
+            if not path.is_file():
+                continue
+            try:
+                stat_result = path.stat()
+            except OSError:
+                continue
+            file_count += 1
+            newest_mtime_ns = max(newest_mtime_ns, int(stat_result.st_mtime_ns))
+            total_size += int(stat_result.st_size)
+        return f"files:{file_count}:{newest_mtime_ns}:{total_size}"
+
+    store = ArtifactStore(data_root=data_root)
+    rows = store.list_artifacts(
+        artifact_type=SNAPSHOT_ARTIFACT_TYPE,
+        key_prefix=f"{year}::",
+        limit=600,
+    )
+    row_fingerprints: list[tuple[str, str, str, str]] = []
+    for row in rows:
+        payload = row.get("data") if isinstance(row, dict) else None
+        row_fingerprints.append(
+            (
+                str(row.get("artifact_key", "")).strip() if isinstance(row, dict) else "",
+                str(row.get("created_at", "")).strip() if isinstance(row, dict) else "",
+                str(payload.get("captured_at", "")).strip() if isinstance(payload, dict) else "",
+                str(payload.get("session_started_at", "")).strip()
+                if isinstance(payload, dict)
+                else "",
+            )
+        )
+    fingerprint_payload = json.dumps(row_fingerprints, separators=(",", ":"), ensure_ascii=True)
+    return f"rows:{sha1(fingerprint_payload.encode('utf-8')).hexdigest()}"
+
+
 @st.cache_data(ttl=300, show_spinner=False)
-def _load_team_snapshot_history(year: int) -> list[dict[str, Any]]:
+def _load_team_snapshot_history(year: int, cache_token: str = "") -> list[dict[str, Any]]:
     """Load stored session snapshots for development history charts."""
+    del cache_token
     _processed_path, data_root = _resolve_processed_and_data_roots()
     store = ArtifactStore(data_root=data_root)
     rows = store.list_artifacts(
@@ -985,7 +1038,7 @@ def _render_development_history_section(
             )
             st.rerun()
 
-    snapshots = _load_team_snapshot_history(year)
+    snapshots = _load_team_snapshot_history(year, _snapshot_history_cache_token(year))
     if not snapshots:
         st.info("No session snapshot history yet. Use the sync button to build it from cache.")
         return
@@ -1138,7 +1191,7 @@ def _render_team_comparison_section(year: int = 2026) -> None:
     if not isinstance(base_teams_payload, dict):
         base_teams_payload = {}
 
-    snapshots = _load_team_snapshot_history(year)
+    snapshots = _load_team_snapshot_history(year, _snapshot_history_cache_token(year))
     latest_snapshot = _latest_snapshot_payload(snapshots)
     latest_snapshot_label = _snapshot_label(latest_snapshot) if latest_snapshot else ""
 

@@ -807,6 +807,54 @@ def test_load_team_snapshot_history_orders_same_day_snapshots_by_full_timestamp(
     ]
 
 
+def test_load_team_snapshot_history_cache_token_notices_new_snapshot_file(patcher, tmp_path):
+    patcher.setattr(team_comparison.config_loader, "get", lambda key, default=None: str(tmp_path))
+
+    team_profiles = {
+        "McLaren": {
+            "balanced": {
+                "slow_corner_performance": 0.71,
+                "medium_corner_performance": 0.72,
+                "fast_corner_performance": 0.73,
+                "braking_performance": 0.70,
+                "top_speed": 0.69,
+                "tire_deg_performance": 0.74,
+                "overall_pace": 0.75,
+            }
+        }
+    }
+    _write_snapshot(
+        tmp_path,
+        year=2027,
+        event_name="Chinese Grand Prix",
+        session_name="Q",
+        team_profiles=team_profiles,
+        round_number=2,
+        session_order=6,
+    )
+
+    team_comparison._load_team_snapshot_history.clear()
+    first_token = team_comparison._snapshot_history_cache_token(2027)
+    first_snapshots = team_comparison._load_team_snapshot_history(2027, first_token)
+
+    _write_snapshot(
+        tmp_path,
+        year=2027,
+        event_name="Chinese Grand Prix",
+        session_name="R",
+        team_profiles=team_profiles,
+        round_number=2,
+        session_order=7,
+    )
+
+    second_token = team_comparison._snapshot_history_cache_token(2027)
+    second_snapshots = team_comparison._load_team_snapshot_history(2027, second_token)
+
+    assert first_token != second_token
+    assert [snapshot["session_name"] for snapshot in first_snapshots] == ["Q"]
+    assert [snapshot["session_name"] for snapshot in second_snapshots] == ["Q", "R"]
+
+
 def test_snapshot_label_avoids_duplicate_testing_prefix():
     payload = {"event_name": "Testing 1", "session_name": "Testing 1 Day 2"}
 
