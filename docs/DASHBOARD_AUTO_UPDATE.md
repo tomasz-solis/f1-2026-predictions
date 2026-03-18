@@ -1,25 +1,27 @@
 # Dashboard Update Behavior
 
-This guide shows what the app refreshes on a normal prediction click and what still needs an explicit script run.
+This guide shows what the app does on a normal prediction click and what still needs a worker or explicit script run.
 
-## Automatic During `Predict`
+## During `Predict`
 
 When the user clicks **Predict** in `src/dashboard/pages.py` (called by `app.py`):
 
-1. Session-boundary changes are checked for the selected race.
-2. `auto_update_if_needed(force_recheck=...)` checks for race-result learning updates.
-3. If new races are found, it runs `auto_update_from_races()`.
-4. `auto_update_practice_characteristics_if_needed(force_recheck=...)` checks/updates FP-derived characteristics.
-5. Streamlit caches are cleared so the prediction run in the same click uses fresh artifacts.
-6. Competitive-session completion checks are re-run before using cached outputs.
+1. Weekend format is resolved for the selected race.
+2. Session-boundary freshness is checked for the selected race.
+3. The dashboard loads the warmed persisted prediction for the current checkpoint.
+4. If warmup has not caught up yet, the dashboard serves the latest warmed checkpoint instead.
 
-Steps 2 and 3 above handle race-result ingestion.
+The request path is read-only. It does not:
+
+- run `auto_update_if_needed(...)`
+- run `auto_update_practice_characteristics_if_needed(...)`
+- clear FastF1 caches to force a refresh
+- generate new prediction artifacts inline
 
 ### Practice-characteristics auto capture
 
-During weekend predictions, the app checks completed FP sessions and can update
-car characteristics from FP telemetry (FP1/FP2/FP3). By default, the update step
-uses cached session-state checks and boundary signatures to avoid unnecessary refreshes.
+Practice-derived car characteristics are still updated automatically, but by
+warmup/session automation workers rather than by the dashboard request path.
 
 State persistence:
 
@@ -61,9 +63,9 @@ By default it runs as dry-run; pass `--apply` to write updates.
 In DB-enabled modes (`db_only`, `fallback`, `dual_write`), `--apply` writes through
 `ArtifactStore` so Supabase stays in sync with file artifacts.
 
-Clarification: dashboard FP auto-capture uses the same underlying testing updater logic for
-completed race-weekend FP sessions, but explicit testing-event runs (for example pre-season testing)
-still require manual script execution.
+Clarification: warmup/session automation uses the same underlying testing updater logic for
+completed race-weekend FP sessions, but explicit testing-event runs (for example pre-season
+testing) still require manual script execution.
 
 ## Cache Locations
 
@@ -80,7 +82,7 @@ python scripts/update_from_testing.py "Testing 1" \
   --apply
 ```
 
-## What Is Not Automatic
+## What Is Not Automatic In The Dashboard
 
 - Pre-season testing directionality extraction.
 - Historical notebook validation runs.
@@ -88,9 +90,10 @@ python scripts/update_from_testing.py "Testing 1" \
 
 ## Operational Notes
 
-The dashboard auto-update depends on FastF1 schedule/session availability. If session data is delayed, updates may appear later even when race date has passed.
+The dashboard still performs lightweight schedule/boundary checks. If FastF1 session data is delayed,
+the app may keep serving the last warmed checkpoint until warmup can persist a newer one.
 
-Competitive-session refresh uses fail-closed handling:
+When prediction artifacts are generated, competitive-session resolution uses fail-closed handling:
 
 - unknown completion status does not silently downgrade ACTUAL grid source to PREDICTED
 - transient FastF1 failures emit runtime alerts/counters for visibility
@@ -116,5 +119,5 @@ This worker is checkpoint-aware and idempotent. It warms the next 3 races,
 stores missing weather scenarios only, and updates the ready-race horizon index
 used by the race dropdown.
 
-For production, keep `dashboard.prediction_precompute.inline_enabled: false` so
-this warmup runs outside the Streamlit request thread.
+For production, keep the dashboard request path read-only so this warmup owns
+freshness outside the Streamlit request thread.

@@ -122,7 +122,6 @@ def get_prediction_precompute_config() -> dict[str, Any]:
     Returns:
         dict with:
             enabled: bool
-            inline_enabled: bool
             horizon_races: int
             weather_scenarios: list[str]
             max_file_entries: int
@@ -163,9 +162,6 @@ def get_prediction_precompute_config() -> dict[str, Any]:
 
     return {
         "enabled": enabled,
-        "inline_enabled": bool(
-            config_loader.get("dashboard.prediction_precompute.inline_enabled", True)
-        ),
         "horizon_races": horizon_races,
         "weather_scenarios": weather_scenarios,
         "max_file_entries": max_file_entries,
@@ -454,8 +450,9 @@ def _extract_prediction_results(payload: Any) -> dict[str, Any] | None:
     Extract prediction results when payload has the expected shape.
 
     The returned mapping keeps a small context footer so downstream callers can
-    tell which boundary session produced the cached prediction. That matters
-    when a served prediction is later persisted for accuracy tracking.
+    tell which boundary session produced the cached prediction and when the
+    persisted payload was last updated. That matters when a served prediction is
+    later persisted for accuracy tracking or refreshed in memory.
     """
     if not isinstance(payload, dict):
         return None
@@ -472,6 +469,13 @@ def _extract_prediction_results(payload: Any) -> dict[str, Any] | None:
             context = dict(existing_context) if isinstance(existing_context, dict) else {}
             context["boundary_session_name"] = boundary_session_name
             extracted_results["_prediction_context"] = context
+
+    updated_at = str(payload.get("updated_at", "")).strip()
+    if updated_at:
+        existing_context = extracted_results.get("_prediction_context")
+        context = dict(existing_context) if isinstance(existing_context, dict) else {}
+        context["persisted_updated_at"] = updated_at
+        extracted_results["_prediction_context"] = context
 
     return extracted_results
 

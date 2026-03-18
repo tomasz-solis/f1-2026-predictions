@@ -397,7 +397,7 @@ def run_prediction(
     """
     Run full weekend cascade prediction.
 
-    Executes on every user-triggered run so FastF1-dependent session checks refresh.
+    Used by warmup and automation to build persisted prediction artifacts.
     """
     valid_weather = ["dry", "rain", "mixed"]
     if weather not in valid_weather:

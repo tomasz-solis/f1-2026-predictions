@@ -105,16 +105,15 @@ Outputs: Finish order + compound strategy distribution + pit window histogram.
 
 ## Data Update Flows
 
-### 1. Automatic on Predict
+### 1. Persisted predictions on Predict
 
 When you click **Predict**, the app:
 
-- runs session-boundary freshness checks automatically (no force-refresh toggle),
-- checks for race-result learning updates,
-- checks completed FP sessions (FP1/FP2/FP3) for practice-based characteristic updates,
-- clears Streamlit caches when refresh/update steps run so the same click uses fresh artifacts,
-- always runs FastF1 completion checks for competitive sessions on each click,
-- blocks silent ACTUAL -> PREDICTED downgrades when transient FastF1 failures occur.
+- resolves the current weekend format,
+- checks whether a newer session boundary exists for the selected race,
+- loads the matching warmed prediction from persisted storage,
+- falls back to the last warmed checkpoint if the live boundary is ahead,
+- does not refresh artifacts or rerun simulations in the request path.
 
 ### 1b. Optional background automation (no click required)
 
@@ -153,8 +152,8 @@ What it does:
 - computes/stores only missing weather scenarios (`dry`, `mixed`, `rain`)
 - updates the precompute horizon index used by the race dropdown filter
 
-Inline horizon precompute in the Streamlit request path is disabled by default
-(`inline_enabled: false`) to avoid user-facing latency spikes.
+The Streamlit request path is intentionally read-only. Warmup owns prediction
+freshness so user clicks do not mutate artifacts or rerun simulations.
 
 Cron example (Render preheat every 5 minutes):
 

@@ -120,7 +120,6 @@ logging:
 dashboard:
   prediction_precompute:
     enabled: true
-    inline_enabled: false
     horizon_races: 3
     weather_scenarios: ["dry", "mixed", "rain"]
     max_file_entries: 2048

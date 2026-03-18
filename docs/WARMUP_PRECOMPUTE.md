@@ -75,4 +75,5 @@ For multi-instance deployments (Render web + worker), set `USE_DB_STORAGE` to a 
 
 `file_only` does not share warmup state across instances.
 
-To keep user requests fast, disable inline warmup in the Streamlit path (`dashboard.prediction_precompute.inline_enabled: false`) and rely on this worker.
+The Streamlit request path is intentionally read-only. Rely on this worker to
+refresh warmed predictions instead of trying to recompute them during a user request.

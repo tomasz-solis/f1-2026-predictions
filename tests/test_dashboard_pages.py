@@ -256,7 +256,7 @@ def test_prediction_action_state_keeps_current_race_enabled_during_boundary_lag(
     patcher.setattr(
         pages,
         "get_prediction_precompute_config",
-        lambda: {"inline_enabled": False, "horizon_races": 3},
+        lambda: {"horizon_races": 3},
     )
 
     state = pages._prediction_action_state(
@@ -268,7 +268,7 @@ def test_prediction_action_state_keeps_current_race_enabled_during_boundary_lag(
     )
 
     assert state["disabled"] is False
-    assert "selected race can still run from live checkpoint data" in state["pending_message"]
+    assert "latest warmed persisted checkpoint" in state["pending_message"]
 
 
 def test_selected_race_persisted_prediction_available_uses_current_boundary_and_weather(patcher):
@@ -311,7 +311,7 @@ def test_prediction_action_state_keeps_selected_race_enabled_when_exact_predicti
     patcher.setattr(
         pages,
         "get_prediction_precompute_config",
-        lambda: {"inline_enabled": False, "horizon_races": 3},
+        lambda: {"horizon_races": 3},
     )
 
     state = pages._prediction_action_state(
@@ -433,7 +433,7 @@ def test_prediction_failure_hint_uses_precompute_guidance_when_db_prediction_mis
 
     assert hint is not None
     assert "warmup_precompute.py" in hint
-    assert "file_only" in hint
+    assert "--require-db" in hint
 
 
 def test_dashboard_refresh_label_prefers_newest_runtime_timestamp(patcher):

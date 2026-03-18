@@ -281,7 +281,7 @@ def test_render_prediction_hero_deck_uses_fixed_meta_grid(patcher):
     rendering.render_prediction_hero_deck(
         title="Race Weekend Prediction",
         summary="Practice-aware forecasts.",
-        eyebrow="Prediction lab",
+        eyebrow="Weekend forecast",
         cards=[
             {"label": "Model", "value": "v1.3", "meta": "Current dashboard release."},
             {"label": "Updated", "value": "2026-03-04", "meta": "Latest refresh stamp."},

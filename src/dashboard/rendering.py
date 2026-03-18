@@ -217,7 +217,7 @@ def _build_team_clustering_warning(
         )
 
     return (
-        f"🧩 Team-clustered ordering: {same_team_adjacent} adjacent teammate pairs detected."
+        f"Team-clustered ordering: {same_team_adjacent} adjacent teammate pairs detected."
         f"{confidence_note}"
     )
 
@@ -1051,13 +1051,13 @@ def _render_race_result(df: pd.DataFrame) -> None:
     mean_confidence = float(race_df["confidence"].mean()) if not race_df.empty else 0.0
     if mean_confidence < 56.0:
         warnings.append(
-            f"⚠️ Low confidence run: mean confidence is {mean_confidence:.1f}%. "
+            f"Low confidence run: mean confidence is {mean_confidence:.1f}%. "
             "Use this as a rough order; it should move as more weekend data comes in."
         )
 
     if isinstance(input_confidence, int | float) and float(input_confidence) < 0.60:
         warnings.append(
-            f"⚠️ Low input-data confidence ({float(input_confidence):.2f}/1.00). "
+            f"Low input-data confidence ({float(input_confidence):.2f}/1.00). "
             "This run leans heavily on priors."
         )
 
@@ -1067,14 +1067,14 @@ def _render_race_result(df: pd.DataFrame) -> None:
         wide_ranges = int((interval_width >= 8.0).sum())
         if wide_ranges >= max(6, int(len(race_df) * 0.35)):
             warnings.append(
-                f"📏 Wide position ranges: {wide_ranges} drivers have 90% ranges spanning 8+ places "
+                f"Wide position ranges: {wide_ranges} drivers have 90% ranges spanning 8+ places "
                 f"(median span: {median_width:.1f})."
             )
 
     high_dnf = race_df[race_df["dnf_probability"] > 20]
     if not high_dnf.empty:
         warnings.append(
-            f"🛑 High DNF risk ({len(high_dnf)} drivers): {', '.join(high_dnf['driver'].values)}"
+            f"High DNF risk ({len(high_dnf)} drivers): {', '.join(high_dnf['driver'].values)}"
         )
     team_cluster_warning = _build_team_clustering_warning(
         race_df,
@@ -1083,7 +1083,7 @@ def _render_race_result(df: pd.DataFrame) -> None:
     if team_cluster_warning:
         warnings.append(team_cluster_warning)
 
-    _render_collapsible_warnings(warnings, title="⚠️ Race Warnings")
+    _render_collapsible_warnings(warnings, title="Race warnings")
 
     st.caption(
         "Rows are ranked by expected finishing position across the full simulation "
@@ -1111,7 +1111,7 @@ def _render_race_result(df: pd.DataFrame) -> None:
     df_display = race_df[display_cols].copy()
     df_display.columns = display_names
 
-    st.subheader("🏁 Predicted Podium")
+    st.subheader("Projected podium")
     podium = race_df[race_df["position"] <= 3].copy().sort_values("position", ascending=True)
     podium_cards: list[dict[str, str]] = []
     podium_order = [2, 1, 3]
@@ -1161,7 +1161,7 @@ def _render_qualifying_result(df: pd.DataFrame) -> None:
     if has_ci:
         df_display["90% Range"] = df.apply(lambda r: f"P{int(r['p5'])}-P{int(r['p95'])}", axis=1)
         st.caption(
-            "📊 `90% Range` shows where each driver lands in 90% of qualifying simulations. "
+            "`90% Range` shows where each driver lands in 90% of qualifying simulations. "
             "Ranges should tighten as weekend and season data accumulates."
         )
     st.caption(
@@ -1345,12 +1345,12 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
             render_notice_banner(f"Data source: {data_source}.", tone="info", label="Input mix")
             if isinstance(data_source, str) and "Model-only" in data_source:
                 qualifying_warning_messages.append(
-                    "⚠️ Low-confidence qualifying mode: no weekend practice/testing signal. "
+                    "Low-confidence qualifying mode: no weekend practice/testing signal. "
                     "Early grids can look too team-ordered."
                 )
             elif isinstance(data_source, str) and "Testing short-run profile blend" in data_source:
                 qualifying_warning_messages.append(
-                    "⚠️ Medium-confidence qualifying mode: using testing-derived team pace without "
+                    "Medium-confidence qualifying mode: using testing-derived team pace without "
                     "weekend laps. Expect wider position ranges."
                 )
         if "confidence" in df.columns and not df.empty:
@@ -1359,7 +1359,7 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
             )
             if mean_qualifying_confidence < 56.0:
                 qualifying_warning_messages.append(
-                    f"⚠️ Low confidence run: mean confidence is {mean_qualifying_confidence:.1f}%. "
+                    f"Low confidence run: mean confidence is {mean_qualifying_confidence:.1f}%. "
                     "Use this as a rough order."
                 )
         else:
@@ -1373,7 +1373,7 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
             wide_ranges = int((interval_width >= 8.0).sum())
             if wide_ranges >= max(6, int(len(df) * 0.35)):
                 qualifying_warning_messages.append(
-                    f"📏 Wide position ranges: {wide_ranges} drivers have 90% ranges spanning 8+ places."
+                    f"Wide position ranges: {wide_ranges} drivers have 90% ranges spanning 8+ places."
                 )
 
         team_cluster_warning = _build_team_clustering_warning(
@@ -1389,7 +1389,7 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
     if not is_race:
         _render_collapsible_warnings(
             qualifying_warning_messages,
-            title="⚠️ Qualifying Warnings",
+            title="Qualifying warnings",
         )
 
     if is_race:

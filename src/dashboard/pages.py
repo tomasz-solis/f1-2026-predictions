@@ -809,17 +809,11 @@ def _prediction_action_state(
     *,
     selected_race_prediction_available: bool = False,
 ) -> dict[str, Any]:
-    """Resolve whether live prediction should be available for the selected race."""
-    settings = get_prediction_precompute_config()
-    require_persisted_predictions = not bool(settings.get("inline_enabled", True))
-    if not require_persisted_predictions:
-        return {"disabled": False, "pending_message": None}
-
+    """Resolve whether a persisted dashboard prediction is available."""
     if bool(precompute_filter_meta.get("fallback_boundary_active")):
         pending_message = (
-            "A newer checkpoint exists beyond the warmed horizon. The selected race can still "
-            "run from live checkpoint data, but future-race options stay pinned to the last "
-            "warmed horizon until the next hourly warmup."
+            "A newer checkpoint exists beyond the warmed horizon. The selected race will stay "
+            "on the latest warmed persisted checkpoint until the next warmup catches up."
         )
         return {
             "disabled": False,
@@ -847,7 +841,7 @@ def _prediction_action_state(
     else:
         pending_message = (
             "Persisted-only mode is enabled and no warmed horizon is available yet. "
-            "Run warmup before using live predictions."
+            "Run warmup before using dashboard predictions."
         )
 
     return {
@@ -990,31 +984,31 @@ def _render_collapsible_runtime_messages(messages: list[tuple[str, str]]) -> Non
 
     with expander:
         for level, message in unique_messages:
-            prefix = "ℹ️"
+            prefix = "Info"
             if level == "warning":
-                prefix = "⚠️"
+                prefix = "Warning"
             elif level == "success":
-                prefix = "✅"
-            st.markdown(f"- {prefix} {message}")
+                prefix = "Success"
+            st.markdown(f"- **{prefix}:** {message}")
 
 
 def execute_live_prediction_pipeline(
     race_name: str,
     weather: str,
     year: int = DEFAULT_SEASON,
-    force_refresh: bool = True,
+    force_refresh: bool = False,
     progress_callback: Callable[[str], None] | None = None,
 ) -> dict:
     """
-    Refresh input data and execute a prediction run.
+    Load the persisted prediction selected in the dashboard.
 
-    Kept separate from Streamlit rendering so tests can assert refresh call order.
+    Kept separate from Streamlit rendering so tests can assert request-path behavior.
 
     Args:
         race_name: The name of the race
         weather: Weather forecast for the race
         year: Season year
-        force_refresh: If True, clears FastF1 cache and forces re-check of session completion
+        force_refresh: Compatibility flag. Manual dashboard refresh is intentionally disabled.
         progress_callback: Optional callback for progress updates
     """
     return _execute_live_prediction_pipeline_core(
@@ -1068,8 +1062,8 @@ def _prediction_failure_hint(error: Exception) -> str | None:
         return (
             "The dashboard is currently in persisted-prediction mode, so it will not simulate on demand. "
             "Warm the 3-race horizon first with "
-            "`python scripts/warmup_precompute.py --year 2026 --require-db`, "
-            "and confirm the app is not running in `file_only` mode."
+            "`python scripts/warmup_precompute.py --year 2026` "
+            "(add `--require-db` only when you want DB-backed warmup to be mandatory)."
         )
 
     return None
@@ -1080,11 +1074,10 @@ def render_live_prediction_page(enable_logging: bool) -> None:
     render_prediction_hero_deck(
         title="Race Weekend Prediction",
         summary=(
-            "Practice-aware forecasts for qualifying and race. The layout now pushes the "
-            "key weekend signals forward so sprint rounds stay readable instead of turning "
-            "into one long stack of tables."
+            "Qualifying and race forecasts from the latest warmed checkpoint. "
+            "Session context and data freshness stay visible without crowding the page."
         ),
-        eyebrow="Prediction lab",
+        eyebrow="Weekend forecast",
         cards=[
             {
                 "label": "Model",
@@ -1105,9 +1098,9 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                 "tone": "success" if enable_logging else "warning",
             },
             {
-                "label": "Refresh",
-                "value": "Automatic",
-                "meta": "FastF1 session checks rerun on every prediction.",
+                "label": "Serving",
+                "value": "Persisted",
+                "meta": "Warmup and cron refresh predictions outside the request path.",
                 "tone": "neutral",
             },
         ],
@@ -1126,10 +1119,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                 options=season_options,
                 index=season_index,
                 key="selected_season",
-                help=(
-                    "Controls schedule lookup, update checks, artifacts, and prediction "
-                    "execution year."
-                ),
+                help=("Controls schedule lookup, warmed artifacts, and prediction execution year."),
             )
         )
     _set_selected_season(selected_season)
@@ -1158,7 +1148,8 @@ def render_live_prediction_page(enable_logging: bool) -> None:
     render_notice_banner(
         (
             f"{selected_weekend_label} selected for {race_name} {selected_season}. "
-            "Refresh and session-completion checks are automatic; no manual force refresh."
+            "Predictions are served from warmed persisted artifacts; run warmup outside the "
+            "dashboard if a newer checkpoint is needed."
         ),
         tone="info",
         label="Run setup",
@@ -1179,9 +1170,9 @@ def render_live_prediction_page(enable_logging: bool) -> None:
             precompute_message = (
                 f"Showing {ready_count}/{horizon_count} precomputed races from "
                 f"{anchor_race} checkpoint {anchor_session}. "
-                "A newer checkpoint exists, but it is not warmed yet. The selected race can "
-                "still run from live checkpoint data while future-race options stay on the "
-                "last warmed horizon."
+                "A newer checkpoint exists, but it is not warmed yet. The selected race stays "
+                "on the latest warmed persisted checkpoint while future-race options remain on "
+                "the last warmed horizon."
             )
         elif anchor_race and anchor_session:
             precompute_message = (
@@ -1316,34 +1307,21 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                         )
                     )
                 if isinstance(boundary_fallback, dict) and boundary_fallback:
-                    fallback_mode = str(boundary_fallback.get("mode", "")).strip().lower()
                     current_checkpoint = str(
                         boundary_fallback.get("current_boundary_session_name", "")
                     ).strip()
                     warmed_checkpoint = str(
                         boundary_fallback.get("warmed_boundary_session_name", "")
                     ).strip()
-                    if fallback_mode == "inline_current_boundary":
-                        runtime_messages.append(
-                            (
-                                "warning",
-                                "Latest completed checkpoint "
-                                f"{current_checkpoint or 'current'} is ahead of the warmed "
-                                "horizon. This selected race was generated from live checkpoint "
-                                f"data, while future-race options remain pinned to "
-                                f"{warmed_checkpoint or 'PRE'} until the next hourly warmup.",
-                            )
+                    runtime_messages.append(
+                        (
+                            "warning",
+                            "Latest completed checkpoint "
+                            f"{current_checkpoint or 'current'} is not warmed yet. "
+                            "Serving the latest available persisted checkpoint "
+                            f"{warmed_checkpoint or 'PRE'} instead.",
                         )
-                    else:
-                        runtime_messages.append(
-                            (
-                                "warning",
-                                "Latest completed checkpoint "
-                                f"{current_checkpoint or 'current'} is not warmed yet. "
-                                "Serving the latest available persisted checkpoint "
-                                f"{warmed_checkpoint or 'PRE'} instead.",
-                            )
-                        )
+                    )
                 if practice_update.get("updated"):
                     runtime_messages.append(
                         (
@@ -1379,7 +1357,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                         runtime_messages.append(
                             (
                                 "info",
-                                "Auto-refresh triggered by event boundary change "
+                                "A newer checkpoint was detected but is still waiting on warmup "
                                 f"({reason}): {', '.join(new_sessions)}",
                             )
                         )
@@ -1387,7 +1365,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                         runtime_messages.append(
                             (
                                 "info",
-                                f"Auto-refresh triggered by event boundary change ({reason}).",
+                                f"A newer checkpoint was detected but is still waiting on warmup ({reason}).",
                             )
                         )
 
@@ -1420,10 +1398,10 @@ def render_live_prediction_page(enable_logging: bool) -> None:
 
                 if pipeline_timing:
                     timing_parts = [
-                        f"updates {pipeline_timing.get('race_update_check', 0.0):.1f}s",
+                        f"boundary check {pipeline_timing.get('boundary_check', 0.0):.1f}s",
                         f"weekend lookup {pipeline_timing.get('weekend_lookup', 0.0):.1f}s",
                         f"practice check {pipeline_timing.get('practice_update_check', 0.0):.1f}s",
-                        f"prediction {pipeline_timing.get('prediction_run', 0.0):.1f}s",
+                        f"prediction load {pipeline_timing.get('prediction_load', 0.0):.1f}s",
                         f"total {pipeline_timing.get('total', 0.0):.1f}s",
                     ]
                     st.caption("Pipeline timing: " + " | ".join(timing_parts))
