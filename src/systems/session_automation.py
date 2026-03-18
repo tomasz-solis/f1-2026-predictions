@@ -510,8 +510,14 @@ def run_session_automation_cycle(
         is_sprint = bool(race_is_sprint)
         try:
             is_sprint = is_sprint_weekend(year, race_name)
-        except Exception:
-            pass
+        except ValueError as exc:
+            logger.warning(
+                "Could not refresh weekend format for %s %s; using schedule-window value %s: %s",
+                year,
+                race_name,
+                race_is_sprint,
+                exc,
+            )
 
         boundary_refresh = detect_event_boundary_refresh_if_needed(
             year=year,

@@ -247,6 +247,17 @@ class TestBaseline2026EdgeCases:
             # If it raises, that's also acceptable behavior
             pass
 
+    def test_predict_qualifying_raises_when_weekend_type_is_unknown(self, patcher):
+        """Predict qualifying should fail closed when weekend format cannot be resolved."""
+        predictor = Baseline2026Predictor()
+        patcher.setattr(
+            "src.predictors.baseline.qualifying_mixin.is_sprint_weekend",
+            lambda year, race_name: (_ for _ in ()).throw(ValueError("missing schedule row")),
+        )
+
+        with pytest.raises(ValueError, match="Could not determine weekend format"):
+            predictor.predict_qualifying(2026, "Mystery Grand Prix", n_simulations=1)
+
     def test_extreme_weather(self):
         """Test mixed weather condition"""
         predictor = Baseline2026Predictor()

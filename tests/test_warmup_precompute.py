@@ -249,6 +249,68 @@ def test_run_warmup_precompute_cycle_refreshes_practice_before_hashing(patcher):
     assert result.practice_teams_updated == 10
 
 
+def test_run_warmup_precompute_cycle_skips_target_with_unknown_weekend_type(patcher):
+    """Warmup should skip a target race when its weekend format cannot be resolved."""
+    fixed_now = datetime(2026, 3, 5, 12, 0, tzinfo=UTC)
+    patcher.setattr(warmup, "should_write_to_db", lambda: False)
+    patcher.setattr(warmup, "_refresh_anchor_practice_characteristics", lambda **kwargs: {})
+    patcher.setattr(
+        warmup,
+        "get_prediction_precompute_config",
+        lambda: {
+            "enabled": True,
+            "horizon_races": 3,
+            "weather_scenarios": ["dry"],
+            "max_file_entries": 2048,
+        },
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_warmup_targets",
+        lambda year, now_utc, horizon_races: warmup.WarmupTargets(
+            anchor_race_name="Bahrain Grand Prix",
+            anchor_is_sprint=False,
+            target_races=("Bahrain Grand Prix", "Mystery Grand Prix"),
+        ),
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_checkpoint_context",
+        lambda year, race_name, is_sprint, now_utc, session_detector: warmup.CheckpointContext(
+            checkpoint="PRE",
+            expected_checkpoint="PRE",
+            latest_ready_checkpoint="PRE",
+            checkpoint_ready=True,
+            reason="ready",
+            boundary_signature=f"{race_name}-sig",
+        ),
+    )
+    patcher.setattr(warmup, "get_artifact_versions", lambda year=2026: {"k": (1, "ts")})
+    patcher.setattr(warmup, "compute_artifact_hash", lambda artifact_versions: "artifact_hash")
+    patcher.setattr(warmup, "_load_predictor", lambda artifact_versions, year: object())
+    patcher.setattr(warmup, "load_precomputed_base_features", lambda **kwargs: None)
+    patcher.setattr(warmup, "load_precomputed_prediction", lambda **kwargs: None)
+
+    def _is_sprint_weekend(year, race_name):
+        if race_name == "Mystery Grand Prix":
+            raise ValueError("missing schedule row")
+        return False
+
+    patcher.setattr(warmup, "is_sprint_weekend", _is_sprint_weekend)
+
+    result = warmup.run_warmup_precompute_cycle(
+        2026,
+        now_utc=fixed_now,
+        dry_run=True,
+        verify_db_writes=False,
+    )
+
+    assert result.status == "partial_success"
+    assert result.ready_races == ["Bahrain Grand Prix"]
+    assert [context["race_name"] for context in result.target_contexts] == ["Bahrain Grand Prix"]
+    assert any("Mystery Grand Prix [weekend_format]" in error for error in result.errors)
+
+
 def test_run_warmup_precompute_cycle_returns_quickly_when_checkpoint_not_ready(patcher):
     """Warmup should skip compute work when the target checkpoint is not ready."""
     fixed_now = datetime(2026, 3, 6, 8, 0, tzinfo=UTC)

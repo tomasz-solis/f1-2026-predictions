@@ -469,9 +469,10 @@ class BaselineQualifyingMixin:
 
         try:
             is_sprint = is_sprint_weekend(year, race_name)
-        except (ValueError, KeyError, FileNotFoundError) as e:
-            logger.warning(f"Could not determine sprint weekend for {race_name}: {e}")
-            is_sprint = False
+        except ValueError as exc:
+            raise ValueError(
+                f"Could not determine weekend format for {race_name} ({year}): {exc}"
+            ) from exc
 
         seed_material = f"{self.seed}:{year}:{race_name}:{qualifying_stage}:{int(is_sprint)}"
         seed = int(sha256(seed_material.encode("utf-8")).hexdigest()[:16], 16)

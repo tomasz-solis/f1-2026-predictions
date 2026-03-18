@@ -854,14 +854,18 @@ def run_warmup_precompute_cycle(
         for target_race in summary.target_races:
             try:
                 target_is_sprint = bool(is_sprint_weekend(int(year), target_race))
-            except Exception as exc:
+            except ValueError as exc:
+                error_message = (
+                    f"{target_race} [weekend_format]: could not determine weekend format: {exc}"
+                )
+                summary.errors.append(error_message)
                 logger.warning(
-                    "Could not determine weekend format for %s %s, defaulting to conventional: %s",
+                    "Warmup skipped race target due to unknown weekend format (%s %s): %s",
                     int(year),
                     target_race,
                     exc,
                 )
-                target_is_sprint = False
+                continue
 
             if target_race == targets.anchor_race_name:
                 target_checkpoint_context = checkpoint_context
