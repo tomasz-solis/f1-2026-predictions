@@ -558,6 +558,14 @@ def _is_comparison_snapshot_session(session_name: str) -> bool:
     return session_order_index(normalized) in {1, 2, 3, 6, 7}
 
 
+def _is_history_chart_snapshot_session(session_name: str) -> bool:
+    """Return True for stored snapshots that should appear in the development chart."""
+    normalized = "".join(ch for ch in str(session_name).strip().upper() if ch.isalnum())
+    if not normalized:
+        return False
+    return session_order_index(normalized) in {1, 2, 3, 4, 5, 6, 7}
+
+
 def _run_characteristics_season_sync(year: int, payload: dict[str, Any]) -> dict[str, Any]:
     """Refresh snapshot history from cached sessions without touching live artifacts."""
     from src.systems.testing_updater import backfill_season_snapshot_history
@@ -797,7 +805,7 @@ def _build_snapshot_history_dataframe(
 
     for index, snapshot_payload in enumerate(snapshots):
         session_name = str(snapshot_payload.get("session_name", "")).strip()
-        if not _is_comparison_snapshot_session(session_name):
+        if not _is_history_chart_snapshot_session(session_name):
             continue
 
         label = _snapshot_label(snapshot_payload)
@@ -960,7 +968,7 @@ def _render_development_history_section(
     st.caption(
         "Sync rebuilds the stored session snapshot history from cached sessions without "
         "changing the live prediction artifact. The chart follows testing, practice, "
-        "qualifying, and race snapshots while skipping sprint-only checkpoints."
+        "sprint, qualifying, and race snapshots in chronological order."
     )
     if st.button(
         "Sync Car Stats From Cache",

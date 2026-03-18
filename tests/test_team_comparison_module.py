@@ -984,7 +984,7 @@ def test_latest_snapshot_payload_skips_sprint_only_sessions():
     assert latest["session_name"] == "FP1"
 
 
-def test_build_snapshot_history_dataframe_keeps_testing_and_main_weekend_sessions():
+def test_build_snapshot_history_dataframe_includes_sprint_weekend_sessions():
     snapshots = [
         {
             "event_name": "Testing 1",
@@ -1076,6 +1076,24 @@ def test_build_snapshot_history_dataframe_keeps_testing_and_main_weekend_session
                 }
             },
         },
+        {
+            "event_name": "Chinese Grand Prix",
+            "session_name": "Sprint",
+            "teams": {
+                "McLaren": {
+                    "profiles": {
+                        "balanced": {
+                            "slow_corner_performance": 0.20,
+                            "medium_corner_performance": 0.21,
+                            "fast_corner_performance": 0.22,
+                            "braking_performance": 0.19,
+                            "top_speed": 0.18,
+                            "tire_deg_performance": 0.23,
+                        }
+                    }
+                }
+            },
+        },
     ]
 
     frame = team_comparison._build_snapshot_history_dataframe(
@@ -1089,6 +1107,8 @@ def test_build_snapshot_history_dataframe_keeps_testing_and_main_weekend_session
         "Chinese Grand Prix FP1",
         "Australian Grand Prix Q",
         "Australian Grand Prix R",
+        "Chinese Grand Prix SQ",
+        "Chinese Grand Prix Sprint",
     ]
 
 
