@@ -152,6 +152,46 @@ def test_filter_race_options_to_precomputed_horizon_keeps_full_calendar_when_ind
     assert metadata["applied"] is False
 
 
+def test_filter_race_options_to_precomputed_horizon_marks_artifact_hash_mismatch_when_prior_horizon_exists(
+    patcher,
+):
+    patcher.setattr(pages, "get_artifact_versions", lambda year=2026: {"k": (1, "ts")})
+    patcher.setattr(pages, "compute_artifact_hash", lambda versions: "artifact_hash")
+    patcher.setattr(pages, "get_prediction_precompute_config", lambda: {"horizon_races": 3})
+    patcher.setattr(
+        pages,
+        "_resolve_dashboard_race_horizon",
+        lambda year, requested_horizon: [
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Bahrain Grand Prix",
+        ],
+    )
+    patcher.setattr(pages, "load_precompute_horizon_index", lambda year, artifact_hash: None)
+    patcher.setattr(pages, "load_precomputed_prediction", lambda **kwargs: None)
+    patcher.setattr(
+        pages, "has_precompute_horizon_for_year", lambda year, exclude_artifact_hash: True
+    )
+
+    filtered, metadata = pages._filter_race_options_to_precomputed_horizon(
+        year=2026,
+        race_options=[
+            "Chinese Grand Prix (Sprint)",
+            "Japanese Grand Prix",
+            "Bahrain Grand Prix",
+        ],
+    )
+
+    assert filtered == [
+        "Chinese Grand Prix (Sprint)",
+        "Japanese Grand Prix",
+        "Bahrain Grand Prix",
+    ]
+    assert metadata["applied"] is False
+    assert metadata["scope_applied"] is False
+    assert metadata["stale_reason"] == "artifact_hash_mismatch"
+
+
 def test_filter_race_options_to_precomputed_horizon_limits_to_upcoming_window_when_index_missing(
     patcher,
 ):
@@ -269,6 +309,19 @@ def test_prediction_action_state_keeps_current_race_enabled_during_boundary_lag(
 
     assert state["disabled"] is False
     assert "latest warmed persisted checkpoint" in state["pending_message"]
+
+
+def test_prediction_action_state_reports_rewarm_when_artifact_hash_changed():
+    state = pages._prediction_action_state(
+        {
+            "applied": False,
+            "scope_applied": True,
+            "stale_reason": "artifact_hash_mismatch",
+        }
+    )
+
+    assert state["disabled"] is True
+    assert "older artifact set" in state["pending_message"]
 
 
 def test_selected_race_persisted_prediction_available_uses_current_boundary_and_weather(patcher):

@@ -42,6 +42,7 @@ from .page_content import (
 from .precomputed_predictions import (
     compute_artifact_hash,
     get_prediction_precompute_config,
+    has_precompute_horizon_for_year,
     load_precompute_horizon_index,
     load_precomputed_prediction,
 )
@@ -671,10 +672,16 @@ def _filter_race_options_to_precomputed_horizon(
                     "expected_targets": planned_races,
                     "source": "storage_scan",
                 }
+        stale_reason = "missing_horizon_index"
+        if has_precompute_horizon_for_year(
+            year=year,
+            exclude_artifact_hash=artifact_hash,
+        ):
+            stale_reason = "artifact_hash_mismatch"
         return scoped_race_options, {
             **scope_metadata,
             "artifact_hash": artifact_hash,
-            "stale_reason": "missing_horizon_index",
+            "stale_reason": stale_reason,
         }
 
     anchor_race_name = str(index_payload.get("anchor_race_name", "")).strip()
@@ -828,7 +835,12 @@ def _prediction_action_state(
         return {"disabled": False, "pending_message": None}
 
     stale_reason = str(precompute_filter_meta.get("stale_reason", "")).strip()
-    if stale_reason == "boundary_mismatch":
+    if stale_reason == "artifact_hash_mismatch":
+        pending_message = (
+            "Stored predictions exist for an older artifact set, but the current artifact set "
+            "has not been warmed yet. Run warmup again after artifact or config changes."
+        )
+    elif stale_reason == "boundary_mismatch":
         pending_message = (
             "Current session boundary is ahead of the warmed horizon. Predictions will unlock "
             "after the next hourly warmup persists this checkpoint."
@@ -1185,6 +1197,14 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                 f"Showing {ready_count} precomputed races. "
                 "Hidden races will appear after the horizon is warmed."
             )
+    elif str(precompute_filter_meta.get("stale_reason", "")).strip() == "artifact_hash_mismatch":
+        planned_races = precompute_filter_meta.get("planned_races", [])
+        visible_count = len(race_options)
+        planned_count = len(planned_races) if isinstance(planned_races, list) else visible_count
+        precompute_message = (
+            f"Showing the next {visible_count}/{planned_count} scheduled races only. "
+            "Warmup exists for an older artifact set, but not for the current one yet."
+        )
     elif bool(precompute_filter_meta.get("scope_applied")):
         planned_races = precompute_filter_meta.get("planned_races", [])
         visible_count = len(race_options)

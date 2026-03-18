@@ -581,6 +581,45 @@ def load_precompute_horizon_index(*, year: int, artifact_hash: str) -> dict[str,
     return payload if isinstance(payload, dict) else None
 
 
+def has_precompute_horizon_for_year(
+    *,
+    year: int,
+    exclude_artifact_hash: str | None = None,
+) -> bool:
+    """Return True when any persisted horizon metadata exists for the season."""
+    year_prefix = f"{int(year)}::"
+    excluded_key = ""
+    if exclude_artifact_hash is not None:
+        excluded_key = f"{int(year)}::{str(exclude_artifact_hash).strip()}"
+
+    def _matches(entries: Any) -> bool:
+        if not isinstance(entries, dict):
+            return False
+        for state_key, payload in entries.items():
+            normalized_key = str(state_key).strip()
+            if not normalized_key.startswith(year_prefix):
+                continue
+            if excluded_key and normalized_key == excluded_key:
+                continue
+            if isinstance(payload, dict):
+                return True
+        return False
+
+    if should_read_db_first():
+        try:
+            db_entries = RuntimeStateStore().load_namespace(
+                _STATE_NAMESPACE_PRECOMPUTE_HORIZON_INDEX
+            )
+            if _matches(db_entries):
+                return True
+        except Exception as exc:
+            logger.warning("Could not inspect precompute horizon index in DB: %s", exc)
+
+    file_state = _load_horizon_index_state()
+    file_entries = file_state.get("entries", {})
+    return _matches(file_entries)
+
+
 def save_precompute_horizon_index(
     *,
     year: int,
