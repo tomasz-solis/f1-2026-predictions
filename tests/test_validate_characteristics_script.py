@@ -17,6 +17,52 @@ def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def _build_valid_driver_payload() -> dict:
+    drivers = {
+        "HAM": {
+            "racecraft": {"skill_score": 0.83},
+            "pace": {"quali_pace": 0.83, "race_pace": 0.82},
+            "dnf_risk": {"dnf_rate": 0.05},
+        },
+        "VER": {
+            "racecraft": {"skill_score": 0.91},
+            "pace": {"quali_pace": 0.92, "race_pace": 0.90},
+            "dnf_risk": {"dnf_rate": 0.02},
+        },
+    }
+    for idx in range(16):
+        skill = 0.32 + (idx * 0.02)
+        drivers[f"D{idx:02d}"] = {
+            "racecraft": {"skill_score": round(skill, 3)},
+            "pace": {"quali_pace": round(skill, 3), "race_pace": round(skill, 3)},
+            "dnf_risk": {"dnf_rate": 0.05},
+        }
+
+    return {"drivers": drivers}
+
+
+def _build_valid_team_payload() -> dict:
+    teams = {f"Team {idx}": {"overall_performance": 0.5, "uncertainty": 0.3} for idx in range(10)}
+    return {
+        "year": 2026,
+        "data_freshness": "BASELINE_PRESEASON",
+        "teams": teams,
+    }
+
+
+def _build_valid_track_payload() -> dict:
+    return {
+        "year": 2026,
+        "tracks": {
+            "Bahrain Grand Prix": {
+                "pit_stop_loss": 21.5,
+                "safety_car_prob": 0.45,
+                "overtaking_difficulty": 0.55,
+            }
+        },
+    }
+
+
 def test_team_validation_accepts_preseason_neutral_baseline(tmp_path):
     validator = _load_validator_module()
     team_file = tmp_path / "car_characteristics" / "2026_car_characteristics.json"
@@ -103,3 +149,40 @@ def test_driver_expectations_warn_by_default(tmp_path):
     assert is_valid
     assert errors == []
     assert any("HAM" in warning for warning in warnings)
+
+
+def test_resolve_driver_characteristics_file_falls_back_to_legacy_layout(tmp_path):
+    validator = _load_validator_module()
+    legacy_file = tmp_path / "driver_characteristics.json"
+    _write_json(legacy_file, {"drivers": {}})
+
+    resolved = validator._resolve_driver_characteristics_file(tmp_path, 2026)
+
+    assert resolved == legacy_file
+
+
+def test_main_accepts_season_scoped_repo_layout(tmp_path, monkeypatch, capsys):
+    validator = _load_validator_module()
+    data_dir = tmp_path / "processed"
+    _write_json(
+        data_dir / "driver_characteristics" / "2026_driver_characteristics.json",
+        _build_valid_driver_payload(),
+    )
+    _write_json(
+        data_dir / "car_characteristics" / "2026_car_characteristics.json",
+        _build_valid_team_payload(),
+    )
+    _write_json(
+        data_dir / "track_characteristics" / "2026_track_characteristics.json",
+        _build_valid_track_payload(),
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["validate_characteristics.py", "--data-dir", str(data_dir)],
+    )
+
+    exit_code = validator.main()
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "2026_driver_characteristics.json" in output

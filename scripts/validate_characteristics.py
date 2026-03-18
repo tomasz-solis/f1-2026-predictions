@@ -13,6 +13,8 @@ import json
 import sys
 from pathlib import Path
 
+DEFAULT_SEASON_YEAR = 2026
+
 # Known driver skill expectations (historical guidance only; can drift as extraction logic evolves)
 DRIVER_EXPECTATION_RULES = {
     # Elite (World Champions, consistent top performers)
@@ -54,6 +56,61 @@ TEAM_EXPECTATION_RULES = {
     "Audi": {"min": 0.30, "max": 0.50},  # New team, uncertain
     "Cadillac F1": {"min": 0.25, "max": 0.45},  # New team
 }
+
+
+def _find_latest_season_file(
+    data_dir: Path,
+    subdir: str,
+    filename_suffix: str,
+) -> Path | None:
+    """Return the highest-year season file for one characteristics artifact."""
+    season_dir = data_dir / subdir
+    matches: list[tuple[int, Path]] = []
+
+    for candidate in season_dir.glob(f"*_{filename_suffix}.json"):
+        year_token = candidate.name.split("_", 1)[0]
+        if year_token.isdigit():
+            matches.append((int(year_token), candidate))
+
+    if not matches:
+        return None
+
+    return max(matches, key=lambda item: item[0])[1]
+
+
+def _resolve_season_scoped_file(
+    data_dir: Path,
+    subdir: str,
+    filename_suffix: str,
+    season_year: int | None,
+) -> Path:
+    """Resolve a season-scoped artifact path, defaulting to the latest available season."""
+    if season_year is not None:
+        return data_dir / subdir / f"{season_year}_{filename_suffix}.json"
+
+    latest_file = _find_latest_season_file(data_dir, subdir, filename_suffix)
+    if latest_file is not None:
+        return latest_file
+
+    return data_dir / subdir / f"{DEFAULT_SEASON_YEAR}_{filename_suffix}.json"
+
+
+def _resolve_driver_characteristics_file(data_dir: Path, season_year: int | None) -> Path:
+    """Prefer season-scoped driver data, then fall back to the legacy flat file."""
+    season_file = _resolve_season_scoped_file(
+        data_dir=data_dir,
+        subdir="driver_characteristics",
+        filename_suffix="driver_characteristics",
+        season_year=season_year,
+    )
+    if season_file.exists():
+        return season_file
+
+    legacy_file = data_dir / "driver_characteristics.json"
+    if legacy_file.exists():
+        return legacy_file
+
+    return season_file
 
 
 def _record_expectation_violation(
@@ -361,6 +418,15 @@ def main():
             "By default these are warnings so preseason neutral baselines can pass."
         ),
     )
+    parser.add_argument(
+        "--season-year",
+        type=int,
+        default=None,
+        help=(
+            "Season year to validate. Defaults to the latest season-scoped files "
+            "found in each characteristics directory."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -377,7 +443,8 @@ def main():
 
     # Validate driver characteristics
     print("1. Validating driver characteristics...")
-    driver_file = data_dir / "driver_characteristics.json"
+    driver_file = _resolve_driver_characteristics_file(data_dir, args.season_year)
+    print(f"   Using {driver_file}")
     driver_valid, driver_errors, driver_warnings = validate_driver_characteristics(
         driver_file, enforce_expectations=args.enforce_expectations
     )
@@ -404,7 +471,13 @@ def main():
 
     # Validate team characteristics
     print("2. Validating team characteristics...")
-    team_file = data_dir / "car_characteristics" / "2026_car_characteristics.json"
+    team_file = _resolve_season_scoped_file(
+        data_dir=data_dir,
+        subdir="car_characteristics",
+        filename_suffix="car_characteristics",
+        season_year=args.season_year,
+    )
+    print(f"   Using {team_file}")
     team_valid, team_errors, team_warnings = validate_team_characteristics(
         team_file, enforce_expectations=args.enforce_expectations
     )
@@ -427,7 +500,13 @@ def main():
 
     # Validate track characteristics
     print("3. Validating track characteristics...")
-    track_file = data_dir / "track_characteristics" / "2026_track_characteristics.json"
+    track_file = _resolve_season_scoped_file(
+        data_dir=data_dir,
+        subdir="track_characteristics",
+        filename_suffix="track_characteristics",
+        season_year=args.season_year,
+    )
+    print(f"   Using {track_file}")
     track_valid, track_errors, track_warnings = validate_track_characteristics(track_file)
 
     if track_valid:
@@ -460,6 +539,11 @@ def main():
         print("[WARN] Data has blocking validation errors and should not be used for predictions.")
         print("   To regenerate characteristics, run:")
         print("   1) python scripts/extract_driver_characteristics.py --years 2023,2024,2025")
+        print(
+            "      Validator accepts either season-scoped driver output under "
+            "data/processed/driver_characteristics/<year>_driver_characteristics.json"
+        )
+        print("      or the legacy fallback data/processed/driver_characteristics.json")
         print(
             "   2) python scripts/generate_2026_baseline.py --years 2023,2024,2025 --output data/processed"
         )
