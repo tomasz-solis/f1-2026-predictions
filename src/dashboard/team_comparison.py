@@ -45,7 +45,7 @@ _TEAM_BRAND_COLORS: dict[str, str] = {
 _DEFAULT_TEAM_COLOR = "#B6BABD"
 _DEFAULT_BIG4_CANONICAL: tuple[str, ...] = ("MCLAREN", "MERCEDES", "FERRARI", "RED BULL")
 _UNIT_CHART_RANGE_PADDING = 0.02
-_TIRE_DEG_SLOPE_DISPLAY_RANGE: tuple[float, float] = (-0.05, 0.40)
+_TIRE_DEG_SLOPE_DISPLAY_RANGE: tuple[float, float] = (-0.20, 0.40)
 _DISPLAY_SCORE_FLOOR = 0.20
 _DISPLAY_SCORE_CEILING = 1.00
 _DISPLAY_SCORE_RANGE: tuple[float, float] = (_DISPLAY_SCORE_FLOOR, _DISPLAY_SCORE_CEILING)
@@ -451,6 +451,39 @@ def _has_profile_metrics(team_data: dict[str, Any], profile: str) -> bool:
     return False
 
 
+def _strip_raw_display_inputs(metrics_payload: dict[str, Any]) -> None:
+    """Remove raw metric fields so a fallback team cannot distort latest-session scales."""
+    raw_keys = {
+        _RAW_PACE_FIELD,
+        "top_speed_kph",
+        "tire_deg_slope",
+        *(
+            raw_metric_key
+            for raw_metric_key, _higher_is_better, _min_padding in _RAW_METRIC_FIELDS.values()
+        ),
+    }
+    for key in raw_keys:
+        metrics_payload.pop(key, None)
+
+
+def _prepare_team_payload_for_comparison_scales(
+    team_data: dict[str, Any],
+    profile: str,
+) -> dict[str, Any]:
+    """Sanitize approximated team payloads before building comparison display scales."""
+    sanitized_team_data = deepcopy(team_data)
+    if not _uses_same_event_average_fallback(sanitized_team_data):
+        return sanitized_team_data
+
+    metrics_payload = _resolve_profile_metrics(sanitized_team_data, profile)
+    if isinstance(metrics_payload, dict):
+        _strip_raw_display_inputs(metrics_payload)
+    testing_payload = sanitized_team_data.get("testing_characteristics")
+    if isinstance(testing_payload, dict):
+        _strip_raw_display_inputs(testing_payload)
+    return sanitized_team_data
+
+
 def _build_team_comparison_dataframe(
     teams_payload: dict[str, Any],
     selected_teams: list[str],
@@ -459,10 +492,15 @@ def _build_team_comparison_dataframe(
     """Build team comparison frame and return count of neutral fallbacks used."""
     rows: list[dict[str, Any]] = []
     neutral_fallback_count = 0
-    top_speed_display_scale = _build_top_speed_display_scale(teams_payload, profile)
+    scale_payload = {
+        team_name: _prepare_team_payload_for_comparison_scales(team_data, profile)
+        for team_name, team_data in teams_payload.items()
+        if isinstance(team_data, dict)
+    }
+    top_speed_display_scale = _build_top_speed_display_scale(scale_payload, profile)
     raw_metric_display_scales = {
         metric_key: _build_raw_metric_display_scale(
-            teams_payload,
+            scale_payload,
             profile,
             raw_metric_key=raw_metric_key,
             min_padding=min_padding,
@@ -534,6 +572,125 @@ def _build_team_comparison_dataframe(
     rows.sort(key=lambda row: float(row.get("Overall Pace", 0.0)), reverse=True)
     frame = pd.DataFrame(rows)
     return frame, neutral_fallback_count
+
+
+def _build_same_event_display_metric_fallbacks(
+    *,
+    snapshot_history: list[dict[str, Any]],
+    latest_snapshot: dict[str, Any] | None,
+    teams_payload: dict[str, Any],
+    selected_teams: list[str],
+    profile: str,
+) -> dict[str, dict[str, float]]:
+    """
+    Average earlier same-event display scores for teams missing from the latest snapshot.
+
+    A starred comparison row should stay aligned with the Development Over Time
+    chart. That means we need to average the already-rendered event scores, not
+    raw session seconds from practice, sprint, and qualifying mixed together.
+    """
+    if not isinstance(latest_snapshot, dict) or not selected_teams or not snapshot_history:
+        return {}
+
+    fallback_teams = [
+        team_name
+        for team_name in selected_teams
+        if _uses_same_event_average_fallback(teams_payload.get(team_name))
+    ]
+    if not fallback_teams:
+        return {}
+
+    history_df = _build_snapshot_history_dataframe(
+        snapshots=snapshot_history,
+        selected_teams=selected_teams,
+        profile=profile,
+    )
+    if history_df.empty:
+        return {}
+
+    latest_event = str(latest_snapshot.get("event_name", "")).strip()
+    latest_session = str(latest_snapshot.get("session_name", "")).strip()
+    if not latest_event or not latest_session:
+        return {}
+
+    latest_rows = history_df[
+        (history_df["Event"] == latest_event) & (history_df["Session"] == latest_session)
+    ]
+    if latest_rows.empty:
+        return {}
+
+    latest_order = int(latest_rows["Snapshot Order"].max())
+    event_history = history_df[
+        (history_df["Event"] == latest_event)
+        & (history_df["Snapshot Order"] < latest_order)
+        & history_df["Has Data"].fillna(False)
+    ]
+    if event_history.empty:
+        return {}
+
+    display_columns = ["Overall Pace", *[label for _, label in _TEAM_RADAR_METRICS]]
+    fallback_rows: dict[str, dict[str, float]] = {}
+    for team_name in fallback_teams:
+        team_history = event_history[event_history["Team"] == team_name]
+        if team_history.empty:
+            continue
+
+        averaged_scores: dict[str, float] = {}
+        for column in display_columns:
+            if column not in team_history.columns:
+                continue
+            series = team_history[column].dropna()
+            if series.empty:
+                continue
+            averaged_scores[column] = float(series.mean())
+
+        if averaged_scores:
+            fallback_rows[team_name] = averaged_scores
+
+    return fallback_rows
+
+
+def _apply_display_metric_fallbacks(
+    comparison_df: pd.DataFrame,
+    *,
+    teams_payload: dict[str, Any],
+    fallback_display_scores: dict[str, dict[str, float]],
+) -> pd.DataFrame:
+    """Override approximated comparison rows with same-event display-score averages."""
+    if comparison_df.empty or not fallback_display_scores:
+        return comparison_df
+
+    radar_labels = [label for _, label in _TEAM_RADAR_METRICS]
+    updated_rows: list[dict[str, Any]] = []
+    for row in comparison_df.to_dict(orient="records"):
+        team_name = str(row.get("Team", "")).strip()
+        fallback_scores = fallback_display_scores.get(team_name)
+        if not fallback_scores or not _uses_same_event_average_fallback(
+            teams_payload.get(team_name)
+        ):
+            updated_rows.append(row)
+            continue
+
+        updated_row = dict(row)
+        for column, value in fallback_scores.items():
+            updated_row[column] = float(value)
+
+        radar_values = [
+            float(updated_row[label])
+            for label in radar_labels
+            if isinstance(updated_row.get(label), int | float)
+        ]
+        if len(radar_values) == len(radar_labels):
+            radar_composite = float(sum(radar_values) / len(radar_values))
+            updated_row["Radar Composite"] = radar_composite
+            updated_row["Radar Minus Prior"] = radar_composite - float(
+                updated_row["Overall Performance"]
+            )
+
+        updated_rows.append(updated_row)
+
+    updated_rows.sort(key=lambda row: float(row.get("Overall Pace", 0.0)), reverse=True)
+    return pd.DataFrame(updated_rows)
 
 
 def _resolve_processed_and_data_roots() -> tuple[Path, Path]:
@@ -1413,7 +1570,7 @@ def _render_team_comparison_section(year: int = 2026) -> None:
             )
             st.caption(
                 "For these teams, the latest session snapshot has no stored team sample, so the "
-                "comparison uses an average of earlier sessions from the same race weekend."
+                "comparison uses an average of earlier same-weekend comparison scores."
             )
             st.caption(
                 "This does not relabel the team, change season priors, or turn the missing race "
@@ -1424,6 +1581,17 @@ def _render_team_comparison_section(year: int = 2026) -> None:
         teams_payload=teams_payload,
         selected_teams=teams_with_signal,
         profile=profile,
+    )
+    comparison_df = _apply_display_metric_fallbacks(
+        comparison_df,
+        teams_payload=teams_payload,
+        fallback_display_scores=_build_same_event_display_metric_fallbacks(
+            snapshot_history=snapshots,
+            latest_snapshot=latest_snapshot,
+            teams_payload=teams_payload,
+            selected_teams=teams_with_signal,
+            profile=profile,
+        ),
     )
 
     if comparison_df.empty:

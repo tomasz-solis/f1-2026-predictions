@@ -6,6 +6,7 @@ import json
 import math
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from src.dashboard import team_comparison
@@ -254,7 +255,18 @@ def test_build_team_comparison_dataframe_uses_slope_based_tire_deg_display_value
     )
 
     assert neutral_fallbacks == 0
-    assert frame.iloc[0]["Tire Deg"] == pytest.approx(0.2620, abs=1e-4)
+    assert frame.iloc[0]["Tire Deg"] == pytest.approx(0.2465, abs=1e-4)
+
+
+def test_normalize_tire_deg_slope_for_display_does_not_pin_common_negative_slopes_to_max():
+    values = [
+        team_comparison._normalize_tire_deg_slope_for_display(-0.1227),
+        team_comparison._normalize_tire_deg_slope_for_display(-0.0772),
+        team_comparison._normalize_tire_deg_slope_for_display(-0.05),
+    ]
+
+    assert all(value < 1.0 for value in values)
+    assert values[0] > values[1] > values[2]
 
 
 def test_build_team_comparison_dataframe_prefers_raw_top_speed_display_value():
@@ -317,6 +329,91 @@ def test_build_team_comparison_dataframe_prefers_raw_top_speed_display_value():
     assert rows.loc["McLaren", "Top Speed"] == pytest.approx(0.4353, abs=1e-4)
     assert rows.loc["Ferrari", "Top Speed"] == pytest.approx(0.5294, abs=1e-4)
     assert rows.loc["Mercedes", "Top Speed"] == pytest.approx(0.7647, abs=1e-4)
+
+
+def test_build_team_comparison_dataframe_excludes_approximated_team_from_raw_scales():
+    baseline_payload = {
+        "Mercedes": {
+            "overall_performance": 0.80,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.62,
+                    "overall_pace_seconds": 96.0,
+                    "slow_corner_performance": 0.63,
+                    "slow_corner_seconds": 25.7,
+                    "medium_corner_performance": 0.64,
+                    "medium_corner_seconds": 29.2,
+                    "fast_corner_performance": 0.65,
+                    "fast_corner_seconds": 41.8,
+                    "braking_performance": 0.63,
+                    "top_speed": 0.58,
+                    "top_speed_kph": 325.9,
+                    "tire_deg_performance": 0.62,
+                    "tire_deg_slope": -0.0772,
+                }
+            },
+        },
+        "Ferrari": {
+            "overall_performance": 0.70,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.54,
+                    "overall_pace_seconds": 97.4,
+                    "slow_corner_performance": 0.55,
+                    "slow_corner_seconds": 25.9,
+                    "medium_corner_performance": 0.59,
+                    "medium_corner_seconds": 29.4,
+                    "fast_corner_performance": 0.60,
+                    "fast_corner_seconds": 42.1,
+                    "braking_performance": 0.55,
+                    "top_speed": 0.49,
+                    "top_speed_kph": 321.9,
+                    "tire_deg_performance": 0.56,
+                    "tire_deg_slope": -0.071,
+                }
+            },
+        },
+    }
+    payload_with_fallback = {
+        **baseline_payload,
+        "McLaren": {
+            "comparison_fallback_source": "same_event_average",
+            "overall_performance": 0.85,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.76,
+                    "overall_pace_seconds": 94.8,
+                    "slow_corner_performance": 0.77,
+                    "slow_corner_seconds": 24.8,
+                    "medium_corner_performance": 0.72,
+                    "medium_corner_seconds": 28.6,
+                    "fast_corner_performance": 0.74,
+                    "fast_corner_seconds": 41.4,
+                    "braking_performance": 0.77,
+                    "top_speed": 0.43,
+                    "top_speed_kph": 313.5,
+                    "tire_deg_performance": 0.39,
+                    "tire_deg_slope": 0.1496,
+                }
+            },
+        },
+    }
+
+    frame_without_fallback, _ = team_comparison._build_team_comparison_dataframe(
+        teams_payload=baseline_payload,
+        selected_teams=["Mercedes", "Ferrari"],
+        profile="balanced",
+    )
+    frame_with_fallback, _ = team_comparison._build_team_comparison_dataframe(
+        teams_payload=payload_with_fallback,
+        selected_teams=["Mercedes", "Ferrari"],
+        profile="balanced",
+    )
+
+    cols = ["Overall Pace", "Slow Corners", "Medium Corners", "Fast Corners", "Top Speed"]
+    without_rows = frame_without_fallback.set_index("Team")[cols]
+    with_rows = frame_with_fallback.set_index("Team")[cols]
+    pd.testing.assert_frame_equal(without_rows, with_rows)
 
 
 def test_build_team_comparison_dataframe_prefers_raw_pace_and_corner_values():
@@ -613,6 +710,177 @@ def test_build_latest_snapshot_comparison_payload_uses_same_event_average_for_mi
         payload["McLaren"]["testing_characteristics_profiles"]["balanced"]["overall_pace"] == 0.75
     )
     assert payload["McLaren"]["testing_characteristics"]["slow_corner_performance"] == 0.65
+
+
+def test_build_same_event_display_metric_fallbacks_uses_history_display_scores():
+    base_teams_payload = {
+        "McLaren": {"overall_performance": 0.84},
+        "Mercedes": {"overall_performance": 0.80},
+    }
+    fp1_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "FP1",
+        "teams": {
+            "McLaren": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.70,
+                        "overall_pace_seconds": 100.0,
+                        "slow_corner_performance": 0.60,
+                        "slow_corner_seconds": 30.0,
+                        "medium_corner_performance": 0.61,
+                        "medium_corner_seconds": 31.0,
+                        "fast_corner_performance": 0.62,
+                        "fast_corner_seconds": 39.0,
+                        "braking_performance": 0.63,
+                        "top_speed": 0.64,
+                        "top_speed_kph": 300.0,
+                        "tire_deg_performance": 0.65,
+                        "tire_deg_slope": 0.12,
+                    }
+                }
+            },
+            "Mercedes": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.82,
+                        "overall_pace_seconds": 99.0,
+                        "slow_corner_performance": 0.81,
+                        "slow_corner_seconds": 29.4,
+                        "medium_corner_performance": 0.80,
+                        "medium_corner_seconds": 30.4,
+                        "fast_corner_performance": 0.79,
+                        "fast_corner_seconds": 38.5,
+                        "braking_performance": 0.78,
+                        "top_speed": 0.77,
+                        "top_speed_kph": 305.0,
+                        "tire_deg_performance": 0.76,
+                        "tire_deg_slope": 0.05,
+                    }
+                }
+            },
+        },
+    }
+    qualifying_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "Q",
+        "teams": {
+            "McLaren": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.80,
+                        "overall_pace_seconds": 91.0,
+                        "slow_corner_performance": 0.70,
+                        "slow_corner_seconds": 27.5,
+                        "medium_corner_performance": 0.71,
+                        "medium_corner_seconds": 28.1,
+                        "fast_corner_performance": 0.72,
+                        "fast_corner_seconds": 36.7,
+                        "braking_performance": 0.73,
+                        "top_speed": 0.74,
+                        "top_speed_kph": 309.0,
+                        "tire_deg_performance": 0.75,
+                        "tire_deg_slope": 0.02,
+                    }
+                }
+            },
+            "Mercedes": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.86,
+                        "overall_pace_seconds": 90.0,
+                        "slow_corner_performance": 0.85,
+                        "slow_corner_seconds": 27.0,
+                        "medium_corner_performance": 0.84,
+                        "medium_corner_seconds": 27.5,
+                        "fast_corner_performance": 0.83,
+                        "fast_corner_seconds": 36.2,
+                        "braking_performance": 0.82,
+                        "top_speed": 0.81,
+                        "top_speed_kph": 312.0,
+                        "tire_deg_performance": 0.80,
+                        "tire_deg_slope": -0.03,
+                    }
+                }
+            },
+        },
+    }
+    latest_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "R",
+        "teams": {
+            "Mercedes": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.84,
+                        "overall_pace_seconds": 96.0,
+                        "slow_corner_performance": 0.83,
+                        "slow_corner_seconds": 28.4,
+                        "medium_corner_performance": 0.82,
+                        "medium_corner_seconds": 29.0,
+                        "fast_corner_performance": 0.81,
+                        "fast_corner_seconds": 37.6,
+                        "braking_performance": 0.80,
+                        "top_speed": 0.79,
+                        "top_speed_kph": 314.0,
+                        "tire_deg_performance": 0.78,
+                        "tire_deg_slope": -0.05,
+                    }
+                }
+            }
+        },
+    }
+
+    snapshots = [fp1_snapshot, qualifying_snapshot, latest_snapshot]
+    teams_payload = team_comparison._build_latest_snapshot_comparison_payload(
+        base_teams_payload=base_teams_payload,
+        latest_snapshot=latest_snapshot,
+        snapshot_history=snapshots,
+    )
+    fallback_scores = team_comparison._build_same_event_display_metric_fallbacks(
+        snapshot_history=snapshots,
+        latest_snapshot=latest_snapshot,
+        teams_payload=teams_payload,
+        selected_teams=["McLaren", "Mercedes"],
+        profile="balanced",
+    )
+    history_df = team_comparison._build_snapshot_history_dataframe(
+        snapshots=snapshots,
+        selected_teams=["McLaren", "Mercedes"],
+        profile="balanced",
+    )
+    expected_row = (
+        history_df[
+            (history_df["Event"] == "Chinese Grand Prix")
+            & (history_df["Team"] == "McLaren")
+            & (history_df["Snapshot"] != "Chinese Grand Prix R")
+            & history_df["Has Data"].fillna(False)
+        ][
+            [
+                "Overall Pace",
+                "Slow Corners",
+                "Medium Corners",
+                "Fast Corners",
+                "Braking",
+                "Top Speed",
+                "Tire Deg",
+            ]
+        ]
+        .mean(numeric_only=True)
+        .to_dict()
+    )
+
+    assert teams_payload["McLaren"]["comparison_fallback_source"] == "same_event_average"
+    assert fallback_scores["McLaren"]["Overall Pace"] == pytest.approx(
+        expected_row["Overall Pace"], abs=1e-4
+    )
+    assert fallback_scores["McLaren"]["Top Speed"] == pytest.approx(
+        expected_row["Top Speed"], abs=1e-4
+    )
+    assert fallback_scores["McLaren"]["Overall Pace"] != pytest.approx(
+        teams_payload["McLaren"]["testing_characteristics_profiles"]["balanced"]["overall_pace"],
+        abs=1e-4,
+    )
 
 
 def test_run_characteristics_season_sync_backfills_snapshots_only(patcher):
