@@ -11,6 +11,7 @@ import pandas as pd
 import streamlit as st
 
 from src.persistence.artifact_store import ArtifactStore
+from src.persistence.config import should_read_db_first
 from src.utils import config_loader
 from src.utils.car_snapshot_history import (
     SNAPSHOT_ARTIFACT_TYPE,
@@ -45,9 +46,13 @@ _DEFAULT_TEAM_COLOR = "#B6BABD"
 _DEFAULT_BIG4_CANONICAL: tuple[str, ...] = ("MCLAREN", "MERCEDES", "FERRARI", "RED BULL")
 _UNIT_CHART_RANGE_PADDING = 0.02
 _TIRE_DEG_SLOPE_DISPLAY_RANGE: tuple[float, float] = (-0.05, 0.40)
-_TIRE_DEG_SCORE_DISPLAY_RANGE: tuple[float, float] = (0.15, 0.85)
+_DISPLAY_SCORE_FLOOR = 0.20
+_DISPLAY_SCORE_CEILING = 1.00
+_DISPLAY_SCORE_RANGE: tuple[float, float] = (_DISPLAY_SCORE_FLOOR, _DISPLAY_SCORE_CEILING)
+_TIRE_DEG_SCORE_DISPLAY_RANGE: tuple[float, float] = _DISPLAY_SCORE_RANGE
 _TOP_SPEED_KPH_BUFFER = 5.0
-_TOP_SPEED_SCORE_DISPLAY_RANGE: tuple[float, float] = (0.25, 0.85)
+_TOP_SPEED_SCORE_DISPLAY_RANGE: tuple[float, float] = _DISPLAY_SCORE_RANGE
+_RADAR_AXIS_DISPLAY_MAX = 1.05
 _RAW_TIME_PADDING_RATIO = 0.35
 _RAW_SECTOR_MIN_PADDING_SECONDS = 0.02
 _RAW_PACE_MIN_PADDING_SECONDS = 0.08
@@ -551,6 +556,18 @@ def _snapshot_label(snapshot_payload: dict[str, Any]) -> str:
     return f"{event_name} {session_name}"
 
 
+def _uses_same_event_average_fallback(team_payload: dict[str, Any] | None) -> bool:
+    """Return True when the latest comparison view uses a weekend-average approximation."""
+    if not isinstance(team_payload, dict):
+        return False
+    return str(team_payload.get("comparison_fallback_source", "")).strip() == "same_event_average"
+
+
+def _comparison_display_team_name(team_name: str, team_payload: dict[str, Any] | None) -> str:
+    """Add an asterisk only when the latest comparison scores are approximated."""
+    return f"{team_name}*" if _uses_same_event_average_fallback(team_payload) else team_name
+
+
 def _is_comparison_snapshot_session(session_name: str) -> bool:
     """Return True for stored snapshots that belong in comparison charts and tables."""
     normalized = "".join(ch for ch in str(session_name).strip().upper() if ch.isalnum())
@@ -602,6 +619,35 @@ def _snapshot_history_cache_token(year: int) -> str:
     _processed_path, data_root = _resolve_processed_and_data_roots()
     snapshot_root = data_root / SNAPSHOT_ARTIFACT_TYPE / str(int(year))
 
+    if should_read_db_first():
+        store = ArtifactStore(data_root=data_root)
+        rows = store.list_artifacts(
+            artifact_type=SNAPSHOT_ARTIFACT_TYPE,
+            key_prefix=f"{year}::",
+            limit=600,
+        )
+        row_fingerprints: list[tuple[str, str, str, str]] = []
+        for row in rows:
+            payload = row.get("data") if isinstance(row, dict) else None
+            row_fingerprints.append(
+                (
+                    str(row.get("artifact_key", "")).strip() if isinstance(row, dict) else "",
+                    str(row.get("created_at", "")).strip() if isinstance(row, dict) else "",
+                    str(payload.get("captured_at", "")).strip()
+                    if isinstance(payload, dict)
+                    else "",
+                    str(payload.get("session_started_at", "")).strip()
+                    if isinstance(payload, dict)
+                    else "",
+                )
+            )
+        fingerprint_payload = json.dumps(
+            row_fingerprints,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        )
+        return f"rows:{sha1(fingerprint_payload.encode('utf-8')).hexdigest()}"
+
     if snapshot_root.exists():
         file_count = 0
         newest_mtime_ns = 0
@@ -618,27 +664,7 @@ def _snapshot_history_cache_token(year: int) -> str:
             total_size += int(stat_result.st_size)
         return f"files:{file_count}:{newest_mtime_ns}:{total_size}"
 
-    store = ArtifactStore(data_root=data_root)
-    rows = store.list_artifacts(
-        artifact_type=SNAPSHOT_ARTIFACT_TYPE,
-        key_prefix=f"{year}::",
-        limit=600,
-    )
-    row_fingerprints: list[tuple[str, str, str, str]] = []
-    for row in rows:
-        payload = row.get("data") if isinstance(row, dict) else None
-        row_fingerprints.append(
-            (
-                str(row.get("artifact_key", "")).strip() if isinstance(row, dict) else "",
-                str(row.get("created_at", "")).strip() if isinstance(row, dict) else "",
-                str(payload.get("captured_at", "")).strip() if isinstance(payload, dict) else "",
-                str(payload.get("session_started_at", "")).strip()
-                if isinstance(payload, dict)
-                else "",
-            )
-        )
-    fingerprint_payload = json.dumps(row_fingerprints, separators=(",", ":"), ensure_ascii=True)
-    return f"rows:{sha1(fingerprint_payload.encode('utf-8')).hexdigest()}"
+    return "rows:missing"
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -693,35 +719,50 @@ def _build_latest_snapshot_comparison_payload(
     if not isinstance(snapshot_teams_payload, dict):
         return {}
 
+    history = snapshot_history or []
     canonical_base_payload = _canonicalize_teams_payload_for_comparison(base_teams_payload)
     merged_payload: dict[str, dict[str, Any]] = {}
-
-    for raw_team_name, raw_team_payload in snapshot_teams_payload.items():
-        if not isinstance(raw_team_payload, dict):
-            continue
-
-        profiles = raw_team_payload.get("profiles")
-        if not isinstance(profiles, dict) or not profiles:
-            continue
-
+    candidate_team_names: set[str] = set(canonical_base_payload.keys())
+    for raw_team_name in snapshot_teams_payload:
         mapped_name = map_team_to_characteristics(str(raw_team_name))
         display_name = (
             mapped_name if isinstance(mapped_name, str) and mapped_name else str(raw_team_name)
         )
-        profiles_payload = deepcopy(profiles)
+        candidate_team_names.add(display_name)
+
+    for display_name in sorted(candidate_team_names):
+        profiles_payload = _resolve_snapshot_team_profiles(latest_snapshot, display_name)
+        fallback_source = ""
+        if not profiles_payload:
+            profiles_payload = _resolve_same_event_profile_average_fallback(
+                snapshot_history=history,
+                latest_snapshot=latest_snapshot,
+                team_name=display_name,
+            )
+            if profiles_payload:
+                fallback_source = "same_event_average"
+        if not profiles_payload:
+            continue
+
+        normalized_profiles = deepcopy(profiles_payload)
         tire_deg_fallback = _resolve_latest_tire_deg_fallback(
-            snapshot_history=snapshot_history or [],
+            snapshot_history=history,
             latest_snapshot=latest_snapshot,
             team_name=display_name,
         )
         if tire_deg_fallback:
-            _apply_profile_tire_deg_fallbacks(profiles_payload, tire_deg_fallback)
+            _apply_profile_tire_deg_fallbacks(normalized_profiles, tire_deg_fallback)
 
-        team_payload: dict[str, Any] = {"testing_characteristics_profiles": profiles_payload}
+        team_payload: dict[str, Any] = {"testing_characteristics_profiles": normalized_profiles}
 
-        balanced_profile = profiles_payload.get("balanced")
+        balanced_profile = normalized_profiles.get("balanced")
         if isinstance(balanced_profile, dict):
             team_payload["testing_characteristics"] = deepcopy(balanced_profile)
+        if fallback_source:
+            team_payload["comparison_fallback_source"] = fallback_source
+            team_payload["comparison_fallback_label"] = (
+                f"{str(latest_snapshot.get('event_name', '')).strip()} weekend average"
+            )
 
         base_team_payload = canonical_base_payload.get(display_name)
         if isinstance(base_team_payload, dict):
@@ -769,6 +810,71 @@ def _snapshot_identity(snapshot_payload: dict[str, Any]) -> tuple[str, str]:
         str(snapshot_payload.get("event_name", "")).strip(),
         str(snapshot_payload.get("session_name", "")).strip(),
     )
+
+
+def _average_snapshot_profile_metrics(profile_samples: list[dict[str, Any]]) -> dict[str, float]:
+    """Average numeric profile metrics across multiple stored session snapshots."""
+    metric_samples: dict[str, list[float]] = {}
+    for metrics_payload in profile_samples:
+        if not isinstance(metrics_payload, dict):
+            continue
+        for metric_name, raw_value in metrics_payload.items():
+            if not isinstance(raw_value, int | float):
+                continue
+            numeric_value = float(raw_value)
+            if not isfinite(numeric_value):
+                continue
+            metric_samples.setdefault(str(metric_name), []).append(numeric_value)
+
+    averaged_metrics: dict[str, float] = {}
+    for metric_name, values in metric_samples.items():
+        if not values:
+            continue
+        averaged_metrics[metric_name] = round(sum(values) / len(values), 4)
+    return averaged_metrics
+
+
+def _resolve_same_event_profile_average_fallback(
+    *,
+    snapshot_history: list[dict[str, Any]],
+    latest_snapshot: dict[str, Any],
+    team_name: str,
+) -> dict[str, dict[str, float]]:
+    """
+    Build a same-weekend profile fallback for teams missing from the latest snapshot.
+
+    When a team has no usable latest-session sample, for example after a double
+    retirement, the comparison chart should keep the team visible without
+    pretending that the missing race snapshot contained valid telemetry. We use
+    the average of the earlier snapshots from the same event as a conservative
+    weekend-level fallback.
+    """
+    latest_event = str(latest_snapshot.get("event_name", "")).strip()
+    latest_identity = _snapshot_identity(latest_snapshot)
+    if not latest_event:
+        return {}
+
+    profile_samples: dict[str, list[dict[str, Any]]] = {}
+    for snapshot_payload in snapshot_history:
+        snapshot_identity = _snapshot_identity(snapshot_payload)
+        if snapshot_identity == latest_identity:
+            break
+        if str(snapshot_payload.get("event_name", "")).strip() != latest_event:
+            continue
+        team_profiles = _resolve_snapshot_team_profiles(snapshot_payload, team_name)
+        if not team_profiles:
+            continue
+        for profile_name, metrics_payload in team_profiles.items():
+            if not isinstance(metrics_payload, dict):
+                continue
+            profile_samples.setdefault(str(profile_name), []).append(metrics_payload)
+
+    averaged_profiles: dict[str, dict[str, float]] = {}
+    for profile_name, samples in profile_samples.items():
+        averaged_metrics = _average_snapshot_profile_metrics(samples)
+        if averaged_metrics:
+            averaged_profiles[profile_name] = averaged_metrics
+    return averaged_profiles
 
 
 def _resolve_latest_tire_deg_fallback(
@@ -895,13 +1001,6 @@ def _build_snapshot_history_dataframe(
         }
 
         for team_name in selected_teams:
-            team_payload = snapshot_team_payload.get(team_name)
-            if not isinstance(team_payload, dict):
-                continue
-            metrics_payload = _resolve_profile_metrics(team_payload, profile)
-            if not isinstance(metrics_payload, dict):
-                continue
-
             row: dict[str, Any] = {
                 "Snapshot": label,
                 "Snapshot Order": index,
@@ -909,7 +1008,16 @@ def _build_snapshot_history_dataframe(
                 "Event": str(snapshot_payload.get("event_name", "")).strip(),
                 "Session": session_name,
                 "Team": team_name,
+                "Has Data": False,
             }
+            team_payload = snapshot_team_payload.get(team_name)
+            if not isinstance(team_payload, dict):
+                rows.append(row)
+                continue
+            metrics_payload = _resolve_profile_metrics(team_payload, profile)
+            if not isinstance(metrics_payload, dict):
+                rows.append(row)
+                continue
 
             metric_values: list[float] = []
             for payload_key, label_name in _TEAM_RADAR_METRICS:
@@ -950,8 +1058,8 @@ def _build_snapshot_history_dataframe(
                 row["Overall"] = float(sum(metric_values) / metric_count)
                 row["Metric Count"] = metric_count
                 row["Metric Coverage"] = float(metric_count / len(_TEAM_RADAR_METRICS))
-            if metric_values or overall_pace is not None:
-                rows.append(row)
+            row["Has Data"] = bool(metric_values or overall_pace is not None)
+            rows.append(row)
 
     if not rows:
         return pd.DataFrame()
@@ -1074,11 +1182,12 @@ def _render_development_history_section(
     metric_frame_columns = ["Snapshot Order", "Snapshot", "Team", metric_label]
     if metric_label == "Overall":
         metric_frame_columns.extend(["Metric Count", "Metric Coverage"])
-    metric_frame = history_df[metric_frame_columns].dropna(subset=[metric_label])
-    if metric_frame.empty:
+    metric_frame = history_df[metric_frame_columns].copy()
+    if metric_frame[metric_label].dropna().empty:
         st.info(f"No stored `{metric_label}` values are available for this selection yet.")
         return
     category_order = _ordered_snapshot_labels(history_df)
+    missing_history_points = bool((~history_df["Has Data"].fillna(False)).any())
 
     try:
         import plotly.graph_objects as go
@@ -1109,6 +1218,7 @@ def _render_development_history_section(
                     y=list(team_frame[metric_label]),
                     mode="lines+markers",
                     name=team_name,
+                    connectgaps=False,
                     line=dict(color=trace_color, width=3),
                     marker=dict(color=trace_color, size=8),
                     customdata=customdata,
@@ -1158,6 +1268,11 @@ def _render_development_history_section(
     else:
         st.caption(
             "Each point is one session snapshot. Relative changes matter more than absolute levels."
+        )
+    if missing_history_points:
+        st.caption(
+            "Gaps indicate sessions where a selected team has no stored snapshot sample, "
+            "for example after a non-classified or double-retirement result."
         )
 
 
@@ -1262,6 +1377,15 @@ def _render_team_comparison_section(year: int = 2026) -> None:
     teams_without_signal = [
         team_name for team_name in selected_teams if team_name not in teams_with_signal
     ]
+    selected_weekend_fallback_teams = [
+        team_name
+        for team_name in teams_with_signal
+        if _uses_same_event_average_fallback(teams_payload.get(team_name))
+    ]
+    comparison_display_names = {
+        team_name: _comparison_display_team_name(team_name, teams_payload.get(team_name))
+        for team_name in teams_with_signal
+    }
 
     if not teams_with_signal:
         st.info(
@@ -1274,6 +1398,27 @@ def _render_team_comparison_section(year: int = 2026) -> None:
     if teams_without_signal:
         excluded_team_list = ", ".join(teams_without_signal)
         st.caption(f"Excluded teams without `{profile}` profile metrics: {excluded_team_list}.")
+    if selected_weekend_fallback_teams:
+        fallback_team_list = ", ".join(
+            comparison_display_names[team_name]
+            for team_name in sorted(selected_weekend_fallback_teams)
+        )
+        st.caption(
+            "Weekend-average approximation applied to "
+            f"{fallback_team_list} because the latest session snapshot has no stored team sample."
+        )
+        with st.expander("* What the asterisk means"):
+            st.caption(
+                "* only marks the latest-comparison profile pace and radar scores in this section."
+            )
+            st.caption(
+                "For these teams, the latest session snapshot has no stored team sample, so the "
+                "comparison uses an average of earlier sessions from the same race weekend."
+            )
+            st.caption(
+                "This does not relabel the team, change season priors, or turn the missing race "
+                "session in Development Over Time into a proxy point."
+            )
 
     comparison_df, neutral_fallbacks = _build_team_comparison_dataframe(
         teams_payload=teams_payload,
@@ -1302,14 +1447,15 @@ def _render_team_comparison_section(year: int = 2026) -> None:
         line_width = 2.8 if team_count <= 3 else 2.2
         for _, row in comparison_df.iterrows():
             values = [float(row[label]) for label in radar_labels]
-            trace_color = _team_brand_color(str(row["Team"]))
+            team_name = str(row["Team"])
+            trace_color = _team_brand_color(team_name)
             fig.add_trace(
                 go.Scatterpolar(
                     mode="lines+markers",
                     r=values + [values[0]],
                     theta=radar_labels + [radar_labels[0]],
                     fill=fill_mode,
-                    name=str(row["Team"]),
+                    name=comparison_display_names.get(team_name, team_name),
                     line=dict(color=trace_color, width=line_width),
                     fillcolor=_hex_to_rgba(trace_color, fill_alpha),
                     marker=dict(color=trace_color, size=marker_size),
@@ -1338,7 +1484,7 @@ def _render_team_comparison_section(year: int = 2026) -> None:
                 bgcolor="rgba(11,15,20,0.42)",
                 radialaxis=dict(
                     visible=True,
-                    range=[0.0, 1.0],
+                    range=[0.0, _RADAR_AXIS_DISPLAY_MAX],
                     tickvals=[0.2, 0.4, 0.6, 0.8, 1.0],
                     ticktext=["20", "40", "60", "80", "100"],
                     tickfont=dict(color="#AAB4C2", size=12),
@@ -1367,6 +1513,9 @@ def _render_team_comparison_section(year: int = 2026) -> None:
     ]
     for column in percent_cols:
         display_df[column] = (display_df[column].astype(float) * 100.0).round(1)
+    display_df["Team"] = display_df["Team"].map(
+        lambda team_name: comparison_display_names.get(str(team_name), str(team_name))
+    )
     display_df = display_df[
         [
             "Team",
@@ -1387,8 +1536,9 @@ def _render_team_comparison_section(year: int = 2026) -> None:
 
     st.dataframe(display_df, hide_index=True, width="stretch")
     st.caption(
-        "Profile pace/radar come from the latest synced non-sprint snapshot; "
-        "Season Prior Strength is a separate baseline signal."
+        "Profile pace/radar come from the latest synced comparison snapshot when present; "
+        "starred teams use a same-weekend approximation in this section only. "
+        "Season Prior Strength stays a separate baseline signal."
     )
     st.caption(
         f"Source: {source_label or f'`{characteristics_path}`'} | profile=`{profile}` | "

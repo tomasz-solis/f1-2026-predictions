@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -11,13 +12,22 @@ from src.dashboard import team_comparison
 
 
 def _stub_streamlit_team(patcher):
+    class _Ctx:
+        def __enter__(self):
+            return None
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
     calls = {
         "info": [],
         "plotly": 0,
         "plotly_figures": [],
         "dataframe": 0,
+        "dataframes": [],
         "captions": [],
         "success": [],
+        "expanders": [],
     }
     patcher.setattr(team_comparison.st, "subheader", lambda *_args, **_kwargs: None)
     patcher.setattr(team_comparison.st, "selectbox", lambda _label, options, **_kwargs: options[0])
@@ -43,12 +53,23 @@ def _stub_streamlit_team(patcher):
     patcher.setattr(
         team_comparison.st,
         "dataframe",
-        lambda *_args, **_kwargs: calls.__setitem__("dataframe", calls["dataframe"] + 1),
+        lambda data, **_kwargs: (
+            calls["dataframes"].append(data.copy() if hasattr(data, "copy") else data),
+            calls.__setitem__("dataframe", calls["dataframe"] + 1),
+        ),
     )
     patcher.setattr(
         team_comparison.st,
         "caption",
         lambda message: calls["captions"].append(str(message)),
+    )
+    patcher.setattr(
+        team_comparison.st,
+        "expander",
+        lambda label, **_kwargs: (
+            calls["expanders"].append(str(label)),
+            _Ctx(),
+        )[1],
     )
     return calls
 
@@ -233,7 +254,7 @@ def test_build_team_comparison_dataframe_uses_slope_based_tire_deg_display_value
     )
 
     assert neutral_fallbacks == 0
-    assert frame.iloc[0]["Tire Deg"] == pytest.approx(0.2043, abs=1e-4)
+    assert frame.iloc[0]["Tire Deg"] == pytest.approx(0.2620, abs=1e-4)
 
 
 def test_build_team_comparison_dataframe_prefers_raw_top_speed_display_value():
@@ -293,9 +314,9 @@ def test_build_team_comparison_dataframe_prefers_raw_top_speed_display_value():
 
     rows = frame.set_index("Team")
     assert neutral_fallbacks == 0
-    assert rows.loc["McLaren", "Top Speed"] == pytest.approx(0.4265, abs=1e-4)
-    assert rows.loc["Ferrari", "Top Speed"] == pytest.approx(0.4971, abs=1e-4)
-    assert rows.loc["Mercedes", "Top Speed"] == pytest.approx(0.6735, abs=1e-4)
+    assert rows.loc["McLaren", "Top Speed"] == pytest.approx(0.4353, abs=1e-4)
+    assert rows.loc["Ferrari", "Top Speed"] == pytest.approx(0.5294, abs=1e-4)
+    assert rows.loc["Mercedes", "Top Speed"] == pytest.approx(0.7647, abs=1e-4)
 
 
 def test_build_team_comparison_dataframe_prefers_raw_pace_and_corner_values():
@@ -503,6 +524,95 @@ def test_build_latest_snapshot_comparison_payload_carries_forward_latest_long_ru
     assert long_run["tire_deg_performance"] == 0.67
     assert long_run["tire_deg_slope"] == 0.19
     assert payload["Ferrari"]["testing_characteristics"]["tire_deg_performance"] == 0.67
+
+
+def test_build_latest_snapshot_comparison_payload_uses_same_event_average_for_missing_team():
+    base_teams_payload = {
+        "McLaren": {
+            "overall_performance": 0.84,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.80,
+                    "slow_corner_performance": 0.79,
+                    "medium_corner_performance": 0.78,
+                    "fast_corner_performance": 0.77,
+                    "braking_performance": 0.76,
+                    "top_speed": 0.75,
+                    "tire_deg_performance": 0.74,
+                }
+            },
+        }
+    }
+    fp1_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "FP1",
+        "teams": {
+            "McLaren": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.70,
+                        "slow_corner_performance": 0.60,
+                        "medium_corner_performance": 0.61,
+                        "fast_corner_performance": 0.62,
+                        "braking_performance": 0.63,
+                        "top_speed": 0.64,
+                        "tire_deg_performance": 0.65,
+                    }
+                }
+            }
+        },
+    }
+    qualifying_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "Q",
+        "teams": {
+            "McLaren": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.80,
+                        "slow_corner_performance": 0.70,
+                        "medium_corner_performance": 0.71,
+                        "fast_corner_performance": 0.72,
+                        "braking_performance": 0.73,
+                        "top_speed": 0.74,
+                        "tire_deg_performance": 0.75,
+                    }
+                }
+            }
+        },
+    }
+    latest_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "R",
+        "teams": {
+            "Ferrari": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.82,
+                        "slow_corner_performance": 0.81,
+                        "medium_corner_performance": 0.80,
+                        "fast_corner_performance": 0.79,
+                        "braking_performance": 0.78,
+                        "top_speed": 0.77,
+                        "tire_deg_performance": 0.76,
+                    }
+                }
+            }
+        },
+    }
+
+    payload = team_comparison._build_latest_snapshot_comparison_payload(
+        base_teams_payload=base_teams_payload,
+        latest_snapshot=latest_snapshot,
+        snapshot_history=[fp1_snapshot, qualifying_snapshot, latest_snapshot],
+    )
+
+    assert payload["McLaren"]["overall_performance"] == 0.84
+    assert payload["McLaren"]["comparison_fallback_source"] == "same_event_average"
+    assert (
+        payload["McLaren"]["testing_characteristics_profiles"]["balanced"]["overall_pace"] == 0.75
+    )
+    assert payload["McLaren"]["testing_characteristics"]["slow_corner_performance"] == 0.65
 
 
 def test_run_characteristics_season_sync_backfills_snapshots_only(patcher):
@@ -855,6 +965,119 @@ def test_load_team_snapshot_history_cache_token_notices_new_snapshot_file(patche
     assert [snapshot["session_name"] for snapshot in second_snapshots] == ["Q", "R"]
 
 
+def test_snapshot_history_cache_token_prefers_db_rows_in_db_mode(patcher, tmp_path):
+    patcher.setattr(team_comparison.config_loader, "get", lambda key, default=None: str(tmp_path))
+    patcher.setattr(team_comparison, "should_read_db_first", lambda: True)
+
+    team_profiles = {
+        "McLaren": {
+            "balanced": {
+                "slow_corner_performance": 0.71,
+                "medium_corner_performance": 0.72,
+                "fast_corner_performance": 0.73,
+                "braking_performance": 0.70,
+                "top_speed": 0.69,
+                "tire_deg_performance": 0.74,
+                "overall_pace": 0.75,
+            }
+        }
+    }
+    _write_snapshot(
+        tmp_path,
+        year=2027,
+        event_name="Chinese Grand Prix",
+        session_name="Q",
+        team_profiles=team_profiles,
+        round_number=2,
+        session_order=6,
+    )
+
+    db_rows = [
+        {
+            "artifact_key": "2027::Chinese Grand Prix::Q",
+            "created_at": "2027-03-22T10:00:00+00:00",
+            "data": {
+                "captured_at": "2027-03-22T10:00:00+00:00",
+                "session_started_at": "2027-03-22T09:00:00+00:00",
+            },
+        }
+    ]
+
+    patcher.setattr(
+        team_comparison.ArtifactStore,
+        "list_artifacts",
+        lambda self, artifact_type, key_prefix=None, limit=100: list(db_rows),
+    )
+
+    first_token = team_comparison._snapshot_history_cache_token(2027)
+    db_rows.append(
+        {
+            "artifact_key": "2027::Chinese Grand Prix::R",
+            "created_at": "2027-03-22T12:00:00+00:00",
+            "data": {
+                "captured_at": "2027-03-22T12:00:00+00:00",
+                "session_started_at": "2027-03-22T11:00:00+00:00",
+            },
+        }
+    )
+    second_token = team_comparison._snapshot_history_cache_token(2027)
+
+    assert first_token.startswith("rows:")
+    assert second_token.startswith("rows:")
+    assert first_token != second_token
+
+
+def test_build_snapshot_history_dataframe_keeps_missing_team_snapshot_as_gap_row():
+    snapshots = [
+        {
+            "event_name": "Chinese Grand Prix",
+            "session_name": "Q",
+            "teams": {
+                "McLaren": {
+                    "profiles": {
+                        "balanced": {
+                            "slow_corner_performance": 0.70,
+                            "medium_corner_performance": 0.71,
+                            "fast_corner_performance": 0.72,
+                            "braking_performance": 0.69,
+                            "top_speed": 0.68,
+                            "tire_deg_performance": 0.73,
+                        }
+                    }
+                }
+            },
+        },
+        {
+            "event_name": "Chinese Grand Prix",
+            "session_name": "R",
+            "teams": {
+                "Ferrari": {
+                    "profiles": {
+                        "balanced": {
+                            "slow_corner_performance": 0.80,
+                            "medium_corner_performance": 0.81,
+                            "fast_corner_performance": 0.82,
+                            "braking_performance": 0.79,
+                            "top_speed": 0.78,
+                            "tire_deg_performance": 0.83,
+                        }
+                    }
+                }
+            },
+        },
+    ]
+
+    frame = team_comparison._build_snapshot_history_dataframe(
+        snapshots=snapshots,
+        selected_teams=["McLaren"],
+        profile="balanced",
+    )
+
+    assert frame["Snapshot"].tolist() == ["Chinese Grand Prix Q", "Chinese Grand Prix R"]
+    assert frame["Has Data"].tolist() == [True, False]
+    assert frame["Overall"].isna().tolist() == [False, True]
+
+
 def test_snapshot_label_avoids_duplicate_testing_prefix():
     payload = {"event_name": "Testing 1", "session_name": "Testing 1 Day 2"}
 
@@ -940,8 +1163,8 @@ def test_build_snapshot_history_dataframe_and_summary():
     )
 
     assert list(frame["Snapshot"]) == ["Bahrain Grand Prix FP1", "Bahrain Grand Prix FP2"]
-    assert frame.iloc[0]["Top Speed"] == pytest.approx(0.4265, abs=1e-4)
-    assert round(float(frame.iloc[0]["Overall"]), 3) == 0.579
+    assert frame.iloc[0]["Top Speed"] == pytest.approx(0.4353, abs=1e-4)
+    assert round(float(frame.iloc[0]["Overall"]), 3) == 0.581
 
 
 def test_build_snapshot_history_dataframe_keeps_partial_overall_points():
@@ -1410,3 +1633,132 @@ def test_render_team_comparison_section_orders_development_axis_chronologically(
         "Australian Grand Prix Q",
     ]
     assert list(development_figure.layout.yaxis.range) == [-0.02, 1.02]
+
+
+def test_render_team_comparison_section_keeps_weekend_fallback_team_visible(patcher, tmp_path):
+    calls = _stub_streamlit_team(patcher)
+    selection_meta: dict[str, list[str]] = {}
+    patcher.setattr(team_comparison.config_loader, "get", lambda key, default=None: str(tmp_path))
+
+    def _capture_multiselect(_label, options, default=None, **_kwargs):
+        selection_meta["options"] = list(options)
+        selection_meta["default"] = list(default or [])
+        return list(default or [])
+
+    patcher.setattr(team_comparison.st, "multiselect", _capture_multiselect)
+
+    data_path = tmp_path / "car_characteristics" / "2027_car_characteristics.json"
+    data_path.parent.mkdir(parents=True, exist_ok=True)
+    data_path.write_text(
+        json.dumps(
+            {
+                "teams": {
+                    "McLaren": {
+                        "overall_performance": 0.84,
+                        "testing_characteristics_profiles": {
+                            "balanced": {
+                                "overall_pace": 0.80,
+                                "slow_corner_performance": 0.79,
+                                "medium_corner_performance": 0.78,
+                                "fast_corner_performance": 0.77,
+                                "braking_performance": 0.76,
+                                "top_speed": 0.75,
+                                "tire_deg_performance": 0.74,
+                            }
+                        },
+                    },
+                    "Ferrari": {
+                        "overall_performance": 0.82,
+                        "testing_characteristics_profiles": {
+                            "balanced": {
+                                "overall_pace": 0.81,
+                                "slow_corner_performance": 0.80,
+                                "medium_corner_performance": 0.79,
+                                "fast_corner_performance": 0.78,
+                                "braking_performance": 0.77,
+                                "top_speed": 0.76,
+                                "tire_deg_performance": 0.75,
+                            }
+                        },
+                    },
+                }
+            }
+        )
+    )
+    _write_snapshot(
+        tmp_path,
+        year=2027,
+        event_name="Chinese Grand Prix",
+        session_name="Q",
+        round_number=2,
+        session_order=6,
+        team_profiles={
+            "McLaren": {
+                "balanced": {
+                    "overall_pace": 0.76,
+                    "slow_corner_performance": 0.72,
+                    "medium_corner_performance": 0.73,
+                    "fast_corner_performance": 0.74,
+                    "braking_performance": 0.71,
+                    "top_speed": 0.70,
+                    "tire_deg_performance": 0.69,
+                }
+            },
+            "Ferrari": {
+                "balanced": {
+                    "overall_pace": 0.82,
+                    "slow_corner_performance": 0.81,
+                    "medium_corner_performance": 0.80,
+                    "fast_corner_performance": 0.79,
+                    "braking_performance": 0.78,
+                    "top_speed": 0.77,
+                    "tire_deg_performance": 0.76,
+                }
+            },
+        },
+    )
+    _write_snapshot(
+        tmp_path,
+        year=2027,
+        event_name="Chinese Grand Prix",
+        session_name="R",
+        round_number=2,
+        session_order=7,
+        team_profiles={
+            "Ferrari": {
+                "balanced": {
+                    "overall_pace": 0.83,
+                    "slow_corner_performance": 0.82,
+                    "medium_corner_performance": 0.81,
+                    "fast_corner_performance": 0.80,
+                    "braking_performance": 0.79,
+                    "top_speed": 0.78,
+                    "tire_deg_performance": 0.77,
+                }
+            }
+        },
+    )
+
+    team_comparison._load_team_characteristics_payload.clear()
+    team_comparison._load_team_snapshot_history.clear()
+    team_comparison._render_team_comparison_section(year=2027)
+
+    assert "McLaren" in selection_meta["options"]
+    assert "McLaren" in selection_meta["default"]
+    assert any(
+        "Weekend-average approximation applied to McLaren*" in caption
+        for caption in calls["captions"]
+    )
+    assert "* What the asterisk means" in calls["expanders"]
+
+    radar_figure = calls["plotly_figures"][0]
+    assert "McLaren*" in [trace.name for trace in radar_figure.data]
+    assert list(radar_figure.layout.polar.radialaxis.range) == [0.0, 1.05]
+
+    comparison_df = calls["dataframes"][0]
+    assert "McLaren*" in set(comparison_df["Team"])
+
+    development_figure = calls["plotly_figures"][1]
+    mclaren_trace = next(trace for trace in development_figure.data if trace.name == "McLaren")
+    assert list(mclaren_trace.x) == ["Chinese Grand Prix Q", "Chinese Grand Prix R"]
+    assert math.isnan(mclaren_trace.y[1])
