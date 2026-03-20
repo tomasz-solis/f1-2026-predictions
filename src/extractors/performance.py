@@ -111,6 +111,11 @@ def _extract_raw_metrics(session_data: dict) -> dict:
         if sp.get("top_speed"):
             metrics["top_speed"] = sp["top_speed"]
 
+    if "braking_profile" in session_data:
+        braking = session_data["braking_profile"]
+        if braking.get("braking_pct") is not None:
+            metrics["braking"] = braking["braking_pct"]
+
     if "consistency" in session_data:
         cons = session_data["consistency"]
         if cons.get("std_lap_time"):
@@ -125,6 +130,7 @@ def _normalize_relative(raw_metrics: dict[str, dict]) -> dict[str, dict]:
         "s1": ("slow_corner_performance", False),
         "s2": ("medium_corner_performance", False),
         "s3": ("fast_corner_performance", False),
+        "braking": ("braking_performance", False),
         "top_speed": ("top_speed", True),
         "std": ("consistency", False),
     }
@@ -150,9 +156,6 @@ def _normalize_relative(raw_metrics: dict[str, dict]) -> dict[str, dict]:
             if score is None:
                 continue
             perf[output_metric] = score
-
-        if "slow_corner_performance" in perf:
-            perf["braking_performance"] = perf["slow_corner_performance"]
 
         normalized[team_name] = perf
 

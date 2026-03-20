@@ -67,7 +67,7 @@ def test_load_testing_session_with_backends_handles_failed_backend(patcher):
     good_session = SimpleNamespace(
         laps=pd.DataFrame({"LapTime": [pd.to_timedelta("0:01:30")]}),
     )
-    good_session.load = lambda **kwargs: None
+    good_session.load = MagicMock(return_value=None)
 
     def _mock_get_testing_event(year, test_number, backend=None):
         if backend == "f1timing":
@@ -87,11 +87,17 @@ def test_load_testing_session_with_backends_handles_failed_backend(patcher):
 
     assert loaded is good_session
     assert errors and "backend=f1timing" in errors[0]
+    good_session.load.assert_called_once_with(
+        laps=True,
+        telemetry=True,
+        weather=False,
+        messages=False,
+    )
 
 
 def test_load_sessions_for_non_testing_event_collects_errors(patcher):
     session = SimpleNamespace(laps=pd.DataFrame({"LapTime": [pd.to_timedelta("0:01:30")]}))
-    session.load = lambda **kwargs: None
+    session.load = MagicMock(return_value=None)
 
     def _mock_get_session(year, event_name, session_name):
         if session_name == "FP1":
@@ -111,6 +117,12 @@ def test_load_sessions_for_non_testing_event_collects_errors(patcher):
     assert len(loaded) == 1
     assert loaded[0][0] == "FP2"
     assert errors and "Bahrain Grand Prix::FP1" in errors[0]
+    session.load.assert_called_once_with(
+        laps=True,
+        telemetry=True,
+        weather=False,
+        messages=False,
+    )
 
 
 def test_load_sessions_for_non_testing_event_skips_incomplete_laps(patcher):

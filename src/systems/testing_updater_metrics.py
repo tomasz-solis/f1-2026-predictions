@@ -38,6 +38,7 @@ _RAW_OVERALL_PACE_METRIC = "overall_pace_seconds"
 _RAW_SLOW_CORNER_METRIC = "slow_corner_seconds"
 _RAW_MEDIUM_CORNER_METRIC = "medium_corner_seconds"
 _RAW_FAST_CORNER_METRIC = "fast_corner_seconds"
+_RAW_BRAKING_METRIC = "braking_pct"
 
 
 def _canonicalize_team_name(raw_team: str, known_teams: set[str]) -> str | None:
@@ -132,7 +133,8 @@ def _select_stint_representative_laps(team_laps: pd.DataFrame) -> pd.DataFrame:
     """
     Reduce laps to one representative lap per driver/stint(/compound) slice.
 
-    This avoids over-weighting teams with longer programs in the same session.
+    This avoids over-weighting teams with longer programs in the same session
+    while preserving FastF1's `Laps` subclass when it is available.
     """
     if team_laps.empty:
         return team_laps
@@ -143,7 +145,7 @@ def _select_stint_representative_laps(team_laps: pd.DataFrame) -> pd.DataFrame:
     if "Compound" in team_laps.columns and bool(team_laps["Compound"].notna().any()):
         grouping_cols.append("Compound")
 
-    rows = []
+    representative_indices = []
     for _, laps in team_laps.groupby(grouping_cols, dropna=False):
         timed = laps[laps["LapTime"].notna()].copy()
         if timed.empty:
@@ -159,12 +161,12 @@ def _select_stint_representative_laps(team_laps: pd.DataFrame) -> pd.DataFrame:
         else:
             median_value = float(lap_seconds.median())
             representative_idx = (lap_seconds - median_value).abs().idxmin()
-        rows.append(filtered.loc[representative_idx])
+        representative_indices.append(representative_idx)
 
-    if not rows:
+    if not representative_indices:
         return team_laps
 
-    return pd.DataFrame(rows).copy()
+    return team_laps.loc[representative_indices].copy()
 
 
 def _select_program_aware_laps(team_laps: pd.DataFrame, run_profile: str) -> pd.DataFrame:
@@ -195,7 +197,11 @@ def _select_program_aware_laps(team_laps: pd.DataFrame, run_profile: str) -> pd.
             selected = long_laps if not long_laps.empty else team_laps
         else:
             if not short_laps.empty and not long_laps.empty:
-                selected = pd.concat([short_laps, long_laps], ignore_index=False)
+                ordered_indices = list(short_laps.index)
+                ordered_indices.extend(
+                    index for index in long_laps.index if index not in short_laps.index
+                )
+                selected = team_laps.loc[ordered_indices].copy()
             elif not short_laps.empty:
                 selected = short_laps
             elif not long_laps.empty:
@@ -425,6 +431,12 @@ def _attach_raw_snapshot_metrics(
             if isinstance(s3, int | float):
                 team_payload[_RAW_FAST_CORNER_METRIC] = float(s3)
 
+        braking_profile = session_payload.get("braking_profile")
+        if isinstance(braking_profile, dict):
+            braking_pct = braking_profile.get("braking_pct")
+            if isinstance(braking_pct, int | float):
+                team_payload[_RAW_BRAKING_METRIC] = float(braking_pct)
+
     for team_name, lap_seconds in lap_pace_seconds.items():
         team_payload = merged.setdefault(str(team_name), {})
         team_payload[_RAW_OVERALL_PACE_METRIC] = float(lap_seconds)
@@ -459,11 +471,81 @@ def _extract_team_payload(valid_laps: pd.DataFrame) -> dict:
     if top_speed is not None:
         payload["speed_profile"] = {"top_speed": top_speed}
 
+    braking_pct = _extract_braking_capability(valid_laps)
+    if braking_pct is not None:
+        payload["braking_profile"] = {"braking_pct": braking_pct}
+
     lap_seconds = _lap_seconds_series(valid_laps)
     if len(lap_seconds) >= 2:
         payload["consistency"] = {"std_lap_time": float(lap_seconds.std(ddof=0))}
 
     return payload
+
+
+def _iter_lap_objects(valid_laps: pd.DataFrame):
+    """Yield FastF1 lap objects from a Laps frame when telemetry access is available."""
+    iterlaps = getattr(valid_laps, "iterlaps", None)
+    if not callable(iterlaps):
+        return
+
+    for item in iterlaps():
+        if isinstance(item, tuple) and len(item) == 2:
+            _index, lap = item
+        else:
+            lap = item
+        yield lap
+
+
+def _extract_braking_pct_from_telemetry(telemetry: pd.DataFrame) -> float | None:
+    """Return the share of telemetry samples spent on the brake pedal."""
+    if telemetry is None or telemetry.empty or "Brake" not in telemetry.columns:
+        return None
+
+    brake = pd.to_numeric(telemetry["Brake"], errors="coerce").dropna()
+    if brake.empty:
+        return None
+    return float((brake > 0).mean() * 100.0)
+
+
+def _extract_braking_capability(valid_laps: pd.DataFrame) -> float | None:
+    """
+    Estimate a session-relative braking proxy from representative lap telemetry.
+
+    We use brake-on sample share as a simple, stable proxy: on the same circuit,
+    cars that can brake later typically spend less of the lap on the pedal. This
+    is still a proxy rather than a pure braking-efficiency metric, but it is
+    materially better than copying the slow-corner score.
+    """
+    braking_samples: list[float] = []
+
+    for lap in _iter_lap_objects(valid_laps):
+        telemetry = None
+
+        get_telemetry = getattr(lap, "get_telemetry", None)
+        if callable(get_telemetry):
+            try:
+                telemetry = get_telemetry()
+            except Exception:
+                telemetry = None
+
+        if telemetry is None:
+            get_car_data = getattr(lap, "get_car_data", None)
+            if callable(get_car_data):
+                try:
+                    telemetry = get_car_data()
+                except Exception:
+                    telemetry = None
+
+        if not isinstance(telemetry, pd.DataFrame):
+            continue
+
+        braking_pct = _extract_braking_pct_from_telemetry(telemetry)
+        if braking_pct is not None:
+            braking_samples.append(braking_pct)
+
+    if not braking_samples:
+        return None
+    return float(np.median(np.asarray(braking_samples, dtype=float)))
 
 
 def _extract_top_speed_value(valid_laps: pd.DataFrame) -> float | None:

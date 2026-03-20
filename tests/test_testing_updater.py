@@ -265,6 +265,80 @@ def test_extract_team_payload_uses_per_lap_top_speed_traps():
     assert payload["speed_profile"]["top_speed"] == 312.5
 
 
+def test_extract_team_payload_attaches_braking_proxy_from_telemetry():
+    class _TelemetryLap:
+        def __init__(self, telemetry: pd.DataFrame):
+            self._telemetry = telemetry.copy()
+
+        def get_telemetry(self):
+            return self._telemetry.copy()
+
+    class _TelemetryLaps(pd.DataFrame):
+        _metadata = ["_lap_objects"]
+
+        def __init__(self, *args, lap_objects=None, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._lap_objects = list(lap_objects or [])
+
+        @property
+        def _constructor(self):
+            return _TelemetryLaps
+
+        def iterlaps(self, require=None):
+            del require
+            yield from enumerate(self._lap_objects)
+
+    laps = _TelemetryLaps(
+        {
+            "LapTime": [pd.to_timedelta("0:01:20"), pd.to_timedelta("0:01:21")],
+            "SpeedST": [310.0, 315.0],
+            "SpeedFL": [300.0, 301.0],
+        },
+        lap_objects=[
+            _TelemetryLap(pd.DataFrame({"Brake": [0, 0, 35, 60, 0]})),
+            _TelemetryLap(pd.DataFrame({"Brake": [0, 15, 25, 0, 0]})),
+        ],
+    )
+
+    payload = _extract_team_payload(laps)
+
+    assert payload["braking_profile"]["braking_pct"] == pytest.approx(40.0)
+
+
+def test_select_program_aware_laps_preserves_fastf1_laps_behaviour():
+    """Representative lap selection should keep telemetry-capable lap containers."""
+
+    class _TelemetryLaps(pd.DataFrame):
+        _metadata = ["_lap_objects"]
+
+        def __init__(self, *args, lap_objects=None, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._lap_objects = list(lap_objects or [])
+
+        @property
+        def _constructor(self):
+            return _TelemetryLaps
+
+        def iterlaps(self):
+            yield from enumerate(self._lap_objects)
+
+    laps = _TelemetryLaps(
+        {
+            "Driver": ["DRV"] * 12,
+            "Stint": ([1] * 4) + ([2] * 8),
+            "Compound": (["SOFT"] * 4) + (["MEDIUM"] * 8),
+            "LapTime": [pd.to_timedelta(f"0:01:{20 + index:02d}") for index in range(12)],
+        },
+        lap_objects=[f"lap-{index + 1}" for index in range(12)],
+    )
+
+    selected = _select_program_aware_laps(laps, run_profile="balanced")
+
+    assert isinstance(selected, _TelemetryLaps)
+    assert callable(getattr(selected, "iterlaps", None))
+    assert len(selected) == 2
+
+
 def test_collect_session_metrics_attaches_raw_top_speed_from_all_valid_laps(monkeypatch):
     from src.systems import testing_updater as testing_updater
 

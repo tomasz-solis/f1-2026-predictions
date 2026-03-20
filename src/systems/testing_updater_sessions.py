@@ -178,7 +178,8 @@ def load_testing_session_with_backends(
     Load a testing session and verify laps are actually accessible.
 
     This avoids reporting sessions as discovered when `session.laps` would still
-    raise DataNotLoadedError after `load()`.
+    raise DataNotLoadedError after `load()`. Telemetry is loaded because the
+    updater now derives braking capability from lap-level brake traces.
     """
     for backend in testing_backends:
         kwargs = {"backend": backend} if backend is not None else {}
@@ -187,7 +188,7 @@ def load_testing_session_with_backends(
             event = fastf1_get_testing_event(year, test_number, **kwargs)
             normalize_testing_event_sessions_fn(event)
             session = event.get_session(day_number)
-            session.load(laps=True, telemetry=False, weather=False, messages=False)
+            session.load(laps=True, telemetry=True, weather=False, messages=False)
             laps = session.laps
             if laps is None:
                 raise ValueError("laps are None after session.load()")
@@ -233,6 +234,9 @@ def load_sessions_for_event(
     Strategy:
     1) For non-testing events: use regular `get_session(event_name, session_name)`.
     2) For testing events: use `get_testing_event` + `get_testing_session`.
+
+    Telemetry is enabled for both paths because braking extraction depends on
+    per-lap car data instead of a placeholder slow-corner copy.
     """
     loaded: list[tuple[str, fastf1.core.Session]] = []
 
@@ -240,7 +244,7 @@ def load_sessions_for_event(
         for session_name in session_candidates:
             try:
                 session = fastf1_get_session(year, event_name, session_name)
-                session.load(laps=True, telemetry=False, weather=False, messages=False)
+                session.load(laps=True, telemetry=True, weather=False, messages=False)
                 laps = session.laps
                 if laps is None:
                     raise ValueError("laps are None after session.load()")
