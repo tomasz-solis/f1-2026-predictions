@@ -77,28 +77,33 @@ class PredictionLogger:
         if run_id is None:
             run_id = str(uuid.uuid4())
 
-        safe_race_name = race_name.lower().replace(" ", "_").replace("'", "")
-        year_dir = self.predictions_dir / str(year)
+        normalized_year, normalized_race_name, normalized_session_name = self._prediction_identity(
+            year,
+            race_name,
+            session_name,
+        )
+        safe_race_name = normalized_race_name.lower().replace(" ", "_").replace("'", "")
+        year_dir = self.predictions_dir / str(normalized_year)
         year_dir.mkdir(parents=True, exist_ok=True)
         race_dir = year_dir / safe_race_name
         race_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"{safe_race_name}_{session_name.lower()}.json"
+        filename = f"{safe_race_name}_{normalized_session_name.lower()}.json"
         filepath = race_dir / filename
 
         normalized_targets = self._normalize_target_predictions(target_predictions)
         metadata_payload = {} if metadata is None else dict(metadata)
         if "weekend_format" not in metadata_payload:
             metadata_payload["weekend_format"] = self._infer_weekend_format(
-                session_name=session_name,
+                session_name=normalized_session_name,
                 target_predictions=normalized_targets,
             )
 
         prediction_data = {
             "metadata": {
                 "run_id": run_id,
-                "year": year,
-                "race_name": race_name,
-                "session_name": session_name,
+                "year": normalized_year,
+                "race_name": normalized_race_name,
+                "session_name": normalized_session_name,
                 "predicted_at": datetime.now(UTC).isoformat(),
                 "weather": weather,
                 "fp_blend_info": fp_blend_info or {},
@@ -136,7 +141,11 @@ class PredictionLogger:
             },
         }
 
-        artifact_key = f"{year}::{race_name}::{session_name}"
+        artifact_key = self._artifact_key_for_prediction(
+            normalized_year,
+            normalized_race_name,
+            normalized_session_name,
+        )
         try:
             self.artifact_store.save_artifact(
                 artifact_type="prediction",
@@ -162,7 +171,16 @@ class PredictionLogger:
         run_id: str | None = None,
     ) -> dict[str, Any] | None:
         """Load a saved prediction with schema validation."""
-        artifact_key = f"{year}::{race_name}::{session_name}"
+        normalized_year, normalized_race_name, normalized_session_name = self._prediction_identity(
+            year,
+            race_name,
+            session_name,
+        )
+        artifact_key = self._artifact_key_for_prediction(
+            normalized_year,
+            normalized_race_name,
+            normalized_session_name,
+        )
         try:
             data = self.artifact_store.load_artifact(
                 artifact_type="prediction",
@@ -177,12 +195,12 @@ class PredictionLogger:
         except Exception as exc:
             logger.warning("ArtifactStore load failed: %s, trying file fallback", exc)
 
-        safe_race_name = race_name.lower().replace(" ", "_").replace("'", "")
+        safe_race_name = normalized_race_name.lower().replace(" ", "_").replace("'", "")
         filepath = (
             self.predictions_dir
-            / str(year)
+            / str(normalized_year)
             / safe_race_name
-            / f"{safe_race_name}_{session_name.lower()}.json"
+            / f"{safe_race_name}_{normalized_session_name.lower()}.json"
         )
         if not filepath.exists():
             logger.warning("Prediction not found in file: %s", filepath)
@@ -269,7 +287,16 @@ class PredictionLogger:
             ]
 
         actual_run_id = run_id or prediction["metadata"].get("run_id")
-        artifact_key = f"{year}::{race_name}::{session_name}"
+        normalized_year, normalized_race_name, normalized_session_name = self._prediction_identity(
+            year,
+            race_name,
+            session_name,
+        )
+        artifact_key = self._artifact_key_for_prediction(
+            normalized_year,
+            normalized_race_name,
+            normalized_session_name,
+        )
         try:
             self.artifact_store.save_artifact(
                 artifact_type="prediction",
@@ -281,12 +308,12 @@ class PredictionLogger:
             logger.info("Updated actuals via ArtifactStore (run_id=%s)", actual_run_id)
         except Exception as exc:
             logger.warning("ArtifactStore save failed: %s, falling back to file", exc)
-            safe_race_name = race_name.lower().replace(" ", "_").replace("'", "")
+            safe_race_name = normalized_race_name.lower().replace(" ", "_").replace("'", "")
             filepath = (
                 self.predictions_dir
-                / str(year)
+                / str(normalized_year)
                 / safe_race_name
-                / f"{safe_race_name}_{session_name.lower()}.json"
+                / f"{safe_race_name}_{normalized_session_name.lower()}.json"
             )
             with open(filepath, "w") as file_handle:
                 json.dump(prediction, file_handle, indent=2)
@@ -333,10 +360,9 @@ class PredictionLogger:
             predictions.append(payload)
 
         if predictions:
-            predictions.sort(key=self._prediction_sort_key)
-            return predictions
+            return self._deduplicate_predictions(predictions)
 
-        return self._load_predictions_from_files(target_year)
+        return self._deduplicate_predictions(self._load_predictions_from_files(target_year))
 
     def reconcile_completed_prediction_actuals(self, year: int) -> int:
         """Attach saved target actuals to completed race weekends for a season."""
@@ -441,7 +467,16 @@ class PredictionLogger:
 
     def has_prediction_for_session(self, year: int, race_name: str, session_name: str) -> bool:
         """Check if a prediction already exists for a race checkpoint."""
-        artifact_key = f"{year}::{race_name}::{session_name}"
+        normalized_year, normalized_race_name, normalized_session_name = self._prediction_identity(
+            year,
+            race_name,
+            session_name,
+        )
+        artifact_key = self._artifact_key_for_prediction(
+            normalized_year,
+            normalized_race_name,
+            normalized_session_name,
+        )
         try:
             data = self.artifact_store.load_artifact(
                 artifact_type="prediction",
@@ -453,12 +488,12 @@ class PredictionLogger:
         except Exception:
             pass
 
-        safe_race_name = race_name.lower().replace(" ", "_").replace("'", "")
+        safe_race_name = normalized_race_name.lower().replace(" ", "_").replace("'", "")
         filepath = (
             self.predictions_dir
-            / str(year)
+            / str(normalized_year)
             / safe_race_name
-            / f"{safe_race_name}_{session_name.lower()}.json"
+            / f"{safe_race_name}_{normalized_session_name.lower()}.json"
         )
         return filepath.exists()
 
@@ -647,12 +682,87 @@ class PredictionLogger:
         return bool(metadata.get(metadata_key, True))
 
     @staticmethod
+    def _normalize_race_name(value: Any) -> str:
+        """Normalize race names so whitespace drift cannot create a new storage key."""
+        return " ".join(str(value).split()).strip()
+
+    @staticmethod
+    def _normalize_session_name(value: Any) -> str:
+        """Normalize checkpoint session identifiers for storage and lookup."""
+        return str(value).strip().upper()
+
+    @classmethod
+    def _prediction_identity(
+        cls, year: Any, race_name: Any, session_name: Any
+    ) -> tuple[int, str, str]:
+        """Return the canonical storage identity for one saved prediction."""
+        return (
+            int(year),
+            cls._normalize_race_name(race_name),
+            cls._normalize_session_name(session_name),
+        )
+
+    @classmethod
+    def _artifact_key_for_prediction(cls, year: Any, race_name: Any, session_name: Any) -> str:
+        """Build the canonical artifact key for one saved prediction."""
+        normalized_year, normalized_race_name, normalized_session_name = cls._prediction_identity(
+            year,
+            race_name,
+            session_name,
+        )
+        return f"{normalized_year}::{normalized_race_name}::{normalized_session_name}"
+
+    def _deduplicate_predictions(self, predictions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Collapse duplicate checkpoint payloads and keep the newest one per state."""
+        deduped_by_identity: dict[tuple[int, str, str], dict[str, Any]] = {}
+        duplicate_count = 0
+
+        for prediction in predictions:
+            metadata = prediction.get("metadata", {})
+            if not isinstance(metadata, dict):
+                continue
+            try:
+                identity = self._prediction_identity(
+                    metadata.get("year"),
+                    metadata.get("race_name"),
+                    metadata.get("session_name"),
+                )
+            except (TypeError, ValueError):
+                continue
+
+            existing = deduped_by_identity.get(identity)
+            if existing is None:
+                deduped_by_identity[identity] = prediction
+                continue
+
+            duplicate_count += 1
+            if self._prediction_sort_key(prediction) >= self._prediction_sort_key(existing):
+                deduped_by_identity[identity] = prediction
+
+        deduped_predictions = list(deduped_by_identity.values())
+        deduped_predictions.sort(key=self._prediction_sort_key)
+        if duplicate_count > 0:
+            logger.warning(
+                "Collapsed %s duplicate prediction artifact(s) while loading history",
+                duplicate_count,
+            )
+        return deduped_predictions
+
+    @staticmethod
     def _prediction_sort_key(prediction: dict[str, Any]) -> tuple[datetime, str, str]:
         """Build a stable sort key for prediction-history rendering."""
         metadata = prediction.get("metadata", {})
         predicted_at = metadata.get("predicted_at") if isinstance(metadata, dict) else None
-        race_name = str(metadata.get("race_name", "")) if isinstance(metadata, dict) else ""
-        session_name = str(metadata.get("session_name", "")) if isinstance(metadata, dict) else ""
+        race_name = (
+            PredictionLogger._normalize_race_name(metadata.get("race_name", ""))
+            if isinstance(metadata, dict)
+            else ""
+        )
+        session_name = (
+            PredictionLogger._normalize_session_name(metadata.get("session_name", ""))
+            if isinstance(metadata, dict)
+            else ""
+        )
         return (
             PredictionLogger._parse_prediction_timestamp(predicted_at),
             race_name,

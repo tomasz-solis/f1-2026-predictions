@@ -126,6 +126,31 @@ def test_load_prediction(temp_predictions_dir, sample_quali_prediction, sample_r
     assert prediction["metadata"]["session_name"] == "FP2"
 
 
+def test_prediction_identity_is_normalized_for_storage_and_lookup(
+    temp_predictions_dir,
+    sample_quali_prediction,
+    sample_race_prediction,
+):
+    """Saving one checkpoint should not depend on caller case or whitespace drift."""
+    logger = PredictionLogger(predictions_dir=temp_predictions_dir)
+
+    logger.save_prediction(
+        year=2026,
+        race_name="  Chinese   Grand Prix  ",
+        session_name=" fp1 ",
+        qualifying_prediction=sample_quali_prediction,
+        race_prediction=sample_race_prediction,
+        weather="dry",
+    )
+
+    prediction = logger.load_prediction(2026, "Chinese Grand Prix", "FP1")
+
+    assert prediction is not None
+    assert prediction["metadata"]["race_name"] == "Chinese Grand Prix"
+    assert prediction["metadata"]["session_name"] == "FP1"
+    assert logger.has_prediction_for_session(2026, "Chinese Grand Prix", " fp1 ") is True
+
+
 def test_load_nonexistent_prediction(temp_predictions_dir):
     """Test loading a prediction that doesn't exist."""
     logger = PredictionLogger(predictions_dir=temp_predictions_dir)
@@ -349,6 +374,47 @@ def test_get_all_predictions(temp_predictions_dir, sample_quali_prediction, samp
     assert pred1["metadata"]["session_name"] == "FP1"
     assert pred2["metadata"]["session_name"] == "FP2"
     assert pred3["metadata"]["race_name"] == "Saudi Arabian Grand Prix"
+
+
+def test_get_all_predictions_deduplicates_checkpoint_identity(temp_predictions_dir):
+    """Duplicate stored rows for one checkpoint should collapse to the newest payload."""
+    logger = PredictionLogger(predictions_dir=temp_predictions_dir)
+    older_payload = {
+        "metadata": {
+            "year": 2026,
+            "race_name": "Chinese Grand Prix",
+            "session_name": "FP1",
+            "predicted_at": "2026-03-20T12:00:00+00:00",
+            "weather": "dry",
+        },
+        "qualifying": {"predicted_grid": [{"position": 1, "driver": "VER", "team": "Red Bull"}]},
+        "race": {"predicted_results": [{"position": 1, "driver": "VER", "team": "Red Bull"}]},
+        "targets": {},
+        "actuals": {"qualifying": None, "race": None, "targets": {}},
+    }
+    newer_payload = {
+        "metadata": {
+            "year": 2026,
+            "race_name": " Chinese  Grand Prix ",
+            "session_name": "fp1",
+            "predicted_at": "2026-03-20T12:05:00+00:00",
+            "weather": "dry",
+        },
+        "qualifying": {"predicted_grid": [{"position": 1, "driver": "NOR", "team": "McLaren"}]},
+        "race": {"predicted_results": [{"position": 1, "driver": "NOR", "team": "McLaren"}]},
+        "targets": {},
+        "actuals": {"qualifying": None, "race": None, "targets": {}},
+    }
+    logger.artifact_store.list_artifacts = lambda *_args, **_kwargs: [
+        {"data": older_payload},
+        {"data": newer_payload},
+    ]
+
+    predictions = logger.get_all_predictions(2026)
+
+    assert len(predictions) == 1
+    assert predictions[0]["metadata"]["session_name"] == "fp1"
+    assert predictions[0]["race"]["predicted_results"][0]["driver"] == "NOR"
 
 
 def test_save_prediction_empty_validation(temp_predictions_dir):
