@@ -11,6 +11,19 @@ from src.dashboard.accuracy_view import (
     build_progression_line_series,
     build_progression_series,
 )
+from src.utils.accuracy_snapshots import accuracy_snapshot_artifact_key
+
+
+def test_accuracy_snapshot_artifact_key_normalizes_checkpoint_identity():
+    """Snapshot keys should collapse whitespace and normalize session/target casing."""
+    artifact_key = accuracy_snapshot_artifact_key(
+        year=2026,
+        race_name="  Chinese   Grand Prix ",
+        checkpoint_session=" fp1 ",
+        target_key=" Grand_Prix_Race ",
+    )
+
+    assert artifact_key == "2026::Chinese Grand Prix::FP1::grand_prix_race"
 
 
 def test_accuracy_pipeline_prefers_persisted_snapshots(patcher):

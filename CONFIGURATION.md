@@ -64,7 +64,9 @@ Related docs/scripts:
 - `migrations/001_create_artifacts_table.sql`
 - `migrations/002_create_runtime_state_and_operational_tables.sql`
 - `migrations/003_harden_rls_policies.sql`
+- `migrations/004_normalize_prediction_artifact_keys.sql`
 - `scripts/test_supabase_connection.py`
+- `scripts/normalize_dashboard_artifacts_in_db.py`
 - `scripts/backfill_to_db.py`
 
 In DB-backed modes, the same Supabase credentials are used for:

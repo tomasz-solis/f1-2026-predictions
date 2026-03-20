@@ -14,6 +14,21 @@ from src.utils.accuracy_targets import (
 )
 
 
+def _normalize_snapshot_race_name(value: Any) -> str:
+    """Collapse race-name whitespace so artifact keys stay stable."""
+    return " ".join(str(value).split()).strip()
+
+
+def _normalize_snapshot_checkpoint_session(value: Any) -> str:
+    """Return the canonical checkpoint-session token used in artifact keys."""
+    return str(value).strip().upper()
+
+
+def _normalize_snapshot_target_key(value: Any) -> str:
+    """Return the canonical lower-case target key used in artifact keys."""
+    return str(value).strip().lower()
+
+
 def accuracy_snapshot_artifact_key(
     *,
     year: int,
@@ -22,7 +37,11 @@ def accuracy_snapshot_artifact_key(
     target_key: str,
 ) -> str:
     """Return the canonical artifact key for one checkpoint-target snapshot."""
-    return f"{int(year)}::{race_name}::{str(checkpoint_session).strip().upper()}::{target_key}"
+    return (
+        f"{int(year)}::{_normalize_snapshot_race_name(race_name)}::"
+        f"{_normalize_snapshot_checkpoint_session(checkpoint_session)}::"
+        f"{_normalize_snapshot_target_key(target_key)}"
+    )
 
 
 def build_accuracy_snapshot_records(
@@ -46,8 +65,8 @@ def build_accuracy_snapshot_records(
     if not target_predictions or not target_metrics:
         return []
 
-    checkpoint_session = str(metadata.get("session_name", "")).strip().upper()
-    race_name = str(metadata.get("race_name", "")).strip()
+    checkpoint_session = _normalize_snapshot_checkpoint_session(metadata.get("session_name", ""))
+    race_name = _normalize_snapshot_race_name(metadata.get("race_name", ""))
     year = int(metadata.get("year", 0) or 0)
     weekend_format = str(metadata.get("weekend_format", "")).strip().lower()
     if weekend_format not in {"normal", "sprint"}:

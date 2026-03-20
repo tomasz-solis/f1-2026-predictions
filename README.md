@@ -266,8 +266,10 @@ Supabase assets in the repo:
 - Migration: `migrations/001_create_artifacts_table.sql`
 - Migration: `migrations/002_create_runtime_state_and_operational_tables.sql`
 - Migration: `migrations/003_harden_rls_policies.sql`
+- Migration: `migrations/004_normalize_prediction_artifact_keys.sql`
 - Connectivity check: `scripts/test_supabase_connection.py`
 - Backfill utility: `scripts/backfill_to_db.py` (includes `driver_debuts.csv` migration)
+- Dashboard artifact cleanup: `scripts/normalize_dashboard_artifacts_in_db.py`
 - Targeted dashboard datapoint compare/sync: `scripts/sync_dashboard_datapoints_to_db.py`
 - Predictor/storage smoke test: `scripts/test_predictor_with_db.py`
 

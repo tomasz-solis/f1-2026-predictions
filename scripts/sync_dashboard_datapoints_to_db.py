@@ -319,6 +319,7 @@ def sync_mismatched_artifacts(
             artifact_type=comparison.spec.artifact_type,
             artifact_key=comparison.spec.artifact_key,
             data=payload,
+            version=1,
         )
         synced_specs.append(comparison.spec)
 

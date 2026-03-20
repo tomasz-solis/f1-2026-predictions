@@ -43,7 +43,9 @@ like `ttps://...` now fail fast with an explicit error.
 - SQL migration: `migrations/001_create_artifacts_table.sql`
 - SQL migration: `migrations/002_create_runtime_state_and_operational_tables.sql`
 - SQL migration: `migrations/003_harden_rls_policies.sql`
+- SQL migration: `migrations/004_normalize_prediction_artifact_keys.sql`
 - Connection test: `scripts/test_supabase_connection.py`
+- Cleanup utility: `scripts/normalize_dashboard_artifacts_in_db.py`
 - Backfill utility: `scripts/backfill_to_db.py` (migrates `driver_debuts.csv` too)
 - Targeted dashboard datapoint compare/sync: `scripts/sync_dashboard_datapoints_to_db.py`
 - Stale warmup-cache pruning: `scripts/prune_stale_precompute_state.py`
@@ -188,25 +190,29 @@ These keys are relevant for the baseline predictor stack:
    - `migrations/001_create_artifacts_table.sql`
    - `migrations/002_create_runtime_state_and_operational_tables.sql`
    - `migrations/003_harden_rls_policies.sql`
+   - `migrations/004_normalize_prediction_artifact_keys.sql`
 2. Validate credentials and table access:
    - `uv run --active python scripts/test_supabase_connection.py`
-3. Dry-run data migration:
+3. Inspect or repair normalized dashboard artifact keys:
+   - `uv run --active python scripts/normalize_dashboard_artifacts_in_db.py --env-file .env.local`
+   - `uv run --active python scripts/normalize_dashboard_artifacts_in_db.py --env-file .env.local --apply`
+4. Dry-run data migration:
    - `uv run --active python scripts/backfill_to_db.py --dry-run`
-4. Run backfill with DB writes enabled:
+5. Run backfill with DB writes enabled:
    - set `USE_DB_STORAGE=dual_write` (or `db_only` for isolated testing)
    - `uv run --active python scripts/backfill_to_db.py`
-5. Run predictor smoke test:
+6. Run predictor smoke test:
    - `uv run --active python scripts/test_predictor_with_db.py`
-6. Backfill missing accuracy snapshots from stored prediction truth:
+7. Backfill missing accuracy snapshots from stored prediction truth:
    - `uv run --active python scripts/backfill_accuracy_snapshots.py --year 2026 --dry-run`
    - `uv run --active python scripts/backfill_accuracy_snapshots.py --year 2026`
-7. Verify debut artifact:
+8. Verify debut artifact:
    - `driver_debuts::driver_debuts` should be present and readable via `ArtifactStore`.
-8. Verify runtime tables:
+9. Verify runtime tables:
    - prediction click writes/updates `runtime_state` rows
    - concurrent practice runs create lock contention in `runtime_processing_locks`
    - runtime alerts/counters appear in `operational_events`
-9. Verify race-learning dedupe state:
+10. Verify race-learning dedupe state:
    - namespace `race_learning` has per-season records in `runtime_state`
    - `auto_update_from_races()` does not re-learn already processed races after restart
 
