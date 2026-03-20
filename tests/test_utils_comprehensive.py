@@ -102,7 +102,7 @@ class TestWeekendModule:
             assert weekend.is_sprint_weekend(2026, "Monaco Grand Prix") is False
 
     def test_get_all_sprint_races(self):
-        """Sprint race list should be derived from schedule metadata."""
+        """Sprint race list should include FastF1 rows and any missing local fallback races."""
         from src.utils import weekend
 
         weekend.refresh_schedule_cache()
@@ -112,7 +112,10 @@ class TestWeekendModule:
         ):
             sprint_races = weekend.get_all_sprint_races(2026)
 
-        assert sprint_races == ["Chinese Grand Prix", "Miami Grand Prix"]
+        assert "Chinese Grand Prix" in sprint_races
+        assert "Miami Grand Prix" in sprint_races
+        assert "Bahrain Grand Prix" not in sprint_races
+        assert len(sprint_races) == len(set(sprint_races))
 
     def test_get_best_qualifying_session(self):
         """Best qualifying source should follow weekend format."""

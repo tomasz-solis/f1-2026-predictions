@@ -122,6 +122,7 @@ def _get_schedule_rows(year: int) -> tuple[tuple[str, str], ...]:
 def refresh_schedule_cache() -> None:
     """Clear cached schedule rows so next lookup fetches fresh FastF1 metadata."""
     _get_schedule_rows.cache_clear()
+    _load_fallback_schedule_rows.cache_clear()
 
 
 def get_schedule_rows(year: int) -> tuple[tuple[str, str], ...]:

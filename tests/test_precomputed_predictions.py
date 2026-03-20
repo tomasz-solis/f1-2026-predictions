@@ -76,7 +76,9 @@ def test_load_precomputed_prediction_preserves_boundary_context(patcher, tmp_pat
     )
 
     assert loaded is not None
-    assert loaded["_prediction_context"] == {"boundary_session_name": "Q"}
+    assert loaded["_prediction_context"]["boundary_session_name"] == "Q"
+    assert isinstance(loaded["_prediction_context"].get("persisted_updated_at"), str)
+    assert loaded["_prediction_context"]["persisted_updated_at"]
 
 
 def test_list_precomputed_race_names_filters_by_year_hash_and_boundary(patcher, tmp_path):
