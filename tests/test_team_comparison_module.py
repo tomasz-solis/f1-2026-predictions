@@ -255,7 +255,7 @@ def test_build_team_comparison_dataframe_uses_slope_based_tire_deg_display_value
     )
 
     assert neutral_fallbacks == 0
-    assert frame.iloc[0]["Tire Deg"] == pytest.approx(0.2465, abs=1e-4)
+    assert frame.iloc[0]["Tire Deg"] == pytest.approx(0.15235, abs=1e-4)
 
 
 def test_normalize_tire_deg_slope_for_display_does_not_pin_common_negative_slopes_to_max():
@@ -326,9 +326,67 @@ def test_build_team_comparison_dataframe_prefers_raw_top_speed_display_value():
 
     rows = frame.set_index("Team")
     assert neutral_fallbacks == 0
-    assert rows.loc["McLaren", "Top Speed"] == pytest.approx(0.4353, abs=1e-4)
-    assert rows.loc["Ferrari", "Top Speed"] == pytest.approx(0.5294, abs=1e-4)
-    assert rows.loc["Mercedes", "Top Speed"] == pytest.approx(0.7647, abs=1e-4)
+    assert rows.loc["McLaren", "Top Speed"] == pytest.approx(0.1, abs=1e-4)
+    assert rows.loc["Ferrari", "Top Speed"] == pytest.approx(0.3571, abs=1e-4)
+    assert rows.loc["Mercedes", "Top Speed"] == pytest.approx(1.0, abs=1e-4)
+
+
+def test_build_team_comparison_dataframe_prefers_raw_braking_proxy_over_slow_corner_time():
+    payload = {
+        "Team A": {
+            "overall_performance": 0.72,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.70,
+                    "overall_pace_seconds": 90.10,
+                    "slow_corner_performance": 0.40,
+                    "slow_corner_seconds": 30.20,
+                    "medium_corner_performance": 0.52,
+                    "medium_corner_seconds": 28.10,
+                    "fast_corner_performance": 0.58,
+                    "fast_corner_seconds": 31.10,
+                    "braking_performance": 0.46,
+                    "braking_pct": 12.0,
+                    "top_speed": 0.44,
+                    "top_speed_kph": 314.0,
+                    "tire_deg_performance": 0.60,
+                }
+            },
+        },
+        "Team B": {
+            "overall_performance": 0.74,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.73,
+                    "overall_pace_seconds": 89.90,
+                    "slow_corner_performance": 0.62,
+                    "slow_corner_seconds": 29.80,
+                    "medium_corner_performance": 0.55,
+                    "medium_corner_seconds": 27.95,
+                    "fast_corner_performance": 0.60,
+                    "fast_corner_seconds": 30.95,
+                    "braking_performance": 0.54,
+                    "braking_pct": 20.0,
+                    "top_speed": 0.46,
+                    "top_speed_kph": 315.0,
+                    "tire_deg_performance": 0.58,
+                }
+            },
+        },
+    }
+
+    frame, neutral_fallbacks = team_comparison._build_team_comparison_dataframe(
+        teams_payload=payload,
+        selected_teams=["Team A", "Team B"],
+        profile="balanced",
+    )
+
+    rows = frame.set_index("Team")
+    assert neutral_fallbacks == 0
+    assert rows.loc["Team A", "Slow Corners"] == pytest.approx(0.1, abs=1e-4)
+    assert rows.loc["Team B", "Slow Corners"] == pytest.approx(1.0, abs=1e-4)
+    assert rows.loc["Team A", "Braking"] == pytest.approx(1.0, abs=1e-4)
+    assert rows.loc["Team B", "Braking"] == pytest.approx(0.1, abs=1e-4)
 
 
 def test_build_team_comparison_dataframe_excludes_approximated_team_from_raw_scales():
@@ -485,14 +543,14 @@ def test_build_team_comparison_dataframe_prefers_raw_pace_and_corner_values():
 
     rows = frame.set_index("Team")
     assert neutral_fallbacks == 0
-    assert rows.loc["Aston Martin", "Overall Pace"] == pytest.approx(0.4222, abs=1e-3)
-    assert rows.loc["Aston Martin", "Slow Corners"] == pytest.approx(0.3607, abs=1e-3)
-    assert rows.loc["Aston Martin", "Medium Corners"] == pytest.approx(0.3878, abs=1e-3)
-    assert rows.loc["Aston Martin", "Fast Corners"] == pytest.approx(0.2059, abs=1e-3)
-    assert rows.loc["Cadillac F1", "Overall Pace"] == pytest.approx(0.2059, abs=1e-3)
-    assert rows.loc["Cadillac F1", "Slow Corners"] == pytest.approx(0.2062, abs=1e-3)
-    assert rows.loc["Cadillac F1", "Medium Corners"] == pytest.approx(0.2063, abs=1e-3)
-    assert rows.loc["Cadillac F1", "Fast Corners"] == pytest.approx(0.2794, abs=1e-3)
+    assert rows.loc["Aston Martin", "Overall Pace"] == pytest.approx(0.4310, abs=1e-3)
+    assert rows.loc["Aston Martin", "Slow Corners"] == pytest.approx(0.3368, abs=1e-3)
+    assert rows.loc["Aston Martin", "Medium Corners"] == pytest.approx(0.3769, abs=1e-3)
+    assert rows.loc["Aston Martin", "Fast Corners"] == pytest.approx(0.1, abs=1e-3)
+    assert rows.loc["Cadillac F1", "Overall Pace"] == pytest.approx(0.1, abs=1e-3)
+    assert rows.loc["Cadillac F1", "Slow Corners"] == pytest.approx(0.1, abs=1e-3)
+    assert rows.loc["Cadillac F1", "Medium Corners"] == pytest.approx(0.1, abs=1e-3)
+    assert rows.loc["Cadillac F1", "Fast Corners"] == pytest.approx(0.2125, abs=1e-3)
 
 
 def test_build_latest_snapshot_comparison_payload_prefers_snapshot_profiles():
@@ -712,6 +770,202 @@ def test_build_latest_snapshot_comparison_payload_uses_same_event_average_for_mi
     assert payload["McLaren"]["testing_characteristics"]["slow_corner_performance"] == 0.65
 
 
+def test_build_latest_snapshot_comparison_payload_backfills_placeholder_braking_from_weekend():
+    base_teams_payload = {
+        "Ferrari": {
+            "overall_performance": 0.84,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.78,
+                    "slow_corner_performance": 0.74,
+                    "braking_performance": 0.70,
+                }
+            },
+        }
+    }
+    fp1_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "FP1",
+        "teams": {
+            "Ferrari": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.70,
+                        "slow_corner_performance": 0.66,
+                        "braking_performance": 0.54,
+                    }
+                }
+            }
+        },
+    }
+    qualifying_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "Q",
+        "teams": {
+            "Ferrari": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.76,
+                        "slow_corner_performance": 0.72,
+                        "braking_performance": 0.64,
+                    }
+                }
+            }
+        },
+    }
+    latest_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "R",
+        "teams": {
+            "Ferrari": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.82,
+                        "slow_corner_performance": 0.80,
+                        "braking_performance": 0.80,
+                    }
+                }
+            }
+        },
+    }
+
+    payload = team_comparison._build_latest_snapshot_comparison_payload(
+        base_teams_payload=base_teams_payload,
+        latest_snapshot=latest_snapshot,
+        snapshot_history=[fp1_snapshot, qualifying_snapshot, latest_snapshot],
+    )
+
+    balanced = payload["Ferrari"]["testing_characteristics_profiles"]["balanced"]
+    assert balanced["slow_corner_performance"] == 0.80
+    assert balanced["braking_performance"] == pytest.approx(0.59, abs=1e-4)
+
+
+def test_build_latest_snapshot_comparison_payload_uses_latest_braking_proxy_when_weekend_missing():
+    base_teams_payload = {
+        "Ferrari": {
+            "overall_performance": 0.84,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.78,
+                    "slow_corner_performance": 0.74,
+                    "braking_performance": 0.70,
+                }
+            },
+        }
+    }
+    prior_snapshot = {
+        "event_name": "Australian Grand Prix",
+        "session_name": "R",
+        "teams": {
+            "Ferrari": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.74,
+                        "slow_corner_performance": 0.68,
+                        "braking_performance": 0.66,
+                    }
+                }
+            }
+        },
+    }
+    latest_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "R",
+        "teams": {
+            "Ferrari": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.82,
+                        "slow_corner_performance": 0.80,
+                        "braking_performance": 0.80,
+                    }
+                }
+            }
+        },
+    }
+
+    payload = team_comparison._build_latest_snapshot_comparison_payload(
+        base_teams_payload=base_teams_payload,
+        latest_snapshot=latest_snapshot,
+        snapshot_history=[prior_snapshot, latest_snapshot],
+    )
+
+    balanced = payload["Ferrari"]["testing_characteristics_profiles"]["balanced"]
+    assert balanced["slow_corner_performance"] == 0.80
+    assert balanced["braking_performance"] == pytest.approx(0.66, abs=1e-4)
+
+
+def test_build_latest_snapshot_comparison_payload_skips_placeholder_braking_history():
+    base_teams_payload = {
+        "Ferrari": {
+            "overall_performance": 0.84,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.78,
+                    "slow_corner_performance": 0.74,
+                    "braking_performance": 0.70,
+                }
+            },
+        }
+    }
+    prior_real_snapshot = {
+        "event_name": "Australian Grand Prix",
+        "session_name": "R",
+        "teams": {
+            "Ferrari": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.74,
+                        "slow_corner_performance": 0.68,
+                        "braking_performance": 0.66,
+                        "braking_pct": 14.0,
+                    }
+                }
+            }
+        },
+    }
+    same_event_placeholder_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "Q",
+        "teams": {
+            "Ferrari": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.76,
+                        "slow_corner_performance": 0.72,
+                        "braking_performance": 0.72,
+                    }
+                }
+            }
+        },
+    }
+    latest_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "R",
+        "teams": {
+            "Ferrari": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.82,
+                        "slow_corner_performance": 0.80,
+                        "braking_performance": 0.80,
+                    }
+                }
+            }
+        },
+    }
+
+    payload = team_comparison._build_latest_snapshot_comparison_payload(
+        base_teams_payload=base_teams_payload,
+        latest_snapshot=latest_snapshot,
+        snapshot_history=[prior_real_snapshot, same_event_placeholder_snapshot, latest_snapshot],
+    )
+
+    balanced = payload["Ferrari"]["testing_characteristics_profiles"]["balanced"]
+    assert balanced["slow_corner_performance"] == 0.80
+    assert balanced["braking_performance"] == pytest.approx(0.66, abs=1e-4)
+
+
 def test_build_same_event_display_metric_fallbacks_uses_history_display_scores():
     base_teams_payload = {
         "McLaren": {"overall_performance": 0.84},
@@ -880,6 +1134,301 @@ def test_build_same_event_display_metric_fallbacks_uses_history_display_scores()
     assert fallback_scores["McLaren"]["Overall Pace"] != pytest.approx(
         teams_payload["McLaren"]["testing_characteristics_profiles"]["balanced"]["overall_pace"],
         abs=1e-4,
+    )
+
+
+def test_apply_display_metric_fallbacks_uses_latest_reliable_history_for_missing_metric():
+    teams_payload = {
+        "Williams": {
+            "overall_performance": 0.41,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.46,
+                    "overall_pace_seconds": 91.4,
+                    "slow_corner_performance": 0.42,
+                    "slow_corner_seconds": 30.4,
+                    "medium_corner_performance": 0.44,
+                    "medium_corner_seconds": 28.3,
+                    "fast_corner_performance": 0.45,
+                    "fast_corner_seconds": 31.2,
+                    "top_speed": 0.61,
+                    "top_speed_kph": 319.0,
+                    "tire_deg_performance": 0.57,
+                    "tire_deg_slope": 0.03,
+                }
+            },
+        },
+        "Ferrari": {
+            "overall_performance": 0.84,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "overall_pace": 0.80,
+                    "overall_pace_seconds": 90.3,
+                    "slow_corner_performance": 0.74,
+                    "slow_corner_seconds": 29.9,
+                    "medium_corner_performance": 0.75,
+                    "medium_corner_seconds": 27.7,
+                    "fast_corner_performance": 0.72,
+                    "fast_corner_seconds": 30.8,
+                    "braking_performance": 0.76,
+                    "braking_pct": 14.0,
+                    "top_speed": 0.66,
+                    "top_speed_kph": 323.0,
+                    "tire_deg_performance": 0.64,
+                    "tire_deg_slope": -0.04,
+                }
+            },
+        },
+    }
+    prior_snapshot = {
+        "event_name": "Australian Grand Prix",
+        "session_name": "R",
+        "teams": {
+            "Williams": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.49,
+                        "overall_pace_seconds": 91.0,
+                        "slow_corner_performance": 0.45,
+                        "slow_corner_seconds": 30.1,
+                        "medium_corner_performance": 0.47,
+                        "medium_corner_seconds": 28.0,
+                        "fast_corner_performance": 0.46,
+                        "fast_corner_seconds": 31.0,
+                        "braking_performance": 0.68,
+                        "braking_pct": 16.0,
+                        "top_speed": 0.60,
+                        "top_speed_kph": 318.0,
+                        "tire_deg_performance": 0.55,
+                        "tire_deg_slope": 0.06,
+                    }
+                }
+            },
+            "Ferrari": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.82,
+                        "overall_pace_seconds": 90.0,
+                        "slow_corner_performance": 0.76,
+                        "slow_corner_seconds": 29.6,
+                        "medium_corner_performance": 0.77,
+                        "medium_corner_seconds": 27.5,
+                        "fast_corner_performance": 0.74,
+                        "fast_corner_seconds": 30.6,
+                        "braking_performance": 0.78,
+                        "braking_pct": 13.0,
+                        "top_speed": 0.67,
+                        "top_speed_kph": 322.0,
+                        "tire_deg_performance": 0.62,
+                        "tire_deg_slope": -0.02,
+                    }
+                }
+            },
+        },
+    }
+    latest_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "R",
+        "teams": {
+            "Williams": {
+                "profiles": {
+                    "balanced": teams_payload["Williams"]["testing_characteristics_profiles"][
+                        "balanced"
+                    ]
+                }
+            },
+            "Ferrari": {
+                "profiles": {
+                    "balanced": teams_payload["Ferrari"]["testing_characteristics_profiles"][
+                        "balanced"
+                    ]
+                }
+            },
+        },
+    }
+
+    selected_teams = ["Williams", "Ferrari"]
+    snapshots = [prior_snapshot, latest_snapshot]
+    history_df = team_comparison._build_snapshot_history_dataframe(
+        snapshots=snapshots,
+        selected_teams=selected_teams,
+        profile="balanced",
+    )
+    expected_braking = history_df[
+        (history_df["Team"] == "Williams") & (history_df["Snapshot Order"] == 0)
+    ]["Braking"].iloc[0]
+    latest_reliable_scores = team_comparison._build_latest_reliable_display_metric_fallbacks(
+        snapshot_history=snapshots,
+        latest_snapshot=latest_snapshot,
+        selected_teams=selected_teams,
+        profile="balanced",
+    )
+
+    comparison_df, _ = team_comparison._build_team_comparison_dataframe(
+        teams_payload=teams_payload,
+        selected_teams=selected_teams,
+        profile="balanced",
+    )
+    initial_rows = comparison_df.set_index("Team")
+    assert initial_rows.loc["Williams", "Braking"] == 0.5
+
+    updated_df, unresolved_missing_count = team_comparison._apply_display_metric_fallbacks(
+        comparison_df,
+        teams_payload=teams_payload,
+        selected_teams=selected_teams,
+        profile="balanced",
+        same_event_display_scores={},
+        latest_reliable_display_scores=latest_reliable_scores,
+    )
+
+    updated_rows = updated_df.set_index("Team")
+    assert unresolved_missing_count == 0
+    assert updated_rows.loc["Williams", "Braking"] == pytest.approx(expected_braking, abs=1e-4)
+
+
+def test_build_latest_reliable_display_metric_fallbacks_skips_placeholder_braking_history():
+    real_snapshot = {
+        "event_name": "Australian Grand Prix",
+        "session_name": "R",
+        "teams": {
+            "Williams": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.49,
+                        "overall_pace_seconds": 91.0,
+                        "slow_corner_performance": 0.45,
+                        "slow_corner_seconds": 30.1,
+                        "medium_corner_performance": 0.47,
+                        "medium_corner_seconds": 28.0,
+                        "fast_corner_performance": 0.46,
+                        "fast_corner_seconds": 31.0,
+                        "braking_performance": 0.68,
+                        "braking_pct": 16.0,
+                        "top_speed": 0.60,
+                        "top_speed_kph": 318.0,
+                        "tire_deg_performance": 0.55,
+                        "tire_deg_slope": 0.06,
+                    }
+                }
+            },
+            "Ferrari": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.82,
+                        "overall_pace_seconds": 90.0,
+                        "slow_corner_performance": 0.76,
+                        "slow_corner_seconds": 29.6,
+                        "medium_corner_performance": 0.77,
+                        "medium_corner_seconds": 27.5,
+                        "fast_corner_performance": 0.74,
+                        "fast_corner_seconds": 30.6,
+                        "braking_performance": 0.78,
+                        "braking_pct": 13.0,
+                        "top_speed": 0.67,
+                        "top_speed_kph": 322.0,
+                        "tire_deg_performance": 0.62,
+                        "tire_deg_slope": -0.02,
+                    }
+                }
+            },
+        },
+    }
+    placeholder_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "Q",
+        "teams": {
+            "Williams": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.47,
+                        "overall_pace_seconds": 90.8,
+                        "slow_corner_performance": 0.61,
+                        "slow_corner_seconds": 29.9,
+                        "medium_corner_performance": 0.48,
+                        "medium_corner_seconds": 27.9,
+                        "fast_corner_performance": 0.49,
+                        "fast_corner_seconds": 30.9,
+                        "braking_performance": 0.61,
+                        "top_speed": 0.61,
+                        "top_speed_kph": 319.0,
+                        "tire_deg_performance": 0.56,
+                        "tire_deg_slope": 0.04,
+                    }
+                }
+            },
+            "Ferrari": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.84,
+                        "overall_pace_seconds": 89.9,
+                        "slow_corner_performance": 0.78,
+                        "slow_corner_seconds": 29.5,
+                        "medium_corner_performance": 0.79,
+                        "medium_corner_seconds": 27.4,
+                        "fast_corner_performance": 0.76,
+                        "fast_corner_seconds": 30.5,
+                        "braking_performance": 0.80,
+                        "braking_pct": 12.5,
+                        "top_speed": 0.69,
+                        "top_speed_kph": 323.0,
+                        "tire_deg_performance": 0.63,
+                        "tire_deg_slope": -0.03,
+                    }
+                }
+            },
+        },
+    }
+    latest_snapshot = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "R",
+        "teams": {
+            "Williams": {
+                "profiles": {
+                    "balanced": {
+                        "overall_pace": 0.46,
+                        "overall_pace_seconds": 91.4,
+                        "slow_corner_performance": 0.42,
+                        "slow_corner_seconds": 30.4,
+                        "medium_corner_performance": 0.44,
+                        "medium_corner_seconds": 28.3,
+                        "fast_corner_performance": 0.45,
+                        "fast_corner_seconds": 31.2,
+                        "top_speed": 0.61,
+                        "top_speed_kph": 319.0,
+                        "tire_deg_performance": 0.57,
+                        "tire_deg_slope": 0.03,
+                    }
+                }
+            }
+        },
+    }
+
+    selected_teams = ["Williams", "Ferrari"]
+    snapshots = [real_snapshot, placeholder_snapshot, latest_snapshot]
+    history_df = team_comparison._build_snapshot_history_dataframe(
+        snapshots=snapshots,
+        selected_teams=selected_teams,
+        profile="balanced",
+    )
+    placeholder_row = history_df[
+        (history_df["Event"] == "Chinese Grand Prix")
+        & (history_df["Session"] == "Q")
+        & (history_df["Team"] == "Williams")
+    ].iloc[0]
+    expected_braking = history_df[
+        (history_df["Team"] == "Williams") & history_df["Braking"].notna()
+    ]["Braking"].iloc[-1]
+
+    latest_reliable_scores = team_comparison._build_latest_reliable_display_metric_fallbacks(
+        snapshot_history=snapshots,
+        latest_snapshot=latest_snapshot,
+        selected_teams=selected_teams,
+        profile="balanced",
+    )
+
+    assert pd.isna(placeholder_row["Braking"])
+    assert latest_reliable_scores["Williams"]["Braking"] == pytest.approx(
+        expected_braking, abs=1e-4
     )
 
 
@@ -1431,8 +1980,8 @@ def test_build_snapshot_history_dataframe_and_summary():
     )
 
     assert list(frame["Snapshot"]) == ["Bahrain Grand Prix FP1", "Bahrain Grand Prix FP2"]
-    assert frame.iloc[0]["Top Speed"] == pytest.approx(0.4353, abs=1e-4)
-    assert round(float(frame.iloc[0]["Overall"]), 3) == 0.581
+    assert frame.iloc[0]["Top Speed"] == pytest.approx(0.1, abs=1e-4)
+    assert round(float(frame.iloc[0]["Overall"]), 3) == 0.525
 
 
 def test_build_snapshot_history_dataframe_keeps_partial_overall_points():
