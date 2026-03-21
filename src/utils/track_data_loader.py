@@ -12,6 +12,7 @@ import numpy as np
 from fastf1.exceptions import DataNotLoadedError
 
 from src.utils import config_loader
+from src.utils.track_overtaking import get_track_overtaking_baseline
 
 logger = logging.getLogger(__name__)
 
@@ -61,33 +62,6 @@ KNOWN_SPRINT_LAPS: dict[str, int] = {
     "Las Vegas Grand Prix": 17,
     "Qatar Grand Prix": 19,
     "Abu Dhabi Grand Prix": 20,
-}
-
-# Conservative overtaking-difficulty priors used when extracted files are clearly
-# under-scaled (e.g., all tracks compressed around 0.00-0.05).
-_TRACK_OVERTAKING_BASELINES: dict[str, float] = {
-    "Bahrain Grand Prix": 0.40,
-    "Saudi Arabian Grand Prix": 0.60,
-    "Australian Grand Prix": 0.50,
-    "Japanese Grand Prix": 0.50,
-    "Chinese Grand Prix": 0.30,
-    "Miami Grand Prix": 0.50,
-    "Monaco Grand Prix": 0.95,
-    "Spanish Grand Prix": 0.40,
-    "Canadian Grand Prix": 0.50,
-    "Austrian Grand Prix": 0.40,
-    "British Grand Prix": 0.40,
-    "Hungarian Grand Prix": 0.80,
-    "Belgian Grand Prix": 0.30,
-    "Dutch Grand Prix": 0.50,
-    "Italian Grand Prix": 0.20,
-    "Singapore Grand Prix": 0.80,
-    "United States Grand Prix": 0.40,
-    "Mexico City Grand Prix": 0.40,
-    "Brazilian Grand Prix": 0.40,
-    "Las Vegas Grand Prix": 0.30,
-    "Qatar Grand Prix": 0.40,
-    "Abu Dhabi Grand Prix": 0.50,
 }
 
 _OVERTAKING_DIFFICULTY_LABELS: dict[str, float] = {
@@ -592,9 +566,10 @@ def _normalize_overtaking_difficulty(
                 )
                 return inferred
 
-        baseline = _TRACK_OVERTAKING_BASELINES.get(race_name)
-        if baseline is None:
-            baseline = float(config_loader.get("track_defaults.overtaking_difficulty", 0.5))
+        baseline = get_track_overtaking_baseline(
+            race_name,
+            default=float(config_loader.get("track_defaults.overtaking_difficulty", 0.5)),
+        )
         logger.info(
             "Overtaking difficulty for %s appears under-scaled (%.3f); using baseline %.2f",
             race_name,
@@ -623,9 +598,10 @@ def _blend_overtaking_with_transition_prior(
     if observed_races <= 0:
         return observed_overtaking
 
-    prior = _TRACK_OVERTAKING_BASELINES.get(race_name)
-    if prior is None:
-        prior = float(config_loader.get("track_defaults.overtaking_difficulty", 0.5))
+    prior = get_track_overtaking_baseline(
+        race_name,
+        default=float(config_loader.get("track_defaults.overtaking_difficulty", 0.5)),
+    )
 
     min_weight = float(
         config_loader.get(

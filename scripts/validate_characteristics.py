@@ -358,6 +358,8 @@ def validate_track_characteristics(track_file: Path) -> tuple[bool, list[str], l
 
         tracks = data.get("tracks", {})
 
+        overtaking_values: list[float] = []
+
         for track_name, track_data in tracks.items():
             # Check required fields
             required_fields = [
@@ -391,6 +393,18 @@ def validate_track_characteristics(track_file: Path) -> tuple[bool, list[str], l
                     errors.append(
                         f"{track_name}: Overtaking difficulty {ot_diff:.2f} outside [0.0-1.0]"
                     )
+                else:
+                    overtaking_values.append(float(ot_diff))
+
+        if len(overtaking_values) >= 10:
+            rounded_values = sorted({round(value, 2) for value in overtaking_values})
+            spread = max(overtaking_values) - min(overtaking_values)
+            if len(rounded_values) <= 3 and spread <= 0.10:
+                errors.append(
+                    "Track overtaking difficulty distribution is collapsed "
+                    f"(unique_values={rounded_values}, spread={spread:.2f}). "
+                    "Rebuild the track dataset instead of shipping placeholder-like values."
+                )
 
     except FileNotFoundError:
         errors.append(f"File not found: {track_file}")

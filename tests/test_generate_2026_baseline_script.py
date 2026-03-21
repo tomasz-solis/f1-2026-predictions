@@ -188,3 +188,10 @@ def test_changes_per_lap_to_overtaking_difficulty_is_calibrated():
     assert module._changes_per_lap_to_overtaking_difficulty(None) == 0.5
     assert module._changes_per_lap_to_overtaking_difficulty(1.0) == 0.95
     assert module._changes_per_lap_to_overtaking_difficulty(5.0) == pytest.approx(0.3846, abs=1e-4)
+
+
+def test_resolve_track_overtaking_difficulty_uses_track_prior_when_history_missing():
+    module = _load_baseline_module()
+
+    assert module._resolve_track_overtaking_difficulty("Monaco Grand Prix", None) == 0.95
+    assert module._resolve_track_overtaking_difficulty("Bahrain Grand Prix", None) == 0.40

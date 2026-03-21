@@ -186,3 +186,29 @@ def test_main_accepts_season_scoped_repo_layout(tmp_path, monkeypatch, capsys):
 
     assert exit_code == 0
     assert "2026_driver_characteristics.json" in output
+
+
+def test_track_validation_rejects_collapsed_overtaking_distribution(tmp_path):
+    validator = _load_validator_module()
+    track_file = tmp_path / "track_characteristics" / "2026_track_characteristics.json"
+    collapsed_tracks = {
+        f"Track {idx}": {
+            "pit_stop_loss": 22.0,
+            "safety_car_prob": 0.3,
+            "overtaking_difficulty": [0.0, 0.03, 0.05][idx % 3],
+        }
+        for idx in range(12)
+    }
+    _write_json(
+        track_file,
+        {
+            "year": 2026,
+            "tracks": collapsed_tracks,
+        },
+    )
+
+    is_valid, errors, warnings = validator.validate_track_characteristics(track_file)
+
+    assert not is_valid
+    assert any("distribution is collapsed" in error for error in errors)
+    assert warnings == []

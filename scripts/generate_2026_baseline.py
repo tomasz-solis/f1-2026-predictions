@@ -26,6 +26,8 @@ import fastf1
 import numpy as np
 import pandas as pd
 
+from src.utils.track_overtaking import get_track_overtaking_baseline
+
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 logging.getLogger("fastf1").setLevel(logging.ERROR)
@@ -289,6 +291,16 @@ def _changes_per_lap_to_overtaking_difficulty(avg_changes_per_lap: float | None)
     return float(np.clip(normalized, 0.2, 0.95))
 
 
+def _resolve_track_overtaking_difficulty(
+    track_name: str,
+    avg_changes_per_lap: float | None,
+) -> float:
+    """Resolve overtaking difficulty from history when available, else use track prior."""
+    if avg_changes_per_lap is None:
+        return get_track_overtaking_baseline(track_name)
+    return _changes_per_lap_to_overtaking_difficulty(avg_changes_per_lap)
+
+
 def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
     """
     Calculate track characteristics from historical race data.
@@ -394,7 +406,10 @@ def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
         avg_changes_per_lap = None
         if stats["overtaking_changes_per_lap"]:
             avg_changes_per_lap = float(np.mean(stats["overtaking_changes_per_lap"]))
-        overtaking_difficulty = _changes_per_lap_to_overtaking_difficulty(avg_changes_per_lap)
+        overtaking_difficulty = _resolve_track_overtaking_difficulty(
+            track_name,
+            avg_changes_per_lap,
+        )
 
         # Determine track type
         track_type = "permanent"
