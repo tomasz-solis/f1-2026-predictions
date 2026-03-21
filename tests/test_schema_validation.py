@@ -1,12 +1,4 @@
-"""
-Test suite for JSON schema validation module.
-
-Tests cover:
-- Valid data validation
-- Invalid data detection
-- Error handling and messaging
-- All three schema types (driver, team, track characteristics)
-"""
+"""Tests for runtime JSON schema validation."""
 
 import json
 from pathlib import Path
@@ -22,340 +14,284 @@ from src.utils.schema_validation import (
 )
 
 
+def _driver_payload() -> dict:
+    """Return a valid minimal driver payload."""
+    return {
+        "drivers": {
+            "VER": {
+                "name": "Max Verstappen",
+                "experience": {
+                    "debut_year": 2015,
+                    "total_races": 210,
+                    "years_of_experience": 11,
+                    "tier": "elite",
+                },
+                "racecraft": {"skill_score": 0.85, "overtaking_skill": 0.90},
+                "pace": {"quali_pace": 0.92, "race_pace": 0.88},
+                "dnf_risk": {"dnf_rate": 0.05},
+            }
+        }
+    }
+
+
+def _team_payload() -> dict:
+    """Return a valid nested team payload."""
+    return {
+        "year": 2026,
+        "teams": {
+            "McLaren": {
+                "overall_performance": 0.85,
+                "uncertainty": 0.12,
+                "current_season_performance": [0.80, 0.83],
+                "directionality": {
+                    "max_speed": 0.10,
+                    "slow_corner_speed": 0.02,
+                    "medium_corner_speed": -0.01,
+                    "high_corner_speed": 0.05,
+                },
+                "testing_characteristics": {
+                    "run_profile": "balanced",
+                    "overall_pace": 0.78,
+                    "top_speed": 0.72,
+                },
+                "testing_characteristics_profiles": {
+                    "balanced": {
+                        "run_profile": "balanced",
+                        "overall_pace": 0.78,
+                        "top_speed": 0.72,
+                    }
+                },
+                "compound_characteristics": {
+                    "SOFT": {
+                        "pace_performance": 0.82,
+                        "tire_deg_performance": 0.61,
+                        "consistency_performance": 0.75,
+                        "tire_deg_slope": 0.12,
+                        "laps_sampled": 18,
+                    }
+                },
+            }
+        },
+    }
+
+
+def _track_payload() -> dict:
+    """Return a valid track payload."""
+    return {
+        "year": 2026,
+        "tracks": {
+            "Bahrain Grand Prix": {
+                "pit_stop_loss": 22.0,
+                "safety_car_prob": 0.35,
+                "overtaking_difficulty": 0.60,
+                "lap1_risk_modifier": 0.22,
+                "type": "permanent",
+                "straights_pct": 30.0,
+                "slow_corners_pct": 25.0,
+                "medium_corners_pct": 25.0,
+                "high_corners_pct": 20.0,
+            }
+        },
+    }
+
+
 class TestDriverCharacteristicsSchema:
     """Test driver characteristics schema validation."""
 
-    def test_valid_driver_data_from_file(self):
-        """Test validation of actual driver characteristics file."""
-        file_path = Path("data/processed/driver_characteristics.json")
+    def test_valid_driver_data_from_season_scoped_file(self):
+        """Validate the shipped season-scoped driver file."""
+        file_path = Path("data/processed/driver_characteristics/2026_driver_characteristics.json")
         if file_path.exists():
-            with open(file_path) as f:
-                data = json.load(f)
-            # Should not raise
-            validate_driver_characteristics(data)
+            with open(file_path) as file_obj:
+                data = json.load(file_obj)
+
+            validate_driver_characteristics(data, expected_year=2026)
 
     def test_valid_minimal_driver_data(self):
-        """Test validation of minimal valid driver data."""
-        data = {
-            "drivers": {
-                "VER": {
-                    "racecraft": {"skill_score": 0.85, "overtaking_skill": 0.90},
-                    "pace": {"quali_pace": 0.92, "race_pace": 0.88},
-                    "dnf_risk": {"dnf_rate": 0.05},
-                }
-            }
-        }
-        # Should not raise
-        validate_driver_characteristics(data)
+        """Accept a small but structurally valid driver payload."""
+        validate_driver_characteristics(_driver_payload())
 
     def test_invalid_missing_drivers_key(self):
-        """Test that missing 'drivers' key raises error."""
-        data = {}
+        """Reject payloads without the required drivers map."""
         with pytest.raises(ValueError, match="drivers"):
-            validate_driver_characteristics(data)
-
-    def test_invalid_missing_racecraft(self):
-        """Test that missing 'racecraft' raises error."""
-        data = {
-            "drivers": {
-                "VER": {
-                    "pace": {"quali_pace": 0.9, "race_pace": 0.85},
-                    "dnf_risk": {"dnf_rate": 0.05},
-                }
-            }
-        }
-        with pytest.raises(ValueError):
-            validate_driver_characteristics(data)
-
-    def test_invalid_missing_pace(self):
-        """Test that missing 'pace' raises error."""
-        data = {
-            "drivers": {
-                "VER": {
-                    "racecraft": {"skill_score": 0.8, "overtaking_skill": 0.8},
-                    "dnf_risk": {"dnf_rate": 0.05},
-                }
-            }
-        }
-        with pytest.raises(ValueError):
-            validate_driver_characteristics(data)
-
-    def test_invalid_missing_dnf_risk(self):
-        """Test that missing 'dnf_risk' raises error."""
-        data = {
-            "drivers": {
-                "VER": {
-                    "racecraft": {"skill_score": 0.8, "overtaking_skill": 0.8},
-                    "pace": {"quali_pace": 0.9, "race_pace": 0.85},
-                }
-            }
-        }
-        with pytest.raises(ValueError):
-            validate_driver_characteristics(data)
+            validate_driver_characteristics({})
 
     def test_invalid_skill_score_out_of_range(self):
-        """Test that skill_score > 1.0 raises error."""
-        data = {
-            "drivers": {
-                "VER": {
-                    "racecraft": {
-                        "skill_score": 1.5,
-                        "overtaking_skill": 0.8,
-                    },  # Invalid: > 1.0
-                    "pace": {"quali_pace": 0.9, "race_pace": 0.85},
-                    "dnf_risk": {"dnf_rate": 0.05},
-                }
-            }
-        }
-        with pytest.raises(ValueError):
-            validate_driver_characteristics(data)
+        """Reject racecraft scores outside the normalized range."""
+        data = _driver_payload()
+        data["drivers"]["VER"]["racecraft"]["skill_score"] = 1.5
 
-    def test_invalid_dnf_rate_out_of_range(self):
-        """Test that dnf_rate > 1.0 raises error."""
-        data = {
-            "drivers": {
-                "VER": {
-                    "racecraft": {"skill_score": 0.8, "overtaking_skill": 0.8},
-                    "pace": {"quali_pace": 0.9, "race_pace": 0.85},
-                    "dnf_risk": {"dnf_rate": 1.5},  # Invalid: > 1.0
-                }
-            }
-        }
         with pytest.raises(ValueError):
             validate_driver_characteristics(data)
 
     def test_invalid_driver_code_not_3_letters(self):
-        """Test that invalid driver codes are accepted (pattern is permissive)."""
-        # The schema uses patternProperties with relaxed matching
-        # Non-matching patterns just aren't validated against the driver schema
-        data = {
-            "drivers": {
-                "VERSTAPPEN": {  # Not 3 letters - won't match pattern
-                    "racecraft": {"skill_score": 0.8, "overtaking_skill": 0.8},
-                    "pace": {"quali_pace": 0.9, "race_pace": 0.85},
-                    "dnf_risk": {"dnf_rate": 0.05},
-                }
-            }
-        }
-        # This should pass because patternProperties don't require all to match
-        validate_driver_characteristics(data)
+        """Reject driver keys that do not match canonical three-letter codes."""
+        data = _driver_payload()
+        data["drivers"] = {"VERSTAPPEN": data["drivers"]["VER"]}
+
+        with pytest.raises(ValueError):
+            validate_driver_characteristics(data)
+
+    def test_invalid_driver_bayesian_year_mismatch(self):
+        """Reject season markers that conflict with the expected year."""
+        data = _driver_payload()
+        data["drivers"]["VER"]["bayesian"] = {"season_year": 2025}
+
+        with pytest.raises(ValueError, match="expected season 2026"):
+            validate_driver_characteristics(data, expected_year=2026)
 
 
 class TestTeamCharacteristicsSchema:
     """Test team characteristics schema validation."""
 
     def test_valid_team_data_from_file(self):
-        """Test validation of actual team characteristics file."""
+        """Validate the shipped team characteristics file."""
         file_path = Path("data/processed/car_characteristics/2026_car_characteristics.json")
         if file_path.exists():
-            with open(file_path) as f:
-                data = json.load(f)
-            # Should not raise
-            validate_team_characteristics(data)
+            with open(file_path) as file_obj:
+                data = json.load(file_obj)
 
-    def test_valid_minimal_team_data(self):
-        """Test validation of minimal valid team data."""
-        data = {
-            "teams": {
-                "McLaren": {"overall_performance": 0.85},
-                "Ferrari": {"overall_performance": 0.75},
-            }
-        }
-        # Should not raise
-        validate_team_characteristics(data)
+            validate_team_characteristics(data, expected_year=2026)
+
+    def test_valid_nested_team_data(self):
+        """Accept the richer nested team structure the predictor consumes."""
+        validate_team_characteristics(_team_payload())
 
     def test_invalid_missing_teams_key(self):
-        """Test that missing 'teams' key raises error."""
-        data = {}
+        """Reject payloads without the teams map."""
         with pytest.raises(ValueError, match="teams"):
-            validate_team_characteristics(data)
+            validate_team_characteristics({"year": 2026})
 
     def test_invalid_missing_overall_performance(self):
-        """Test that missing 'overall_performance' raises error."""
-        data = {"teams": {"McLaren": {"uncertainty": 0.30}}}
+        """Reject team entries without baseline strength."""
+        data = {"year": 2026, "teams": {"McLaren": {"uncertainty": 0.30}}}
+
         with pytest.raises(ValueError):
             validate_team_characteristics(data)
 
-    def test_invalid_performance_out_of_range(self):
-        """Test that performance > 1.0 raises error."""
-        data = {"teams": {"McLaren": {"overall_performance": 1.5}}}  # Invalid: > 1.0
+    def test_invalid_current_season_performance_out_of_range(self):
+        """Reject current-season observations outside the normalized range."""
+        data = _team_payload()
+        data["teams"]["McLaren"]["current_season_performance"] = [0.5, 1.2]
+
         with pytest.raises(ValueError):
             validate_team_characteristics(data)
 
-    def test_invalid_uncertainty_out_of_range(self):
-        """Test that uncertainty > 1.0 raises error."""
-        data = {
-            "teams": {
-                "McLaren": {
-                    "overall_performance": 0.85,
-                    "uncertainty": 1.5,
-                }  # Invalid: > 1.0
-            }
-        }
+    def test_invalid_directionality_missing_axis(self):
+        """Reject directionality payloads that omit a required axis."""
+        data = _team_payload()
+        del data["teams"]["McLaren"]["directionality"]["high_corner_speed"]
+
         with pytest.raises(ValueError):
             validate_team_characteristics(data)
+
+    def test_invalid_expected_year_mismatch(self):
+        """Reject team payloads whose embedded season conflicts with the load target."""
+        data = _team_payload()
+        data["year"] = 2025
+
+        with pytest.raises(ValueError, match="expected season 2026"):
+            validate_team_characteristics(data, expected_year=2026)
 
 
 class TestTrackCharacteristicsSchema:
     """Test track characteristics schema validation."""
 
     def test_valid_track_data_from_file(self):
-        """Test validation of actual track characteristics file."""
+        """Validate the shipped track characteristics file."""
         file_path = Path("data/processed/track_characteristics/2026_track_characteristics.json")
         if file_path.exists():
-            with open(file_path) as f:
-                data = json.load(f)
-            # Should not raise
-            validate_track_characteristics(data)
+            with open(file_path) as file_obj:
+                data = json.load(file_obj)
 
-    def test_valid_minimal_track_data(self):
-        """Test validation of minimal valid track data."""
-        data = {
-            "tracks": {
-                "Monaco Grand Prix": {
-                    "pit_stop_loss": 20.0,
-                    "safety_car_prob": 0.8,
-                    "overtaking_difficulty": 0.9,
-                },
-                "Monza Grand Prix": {
-                    "pit_stop_loss": 24.0,
-                    "safety_car_prob": 0.3,
-                    "overtaking_difficulty": 0.2,
-                },
-            }
-        }
-        # Should not raise
-        validate_track_characteristics(data)
+            validate_track_characteristics(data, expected_year=2026)
 
-    def test_valid_track_data_with_sprint(self):
-        """Test validation of track data with sprint flag."""
-        data = {
-            "tracks": {
-                "Miami Grand Prix": {
-                    "pit_stop_loss": 24.0,
-                    "safety_car_prob": 0.7,
-                    "overtaking_difficulty": 0.7,
-                    "has_sprint": True,
-                }
-            }
-        }
-        # Should not raise
-        validate_track_characteristics(data)
+    def test_valid_track_data_with_profile_percentages(self):
+        """Accept valid track payloads with optional composition percentages."""
+        validate_track_characteristics(_track_payload())
 
     def test_invalid_missing_tracks_key(self):
-        """Test that missing 'tracks' key raises error."""
-        data = {}
+        """Reject payloads without the tracks map."""
         with pytest.raises(ValueError, match="tracks"):
+            validate_track_characteristics({"year": 2026})
+
+    def test_invalid_missing_required_track_field(self):
+        """Reject track entries that omit a required core field."""
+        data = _track_payload()
+        del data["tracks"]["Bahrain Grand Prix"]["overtaking_difficulty"]
+
+        with pytest.raises(ValueError):
             validate_track_characteristics(data)
 
-    def test_invalid_safety_car_prob_out_of_range(self):
-        """Test that safety_car_prob > 1.0 raises error."""
-        data = {
-            "tracks": {
-                "Monaco Grand Prix": {
-                    "pit_stop_loss": 20.0,
-                    "safety_car_prob": 1.5,  # Invalid: > 1.0
-                    "overtaking_difficulty": 0.9,
-                }
-            }
-        }
-        with pytest.raises(ValueError):
+    def test_invalid_partial_track_profile_percentages(self):
+        """Reject partial track profile payloads because weighting would be ambiguous."""
+        data = _track_payload()
+        del data["tracks"]["Bahrain Grand Prix"]["high_corners_pct"]
+
+        with pytest.raises(ValueError, match="track profile fields"):
             validate_track_characteristics(data)
 
     def test_invalid_overtaking_difficulty_out_of_range(self):
-        """Test that overtaking_difficulty > 1.0 raises error."""
-        data = {
-            "tracks": {
-                "Monaco Grand Prix": {
-                    "pit_stop_loss": 20.0,
-                    "safety_car_prob": 0.8,
-                    "overtaking_difficulty": 1.5,  # Invalid: > 1.0
-                }
-            }
-        }
+        """Reject overtaking difficulty values outside the normalized range."""
+        data = _track_payload()
+        data["tracks"]["Bahrain Grand Prix"]["overtaking_difficulty"] = 1.5
+
         with pytest.raises(ValueError):
             validate_track_characteristics(data)
 
+    def test_invalid_expected_year_mismatch(self):
+        """Reject track payloads whose embedded season conflicts with the load target."""
+        data = _track_payload()
+        data["year"] = 2025
+
+        with pytest.raises(ValueError, match="expected season 2026"):
+            validate_track_characteristics(data, expected_year=2026)
+
 
 class TestValidateJsonFunction:
-    """Test the generic validate_json function."""
+    """Test the generic validate_json wrapper."""
 
     def test_validate_json_with_valid_data(self):
-        """Test validate_json with valid data."""
-        data = {
-            "drivers": {
-                "VER": {
-                    "racecraft": {"skill_score": 0.8, "overtaking_skill": 0.8},
-                    "pace": {"quali_pace": 0.9, "race_pace": 0.85},
-                    "dnf_risk": {"dnf_rate": 0.05},
-                }
-            }
-        }
-        # Should not raise
-        validate_json(data, DRIVER_CHARACTERISTICS_SCHEMA, "test.json")
+        """Accept valid payloads when called through the generic helper."""
+        validate_json(_driver_payload(), DRIVER_CHARACTERISTICS_SCHEMA, "test.json")
 
     def test_validate_json_with_invalid_data(self):
-        """Test validate_json with invalid data."""
-        data = {}
+        """Raise ValueError for invalid payloads in the generic helper."""
         with pytest.raises(ValueError):
-            validate_json(data, DRIVER_CHARACTERISTICS_SCHEMA, "test.json")
+            validate_json({}, DRIVER_CHARACTERISTICS_SCHEMA, "test.json")
 
 
 class TestEdgeCases:
-    """Test edge cases and boundary conditions."""
+    """Test schema edge cases and boundaries."""
 
     def test_driver_with_empty_dnf_types(self):
-        """Test driver with empty dnf_types dict."""
-        data = {
-            "drivers": {
-                "VER": {
-                    "racecraft": {"skill_score": 0.8, "overtaking_skill": 0.8},
-                    "pace": {"quali_pace": 0.9, "race_pace": 0.85},
-                    "dnf_risk": {"dnf_rate": 0.05, "dnf_types": {}},
-                }
-            }
-        }
-        # Should not raise
+        """Allow an empty DNF type breakdown."""
+        data = _driver_payload()
+        data["drivers"]["VER"]["dnf_risk"]["dnf_types"] = {}
+
         validate_driver_characteristics(data)
 
     def test_track_without_optional_sprint_flag(self):
-        """Test track data without has_sprint flag."""
-        data = {
-            "tracks": {
-                "Monaco Grand Prix": {
-                    "pit_stop_loss": 20.0,
-                    "safety_car_prob": 0.8,
-                    "overtaking_difficulty": 0.9,
-                }
-            }
-        }
-        # Should not raise
+        """Allow track payloads that omit optional weekend metadata."""
+        data = _track_payload()
+        data["tracks"]["Bahrain Grand Prix"].pop("type")
+
         validate_track_characteristics(data)
 
     def test_boundary_values_zero(self):
-        """Test boundary value of 0.0 for normalized fields."""
-        data = {
-            "drivers": {
-                "VER": {
-                    "racecraft": {"skill_score": 0.0, "overtaking_skill": 0.0},
-                    "pace": {"quali_pace": 0.0, "race_pace": 0.0},
-                    "dnf_risk": {"dnf_rate": 0.0},
-                }
-            }
-        }
-        # Should not raise
+        """Allow zero-valued normalized driver metrics."""
+        data = _driver_payload()
+        data["drivers"]["VER"]["racecraft"] = {"skill_score": 0.0, "overtaking_skill": 0.0}
+        data["drivers"]["VER"]["pace"] = {"quali_pace": 0.0, "race_pace": 0.0}
+        data["drivers"]["VER"]["dnf_risk"] = {"dnf_rate": 0.0}
+
         validate_driver_characteristics(data)
 
     def test_boundary_values_one(self):
-        """Test boundary value of 1.0 for normalized fields."""
-        data = {
-            "drivers": {
-                "VER": {
-                    "racecraft": {"skill_score": 1.0, "overtaking_skill": 1.0},
-                    "pace": {"quali_pace": 1.0, "race_pace": 1.0},
-                    "dnf_risk": {"dnf_rate": 1.0},
-                }
-            }
-        }
-        # Should not raise
+        """Allow one-valued normalized driver metrics."""
+        data = _driver_payload()
+        data["drivers"]["VER"]["racecraft"] = {"skill_score": 1.0, "overtaking_skill": 1.0}
+        data["drivers"]["VER"]["pace"] = {"quali_pace": 1.0, "race_pace": 1.0}
+        data["drivers"]["VER"]["dnf_risk"] = {"dnf_rate": 1.0}
+
         validate_driver_characteristics(data)

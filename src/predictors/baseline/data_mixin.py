@@ -27,6 +27,7 @@ from src.utils.compound_performance import (
 from src.utils.schema_validation import (
     validate_driver_characteristics,
     validate_team_characteristics,
+    validate_track_characteristics,
 )
 from src.utils.team_mapping import map_team_to_characteristics
 
@@ -597,7 +598,7 @@ class BaselineDataMixin:
 
         # Validate team characteristics before using
         try:
-            validate_team_characteristics(data)
+            validate_team_characteristics(data, expected_year=target_year)
         except ValueError as e:
             logger.error(f"Failed to load team characteristics: {e}")
             raise
@@ -667,7 +668,7 @@ class BaselineDataMixin:
 
         # Validate driver characteristics before using
         try:
-            validate_driver_characteristics(driver_data)
+            validate_driver_characteristics(driver_data, expected_year=target_year)
         except ValueError as e:
             logger.error(f"Failed to load driver characteristics: {e}")
             raise
@@ -704,6 +705,13 @@ class BaselineDataMixin:
             except FileNotFoundError:
                 logger.warning("Track characteristics not found")
                 track_data = {}
+
+        if track_data:
+            try:
+                validate_track_characteristics(track_data, expected_year=target_year)
+            except ValueError as e:
+                logger.error(f"Failed to load track characteristics: {e}")
+                raise
 
         self.tracks = track_data.get("tracks", {})
         if self.tracks:

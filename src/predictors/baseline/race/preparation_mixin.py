@@ -221,7 +221,7 @@ class BaselineRacePreparationMixin:
             )
             with open(track_file) as f:
                 track_data = json.load(f)
-                validate_track_characteristics(track_data)
+                validate_track_characteristics(track_data, expected_year=season_year)
                 tracks = track_data["tracks"]
                 return tracks.get(race_name, {}).get("overtaking_difficulty", 0.5)
         except (FileNotFoundError, KeyError, json.JSONDecodeError, ValueError) as e:

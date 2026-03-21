@@ -30,6 +30,10 @@ class StubStore:
         self.saved.append((artifact_type, artifact_key, data))
 
 
+def _noop_schema_validator(_payload, **_kwargs) -> None:
+    """Bypass schema validation in tests that target other branches."""
+
+
 @pytest.fixture
 def sample_payloads() -> tuple[dict, dict, dict]:
     car = {
@@ -62,14 +66,18 @@ def sample_payloads() -> tuple[dict, dict, dict]:
         }
     }
     tracks = {
+        "year": 2026,
         "tracks": {
             "Bahrain Grand Prix": {
+                "pit_stop_loss": 22.0,
+                "safety_car_prob": 0.35,
+                "overtaking_difficulty": 0.60,
                 "straights_pct": 30,
                 "slow_corners_pct": 25,
                 "medium_corners_pct": 25,
                 "high_corners_pct": 20,
             }
-        }
+        },
     }
     return car, drivers, tracks
 
@@ -98,8 +106,9 @@ def _write_baseline_files(
         )
 
     if tracks is not None:
+        track_payload = {**tracks, "year": year} if isinstance(tracks, dict) else tracks
         (base_dir / "track_characteristics" / f"{year}_track_characteristics.json").write_text(
-            json.dumps(tracks)
+            json.dumps(track_payload)
         )
 
 
@@ -171,8 +180,8 @@ def test_load_data_falls_back_to_files(tmp_path, patcher, sample_payloads):
 
     predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
 
-    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
-    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", _noop_schema_validator)
     patcher.setattr(
         "src.utils.driver_validation.validate_driver_data",
         lambda drivers_payload: ["sample warning"],
@@ -200,8 +209,8 @@ def test_load_data_canonicalizes_sauber_key_to_audi(tmp_path, patcher, sample_pa
     _write_baseline_files(data_dir, car, drivers, tracks)
 
     predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
-    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
-    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", _noop_schema_validator)
     patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
 
     predictor.load_data()
@@ -231,8 +240,8 @@ def test_load_data_merges_sauber_and_audi_team_payloads(tmp_path, patcher, sampl
     _write_baseline_files(data_dir, car, drivers, tracks)
 
     predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
-    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
-    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", _noop_schema_validator)
     patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
 
     predictor.load_data()
@@ -251,8 +260,8 @@ def test_load_data_missing_track_file_sets_empty_tracks(tmp_path, patcher, sampl
     _write_baseline_files(data_dir, car, drivers, tracks=None)
 
     predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
-    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
-    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", _noop_schema_validator)
     patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
 
     predictor.load_data()
@@ -275,8 +284,8 @@ def test_load_data_uses_season_scoped_driver_fallback_file(tmp_path, patcher, sa
 
     predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
     predictor.season_year = 2027
-    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
-    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", _noop_schema_validator)
     patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
 
     predictor.load_data()
@@ -302,10 +311,25 @@ def test_load_data_raises_for_invalid_team_schema(tmp_path, patcher, sample_payl
     patcher.setattr(
         data_mixin_module,
         "validate_team_characteristics",
-        lambda payload: (_ for _ in ()).throw(ValueError("bad team payload")),
+        lambda payload, **kwargs: (_ for _ in ()).throw(ValueError("bad team payload")),
     )
 
     with pytest.raises(ValueError, match="bad team payload"):
+        predictor.load_data()
+
+
+def test_load_data_raises_for_invalid_track_schema(tmp_path, patcher, sample_payloads):
+    car, drivers, tracks = sample_payloads
+    bad_tracks = {"year": 2026, "tracks": {"Bahrain Grand Prix": {"pit_stop_loss": 22.0}}}
+    data_dir = tmp_path / "processed"
+    _write_baseline_files(data_dir, car, drivers, bad_tracks)
+
+    predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", _noop_schema_validator)
+    patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
+
+    with pytest.raises(ValueError, match="track_characteristics.json"):
         predictor.load_data()
 
 
@@ -365,8 +389,8 @@ def test_load_data_infers_current_season_form_from_saved_actuals(
         ],
     )
     predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
-    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
-    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", _noop_schema_validator)
     patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
 
     predictor.load_data()
@@ -667,8 +691,8 @@ def test_get_current_season_observations_prefers_full_saved_actual_history_over_
         ],
     )
     predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
-    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
-    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", _noop_schema_validator)
     patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
 
     predictor.load_data()
@@ -751,8 +775,8 @@ def test_get_current_season_observations_blends_saved_qualifying_and_race_actual
 
     predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
     predictor.config = _ConfigStub()
-    patcher.setattr(data_mixin_module, "validate_team_characteristics", lambda payload: None)
-    patcher.setattr(data_mixin_module, "validate_driver_characteristics", lambda payload: None)
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", _noop_schema_validator)
     patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
 
     predictor.load_data()
