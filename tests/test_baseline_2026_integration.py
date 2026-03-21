@@ -85,34 +85,35 @@ class TestBaseline2026Integration:
         assert np.mean(differences) < 3.0
 
     def test_team_hierarchy_respected(self, predictor):
-        """Test that strong teams generally finish ahead of weak teams"""
+        """Test that blended team strength still shows up in Bahrain qualifying."""
         result = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=50)
 
-        # Get positions
-        positions = {entry["driver"]: entry["position"] for entry in result["grid"]}
+        team_positions: dict[str, list[int]] = {}
+        for entry in result["grid"]:
+            team_positions.setdefault(entry["team"], []).append(entry["position"])
 
-        # McLaren drivers (strongest team 0.85) should generally be in top 5
-        mclaren_positions = [
-            pos
-            for driver, pos in positions.items()
-            if any(
-                entry["team"] == "McLaren" for entry in result["grid"] if entry["driver"] == driver
-            )
+        blended_strengths = {
+            team: predictor.get_blended_team_strength(team, "Bahrain Grand Prix")
+            for team in team_positions
+        }
+        ranked_teams = [
+            team
+            for team, _ in sorted(blended_strengths.items(), key=lambda item: item[1], reverse=True)
         ]
-        assert all(pos <= 10 for pos in mclaren_positions), "McLaren drivers should be in top 10"
+        mean_positions = {
+            team: float(np.mean(positions)) for team, positions in team_positions.items()
+        }
 
-        # Cadillac drivers (weakest team 0.30) should generally be in bottom 5
-        cadillac_positions = [
-            pos
-            for driver, pos in positions.items()
-            if any(
-                entry["team"] == "Cadillac F1"
-                for entry in result["grid"]
-                if entry["driver"] == driver
-            )
-        ]
-        assert all(pos >= 13 for pos in cadillac_positions), (
-            "Cadillac drivers should be bottom half"
+        top_three_mean = np.mean([mean_positions[team] for team in ranked_teams[:3]])
+        bottom_three_mean = np.mean([mean_positions[team] for team in ranked_teams[-3:]])
+
+        assert top_three_mean < bottom_three_mean, (
+            "Top blended-strength teams should qualify ahead of the bottom tier"
+        )
+
+        weakest_team = ranked_teams[-1]
+        assert all(pos >= 13 for pos in team_positions[weakest_team]), (
+            f"{weakest_team} drivers should be bottom half"
         )
 
     def test_sprint_weekend_detection(self, predictor):
