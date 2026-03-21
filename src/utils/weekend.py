@@ -1,21 +1,4 @@
-"""
-Weekend Type Utilities
-
-Uses FastF1 EventFormat and avoids hardcoded sprint lists.
-Falls back to local track characteristics data if FastF1 schedule is unavailable.
-
-EventFormat values:
-- 'sprint', 'sprint_qualifying', 'sprint_shootout' → sprint weekend
-- 'conventional' → normal weekend
-
-Usage:
-    from src.utils.weekend import get_weekend_type, is_sprint_weekend
-
-    weekend_type = get_weekend_type(2025, 'Chinese Grand Prix')  # 'sprint' or 'conventional'
-
-    if is_sprint_weekend(2025, race_name):
-        session = 'Sprint Qualifying'
-"""
+"""Resolve sprint vs conventional weekends from FastF1 with a local fallback."""
 
 import json
 import logging
@@ -86,12 +69,7 @@ def _merge_schedule_rows(
 
 @lru_cache(maxsize=8)
 def _get_schedule_rows(year: int) -> tuple[tuple[str, str], ...]:
-    """
-    Load `(EventName, EventFormat)` rows from FastF1 and local fallback data.
-
-    FastF1 remains the primary source. Local track characteristics only fill in
-    races that are missing from the current FastF1 schedule snapshot.
-    """
+    """Load schedule rows from FastF1 and fill missing races from local data."""
     rows: list[tuple[str, str]] = []
 
     try:
@@ -120,7 +98,7 @@ def _get_schedule_rows(year: int) -> tuple[tuple[str, str], ...]:
 
 
 def refresh_schedule_cache() -> None:
-    """Clear cached schedule rows so next lookup fetches fresh FastF1 metadata."""
+    """Clear cached schedule rows so the next lookup refetches them."""
     _get_schedule_rows.cache_clear()
     _load_fallback_schedule_rows.cache_clear()
 
@@ -131,7 +109,7 @@ def get_schedule_rows(year: int) -> tuple[tuple[str, str], ...]:
 
 
 def _find_event_format(year: int, race_name: str) -> str | None:
-    """Return EventFormat string for race_name, or None if not found."""
+    """Look up one race's EventFormat, or ``None`` if it is missing."""
     race_name_lower = race_name.lower()
     for event_name, event_format in _get_schedule_rows(year):
         if event_name == race_name or event_name.lower() == race_name_lower:
@@ -140,10 +118,9 @@ def _find_event_format(year: int, race_name: str) -> str | None:
 
 
 def get_weekend_type(year: int, race_name: str) -> Literal["sprint", "conventional"]:
-    """Get weekend type from FastF1 EventFormat. Raises ValueError if race not found."""
+    """Resolve whether a race weekend is sprint or conventional."""
     event_format = _find_event_format(year, race_name)
     if event_format is None:
-        # Retry once with a fresh schedule snapshot to avoid stale in-process cache.
         refresh_schedule_cache()
         event_format = _find_event_format(year, race_name)
 
@@ -153,12 +130,7 @@ def get_weekend_type(year: int, race_name: str) -> Literal["sprint", "convention
             f"Race '{race_name}' not found in {year} schedule. Available races: {available_races}"
         )
 
-    # Check if sprint weekend
-    # Possible sprint formats: 'sprint', 'sprint_qualifying', 'sprint_shootout'
-    if "sprint" in event_format:
-        return "sprint"
-    else:
-        return "conventional"
+    return "sprint" if "sprint" in event_format else "conventional"
 
 
 def is_sprint_weekend(year: int, race_name: str) -> bool:
@@ -167,7 +139,7 @@ def is_sprint_weekend(year: int, race_name: str) -> bool:
 
 
 def get_event_format(year: int, race_name: str) -> str:
-    """Get exact EventFormat string from FastF1 schedule."""
+    """Return the raw EventFormat string for one race."""
     event_format = _find_event_format(year, race_name)
     if event_format is None:
         raise ValueError(f"Race '{race_name}' not found in {year} schedule")
@@ -176,7 +148,7 @@ def get_event_format(year: int, race_name: str) -> str:
 
 
 def get_all_sprint_races(year: int) -> list[str]:
-    """Get all sprint race names for a season from FastF1 schedule."""
+    """Return all sprint weekends in the season."""
     return [
         event_name
         for event_name, event_format in _get_schedule_rows(year)
@@ -185,7 +157,7 @@ def get_all_sprint_races(year: int) -> list[str]:
 
 
 def get_all_conventional_races(year: int) -> list[str]:
-    """Get all conventional (non-sprint) race names for a season."""
+    """Return all non-sprint weekends in the season."""
     return [
         event_name
         for event_name, event_format in _get_schedule_rows(year)
@@ -194,7 +166,7 @@ def get_all_conventional_races(year: int) -> list[str]:
 
 
 def get_best_qualifying_session(year: int, race_name: str) -> str:
-    """Get best session for qualifying (Sprint Qualifying for sprint weekends, FP3 otherwise)."""
+    """Return the session that best proxies qualifying pace for a race."""
     weekend_type = get_weekend_type(year, race_name)
 
     if weekend_type == "sprint":

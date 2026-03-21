@@ -1,4 +1,4 @@
-"""Dashboard prediction orchestration."""
+"""Weekend prediction builder used by warmup and automation jobs."""
 
 import logging
 import time
@@ -397,7 +397,9 @@ def run_prediction(
     """
     Run full weekend cascade prediction.
 
-    Used by warmup and automation to build persisted prediction artifacts.
+    Warmup and automation use this to build persisted prediction artifacts.
+    The interactive dashboard request path loads those stored outputs instead
+    of calling this function on a user click.
     """
     valid_weather = ["dry", "rain", "mixed"]
     if weather not in valid_weather:

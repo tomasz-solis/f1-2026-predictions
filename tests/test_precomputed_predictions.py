@@ -44,6 +44,45 @@ def test_save_and_load_precompute_horizon_index_file_roundtrip(patcher, tmp_path
     }
 
 
+def test_load_precompute_horizon_index_db_only_does_not_merge_file_fallback(patcher):
+    """DB-first horizon reads should not touch stale local file state in db_only mode."""
+    patcher.setattr(store, "should_read_db_first", lambda: True)
+    patcher.setattr(store, "should_write_to_db", lambda: True)
+    patcher.setattr(store, "should_write_to_file", lambda: False)
+    patcher.setattr(
+        store,
+        "RuntimeStateStore",
+        lambda: type(
+            "_DbStore",
+            (),
+            {
+                "get_record": staticmethod(
+                    lambda namespace, state_key: {
+                        "year": 2026,
+                        "artifact_hash": "artifact_hash",
+                        "boundary_signature": "sig_db",
+                        "anchor_race_name": "Bahrain Grand Prix",
+                        "anchor_session_name": "FP2",
+                        "expected_targets": ["Bahrain Grand Prix"],
+                        "ready_races": ["Bahrain Grand Prix"],
+                    }
+                )
+            },
+        )(),
+    )
+    patcher.setattr(
+        store,
+        "_load_horizon_index_state",
+        lambda: (_ for _ in ()).throw(AssertionError("file fallback should not be read")),
+    )
+
+    loaded = store.load_precompute_horizon_index(year=2026, artifact_hash="artifact_hash")
+
+    assert loaded is not None
+    assert loaded["boundary_signature"] == "sig_db"
+    assert loaded["anchor_session_name"] == "FP2"
+
+
 def test_load_precomputed_prediction_preserves_boundary_context(patcher, tmp_path):
     """Loaded cached predictions should expose the boundary session that produced them."""
     precompute_path = tmp_path / "precomputed_predictions.json"
@@ -162,6 +201,44 @@ def test_save_precomputed_prediction_raises_in_db_only_when_db_write_fails(patch
             boundary_signature="sig_a",
             is_sprint=False,
             prediction_results={"qualifying": {"grid": []}, "race": {"finish_order": []}},
+        )
+        raise AssertionError("Expected RuntimeError in db_only mode.")
+    except RuntimeError as exc:
+        assert "db_only mode" in str(exc)
+
+
+def test_save_precompute_horizon_index_raises_in_db_only_when_db_write_fails(patcher):
+    """DB-only horizon writes should raise so operators can detect silent warmup failure."""
+    patcher.setattr(store, "should_read_db_first", lambda: True)
+    patcher.setattr(store, "should_write_to_db", lambda: True)
+    patcher.setattr(store, "should_write_to_file", lambda: False)
+    patcher.setattr(
+        store,
+        "RuntimeStateStore",
+        lambda: type(
+            "_BrokenStore",
+            (),
+            {
+                "upsert_record": staticmethod(
+                    lambda namespace, state_key, payload: (_ for _ in ()).throw(
+                        RuntimeError("db unavailable")
+                    )
+                )
+            },
+        )(),
+    )
+
+    try:
+        store.save_precompute_horizon_index(
+            year=2026,
+            artifact_hash="artifact_hash",
+            boundary_signature="sig_a",
+            anchor_race_name="Bahrain Grand Prix",
+            anchor_session_name="FP1",
+            expected_targets=["Bahrain Grand Prix"],
+            ready_races=["Bahrain Grand Prix"],
+            weather_scenarios=["dry"],
+            race_boundaries={"Bahrain Grand Prix": "sig_a"},
         )
         raise AssertionError("Expected RuntimeError in db_only mode.")
     except RuntimeError as exc:

@@ -142,6 +142,31 @@ def test_execute_live_prediction_pipeline_raises_when_persisted_prediction_is_mi
         live_prediction_flow.execute_live_prediction_pipeline_core(**_base_core_kwargs())
 
 
+def test_execute_live_prediction_pipeline_fails_closed_when_weekend_lookup_breaks(patcher):
+    """Request-path weekend lookup failures should surface as dashboard-specific errors."""
+    _stub_single_target(patcher)
+
+    patcher.setattr(
+        live_prediction_flow,
+        "load_precomputed_prediction",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("persisted lookup should not run when weekend lookup fails")
+        ),
+    )
+
+    with pytest.raises(
+        live_prediction_flow.PrecomputedPredictionUnavailableError,
+        match="Could not resolve weekend format for Bahrain Grand Prix 2026",
+    ):
+        live_prediction_flow.execute_live_prediction_pipeline_core(
+            **_base_core_kwargs(
+                is_sprint_weekend_fn=lambda year, race_name: (_ for _ in ()).throw(
+                    ValueError("missing schedule row")
+                )
+            )
+        )
+
+
 def test_execute_live_prediction_pipeline_uses_warmed_boundary_fallback_when_current_boundary_ahead(
     patcher,
 ):
@@ -207,6 +232,54 @@ def test_execute_live_prediction_pipeline_uses_warmed_boundary_fallback_when_cur
         "Current checkpoint is ahead of the warmed horizon; serving the latest persisted checkpoint until warmup catches up..."
         in progress_messages
     )
+
+
+def test_execute_live_prediction_pipeline_raises_when_boundary_ahead_but_no_warmed_fallback_exists(
+    patcher,
+):
+    """A newer checkpoint without a warmed fallback should stay fail-closed and actionable."""
+    _stub_single_target(patcher)
+    load_calls: list[str] = []
+
+    patcher.setattr(
+        live_prediction_flow,
+        "load_precomputed_prediction",
+        lambda **kwargs: (load_calls.append(str(kwargs.get("boundary_signature", ""))), None)[1],
+    )
+    patcher.setattr(
+        live_prediction_flow,
+        "load_precompute_horizon_index",
+        lambda **kwargs: {
+            "ready_races": ["Chinese Grand Prix"],
+            "expected_targets": ["Chinese Grand Prix"],
+            "anchor_race_name": "Chinese Grand Prix",
+            "anchor_session_name": "FP1",
+            "boundary_signature": "sig_fp1",
+            "race_boundaries": {"Chinese Grand Prix": "sig_fp1"},
+        },
+    )
+
+    with pytest.raises(
+        live_prediction_flow.PrecomputedPredictionUnavailableError,
+        match=r"Chinese Grand Prix 2026 \[dry\] at checkpoint SQ",
+    ):
+        live_prediction_flow.execute_live_prediction_pipeline_core(
+            **_base_core_kwargs(
+                race_name="Chinese Grand Prix",
+                is_sprint_weekend_fn=lambda year, race_name: True,
+                detect_event_boundary_refresh_if_needed_fn=(
+                    lambda year, race_name, is_sprint, session_detector=None: {
+                        "refresh_needed": True,
+                        "reason": "session_boundary_delta",
+                        "new_sessions": ["SQ"],
+                        "boundary_signature": "sig_sq",
+                        "latest_elapsed_session": "SQ",
+                    }
+                ),
+            )
+        )
+
+    assert load_calls == ["sig_sq", "sig_fp1"]
 
 
 def test_execute_live_prediction_pipeline_resolves_boundary_when_refresh_payload_omits_it(
@@ -336,6 +409,30 @@ def test_execute_live_prediction_pipeline_refreshes_same_boundary_when_persisted
     assert first["prediction_cache_hit"] is False
     assert second["prediction_cache_hit"] is False
     assert load_calls == ["stable_sig", "stable_sig"]
+
+
+def test_execute_live_prediction_pipeline_ignores_stale_horizon_summary_metadata(patcher):
+    """Ready-race summaries should be ignored when saved horizon metadata is stale."""
+    _stub_single_target(patcher)
+    patcher.setattr(
+        live_prediction_flow,
+        "load_precomputed_prediction",
+        lambda **kwargs: {"qualifying": {"grid": []}, "race": {"finish_order": []}},
+    )
+    patcher.setattr(
+        live_prediction_flow,
+        "load_precompute_horizon_index",
+        lambda **kwargs: {
+            "boundary_signature": "stale_sig",
+            "anchor_race_name": "Bahrain Grand Prix",
+            "expected_targets": ["Bahrain Grand Prix"],
+            "ready_races": ["Bahrain Grand Prix"],
+        },
+    )
+
+    output = live_prediction_flow.execute_live_prediction_pipeline_core(**_base_core_kwargs())
+
+    assert output["precompute_summary"]["ready_races"] == []
 
 
 def test_execute_live_prediction_pipeline_skips_request_path_mutations(patcher):

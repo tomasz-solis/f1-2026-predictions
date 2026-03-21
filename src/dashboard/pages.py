@@ -1,4 +1,4 @@
-"""Dashboard pages and page-level orchestration."""
+"""Page-level dashboard helpers and route handlers."""
 
 import logging
 import unicodedata
@@ -101,7 +101,7 @@ _team_brand_color = _team_comparison._team_brand_color
 
 
 def _available_seasons() -> list[int]:
-    """Return season choices shown in the dashboard UI."""
+    """Return the season list shown in the dashboard selector."""
     current_year = datetime.now(UTC).year
     latest = max(DEFAULT_SEASON, current_year)
     earliest = min(DEFAULT_SEASON, _MIN_SELECTABLE_SEASON)
@@ -109,7 +109,7 @@ def _available_seasons() -> list[int]:
 
 
 def _get_selected_season(default: int = DEFAULT_SEASON) -> int:
-    """Read selected season from Streamlit session state with safe fallback."""
+    """Read the selected season from session state."""
     try:
         raw_value = st.session_state.get("selected_season", default)
     except Exception:
@@ -121,7 +121,7 @@ def _get_selected_season(default: int = DEFAULT_SEASON) -> int:
 
 
 def _set_selected_season(year: int) -> None:
-    """Persist selected season in Streamlit session state when available."""
+    """Store the selected season in session state when possible."""
     try:
         st.session_state["selected_season"] = int(year)
     except Exception:
@@ -129,7 +129,7 @@ def _set_selected_season(year: int) -> None:
 
 
 def render_team_comparison_page() -> None:
-    """Render standalone team comparison tab."""
+    """Render the team-comparison page."""
     st.header("Team Comparison")
     st.markdown(
         "Compare team characteristic fingerprints from synced session inputs. "
@@ -139,12 +139,7 @@ def render_team_comparison_page() -> None:
 
 
 def _clear_fastf1_race_cache(year: int, race_name: str) -> None:
-    """
-    Clear FastF1 cache for a specific race to force fresh data fetch.
-
-    This invalidates all cached session data for the race, including practice sessions,
-    qualifying, and race results. The next FastF1 call will fetch fresh data from the API.
-    """
+    """Remove cached FastF1 files for one race weekend."""
     import shutil
 
     for cache_dir in _FASTF1_CACHE_DIRS:
@@ -188,12 +183,7 @@ def _normalize_cache_fragment(value: str) -> str:
 
 
 def _cache_dir_matches_race(cache_dir_name: str, race_name: str) -> bool:
-    """
-    Return True when a FastF1 event cache directory corresponds to race_name.
-
-    FastF1 event directories are often date-prefixed (for example
-    `2025-04-13_Bahrain_Grand_Prix`), so exact-path matching is insufficient.
-    """
+    """Return ``True`` when a FastF1 cache directory belongs to the race."""
     normalized_dir = _normalize_cache_fragment(cache_dir_name)
     normalized_race = _normalize_cache_fragment(race_name)
     if not normalized_dir or not normalized_race:
@@ -212,7 +202,7 @@ def _cache_dir_matches_race(cache_dir_name: str, race_name: str) -> bool:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def _load_race_options_cached(year: int) -> tuple[list[str], str | None]:
-    """Load race options and cache schedule fetches for responsiveness."""
+    """Load race options with a cached schedule lookup."""
 
     def _options_from_schedule_rows(rows: list[tuple[str, str]]) -> list[str]:
         options: list[str] = []
@@ -291,13 +281,7 @@ def _parse_refresh_timestamp(value: Any) -> datetime | None:
 
 
 def _latest_dashboard_refresh_timestamp(year: int) -> datetime | None:
-    """
-    Return the newest dashboard data-refresh timestamp for a season.
-
-    The dashboard can run in DB-backed or local-file modes, so this resolver
-    combines persisted artifact timestamps, horizon-index timestamps, and local
-    file mtimes for the dashboard inputs that actually drive predictions.
-    """
+    """Return the newest refresh stamp that affects dashboard predictions."""
     timestamps: list[datetime] = []
     artifact_hash = ""
 
@@ -453,11 +437,7 @@ def _resolve_dashboard_race_horizon(year: int, horizon_races: int) -> list[str]:
 
 @st.cache_data(show_spinner=False, ttl=120)
 def _current_anchor_boundary_signature(year: int, anchor_race_name: str) -> str | None:
-    """
-    Resolve current boundary signature for horizon anchor race.
-
-    Returns ``None`` when boundary state cannot be validated.
-    """
+    """Return the live boundary signature for the anchor race, if available."""
     try:
         is_sprint = bool(is_sprint_weekend(year, anchor_race_name))
     except Exception as exc:
@@ -499,12 +479,7 @@ def _selected_race_persisted_prediction_available(
     race_name: str,
     weather: str,
 ) -> bool:
-    """Return whether the selected race already has a persisted prediction at the live boundary.
-
-    The prediction page should only hard-block when the selected race itself cannot
-    be served. Full warmed-horizon metadata can lag behind without preventing the
-    current race from loading when an exact persisted prediction already exists.
-    """
+    """Return whether this race already has a served prediction at the live boundary."""
     try:
         artifact_versions = get_artifact_versions(year=year)
         artifact_hash = compute_artifact_hash(artifact_versions)
@@ -583,14 +558,7 @@ def _maybe_scope_race_options_to_planned_horizon(
     planned_races: list[str],
     requested_horizon: int,
 ) -> tuple[list[str], bool]:
-    """
-    Narrow broad calendar dropdowns to the live planned horizon.
-
-    The live page normally passes the full season calendar into this filter, but
-    tests and internal callers can also provide a curated subset. Those smaller
-    lists should stay intact so persisted ready-race metadata remains the source
-    of truth instead of being pre-trimmed by schedule-based fallback logic.
-    """
+    """Trim a full-season dropdown to the live planned horizon when needed."""
     if not race_options:
         return [], False
 
@@ -615,13 +583,7 @@ def _filter_race_options_to_precomputed_horizon(
     year: int,
     race_options: list[str],
 ) -> tuple[list[str], dict[str, Any]]:
-    """
-    Filter race dropdown options to precomputed races for the active artifact state.
-
-    Returns:
-        Tuple of ``(filtered_options, metadata)`` where metadata includes whether
-        filtering was applied and contextual details for user-facing captions.
-    """
+    """Filter race options to the warmed horizon for the active artifact state."""
     if not race_options:
         return race_options, {"applied": False}
 
@@ -1012,15 +974,16 @@ def execute_live_prediction_pipeline(
     progress_callback: Callable[[str], None] | None = None,
 ) -> dict:
     """
-    Load the persisted prediction selected in the dashboard.
+    Load the warmed persisted prediction selected in the dashboard.
 
-    Kept separate from Streamlit rendering so tests can assert request-path behavior.
+    Kept separate from Streamlit rendering so tests can assert request-path
+    behavior without implying that a user click regenerates artifacts.
 
     Args:
         race_name: The name of the race
         weather: Weather forecast for the race
         year: Season year
-        force_refresh: Compatibility flag. Manual dashboard refresh is intentionally disabled.
+        force_refresh: Legacy compatibility flag. Manual request-path refresh is disabled.
         progress_callback: Optional callback for progress updates
     """
     return _execute_live_prediction_pipeline_core(
@@ -1070,6 +1033,16 @@ def _prediction_failure_hint(error: Exception) -> str | None:
             " (prefer a background job or local shell on Render; web-shell runs can hit memory limits)."
         )
 
+    if (
+        isinstance(error, PrecomputedPredictionUnavailableError)
+        and "could not resolve weekend format" in normalized_message
+    ):
+        return (
+            "The schedule lookup for that race failed, so the dashboard refused to guess "
+            "whether it is a sprint or conventional weekend. Verify the race name/year "
+            "and refresh the schedule data before retrying."
+        )
+
     if isinstance(error, PrecomputedPredictionUnavailableError):
         return (
             "The dashboard is currently in persisted-prediction mode, so it will not simulate on demand. "
@@ -1086,8 +1059,8 @@ def render_live_prediction_page(enable_logging: bool) -> None:
     render_prediction_hero_deck(
         title="Race Weekend Prediction",
         summary=(
-            "Qualifying and race forecasts from the latest warmed checkpoint. "
-            "Session context and data freshness stay visible without crowding the page."
+            "Qualifying and race forecasts served from warmed checkpoint artifacts. "
+            "Session context and freshness cues stay visible without implying live recompute on click."
         ),
         eyebrow="Weekend forecast",
         cards=[
@@ -1100,7 +1073,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
             {
                 "label": "Updated",
                 "value": _dashboard_refresh_label(selected_season),
-                "meta": "Latest persisted data refresh stamp.",
+                "meta": "Latest warmed dashboard refresh stamp.",
                 "tone": "neutral",
             },
             {
@@ -1112,7 +1085,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
             {
                 "label": "Serving",
                 "value": "Persisted",
-                "meta": "Warmup and cron refresh predictions outside the request path.",
+                "meta": "Warmup and automation refresh predictions outside the request path.",
                 "tone": "neutral",
             },
         ],

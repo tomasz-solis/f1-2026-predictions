@@ -37,9 +37,12 @@ Behavior can be tuned in `config/default.yaml` under:
 
 - `baseline_predictor.practice_capture.*`
 
-## Automatic Session Data Retrieval
+## Session Data During Artifact Generation
 
-Qualifying prediction also auto-fetches the best available session data through `src/utils/fp_blending.py`.
+When warmup or session automation generates prediction artifacts, qualifying
+still uses the best available session data through `src/utils/fp_blending.py`.
+That blending happens while persisted artifacts are built, not as extra work in
+the Streamlit request path.
 
 - Normal: short-stint blend of `FP3 + FP2 + FP1` (FP3-weighted)
 - Sprint (main qualifying): short-stint blend of `Sprint Qualifying + FP1 + Sprint`

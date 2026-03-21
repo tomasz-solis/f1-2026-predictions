@@ -115,6 +115,9 @@ When you click **Predict**, the app:
 - falls back to the last warmed checkpoint if the live boundary is ahead,
 - does not refresh artifacts or rerun simulations in the request path.
 
+Session-data blending and any FastF1-dependent artifact updates happen during
+warmup or session automation, not inside the click path itself.
+
 ### 1b. Optional background automation (no click required)
 
 Run periodic automation to refresh right after session completion:

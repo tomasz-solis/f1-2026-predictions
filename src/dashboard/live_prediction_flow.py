@@ -1,4 +1,4 @@
-"""Core flow helpers for live prediction dashboard page."""
+"""Serve warmed dashboard predictions and checkpoint-save metadata."""
 
 from __future__ import annotations
 
@@ -41,11 +41,11 @@ ArtifactVersions = dict[str, ArtifactVersion]
 
 
 class PrecomputedPredictionUnavailableError(RuntimeError):
-    """Raised when the dashboard is configured to load persisted predictions only."""
+    """Raised when the dashboard cannot serve a request from warmed artifacts."""
 
 
 class PredictionRunFn(Protocol):
-    """Type contract for prediction orchestration callback."""
+    """Build a full weekend prediction payload."""
 
     def __call__(
         self,
@@ -59,13 +59,13 @@ class PredictionRunFn(Protocol):
 
 
 class AutoUpdateIfNeededFn(Protocol):
-    """Type contract for race-update callback."""
+    """Run a race-update check."""
 
     def __call__(self, *, year: int, force_recheck: bool = False) -> None: ...
 
 
 class DetectEventBoundaryRefreshFn(Protocol):
-    """Type contract for event-boundary refresh callback."""
+    """Return current event-boundary state for one race."""
 
     def __call__(
         self,
@@ -78,7 +78,7 @@ class DetectEventBoundaryRefreshFn(Protocol):
 
 
 class AutoUpdatePracticeIfNeededFn(Protocol):
-    """Type contract for practice-update callback."""
+    """Run a practice-update check."""
 
     def __call__(
         self,
@@ -92,7 +92,7 @@ class AutoUpdatePracticeIfNeededFn(Protocol):
 
 
 class GetArtifactVersionsFn(Protocol):
-    """Type contract for artifact-version callback."""
+    """Return the current artifact-version map."""
 
     def __call__(self, *, year: int) -> ArtifactVersions: ...
 
@@ -116,7 +116,7 @@ _TARGET_SECTION_BINDINGS = {
 
 
 def clear_prediction_result_cache() -> None:
-    """Clear in-memory prediction cache in a thread-safe manner."""
+    """Clear the in-memory LRU of served predictions."""
     with _prediction_result_cache_lock:
         _prediction_result_cache.clear()
 
@@ -130,7 +130,7 @@ def _prediction_cache_key(
     artifact_versions: ArtifactVersions,
     boundary_signature: str,
 ) -> str:
-    """Build stable cache key for prediction output reuse."""
+    """Build the RAM-cache key for one served prediction."""
     payload = {
         "year": year,
         "race_name": race_name,
@@ -145,7 +145,7 @@ def _prediction_cache_key(
 
 
 def _get_cached_prediction(cache_key: str) -> PredictionResults | None:
-    """Fetch cached prediction and mark key as recently used."""
+    """Return a cached prediction and refresh its LRU position."""
     with _prediction_result_cache_lock:
         cached = _prediction_result_cache.get(cache_key)
         if cached is None:
@@ -155,7 +155,7 @@ def _get_cached_prediction(cache_key: str) -> PredictionResults | None:
 
 
 def _store_cached_prediction(cache_key: str, prediction_results: PredictionResults) -> None:
-    """Store prediction output in bounded LRU cache."""
+    """Store a prediction in the bounded in-memory cache."""
     with _prediction_result_cache_lock:
         _prediction_result_cache[cache_key] = prediction_results
         _prediction_result_cache.move_to_end(cache_key)
@@ -164,7 +164,7 @@ def _store_cached_prediction(cache_key: str, prediction_results: PredictionResul
 
 
 def _prediction_persisted_updated_at(prediction_results: PredictionResults) -> str:
-    """Return the persisted timestamp embedded in prediction context when available."""
+    """Read the persisted write timestamp from prediction context."""
     prediction_context = prediction_results.get("_prediction_context")
     if not isinstance(prediction_context, dict):
         return ""
@@ -176,13 +176,7 @@ def _cached_prediction_matches_persisted(
     cached_prediction: PredictionResults,
     persisted_prediction: PredictionResults,
 ) -> bool:
-    """
-    Return True when the in-memory prediction matches the latest persisted payload.
-
-    We only trust the RAM entry when both payloads expose the persisted write
-    timestamp and those timestamps match. If the timestamp is missing, fall back
-    to reloading from storage so same-boundary rewrites do not stay stale.
-    """
+    """Return ``True`` when the cached payload matches the latest stored write."""
     cached_updated_at = _prediction_persisted_updated_at(cached_prediction)
     persisted_updated_at = _prediction_persisted_updated_at(persisted_prediction)
     if not cached_updated_at or not persisted_updated_at:
@@ -203,7 +197,7 @@ def save_prediction_if_enabled_core(
     st_module: Any,
     checkpoint_session_override: str | None = None,
 ) -> None:
-    """Persist prediction artifacts for later accuracy tracking."""
+    """Save the shown prediction for later accuracy tracking."""
     if not enable_logging:
         return
 
@@ -216,8 +210,7 @@ def save_prediction_if_enabled_core(
         ).strip()
     checkpoint_override = str(checkpoint_session_override or "").strip().upper()
     if prediction_boundary_session:
-        # Trust the boundary that produced the shown prediction over an external
-        # checkpoint label, which may be stale when persisted predictions are reused.
+        # Prefer the boundary that produced the shown payload; overrides can lag.
         checkpoint_session = _resolve_prediction_checkpoint_session(prediction_boundary_session)
     elif checkpoint_override:
         checkpoint_session = _resolve_prediction_checkpoint_session(checkpoint_override)
@@ -313,12 +306,7 @@ def prediction_payload_for_session(
     is_sprint: bool,
     session_name: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
-    """
-    Select qualifying/race payload pair to persist for a given completed session.
-
-    For sprint weekends, sessions up to and including ``Sprint`` map to the sprint
-    cascade payload, while later sessions map to the main qualifying/race payload.
-    """
+    """Pick the qualifying/race payload pair that belongs to one checkpoint."""
     if not is_sprint:
         return (
             prediction_results["qualifying"]["grid"],
@@ -348,7 +336,7 @@ def _prediction_sections_for_session(
     is_sprint: bool,
     session_name: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Return qualifying/race section dicts corresponding to a checkpoint session."""
+    """Pick the qualifying and race sections for one checkpoint."""
     if not is_sprint:
         return (
             prediction_results.get("qualifying", {}),
@@ -380,7 +368,7 @@ def prediction_targets_for_checkpoint(
     is_sprint: bool,
     session_name: str,
 ) -> dict[str, dict[str, Any]]:
-    """Extract every forecastable target payload for a checkpoint save."""
+    """Collect still-forecastable targets for one checkpoint save."""
     checkpoint_session = _resolve_prediction_checkpoint_session(session_name)
     target_predictions: dict[str, dict[str, Any]] = {}
     section_bindings = _TARGET_SECTION_BINDINGS[bool(is_sprint)]
@@ -410,7 +398,7 @@ def prediction_targets_for_checkpoint(
 
 
 def _mean_confidence(entries: Any) -> float | None:
-    """Compute mean confidence across prediction rows when values are present."""
+    """Return mean row confidence when entries expose it."""
     return mean_confidence_from_rows(entries)
 
 
@@ -425,7 +413,7 @@ def _persist_prediction_checkpoint_summary(
     is_sprint: bool,
     target_predictions: dict[str, dict[str, Any]],
 ) -> None:
-    """Persist compact checkpoint metadata for session-by-session trend analysis."""
+    """Persist a small checkpoint summary for trend views."""
     artifact_store = getattr(logger_instance, "artifact_store", None)
     if artifact_store is None or not hasattr(artifact_store, "save_artifact"):
         return
@@ -505,10 +493,10 @@ def render_prediction_results_core(
     prediction_cache_hit: bool = False,
     pipeline_timing: Mapping[str, Any] | None = None,
 ) -> None:
-    """Render prediction result sections for sprint and non-sprint weekends."""
+    """Render saved prediction sections for the active weekend format."""
 
     def _section_title(section: Mapping[str, Any], default_title: str) -> str:
-        """Rename completed-session sections from Prediction to Result."""
+        """Swap Prediction for Result once a section becomes actual."""
         result_mode = str(section.get("result_mode", "")).strip().upper()
         if result_mode == "ACTUAL":
             return default_title.replace("Prediction", "Result")
@@ -585,7 +573,7 @@ def render_prediction_results_core(
 
 
 def _get_prediction_precompute_settings() -> dict[str, Any]:
-    """Return normalized settings that control boundary-triggered precompute."""
+    """Normalize dashboard precompute settings with safe fallbacks."""
     defaults: dict[str, Any] = {
         "enabled": True,
         "horizon_races": 3,
@@ -692,13 +680,7 @@ def _resolve_race_boundary_context(
     is_sprint: bool,
     session_detector: Any | None = None,
 ) -> tuple[str, str]:
-    """
-    Resolve race-specific boundary signature and checkpoint label.
-
-    Returns:
-        Tuple ``(boundary_signature, checkpoint_label)`` where checkpoint label
-        is latest elapsed session or ``PRE``.
-    """
+    """Return the current boundary signature and checkpoint label for one race."""
     snapshot = _build_event_boundary_snapshot(
         year=year,
         race_name=race_name,
@@ -839,9 +821,10 @@ def execute_live_prediction_pipeline_core(
     run_prediction_fn: PredictionRunFn,
 ) -> dict[str, Any]:
     """
-    Load a persisted prediction for the selected race and weather.
+    Load a warmed persisted prediction for the selected race and weather.
 
-    Kept separate from Streamlit rendering so tests can assert persisted-loading behavior.
+    This request path does not run warmup work or simulate inline. It only
+    resolves boundary state and loads an already-persisted payload.
 
     """
     pipeline_timing: dict[str, float] = {}
@@ -885,7 +868,14 @@ def execute_live_prediction_pipeline_core(
 
     weekend_start = time.time()
     _notify("Resolving weekend format...")
-    is_sprint = is_sprint_weekend_fn(year, race_name)
+    try:
+        is_sprint = is_sprint_weekend_fn(year, race_name)
+    except Exception as exc:
+        pipeline_timing["weekend_lookup"] = time.time() - weekend_start
+        raise PrecomputedPredictionUnavailableError(
+            f"Could not resolve weekend format for {race_name} {year} because schedule "
+            f"lookup failed: {exc}. The dashboard refuses to guess sprint vs conventional."
+        ) from exc
     pipeline_timing["weekend_lookup"] = time.time() - weekend_start
     from src.utils.session_detector import SessionDetector
 

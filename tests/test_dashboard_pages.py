@@ -489,6 +489,20 @@ def test_prediction_failure_hint_uses_precompute_guidance_when_db_prediction_mis
     assert "--require-db" in hint
 
 
+def test_prediction_failure_hint_uses_schedule_guidance_for_weekend_lookup_failures():
+    """Schedule lookup failures should not point users at warmup as the primary fix."""
+    hint = pages._prediction_failure_hint(
+        PrecomputedPredictionUnavailableError(
+            "Could not resolve weekend format for Mystery Grand Prix 2026 because schedule "
+            "lookup failed: missing schedule row. The dashboard refuses to guess sprint vs conventional."
+        )
+    )
+
+    assert hint is not None
+    assert "refused to guess" in hint
+    assert "warmup_precompute.py" not in hint
+
+
 def test_dashboard_refresh_label_prefers_newest_runtime_timestamp(patcher):
     patcher.setattr(
         pages,
