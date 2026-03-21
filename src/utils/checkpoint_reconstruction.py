@@ -21,7 +21,12 @@ from src.utils.accuracy_targets import (
     target_deadline_session,
     weekend_format_name,
 )
-from src.utils.car_snapshot_history import SNAPSHOT_ARTIFACT_TYPE, snapshot_artifact_key
+from src.utils.car_snapshot_history import (
+    SNAPSHOT_ARTIFACT_TYPE,
+    snapshot_artifact_key,
+    snapshot_sort_timestamp,
+    sort_snapshot_payloads,
+)
 from src.utils.prediction_logger import ActualResultRows, PredictionLogger
 from src.utils.prediction_metrics import PredictionMetrics
 from src.utils.race_input_confidence import cap_predicted_main_race_input_confidence
@@ -132,13 +137,73 @@ def load_checkpoint_snapshot_payload(
     checkpoint_session: str,
 ) -> dict[str, Any]:
     """Load one stored car-characteristics snapshot for a race checkpoint."""
-    artifact_key = snapshot_artifact_key(year, race_name, checkpoint_session)
+    checkpoint_session_upper = str(checkpoint_session).strip().upper()
+    artifact_key = snapshot_artifact_key(year, race_name, checkpoint_session_upper)
     payload = store.load_artifact(SNAPSHOT_ARTIFACT_TYPE, artifact_key)
-    if not isinstance(payload, dict):
-        raise FileNotFoundError(
-            f"Missing car-characteristics snapshot for {race_name} {year} {checkpoint_session}"
+    if isinstance(payload, dict):
+        return payload
+
+    if checkpoint_session_upper == "PRE":
+        fallback_payload = _load_latest_snapshot_before_pre_checkpoint(
+            store=store,
+            year=year,
+            race_name=race_name,
+            is_sprint=is_sprint_weekend(year, race_name),
         )
-    return payload
+        if isinstance(fallback_payload, dict):
+            return fallback_payload
+
+    raise FileNotFoundError(
+        f"Missing car-characteristics snapshot for {race_name} {year} {checkpoint_session_upper}"
+    )
+
+
+def _load_latest_snapshot_before_pre_checkpoint(
+    *,
+    store: ArtifactStore,
+    year: int,
+    race_name: str,
+    is_sprint: bool,
+) -> dict[str, Any] | None:
+    """Return the newest stored snapshot that predates the weekend PRE deadline."""
+    from src.utils.accuracy_targets import _scheduled_session_start
+
+    deadline_starts: list[datetime] = []
+    weekend_format = weekend_format_name(is_sprint)
+    for target_key in eligible_target_keys("PRE", is_sprint):
+        deadline_session = target_deadline_session(target_key, weekend_format, "PRE")
+        if not deadline_session:
+            continue
+        deadline_start = _scheduled_session_start(
+            year=year,
+            race_name=race_name,
+            session_name=deadline_session,
+        )
+        if deadline_start is not None:
+            deadline_starts.append(deadline_start)
+
+    if not deadline_starts:
+        return None
+
+    pre_deadline = min(deadline_starts)
+    snapshot_rows = store.list_artifacts(
+        SNAPSHOT_ARTIFACT_TYPE,
+        key_prefix=f"{int(year)}::",
+        limit=8192,
+    )
+    candidate_payloads: list[dict[str, Any]] = []
+    for row in snapshot_rows:
+        payload = row.get("data")
+        if not isinstance(payload, dict):
+            continue
+        if snapshot_sort_timestamp(payload) >= pre_deadline:
+            continue
+        candidate_payloads.append(payload)
+
+    if not candidate_payloads:
+        return None
+
+    return sort_snapshot_payloads(candidate_payloads)[-1]
 
 
 def build_snapshot_overlay_car_characteristics(

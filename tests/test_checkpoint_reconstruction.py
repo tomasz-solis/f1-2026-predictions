@@ -1,5 +1,6 @@
 """Focused tests for retrospective checkpoint reconstruction helpers."""
 
+from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -9,6 +10,7 @@ from src.utils.checkpoint_reconstruction import (
     SnapshotOverlayArtifactStore,
     build_reconstructed_prediction_results,
     build_snapshot_overlay_car_characteristics,
+    load_checkpoint_snapshot_payload,
 )
 
 
@@ -186,3 +188,64 @@ def test_build_reconstructed_prediction_results_caps_sprint_main_race_confidence
 
     assert reconstructed_is_sprint is True
     assert results["main_race"]["input_confidence"] == pytest.approx(0.5)
+
+
+def test_load_checkpoint_snapshot_payload_falls_back_to_latest_prior_snapshot_for_pre(patcher):
+    """PRE reconstruction should use the newest snapshot before the weekend begins."""
+    patcher.setattr(
+        "src.utils.checkpoint_reconstruction.is_sprint_weekend",
+        lambda year, race_name: False,
+    )
+    patcher.setattr(
+        "src.utils.accuracy_targets._scheduled_session_start",
+        lambda *, year, race_name, session_name: (
+            datetime.fromisoformat("2026-03-06T05:00:00+00:00")
+            if (year, race_name, session_name) == (2026, "Australian Grand Prix", "FP1")
+            else None
+        ),
+    )
+
+    store = MagicMock()
+    store.load_artifact.return_value = None
+    store.list_artifacts.return_value = [
+        {
+            "artifact_key": "2026::Testing 2::Testing 2 Day 2",
+            "data": {
+                "event_name": "Testing 2",
+                "session_name": "Testing 2 Day 2",
+                "captured_at": "2026-02-28T18:00:00+00:00",
+                "session_started_at": "2026-02-28T08:00:00+00:00",
+                "teams": {"McLaren": {"profiles": {"balanced": {"overall_pace": 0.7}}}},
+            },
+        },
+        {
+            "artifact_key": "2026::Testing 2::Testing 2 Day 3",
+            "data": {
+                "event_name": "Testing 2",
+                "session_name": "Testing 2 Day 3",
+                "captured_at": "2026-03-01T18:00:00+00:00",
+                "session_started_at": "2026-03-01T08:00:00+00:00",
+                "teams": {"McLaren": {"profiles": {"balanced": {"overall_pace": 0.8}}}},
+            },
+        },
+        {
+            "artifact_key": "2026::Australian Grand Prix::FP1",
+            "data": {
+                "event_name": "Australian Grand Prix",
+                "session_name": "FP1",
+                "captured_at": "2026-03-06T06:00:00+00:00",
+                "session_started_at": "2026-03-06T05:00:00+00:00",
+                "teams": {"McLaren": {"profiles": {"balanced": {"overall_pace": 0.9}}}},
+            },
+        },
+    ]
+
+    payload = load_checkpoint_snapshot_payload(
+        store=store,
+        year=2026,
+        race_name="Australian Grand Prix",
+        checkpoint_session="PRE",
+    )
+
+    assert payload["event_name"] == "Testing 2"
+    assert payload["session_name"] == "Testing 2 Day 3"
