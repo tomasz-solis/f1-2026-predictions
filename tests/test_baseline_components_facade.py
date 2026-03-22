@@ -135,6 +135,51 @@ def test_engines_delegate_to_mixins(patcher):
     assert race_result == {"finish_order": []}
 
 
+def test_predictor_helpers_are_inherited_without_magic_getattr():
+    """Helper methods should be available through normal MRO, not runtime fallback."""
+    assert "__getattr__" not in Baseline2026Predictor.__dict__
+    assert (
+        Baseline2026Predictor._resolve_predictions_data_root
+        is BaselineDataMixin._resolve_predictions_data_root
+    )
+    assert (
+        Baseline2026Predictor._get_testing_profile_weights
+        is BaselineQualifyingMixin._get_testing_profile_weights
+    )
+    assert (
+        Baseline2026Predictor._prepare_driver_info_with_compounds
+        is BaselineRaceMixin._prepare_driver_info_with_compounds
+    )
+
+
+def test_predictor_inherited_learned_adjustment_supports_race_session():
+    """Inherited adjustment helper should still accept explicit race-session calls."""
+    predictor = Baseline2026Predictor.__new__(Baseline2026Predictor)
+    calls: dict[str, object] = {}
+
+    class _Calibration:
+        def get_combined_position_adjustment(self, **kwargs):
+            calls.update(kwargs)
+            return 0.37
+
+    class _Config:
+        def get(self, key, default=None):
+            return default
+
+    predictor.calibration_system = _Calibration()
+    predictor.config = _Config()
+
+    adjustment = predictor._get_learned_position_adjustment(
+        team="McLaren",
+        driver="NOR",
+        teammates=["NOR", "PIA"],
+        session="race",
+    )
+
+    assert adjustment == 0.37
+    assert calls["session"] == "race"
+
+
 def test_baseline_predictor_facade_methods_delegate_to_components():
     predictor = Baseline2026Predictor.__new__(Baseline2026Predictor)
 

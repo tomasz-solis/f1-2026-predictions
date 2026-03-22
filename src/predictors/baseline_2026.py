@@ -1,16 +1,9 @@
-"""2026 baseline predictor facade over data, strength, qualifying, and race components.
-
-Uses composition (not mixin inheritance) to coordinate prediction logic.
-Internal mixin methods are resolved via ``__getattr__`` delegation so that
-cross-component calls (e.g. qualifying code calling data-layer helpers)
-keep working without the predictor inheriting from every mixin.
-"""
+"""2026 baseline predictor facade with explicit public delegation."""
 
 from __future__ import annotations
 
 import logging
 import os
-import types
 from pathlib import Path
 from typing import Any
 
@@ -33,12 +26,13 @@ from src.utils.data_generator import create_baseline_if_missing
 
 logger = logging.getLogger(__name__)
 
-# Mixin classes whose methods are resolved by __getattr__.
-_COMPOSED_MIXINS = (BaselineDataMixin, BaselineQualifyingMixin, BaselineRaceMixin)
 
-
-class Baseline2026Predictor:
-    """Facade coordinating 2026 prediction components via composition."""
+class Baseline2026Predictor(
+    BaselineDataMixin,
+    BaselineQualifyingMixin,
+    BaselineRaceMixin,
+):
+    """Facade coordinating 2026 prediction components."""
 
     def __init__(
         self,
@@ -48,9 +42,8 @@ class Baseline2026Predictor:
         config: Config | None = None,
         artifact_store: ArtifactStore | None = None,
     ):
-        """Initialize predictor with optional injectable config/artifact store."""
-        # State previously initialised by BaselineDataMixin.__init__
-        self._compound_cache: dict = {}
+        """Initialize predictor state and component delegates."""
+        BaselineDataMixin.__init__(self)
 
         self.seed = seed
         self.season_year = int(season_year)
@@ -90,31 +83,8 @@ class Baseline2026Predictor:
         self.load_data()
 
     # ------------------------------------------------------------------
-    # Composition delegation: resolve mixin methods without inheritance.
-    # ------------------------------------------------------------------
-
-    def __getattr__(self, name: str) -> Any:
-        """Route internal mixin method calls via composition.
-
-        Only triggered for attributes *not* found on the instance or class.
-        Walks the MRO of each composed mixin, correctly handling regular
-        methods, ``@staticmethod``, and ``@classmethod``.
-        """
-        for mixin_cls in _COMPOSED_MIXINS:
-            for klass in mixin_cls.__mro__:
-                if name in klass.__dict__:
-                    raw = klass.__dict__[name]
-                    if isinstance(raw, staticmethod):
-                        return raw.__func__
-                    if isinstance(raw, classmethod):
-                        return raw.__func__.__get__(self, type(self))
-                    if callable(raw):
-                        return types.MethodType(raw, self)
-                    return raw
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
-
-    # ------------------------------------------------------------------
     # Public API — explicit delegation to components.
+    # Internal helpers come from normal mixin inheritance.
     # ------------------------------------------------------------------
 
     def load_data(self) -> None:
