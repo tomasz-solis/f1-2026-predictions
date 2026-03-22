@@ -35,6 +35,9 @@ from src.utils.operational_observability import (
     snapshot_counters,
 )
 
+from . import prediction_boundary as _prediction_boundary
+from . import prediction_serving as _prediction_serving
+
 PredictionResults = dict[str, Any]
 ArtifactVersion = tuple[int, str]
 ArtifactVersions = dict[str, ArtifactVersion]
@@ -574,55 +577,10 @@ def render_prediction_results_core(
 
 def _get_prediction_precompute_settings() -> dict[str, Any]:
     """Normalize dashboard precompute settings with safe fallbacks."""
-    defaults: dict[str, Any] = {
-        "enabled": True,
-        "horizon_races": 3,
-        "weather_scenarios": ["dry", "mixed", "rain"],
-        "max_file_entries": 2048,
-    }
-    try:
-        loaded = get_prediction_precompute_config()
-    except Exception as exc:
-        logger.warning("Could not load prediction precompute config: %s", exc)
-        return defaults
-
-    if not isinstance(loaded, dict):
-        return defaults
-
-    settings: dict[str, Any] = dict(defaults)
-    settings.update(loaded)
-    weather_scenarios = settings.get("weather_scenarios")
-    default_weather_scenarios = [str(item) for item in defaults["weather_scenarios"]]
-    if not isinstance(weather_scenarios, list):
-        settings["weather_scenarios"] = list(default_weather_scenarios)
-    else:
-        valid_weather = {"dry", "mixed", "rain"}
-        normalized_weather = []
-        for weather_option in weather_scenarios:
-            normalized = str(weather_option).strip().lower()
-            if normalized in valid_weather and normalized not in normalized_weather:
-                normalized_weather.append(normalized)
-        settings["weather_scenarios"] = (
-            normalized_weather if normalized_weather else list(default_weather_scenarios)
-        )
-    settings["enabled"] = bool(settings.get("enabled", defaults["enabled"]))
-    raw_horizon_races = settings.get("horizon_races", defaults["horizon_races"])
-    if isinstance(raw_horizon_races, int | float | str):
-        try:
-            settings["horizon_races"] = max(1, int(raw_horizon_races))
-        except (TypeError, ValueError):
-            settings["horizon_races"] = defaults["horizon_races"]
-    else:
-        settings["horizon_races"] = defaults["horizon_races"]
-    raw_max_file_entries = settings.get("max_file_entries", defaults["max_file_entries"])
-    if isinstance(raw_max_file_entries, int | float | str):
-        try:
-            settings["max_file_entries"] = max(16, int(raw_max_file_entries))
-        except (TypeError, ValueError):
-            settings["max_file_entries"] = defaults["max_file_entries"]
-    else:
-        settings["max_file_entries"] = defaults["max_file_entries"]
-    return settings
+    return _prediction_boundary.get_prediction_precompute_settings(
+        get_prediction_precompute_config_fn=get_prediction_precompute_config,
+        logger=logger,
+    )
 
 
 def _resolve_precompute_targets(
@@ -632,45 +590,15 @@ def _resolve_precompute_targets(
     horizon_races: int,
 ) -> list[str]:
     """Resolve race targets for boundary-triggered precompute horizon."""
-    requested_horizon = max(1, int(horizon_races))
-    targets = [race_name]
-    if requested_horizon <= 1:
-        return targets
+    from src.utils.weekend import get_schedule_rows
 
-    try:
-        from src.utils.weekend import get_schedule_rows
-
-        rows = list(get_schedule_rows(year))
-    except Exception as exc:
-        logger.warning("Could not load schedule rows for precompute targeting: %s", exc)
-        return targets
-
-    if not rows:
-        return targets
-
-    race_names: list[str] = []
-    for event_name, event_format in rows:
-        normalized = str(event_name).strip()
-        normalized_format = str(event_format).strip().lower()
-        if not normalized:
-            continue
-        if "testing" in normalized.lower() or "testing" in normalized_format:
-            continue
-        race_names.append(normalized)
-
-    if not race_names:
-        return targets
-
-    normalized_current = race_name.strip().lower()
-    for idx, candidate in enumerate(race_names):
-        if candidate.strip().lower() != normalized_current:
-            continue
-        for next_race in race_names[idx + 1 : idx + requested_horizon]:
-            if next_race not in targets:
-                targets.append(next_race)
-        break
-
-    return targets
+    return _prediction_boundary.resolve_precompute_targets(
+        year=year,
+        race_name=race_name,
+        horizon_races=horizon_races,
+        get_schedule_rows_fn=get_schedule_rows,
+        logger=logger,
+    )
 
 
 def _resolve_race_boundary_context(
@@ -681,16 +609,14 @@ def _resolve_race_boundary_context(
     session_detector: Any | None = None,
 ) -> tuple[str, str]:
     """Return the current boundary signature and checkpoint label for one race."""
-    snapshot = _build_event_boundary_snapshot(
+    return _prediction_boundary.resolve_race_boundary_context(
         year=year,
         race_name=race_name,
         is_sprint=is_sprint,
+        build_event_boundary_snapshot_fn=_build_event_boundary_snapshot,
+        boundary_signature_fn=_boundary_signature,
         session_detector=session_detector,
     )
-    checkpoint = str(snapshot.get("latest_elapsed_session") or "PRE").strip().upper() or "PRE"
-    if not bool(snapshot.get("has_schedule_data")):
-        return "", checkpoint
-    return _boundary_signature(snapshot), checkpoint
 
 
 def _resolve_persisted_boundary_fallback(
@@ -702,45 +628,14 @@ def _resolve_persisted_boundary_fallback(
     current_boundary_session_name: str,
 ) -> dict[str, str] | None:
     """Resolve warmed-boundary metadata when the current checkpoint is newer than storage."""
-    if not current_boundary_signature:
-        return None
-
-    horizon_index = load_precompute_horizon_index(year=year, artifact_hash=artifact_hash)
-    if not isinstance(horizon_index, dict):
-        return None
-
-    ready_races_raw = horizon_index.get("ready_races", [])
-    ready_races = (
-        {str(race).strip() for race in ready_races_raw if str(race).strip()}
-        if isinstance(ready_races_raw, list)
-        else set()
+    return _prediction_boundary.resolve_persisted_boundary_fallback(
+        year=year,
+        race_name=race_name,
+        artifact_hash=artifact_hash,
+        current_boundary_signature=current_boundary_signature,
+        current_boundary_session_name=current_boundary_session_name,
+        load_precompute_horizon_index_fn=load_precompute_horizon_index,
     )
-    if race_name not in ready_races:
-        return None
-
-    race_boundaries = horizon_index.get("race_boundaries", {})
-    fallback_boundary_signature = (
-        str(race_boundaries.get(race_name, "")).strip() if isinstance(race_boundaries, dict) else ""
-    )
-    if not fallback_boundary_signature:
-        fallback_boundary_signature = str(horizon_index.get("boundary_signature", "")).strip()
-    if not fallback_boundary_signature or fallback_boundary_signature == current_boundary_signature:
-        return None
-
-    anchor_race_name = str(horizon_index.get("anchor_race_name", "")).strip()
-    if race_name == anchor_race_name:
-        fallback_session_name = str(horizon_index.get("anchor_session_name", "")).strip().upper()
-    else:
-        fallback_session_name = "PRE"
-    if not fallback_session_name:
-        fallback_session_name = "PRE"
-
-    return {
-        "current_boundary_signature": current_boundary_signature,
-        "current_boundary_session_name": current_boundary_session_name,
-        "served_boundary_signature": fallback_boundary_signature,
-        "served_boundary_session_name": fallback_session_name,
-    }
 
 
 def _load_warmed_boundary_fallback_prediction(
@@ -753,31 +648,15 @@ def _load_warmed_boundary_fallback_prediction(
     notify_fn: Callable[[str], None],
 ) -> tuple[dict[str, Any], dict[str, str]] | None:
     """Load the latest available warmed prediction when the live boundary is ahead."""
-    warmed_boundary_signature = str(fallback_metadata.get("served_boundary_signature", "")).strip()
-    if not warmed_boundary_signature:
-        return None
-
-    fallback_prediction = load_precomputed_prediction(
-        year=year,
+    return _prediction_boundary.load_warmed_boundary_fallback_prediction(
         race_name=race_name,
         weather=weather,
+        year=year,
         artifact_hash=artifact_hash,
-        boundary_signature=warmed_boundary_signature,
+        fallback_metadata=fallback_metadata,
+        notify_fn=notify_fn,
+        load_precomputed_prediction_fn=load_precomputed_prediction,
     )
-    if fallback_prediction is None:
-        return None
-
-    notify_fn(
-        "Current checkpoint is ahead of the warmed horizon; serving the latest "
-        "persisted checkpoint until warmup catches up..."
-    )
-    boundary_fallback = dict(fallback_metadata)
-    boundary_fallback["mode"] = "served_warmed_boundary"
-    boundary_fallback["warmed_boundary_signature"] = warmed_boundary_signature
-    boundary_fallback["warmed_boundary_session_name"] = (
-        str(fallback_metadata.get("served_boundary_session_name", "PRE")).strip().upper() or "PRE"
-    )
-    return fallback_prediction, boundary_fallback
 
 
 def _served_prediction_boundary_session_name(
@@ -786,21 +665,50 @@ def _served_prediction_boundary_session_name(
     boundary_fallback: dict[str, str] | None,
 ) -> str:
     """Return the checkpoint label that matches the prediction actually shown to the user."""
-    served_checkpoint = str(boundary_session_name).strip().upper() or "PRE"
-    if not isinstance(boundary_fallback, dict):
-        return served_checkpoint
-
-    warmed_boundary = (
-        str(
-            boundary_fallback.get(
-                "warmed_boundary_session_name",
-                boundary_fallback.get("served_boundary_session_name", served_checkpoint),
-            )
-        )
-        .strip()
-        .upper()
+    return _prediction_boundary.served_prediction_boundary_session_name(
+        boundary_session_name=boundary_session_name,
+        boundary_fallback=boundary_fallback,
     )
-    return warmed_boundary or served_checkpoint
+
+
+def _load_served_prediction_bundle(
+    *,
+    race_name: str,
+    weather: str,
+    year: int,
+    is_sprint: bool,
+    boundary_refresh: dict[str, Any],
+    session_detector: Any,
+    precompute_settings: dict[str, Any],
+    get_artifact_versions_fn: GetArtifactVersionsFn,
+    notify_fn: Callable[[str], None],
+) -> dict[str, Any]:
+    """Load the prediction payload the dashboard should serve for one request."""
+    return _prediction_serving.load_served_prediction_bundle(
+        race_name=race_name,
+        weather=weather,
+        year=year,
+        is_sprint=is_sprint,
+        boundary_refresh=boundary_refresh,
+        session_detector=session_detector,
+        precompute_settings=precompute_settings,
+        get_artifact_versions_fn=get_artifact_versions_fn,
+        compute_artifact_hash_fn=compute_artifact_hash,
+        resolve_race_boundary_context_fn=_resolve_race_boundary_context,
+        resolve_precompute_targets_fn=_resolve_precompute_targets,
+        prediction_cache_key_fn=_prediction_cache_key,
+        get_cached_prediction_fn=_get_cached_prediction,
+        resolve_persisted_boundary_fallback_fn=_resolve_persisted_boundary_fallback,
+        load_precomputed_prediction_fn=load_precomputed_prediction,
+        cached_prediction_matches_persisted_fn=_cached_prediction_matches_persisted,
+        store_cached_prediction_fn=_store_cached_prediction,
+        load_warmed_boundary_fallback_prediction_fn=_load_warmed_boundary_fallback_prediction,
+        load_precompute_horizon_index_fn=load_precompute_horizon_index,
+        served_prediction_boundary_session_name_fn=_served_prediction_boundary_session_name,
+        prediction_unavailable_error_type=PrecomputedPredictionUnavailableError,
+        notify_fn=notify_fn,
+        logger=logger,
+    )
 
 
 def execute_live_prediction_pipeline_core(
@@ -901,139 +809,17 @@ def execute_live_prediction_pipeline_core(
     pipeline_timing["practice_update_check"] = time.time() - practice_start
 
     prediction_start = time.time()
-    precompute_summary: dict[str, Any] = {
-        "triggered": False,
-        "generated": 0,
-        "reused": 0,
-        "targets": [],
-        "ready_races": [],
-        "errors": [],
-        "skipped_reason": "",
-    }
-
-    artifact_versions = get_artifact_versions_fn(year=year)
-    artifact_hash = compute_artifact_hash(artifact_versions)
-    boundary_signature = str(boundary_refresh.get("boundary_signature", ""))
-    boundary_session_name = str(boundary_refresh.get("latest_elapsed_session") or "PRE").strip()
-    if not boundary_session_name:
-        boundary_session_name = "PRE"
-    boundary_session_name = boundary_session_name.upper()
-    if not boundary_signature:
-        try:
-            resolved_boundary_signature, resolved_boundary_session_name = (
-                _resolve_race_boundary_context(
-                    year=year,
-                    race_name=race_name,
-                    is_sprint=is_sprint,
-                    session_detector=session_detector,
-                )
-            )
-            boundary_signature = resolved_boundary_signature
-            if boundary_session_name == "PRE":
-                boundary_session_name = resolved_boundary_session_name
-        except Exception as exc:
-            logger.warning(
-                "Could not resolve race boundary context for %s %s: %s",
-                year,
-                race_name,
-                exc,
-            )
-    weather_normalized = str(weather).strip().lower()
-    target_races = _resolve_precompute_targets(
-        year=year,
-        race_name=race_name,
-        horizon_races=int(precompute_settings["horizon_races"]),
-    )
-    precompute_summary["targets"] = target_races
-
-    prediction_cache_key = _prediction_cache_key(
-        year=year,
+    served_prediction = _load_served_prediction_bundle(
         race_name=race_name,
         weather=weather,
+        year=year,
         is_sprint=is_sprint,
-        artifact_versions=artifact_versions,
-        boundary_signature=boundary_signature,
+        boundary_refresh=boundary_refresh,
+        session_detector=session_detector,
+        precompute_settings=precompute_settings,
+        get_artifact_versions_fn=get_artifact_versions_fn,
+        notify_fn=_notify,
     )
-    available_boundary_fallback: dict[str, str] | None = None
-    boundary_fallback: dict[str, str] | None = None
-    prediction_cache_hit = False
-
-    cached_prediction = _get_cached_prediction(prediction_cache_key)
-    available_boundary_fallback = _resolve_persisted_boundary_fallback(
-        year=year,
-        race_name=race_name,
-        artifact_hash=artifact_hash,
-        current_boundary_signature=boundary_signature,
-        current_boundary_session_name=boundary_session_name,
-    )
-
-    persisted_prediction = load_precomputed_prediction(
-        year=year,
-        race_name=race_name,
-        weather=weather,
-        artifact_hash=artifact_hash,
-        boundary_signature=boundary_signature,
-    )
-    if persisted_prediction is not None:
-        if cached_prediction is not None and _cached_prediction_matches_persisted(
-            cached_prediction=cached_prediction,
-            persisted_prediction=persisted_prediction,
-        ):
-            prediction_results = cached_prediction
-            prediction_cache_hit = True
-            _notify("Reusing cached persisted prediction...")
-        else:
-            prediction_results = persisted_prediction
-            _store_cached_prediction(prediction_cache_key, persisted_prediction)
-            if cached_prediction is not None:
-                _notify("Loaded updated persisted prediction...")
-            else:
-                _notify("Loaded persisted prediction...")
-    else:
-        fallback_result = None
-        if available_boundary_fallback is not None:
-            fallback_result = _load_warmed_boundary_fallback_prediction(
-                race_name=race_name,
-                weather=weather,
-                year=year,
-                artifact_hash=artifact_hash,
-                fallback_metadata=available_boundary_fallback,
-                notify_fn=_notify,
-            )
-
-        if fallback_result is not None:
-            prediction_results, boundary_fallback = fallback_result
-        else:
-            raise PrecomputedPredictionUnavailableError(
-                "Persisted prediction is not available for "
-                f"{race_name} {year} [{weather_normalized}] at checkpoint {boundary_session_name}. "
-                "Run warmup or trigger the scheduled job before using the dashboard."
-            )
-
-    horizon_index = load_precompute_horizon_index(year=year, artifact_hash=artifact_hash)
-    if isinstance(horizon_index, dict):
-        indexed_boundary = str(horizon_index.get("boundary_signature", "")).strip()
-        indexed_anchor = str(horizon_index.get("anchor_race_name", "")).strip()
-        indexed_targets_raw = horizon_index.get("expected_targets", [])
-        indexed_ready_raw = horizon_index.get("ready_races", [])
-        indexed_targets = (
-            {str(race).strip() for race in indexed_targets_raw}
-            if isinstance(indexed_targets_raw, list)
-            else set()
-        )
-        indexed_ready = (
-            [str(race).strip() for race in indexed_ready_raw if str(race).strip()]
-            if isinstance(indexed_ready_raw, list)
-            else []
-        )
-        if (
-            indexed_boundary == boundary_signature
-            and indexed_anchor == race_name
-            and indexed_targets == {str(race).strip() for race in target_races}
-        ):
-            precompute_summary["ready_races"] = indexed_ready
-
-    precompute_summary["skipped_reason"] = "request_path_read_only"
     pipeline_timing["prediction_load"] = time.time() - prediction_start
     pipeline_timing["total"] = time.time() - pipeline_start
     logger.info(
@@ -1048,18 +834,15 @@ def execute_live_prediction_pipeline_core(
     }
 
     return {
-        "prediction_results": prediction_results,
+        "prediction_results": served_prediction["prediction_results"],
         "is_sprint": is_sprint,
         "practice_update": practice_update,
         "boundary_refresh": boundary_refresh,
-        "boundary_session_name": _served_prediction_boundary_session_name(
-            boundary_session_name=boundary_session_name,
-            boundary_fallback=boundary_fallback,
-        ),
-        "precompute_summary": precompute_summary,
-        "prediction_cache_hit": prediction_cache_hit,
+        "boundary_session_name": served_prediction["boundary_session_name"],
+        "precompute_summary": served_prediction["precompute_summary"],
+        "prediction_cache_hit": served_prediction["prediction_cache_hit"],
         "pipeline_timing": pipeline_timing,
         "practice_update_error": None,
         "observability": observability,
-        "boundary_fallback": boundary_fallback,
+        "boundary_fallback": served_prediction["boundary_fallback"],
     }
