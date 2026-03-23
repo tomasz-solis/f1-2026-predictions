@@ -53,6 +53,35 @@ _PRACTICE_SIGNAL_MODES = ("auto", "raw_sessions", "stored_profiles")
 class BaselineQualifyingMixin:
     """Shared qualifying and sprint-race methods for Baseline2026Predictor."""
 
+    def _stored_profile_data_source_label(
+        self,
+        checkpoint_session_name: str | None,
+    ) -> str:
+        """Describe the stored profile source behind one checkpoint-aware run."""
+        checkpoint_label = str(checkpoint_session_name or "").strip().upper() or "CHECKPOINT"
+        snapshot_meta = getattr(self, "car_characteristics_snapshot", {})
+        if not isinstance(snapshot_meta, dict) or not snapshot_meta:
+            raw_car_payload = getattr(self, "car_characteristics", None)
+            snapshot_meta = (
+                raw_car_payload.get("checkpoint_snapshot", {})
+                if isinstance(raw_car_payload, dict)
+                else {}
+            )
+        snapshot_event = str(snapshot_meta.get("event_name", "")).strip()
+        snapshot_session = str(snapshot_meta.get("session_name", "")).strip()
+
+        snapshot_label = ""
+        if snapshot_session:
+            snapshot_label = snapshot_session
+            if snapshot_event and snapshot_session.lower() != snapshot_event.lower():
+                snapshot_label = f"{snapshot_event} / {snapshot_session}"
+        elif snapshot_event:
+            snapshot_label = snapshot_event
+
+        if snapshot_label:
+            return f"{checkpoint_label} checkpoint profile blend (latest stored snapshot: {snapshot_label})"
+        return f"{checkpoint_label} checkpoint profile blend (stored season profiles)"
+
     def _checkpoint_profile_confidence_label(
         self,
         checkpoint_session_name: str | None,
@@ -580,10 +609,7 @@ class BaselineQualifyingMixin:
             data_source = session_name
         elif testing_fallback_used:
             if normalized_practice_signal_mode == "stored_profiles" and checkpoint_label:
-                data_source = (
-                    f"{checkpoint_label} testing short-run profile blend "
-                    "(stored checkpoint profiles)"
-                )
+                data_source = self._stored_profile_data_source_label(checkpoint_session_name)
             else:
                 data_source = "Testing short-run profile blend (no weekend practice data)"
         else:

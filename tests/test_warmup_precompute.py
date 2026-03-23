@@ -470,6 +470,103 @@ def test_run_warmup_precompute_cycle_uses_target_race_boundary_signatures(patche
     assert ("Saudi Arabian Grand Prix", "sig_future") in saved_prediction_keys
 
 
+def test_run_warmup_precompute_cycle_uses_checkpoint_overlay_predictor_for_target_compute(
+    patcher,
+):
+    """Warmup should reuse one checkpoint-aware predictor across base and weather compute."""
+    fixed_now = datetime(2026, 3, 6, 9, 0, tzinfo=UTC)
+    base_predictor = object()
+    overlay_predictor = object()
+    base_predictor_calls: list[object] = []
+    weather_predictor_calls: list[object] = []
+    overlay_calls: list[dict[str, object]] = []
+
+    patcher.setattr(warmup, "should_write_to_db", lambda: False)
+    patcher.setattr(warmup, "_refresh_anchor_practice_characteristics", lambda **kwargs: {})
+    patcher.setattr(
+        warmup,
+        "get_prediction_precompute_config",
+        lambda: {
+            "enabled": True,
+            "horizon_races": 3,
+            "weather_scenarios": ["dry"],
+            "max_file_entries": 2048,
+        },
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_warmup_targets",
+        lambda year, now_utc, horizon_races: warmup.WarmupTargets(
+            anchor_race_name="Bahrain Grand Prix",
+            anchor_is_sprint=False,
+            target_races=("Bahrain Grand Prix",),
+        ),
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_checkpoint_context",
+        lambda year, race_name, is_sprint, now_utc, session_detector: warmup.CheckpointContext(
+            checkpoint="FP1",
+            expected_checkpoint="FP1",
+            latest_ready_checkpoint="FP1",
+            checkpoint_ready=True,
+            reason="ready",
+            boundary_signature="sig_anchor",
+        ),
+    )
+    patcher.setattr(warmup, "get_artifact_versions", lambda year=2026: {"k": (1, "ts")})
+    patcher.setattr(warmup, "compute_artifact_hash", lambda artifact_versions: "artifact_hash")
+    patcher.setattr(warmup, "_load_predictor", lambda artifact_versions, year: base_predictor)
+    patcher.setattr(warmup, "is_sprint_weekend", lambda year, race_name: False)
+    patcher.setattr(warmup, "load_precomputed_base_features", lambda **kwargs: None)
+    patcher.setattr(warmup, "load_precomputed_prediction", lambda **kwargs: None)
+    patcher.setattr(
+        warmup,
+        "build_checkpoint_overlay_predictor",
+        lambda **kwargs: overlay_calls.append(dict(kwargs)) or overlay_predictor,
+    )
+    patcher.setattr(
+        warmup,
+        "compute_base_features",
+        lambda *args, **kwargs: (
+            base_predictor_calls.append(kwargs["predictor"]),
+            {
+                "is_sprint": False,
+                "qualifying": {"grid": []},
+                "qualifying_grid_for_race": [],
+                "race_input_confidence": 0.7,
+                "timing": {"qualifying": 0.1},
+            },
+        )[1],
+    )
+    patcher.setattr(
+        warmup,
+        "compute_weather_predictions",
+        lambda base_features, weather, predictor, year, target_race: (
+            weather_predictor_calls.append(predictor),
+            {"qualifying": {"grid": []}, "race": {"finish_order": []}},
+        )[1],
+    )
+    patcher.setattr(warmup, "save_precomputed_base_features", lambda **kwargs: None)
+    patcher.setattr(warmup, "save_precomputed_prediction", lambda **kwargs: None)
+    patcher.setattr(warmup, "save_precompute_horizon_index", lambda **kwargs: None)
+
+    result = warmup.run_warmup_precompute_cycle(2026, now_utc=fixed_now)
+
+    assert result.status == "success"
+    assert overlay_calls == [
+        {
+            "base_predictor": base_predictor,
+            "year": 2026,
+            "race_name": "Bahrain Grand Prix",
+            "checkpoint_session": "FP1",
+            "is_sprint": False,
+        }
+    ]
+    assert base_predictor_calls == [overlay_predictor]
+    assert weather_predictor_calls == [overlay_predictor]
+
+
 def test_run_warmup_precompute_cycle_dry_run_plans_without_writes(patcher):
     """Dry-run should report planned work without compute/persistence side effects."""
     fixed_now = datetime(2026, 3, 5, 12, 0, tzinfo=UTC)

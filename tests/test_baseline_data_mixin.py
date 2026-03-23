@@ -220,6 +220,31 @@ def test_load_data_canonicalizes_sauber_key_to_audi(tmp_path, patcher, sample_pa
     assert predictor.teams["Audi"]["overall_performance"] == 0.38
 
 
+def test_load_data_keeps_checkpoint_snapshot_metadata(tmp_path, patcher, sample_payloads):
+    """Load path should retain checkpoint snapshot metadata for downstream labeling."""
+    car, drivers, tracks = sample_payloads
+    car["checkpoint_snapshot"] = {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "FP1",
+        "source": "testing_practice_extraction",
+    }
+    data_dir = tmp_path / "processed"
+    _write_baseline_files(data_dir, car, drivers, tracks)
+
+    predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", _noop_schema_validator)
+    patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
+
+    predictor.load_data()
+
+    assert predictor.car_characteristics_snapshot == {
+        "event_name": "Chinese Grand Prix",
+        "session_name": "FP1",
+        "source": "testing_practice_extraction",
+    }
+
+
 def test_load_data_merges_sauber_and_audi_team_payloads(tmp_path, patcher, sample_payloads):
     car, drivers, tracks = sample_payloads
     car["teams"] = {

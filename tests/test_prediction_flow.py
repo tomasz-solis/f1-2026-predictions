@@ -168,6 +168,104 @@ def test_run_prediction_uses_stored_checkpoint_profiles_for_qualifying(patcher):
     assert mock_predictor.predict_qualifying.call_args.kwargs["checkpoint_session_name"] == "FP2"
 
 
+def test_run_prediction_builds_checkpoint_overlay_predictor(patcher):
+    """Prediction orchestration should use the checkpoint-aware predictor when available."""
+    base_predictor = MagicMock()
+    overlay_predictor = MagicMock()
+    overlay_predictor.predict_qualifying.return_value = {
+        "grid": [{"driver": "VER", "team": "Red Bull Racing", "position": 1}]
+    }
+    overlay_predictor.predict_race.return_value = {
+        "finish_order": [{"driver": "VER", "team": "Red Bull Racing", "position": 1}]
+    }
+    overlay_calls: list[dict[str, object]] = []
+
+    patcher.setattr(prediction_flow, "get_predictor", lambda _versions, year=2026: base_predictor)
+    patcher.setattr(
+        prediction_flow,
+        "build_checkpoint_overlay_predictor",
+        lambda **kwargs: overlay_calls.append(dict(kwargs)) or overlay_predictor,
+    )
+    patcher.setattr(
+        prediction_flow,
+        "_resolve_current_checkpoint_session",
+        lambda year, race_name, is_sprint: "FP2",
+    )
+    patcher.setattr(
+        prediction_flow,
+        "fetch_actual_competitive_results_if_completed",
+        lambda year, race_name, session_name: (None, "INCOMPLETE"),
+    )
+    patcher.setattr(
+        prediction_flow,
+        "fetch_grid_if_available",
+        lambda year, race_name, session_name, predicted_grid: (predicted_grid, "PREDICTED"),
+    )
+
+    artifact_versions = {"car_characteristics::2026::car_characteristics": (1, "ts")}
+    prediction_flow.run_prediction(
+        "Australian Grand Prix",
+        "dry",
+        artifact_versions,
+        is_sprint=False,
+    )
+
+    assert overlay_calls == [
+        {
+            "base_predictor": base_predictor,
+            "year": 2026,
+            "race_name": "Australian Grand Prix",
+            "checkpoint_session": "FP2",
+            "is_sprint": False,
+        }
+    ]
+    assert overlay_predictor.predict_qualifying.call_count == 1
+    assert base_predictor.predict_qualifying.call_count == 0
+
+
+def test_run_prediction_keeps_checkpoint_profile_confidence_penalty(patcher):
+    """Checkpoint profile blends should still carry the reduced race-input confidence."""
+    mock_predictor = MagicMock()
+    mock_predictor.predict_qualifying.return_value = {
+        "grid": [{"driver": "VER", "team": "Red Bull Racing", "position": 1}],
+        "data_confidence_score": 0.85,
+        "data_source": (
+            "FP2 checkpoint profile blend (latest stored snapshot: Australian Grand Prix / FP2)"
+        ),
+        "testing_fallback_used": True,
+    }
+    mock_predictor.predict_race.return_value = {
+        "finish_order": [{"driver": "VER", "team": "Red Bull Racing", "position": 1}]
+    }
+
+    patcher.setattr(prediction_flow, "get_predictor", lambda _versions: mock_predictor)
+    patcher.setattr(
+        prediction_flow,
+        "build_checkpoint_overlay_predictor",
+        lambda **kwargs: mock_predictor,
+    )
+    patcher.setattr(
+        prediction_flow,
+        "fetch_actual_competitive_results_if_completed",
+        lambda year, race_name, session_name: (None, "INCOMPLETE"),
+    )
+    patcher.setattr(
+        prediction_flow,
+        "fetch_grid_if_available",
+        lambda year, race_name, session_name, predicted_grid: (predicted_grid, "PREDICTED"),
+    )
+    patcher.setattr(
+        prediction_flow,
+        "_resolve_current_checkpoint_session",
+        lambda year, race_name, is_sprint: "FP2",
+    )
+
+    artifact_versions = {"car_characteristics::2026::car_characteristics": (1, "ts")}
+    prediction_flow.run_prediction("Bahrain Grand Prix", "dry", artifact_versions, is_sprint=False)
+
+    assert mock_predictor.predict_race.call_args.kwargs["input_confidence"] == pytest.approx(0.8)
+
+
 def test_run_prediction_passes_race_input_confidence_from_quali_context(patcher):
     mock_predictor = MagicMock()
     mock_predictor.predict_qualifying.return_value = {

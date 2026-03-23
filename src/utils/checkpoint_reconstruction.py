@@ -135,6 +135,7 @@ def load_checkpoint_snapshot_payload(
     year: int,
     race_name: str,
     checkpoint_session: str,
+    is_sprint: bool | None = None,
 ) -> dict[str, Any]:
     """Load one stored car-characteristics snapshot for a race checkpoint."""
     checkpoint_session_upper = str(checkpoint_session).strip().upper()
@@ -144,11 +145,14 @@ def load_checkpoint_snapshot_payload(
         return payload
 
     if checkpoint_session_upper == "PRE":
+        resolved_is_sprint = (
+            bool(is_sprint) if is_sprint is not None else bool(is_sprint_weekend(year, race_name))
+        )
         fallback_payload = _load_latest_snapshot_before_pre_checkpoint(
             store=store,
             year=year,
             race_name=race_name,
-            is_sprint=is_sprint_weekend(year, race_name),
+            is_sprint=resolved_is_sprint,
         )
         if isinstance(fallback_payload, dict):
             return fallback_payload
@@ -331,6 +335,7 @@ def build_reconstructed_prediction_results(
         year=year,
         race_name=race_name,
         checkpoint_session=checkpoint_session_upper,
+        is_sprint=is_sprint,
     )
     overlay_payload = build_snapshot_overlay_car_characteristics(
         base_car_payload=base_car_payload,

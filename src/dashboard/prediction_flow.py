@@ -8,6 +8,7 @@ from src.types.prediction_types import QualifyingGridEntry
 from src.utils.race_input_confidence import cap_predicted_main_race_input_confidence
 
 from .cache import get_predictor
+from .checkpoint_predictor import build_checkpoint_overlay_predictor
 from .precomputed_predictions import get_prediction_precompute_config
 
 logger = logging.getLogger(__name__)
@@ -95,7 +96,10 @@ def _derive_race_input_confidence(
     source_adjustment = 0.0
     if "model-only" in data_source:
         source_adjustment = -0.10
-    elif "testing short-run profile blend" in data_source:
+    elif bool(qualifying_result.get("testing_fallback_used")) or (
+        "checkpoint profile blend" in data_source
+        or "testing short-run profile blend" in data_source
+    ):
         source_adjustment = -0.05
 
     grid_adjustment = 0.20 if str(grid_source).upper() == "ACTUAL" else 0.0
@@ -416,6 +420,13 @@ def run_prediction(
     checkpoint_session_name = _resolve_current_checkpoint_session(
         year=year,
         race_name=race_name,
+        is_sprint=is_sprint,
+    )
+    predictor = build_checkpoint_overlay_predictor(
+        base_predictor=predictor,
+        year=year,
+        race_name=race_name,
+        checkpoint_session=checkpoint_session_name,
         is_sprint=is_sprint,
     )
 

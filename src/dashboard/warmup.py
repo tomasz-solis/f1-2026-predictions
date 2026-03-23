@@ -11,6 +11,7 @@ from uuid import uuid4
 import fastf1
 
 from src.dashboard.cache import get_artifact_versions, get_predictor
+from src.dashboard.checkpoint_predictor import build_checkpoint_overlay_predictor
 from src.dashboard.precomputed_predictions import (
     build_precomputed_base_features_key,
     build_precomputed_prediction_key,
@@ -632,6 +633,26 @@ def run_warmup_precompute_cycle(
                     "boundary_signature": target_boundary_signature,
                 }
             )
+            target_predictor: Any | None = None
+
+            def _resolve_target_predictor(
+                *,
+                race_name: str = target_race,
+                checkpoint_name: str = target_checkpoint,
+                is_sprint_flag: bool = target_is_sprint,
+            ) -> Any:
+                """Build one checkpoint-aware predictor lazily for this target race."""
+                nonlocal target_predictor
+                if target_predictor is None:
+                    target_predictor = build_checkpoint_overlay_predictor(
+                        base_predictor=predictor,
+                        year=int(year),
+                        race_name=race_name,
+                        checkpoint_session=checkpoint_name,
+                        is_sprint=is_sprint_flag,
+                    )
+                return target_predictor
+
             base_features = load_precomputed_base_features(
                 year=int(year),
                 race_name=target_race,
@@ -654,7 +675,7 @@ def run_warmup_precompute_cycle(
                             target_checkpoint,
                             artifact_hash,
                             target_boundary_signature,
-                            predictor=predictor,
+                            predictor=_resolve_target_predictor(),
                             is_sprint=target_is_sprint,
                         )
                         save_precomputed_base_features(
@@ -718,7 +739,7 @@ def run_warmup_precompute_cycle(
                     prediction_results = compute_weather_predictions(
                         base_features,
                         target_weather,
-                        predictor=predictor,
+                        predictor=_resolve_target_predictor(),
                         year=int(year),
                         target_race=target_race,
                     )

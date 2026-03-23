@@ -52,13 +52,25 @@ def _team_payload() -> dict:
                 "testing_characteristics": {
                     "run_profile": "balanced",
                     "overall_pace": 0.78,
+                    "overall_pace_seconds": 99.214,
                     "top_speed": 0.72,
+                    "top_speed_kph": 321.5,
+                    "slow_corner_seconds": 31.2,
+                    "medium_corner_seconds": 43.9,
+                    "fast_corner_seconds": 24.1,
+                    "braking_pct": 98.4,
                 },
                 "testing_characteristics_profiles": {
                     "balanced": {
                         "run_profile": "balanced",
                         "overall_pace": 0.78,
+                        "overall_pace_seconds": 99.214,
                         "top_speed": 0.72,
+                        "top_speed_kph": 321.5,
+                        "slow_corner_seconds": 31.2,
+                        "medium_corner_seconds": 43.9,
+                        "fast_corner_seconds": 24.1,
+                        "braking_pct": 98.4,
                     }
                 },
                 "compound_characteristics": {
@@ -156,6 +168,19 @@ class TestTeamCharacteristicsSchema:
     def test_valid_nested_team_data(self):
         """Accept the richer nested team structure the predictor consumes."""
         validate_team_characteristics(_team_payload())
+
+    def test_valid_team_data_with_checkpoint_snapshot_metadata(self):
+        """Allow checkpoint snapshot metadata on overlaid car-characteristics payloads."""
+        data = _team_payload()
+        data["checkpoint_snapshot"] = {
+            "event_name": "Australian Grand Prix",
+            "session_name": "FP1",
+            "source": "testing_practice_extraction",
+            "captured_at": "2026-03-14T23:32:08+00:00",
+            "session_started_at": "2026-03-06T01:30:00+00:00",
+        }
+
+        validate_team_characteristics(data)
 
     def test_invalid_missing_teams_key(self):
         """Reject payloads without the teams map."""

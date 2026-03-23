@@ -138,8 +138,14 @@ _TESTING_CHARACTERISTICS_SCHEMA = {
         "medium_corner_performance": _UNIT_INTERVAL_NUMBER,
         "fast_corner_performance": _UNIT_INTERVAL_NUMBER,
         "braking_performance": _UNIT_INTERVAL_NUMBER,
+        "slow_corner_seconds": {"type": "number", "exclusiveMinimum": 0.0},
+        "medium_corner_seconds": {"type": "number", "exclusiveMinimum": 0.0},
+        "fast_corner_seconds": {"type": "number", "exclusiveMinimum": 0.0},
+        "braking_pct": {"type": "number", "minimum": 0.0, "maximum": 100.0},
         "top_speed": _UNIT_INTERVAL_NUMBER,
+        "top_speed_kph": {"type": "number", "exclusiveMinimum": 0.0},
         "overall_pace": _UNIT_INTERVAL_NUMBER,
+        "overall_pace_seconds": {"type": "number", "exclusiveMinimum": 0.0},
         "consistency": _UNIT_INTERVAL_NUMBER,
         "tire_deg_performance": _UNIT_INTERVAL_NUMBER,
         "consistency_performance": _UNIT_INTERVAL_NUMBER,
@@ -165,6 +171,18 @@ _COMPOUND_CHARACTERISTICS_SCHEMA = {
         "laps_sampled": {"type": "number", "minimum": 0.0},
         "sessions_used": {"type": "number", "minimum": 0.0},
         "last_updated": _STRING_OR_NULL,
+    },
+    "additionalProperties": False,
+}
+
+_CHECKPOINT_SNAPSHOT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "event_name": {"type": "string"},
+        "session_name": {"type": "string"},
+        "source": {"type": "string"},
+        "captured_at": _STRING_OR_NULL,
+        "session_started_at": _STRING_OR_NULL,
     },
     "additionalProperties": False,
 }
@@ -210,6 +228,7 @@ TEAM_CHARACTERISTICS_SCHEMA = {
         "directionality_source": {"type": "string"},
         "directionality_last_updated": _STRING_OR_NULL,
         "directionality_meta": {"type": "object"},
+        "checkpoint_snapshot": _CHECKPOINT_SNAPSHOT_SCHEMA,
         "teams": {
             "type": "object",
             "patternProperties": {

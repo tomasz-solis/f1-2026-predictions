@@ -607,6 +607,10 @@ class BaselineDataMixin:
         if not isinstance(raw_teams, dict):
             raise ValueError("Team characteristics payload is missing a valid `teams` mapping")
         self.teams = _canonicalize_team_payload_keys(raw_teams)
+        checkpoint_snapshot = data.get("checkpoint_snapshot", {})
+        self.car_characteristics_snapshot = (
+            checkpoint_snapshot if isinstance(checkpoint_snapshot, dict) else {}
+        )
 
         # Check data freshness and warn if stale
         data_freshness = data.get("data_freshness", "UNKNOWN")

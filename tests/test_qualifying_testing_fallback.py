@@ -150,6 +150,12 @@ def test_predict_qualifying_can_force_stored_checkpoint_profiles():
             "baseline_predictor.race.testing_profile_weights.short_run": {"overall_pace": 1.0},
         }
     )
+    predictor.car_characteristics = {
+        "checkpoint_snapshot": {
+            "event_name": "Australian Grand Prix",
+            "session_name": "FP2",
+        }
+    }
 
     captured: dict[str, object] = {}
 
@@ -215,7 +221,8 @@ def test_predict_qualifying_can_force_stored_checkpoint_profiles():
     assert result["practice_signal_mode_used"] == "stored_profiles"
     assert result["practice_signal_checkpoint"] == "FP2"
     assert (
-        result["data_source"] == "FP2 testing short-run profile blend (stored checkpoint profiles)"
+        result["data_source"]
+        == "FP2 checkpoint profile blend (latest stored snapshot: Australian Grand Prix / FP2)"
     )
     assert result["data_confidence_score"] == pytest.approx(0.5)
 
