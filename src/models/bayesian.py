@@ -1,10 +1,8 @@
-"""
-Bayesian Ranking Engine for F1 Predictions.
+"""Bayesian driver ranking with volatility-adjusted priors.
 
-This module implements a Gaussian Bayesian update mechanism to track driver performance
-ratings over time. It is designed to handle 'Concept Drift' (e.g., regulation changes)
-by incorporating a 'volatility' parameter that inflates uncertainty when observations
-deviate significantly from priors.
+Uses a conjugate Normal-Normal update. The volatility parameter inflates
+uncertainty when observations deviate from priors, which helps with
+regulation changes and mid-season form shifts.
 """
 
 from dataclasses import dataclass

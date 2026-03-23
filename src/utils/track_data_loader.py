@@ -428,7 +428,7 @@ def _fallback_temperature_profile(
 
 
 def _normalize_rainfall_signal(rainfall_value: float | None) -> float | None:
-    """Normalize rainfall metric to a robust 0..1 wetness signal."""
+    """Normalize rainfall to a 0..1 wetness signal."""
     if rainfall_value is None:
         return None
     try:
