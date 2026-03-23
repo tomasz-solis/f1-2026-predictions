@@ -123,6 +123,29 @@ def _record_expectation_violation(
         warnings.append(message)
 
 
+def _collapsed_track_distribution_error(
+    field_name: str,
+    values: list[float],
+    *,
+    min_unique: int = 4,
+    min_spread: float = 0.10,
+) -> str | None:
+    """Return an error when a track metric looks like placeholder data."""
+    if len(values) < 10:
+        return None
+
+    rounded_values = sorted({round(value, 2) for value in values})
+    spread = max(values) - min(values)
+    if len(rounded_values) < min_unique and spread <= (min_spread + 1e-9):
+        return (
+            f"Track {field_name} distribution is collapsed "
+            f"(unique_values={rounded_values}, spread={spread:.2f}). "
+            "Rebuild the track dataset instead of shipping placeholder-like values."
+        )
+
+    return None
+
+
 def _is_preseason_team_baseline(data: dict) -> bool:
     """
     Detect neutral preseason baseline payloads for regulation resets.
@@ -162,6 +185,7 @@ def validate_driver_characteristics(
     errors = []
     warnings = []
     skill_values: list[float] = []
+    dnf_rates: list[float] = []
 
     try:
         with open(driver_file) as f:
@@ -227,12 +251,18 @@ def validate_driver_characteristics(
             # DNF rate sanity check
             if "dnf_risk" in driver_data:
                 dnf_rate = driver_data["dnf_risk"].get("dnf_rate", 0)
+                if isinstance(dnf_rate, (int | float)):
+                    dnf_rates.append(float(dnf_rate))
                 if dnf_rate > 0.40:
                     errors.append(
                         f"{driver_code}: DNF rate {dnf_rate:.3f} unrealistically high (>40%)"
                     )
 
         # Distribution sanity: ensure extracted skills are not collapsed or missing.
+        if dnf_rates:
+            zero_dnf_count = sum(1 for rate in dnf_rates if rate == 0.0)
+            if zero_dnf_count > len(dnf_rates) / 2:
+                warnings.append("More than 50% of drivers have zero DNF rate - check extraction")
         if len(skill_values) < 18:
             errors.append(
                 f"Only {len(skill_values)} drivers with valid skill scores found (expected >=18)"
@@ -358,7 +388,10 @@ def validate_track_characteristics(track_file: Path) -> tuple[bool, list[str], l
 
         tracks = data.get("tracks", {})
 
+        pit_stop_loss_values: list[float] = []
+        safety_car_values: list[float] = []
         overtaking_values: list[float] = []
+        lap1_risk_modifier_values: list[float] = []
 
         for track_name, track_data in tracks.items():
             # Check required fields
@@ -379,6 +412,8 @@ def validate_track_characteristics(track_file: Path) -> tuple[bool, list[str], l
                     errors.append(
                         f"{track_name}: Pit stop loss {pit_loss:.1f}s outside reasonable range [15-30s]"
                     )
+                else:
+                    pit_stop_loss_values.append(float(pit_loss))
 
             if "safety_car_prob" in track_data:
                 sc_prob = track_data["safety_car_prob"]
@@ -386,6 +421,8 @@ def validate_track_characteristics(track_file: Path) -> tuple[bool, list[str], l
                     errors.append(
                         f"{track_name}: Safety car probability {sc_prob:.2f} outside [0.0-1.0]"
                     )
+                else:
+                    safety_car_values.append(float(sc_prob))
 
             if "overtaking_difficulty" in track_data:
                 ot_diff = track_data["overtaking_difficulty"]
@@ -396,15 +433,34 @@ def validate_track_characteristics(track_file: Path) -> tuple[bool, list[str], l
                 else:
                     overtaking_values.append(float(ot_diff))
 
-        if len(overtaking_values) >= 10:
-            rounded_values = sorted({round(value, 2) for value in overtaking_values})
-            spread = max(overtaking_values) - min(overtaking_values)
-            if len(rounded_values) <= 3 and spread <= 0.10:
-                errors.append(
-                    "Track overtaking difficulty distribution is collapsed "
-                    f"(unique_values={rounded_values}, spread={spread:.2f}). "
-                    "Rebuild the track dataset instead of shipping placeholder-like values."
-                )
+            if "lap1_risk_modifier" in track_data:
+                lap1_risk = track_data["lap1_risk_modifier"]
+                if isinstance(lap1_risk, int | float):
+                    lap1_risk_modifier_values.append(float(lap1_risk))
+
+        collapsed_pit_stop_loss_error = _collapsed_track_distribution_error(
+            "pit stop loss", pit_stop_loss_values
+        )
+        if collapsed_pit_stop_loss_error is not None:
+            errors.append(collapsed_pit_stop_loss_error)
+
+        collapsed_safety_car_error = _collapsed_track_distribution_error(
+            "safety car probability", safety_car_values
+        )
+        if collapsed_safety_car_error is not None:
+            errors.append(collapsed_safety_car_error)
+
+        collapsed_overtaking_error = _collapsed_track_distribution_error(
+            "overtaking difficulty", overtaking_values
+        )
+        if collapsed_overtaking_error is not None:
+            errors.append(collapsed_overtaking_error)
+
+        collapsed_lap1_risk_error = _collapsed_track_distribution_error(
+            "lap 1 risk modifier", lap1_risk_modifier_values
+        )
+        if collapsed_lap1_risk_error is not None:
+            errors.append(collapsed_lap1_risk_error)
 
     except FileNotFoundError:
         errors.append(f"File not found: {track_file}")
@@ -474,7 +530,7 @@ def main():
         all_valid = False
         all_errors.extend(driver_errors)
     if driver_warnings:
-        print(f"   [WARN] Found {len(driver_warnings)} expectation warnings:")
+        print(f"   [WARN] Found {len(driver_warnings)} warnings:")
         for warning in driver_warnings[:10]:
             print(f"      - {warning}")
         if len(driver_warnings) > 10:

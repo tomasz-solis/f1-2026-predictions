@@ -151,6 +151,28 @@ def test_driver_expectations_warn_by_default(tmp_path):
     assert any("HAM" in warning for warning in warnings)
 
 
+def test_driver_validation_warns_when_more_than_half_have_zero_dnf_rate(tmp_path):
+    """Warn when zero-DNF placeholders dominate the driver payload."""
+    validator = _load_validator_module()
+    driver_file = tmp_path / "driver_characteristics.json"
+    drivers = {}
+    for idx in range(18):
+        skill = 0.35 + (idx * 0.02)
+        drivers[f"D{idx:02d}"] = {
+            "racecraft": {"skill_score": round(skill, 3)},
+            "pace": {"quali_pace": round(skill, 3), "race_pace": round(skill, 3)},
+            "dnf_risk": {"dnf_rate": 0.0 if idx < 10 else 0.05},
+        }
+
+    _write_json(driver_file, {"drivers": drivers})
+
+    is_valid, errors, warnings = validator.validate_driver_characteristics(driver_file)
+
+    assert is_valid
+    assert errors == []
+    assert any("More than 50% of drivers have zero DNF rate" in warning for warning in warnings)
+
+
 def test_resolve_driver_characteristics_file_falls_back_to_legacy_layout(tmp_path):
     validator = _load_validator_module()
     legacy_file = tmp_path / "driver_characteristics.json"
@@ -211,4 +233,60 @@ def test_track_validation_rejects_collapsed_overtaking_distribution(tmp_path):
 
     assert not is_valid
     assert any("distribution is collapsed" in error for error in errors)
+    assert warnings == []
+
+
+def test_track_validation_rejects_collapsed_safety_car_distribution(tmp_path):
+    """Flag placeholder-like safety car values across many tracks."""
+    validator = _load_validator_module()
+    track_file = tmp_path / "track_characteristics" / "2026_track_characteristics.json"
+    collapsed_tracks = {
+        f"Track {idx}": {
+            "pit_stop_loss": 22.0,
+            "safety_car_prob": [0.3, 0.34, 0.38][idx % 3],
+            "overtaking_difficulty": 0.45 + (idx * 0.01),
+        }
+        for idx in range(12)
+    }
+    _write_json(
+        track_file,
+        {
+            "year": 2026,
+            "tracks": collapsed_tracks,
+        },
+    )
+
+    is_valid, errors, warnings = validator.validate_track_characteristics(track_file)
+
+    assert not is_valid
+    assert any("safety car probability distribution is collapsed" in error for error in errors)
+    assert warnings == []
+
+
+def test_track_validation_rejects_other_collapsed_track_metrics(tmp_path):
+    """Reject placeholder-like pit loss and lap-one risk distributions."""
+    validator = _load_validator_module()
+    track_file = tmp_path / "track_characteristics" / "2026_track_characteristics.json"
+    collapsed_tracks = {
+        f"Track {idx}": {
+            "pit_stop_loss": [22.0, 22.05, 22.1][idx % 3],
+            "safety_car_prob": 0.2 + (idx * 0.03),
+            "lap1_risk_modifier": [0.05, 0.08, 0.1][idx % 3],
+            "overtaking_difficulty": 0.25 + (idx * 0.04),
+        }
+        for idx in range(12)
+    }
+    _write_json(
+        track_file,
+        {
+            "year": 2026,
+            "tracks": collapsed_tracks,
+        },
+    )
+
+    is_valid, errors, warnings = validator.validate_track_characteristics(track_file)
+
+    assert not is_valid
+    assert any("pit stop loss distribution is collapsed" in error for error in errors)
+    assert any("lap 1 risk modifier distribution is collapsed" in error for error in errors)
     assert warnings == []
