@@ -9,6 +9,7 @@ from src.utils.backtesting import (
     apply_config_overrides,
     parse_experiment_spec,
     rank_experiments_for_generalization,
+    run_previous_race_naive_backtest,
     run_single_race_backtest,
     summarize_generalization,
 )
@@ -133,6 +134,98 @@ def test_run_single_race_backtest_marks_missing_actuals_as_skipped():
 
     assert result["status"] == "skipped"
     assert result["reason"] == "missing_actual_results"
+
+
+def test_run_previous_race_naive_backtest_uses_prior_actual_results():
+    actuals = {
+        ("Australian Grand Prix", "Q"): [
+            {"driver": "VER", "team": "Red Bull Racing", "position": 1},
+            {"driver": "NOR", "team": "McLaren", "position": 2},
+            {"driver": "LEC", "team": "Ferrari", "position": 3},
+        ],
+        ("Australian Grand Prix", "R"): [
+            {"driver": "VER", "team": "Red Bull Racing", "position": 1},
+            {"driver": "NOR", "team": "McLaren", "position": 2},
+            {"driver": "LEC", "team": "Ferrari", "position": 3},
+        ],
+        ("Chinese Grand Prix", "Q"): [
+            {"driver": "VER", "team": "Red Bull Racing", "position": 1},
+            {"driver": "NOR", "team": "McLaren", "position": 2},
+            {"driver": "LEC", "team": "Ferrari", "position": 3},
+        ],
+        ("Chinese Grand Prix", "R"): [
+            {"driver": "VER", "team": "Red Bull Racing", "position": 1},
+            {"driver": "NOR", "team": "McLaren", "position": 2},
+            {"driver": "LEC", "team": "Ferrari", "position": 3},
+        ],
+    }
+
+    def _fetcher(_year: int, race_name: str, session_name: str):
+        return actuals.get((race_name, session_name))
+
+    result = run_previous_race_naive_backtest(
+        year=2025,
+        race_names=["Australian Grand Prix", "Chinese Grand Prix"],
+        results_fetcher=_fetcher,
+    )
+
+    assert result["name"] == "previous_race_classification"
+    assert result["summary"]["races_total"] == 2
+    assert result["summary"]["races_evaluated"] == 1
+    assert result["summary"]["races_skipped"] == 1
+    assert result["summary"]["qualifying_mae_mean"] == pytest.approx(0.0)
+    assert result["summary"]["race_mae_mean"] == pytest.approx(0.0)
+
+    skipped, evaluated = result["race_results"]
+    assert skipped["reason"] == "missing_previous_race_results"
+    assert evaluated["status"] == "ok"
+    assert evaluated["predicted_from_race"] == "Australian Grand Prix"
+    assert evaluated["top3_accuracy"] == pytest.approx(100.0)
+
+
+def test_run_previous_race_naive_backtest_resets_after_missing_actuals():
+    actuals = {
+        ("Australian Grand Prix", "Q"): [
+            {"driver": "VER", "team": "Red Bull Racing", "position": 1},
+            {"driver": "NOR", "team": "McLaren", "position": 2},
+            {"driver": "LEC", "team": "Ferrari", "position": 3},
+        ],
+        ("Australian Grand Prix", "R"): [
+            {"driver": "VER", "team": "Red Bull Racing", "position": 1},
+            {"driver": "NOR", "team": "McLaren", "position": 2},
+            {"driver": "LEC", "team": "Ferrari", "position": 3},
+        ],
+        ("Japanese Grand Prix", "Q"): [
+            {"driver": "NOR", "team": "McLaren", "position": 1},
+            {"driver": "VER", "team": "Red Bull Racing", "position": 2},
+            {"driver": "LEC", "team": "Ferrari", "position": 3},
+        ],
+        ("Japanese Grand Prix", "R"): [
+            {"driver": "NOR", "team": "McLaren", "position": 1},
+            {"driver": "VER", "team": "Red Bull Racing", "position": 2},
+            {"driver": "LEC", "team": "Ferrari", "position": 3},
+        ],
+    }
+
+    def _fetcher(_year: int, race_name: str, session_name: str):
+        return actuals.get((race_name, session_name))
+
+    result = run_previous_race_naive_backtest(
+        year=2025,
+        race_names=[
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+        ],
+        results_fetcher=_fetcher,
+    )
+
+    assert [row["reason"] for row in result["race_results"] if row["status"] == "skipped"] == [
+        "missing_previous_race_results",
+        "missing_actual_results",
+        "missing_previous_race_results",
+    ]
+    assert result["summary"]["races_evaluated"] == 0
 
 
 def test_rank_experiments_recommends_only_generalizing_improvements():

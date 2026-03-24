@@ -118,6 +118,25 @@ When you click **Predict**, the app:
 Session-data blending and any FastF1-dependent artifact updates happen during
 warmup or session automation, not inside the click path itself.
 
+### Serving architecture
+
+The dashboard is intentionally persisted-only.
+
+Clicking **Predict weekend** does not call FastF1, does not rebuild features,
+and does not rerun simulations. It loads the latest warmed artifact that
+matches the current checkpoint and artifact hash.
+
+This is a product choice, not just an implementation shortcut:
+
+- the page responds immediately instead of making users wait 30-40 seconds for a live recompute
+- the same race/checkpoint request resolves the same way for every user on the same deployed revision
+- FastF1 delays, cache misses, and rate-limit pain stay in the warmup worker instead of the request path
+
+The tradeoff is freshness control. A user cannot force a one-off refresh from
+the UI. If a newer session boundary is available but warmup has not caught up
+yet, the dashboard keeps serving the last warmed checkpoint until the worker
+persists the newer one.
+
 ### 1b. Optional background automation (no click required)
 
 Run periodic automation to refresh right after session completion:
@@ -380,3 +399,34 @@ Outputs are written under `reports/backtest_2025/`:
 - cross-experiment comparison (`experiment_comparison.csv`)
 - recommendation report with guardrails against overfitting (`recommendations.md`)
 - race MAE distribution plot when matplotlib is available (`race_mae_distribution.png`)
+
+## Model Performance
+
+Latest checked numbers live in `data/backtesting/2025_backtest_results.json`.
+
+Using `python scripts/backtest_2025_season.py --year 2025`, the current model
+scored 11 of 24 races before FastF1 rate limits cut off later actual-result
+fetches. On those 11 races it averaged:
+
+- qualifying MAE: `3.95` places
+- race MAE: `3.94` places
+
+For a fair naive comparison, use the 10-race overlap where both the model and a
+`previous race classification` baseline were available:
+
+- qualifying MAE: model `3.96`, naive `3.91`
+- race MAE: model `3.93`, naive `4.19`
+- race MAE improvement vs naive: `0.27` places better
+
+The honest read is mixed: the model beat the naive baseline on race finishing
+order, but it was `0.05` places worse on qualifying MAE over the same shared
+window.
+
+Illustrative example, Japanese Grand Prix (same default config, rerun
+separately because the season summary does not persist full predicted orders):
+
+- predicted top 5: `VER`, `RUS`, `NOR`, `LEC`, `HAM`
+- actual top 5: `VER`, `NOR`, `PIA`, `LEC`, `RUS`
+
+If you want a cleaner full-season benchmark, rerun after the FastF1 hourly
+limit resets or prewarm a fuller cache first.

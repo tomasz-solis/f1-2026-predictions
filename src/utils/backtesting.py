@@ -214,6 +214,25 @@ def _normalize_ranked_entries(entries: Iterable[dict[str, Any]]) -> list[dict[st
     return normalized
 
 
+def _compute_ranked_metrics(
+    predicted_entries: Iterable[dict[str, Any]],
+    actual_entries: Iterable[dict[str, Any]],
+) -> dict[str, Any]:
+    """Compute ranking metrics for one predicted classification."""
+    predicted_norm = _normalize_ranked_entries(predicted_entries)
+    actual_norm = _normalize_ranked_entries(actual_entries)
+    podium = PredictionMetrics.podium_accuracy(predicted_norm, actual_norm)
+    winner_correct = PredictionMetrics.winner_accuracy(predicted_norm, actual_norm)
+
+    return {
+        "mae": float(PredictionMetrics.mean_absolute_error(predicted_norm, actual_norm)),
+        "exact_accuracy": float(PredictionMetrics.position_accuracy(predicted_norm, actual_norm)),
+        "within_3": float(PredictionMetrics.within_n_positions(predicted_norm, actual_norm, n=3)),
+        "top3_accuracy": float(podium["accuracy"]),
+        "winner_correct": bool(winner_correct),
+    }
+
+
 def run_single_race_backtest(
     *,
     predictor: Any,
@@ -241,42 +260,31 @@ def run_single_race_backtest(
             race_name=race_name,
             n_simulations=qualifying_simulations,
         )
-        predicted_grid = _normalize_ranked_entries(qualifying_prediction["grid"])
-
         race_prediction = predictor.predict_race(
             qualifying_grid=qualifying_prediction["grid"],
             weather=weather,
             race_name=race_name,
             n_simulations=race_simulations,
         )
-        predicted_finish = _normalize_ranked_entries(race_prediction["finish_order"])
-
-        qualifying_actual_norm = _normalize_ranked_entries(qualifying_actual)
-        race_actual_norm = _normalize_ranked_entries(race_actual)
-
-        race_podium = PredictionMetrics.podium_accuracy(predicted_finish, race_actual_norm)
-        winner_correct = PredictionMetrics.winner_accuracy(predicted_finish, race_actual_norm)
+        qualifying_metrics = _compute_ranked_metrics(
+            qualifying_prediction["grid"],
+            qualifying_actual,
+        )
+        race_metrics = _compute_ranked_metrics(
+            race_prediction["finish_order"],
+            race_actual,
+        )
 
         return {
             "race_name": race_name,
             "status": "ok",
-            "qualifying_mae": float(
-                PredictionMetrics.mean_absolute_error(predicted_grid, qualifying_actual_norm)
-            ),
-            "qualifying_exact_accuracy": float(
-                PredictionMetrics.position_accuracy(predicted_grid, qualifying_actual_norm)
-            ),
-            "race_mae": float(
-                PredictionMetrics.mean_absolute_error(predicted_finish, race_actual_norm)
-            ),
-            "race_exact_accuracy": float(
-                PredictionMetrics.position_accuracy(predicted_finish, race_actual_norm)
-            ),
-            "race_within_3": float(
-                PredictionMetrics.within_n_positions(predicted_finish, race_actual_norm, n=3)
-            ),
-            "top3_accuracy": float(race_podium["accuracy"]),
-            "winner_correct": bool(winner_correct),
+            "qualifying_mae": qualifying_metrics["mae"],
+            "qualifying_exact_accuracy": qualifying_metrics["exact_accuracy"],
+            "race_mae": race_metrics["mae"],
+            "race_exact_accuracy": race_metrics["exact_accuracy"],
+            "race_within_3": race_metrics["within_3"],
+            "top3_accuracy": race_metrics["top3_accuracy"],
+            "winner_correct": race_metrics["winner_correct"],
         }
     except Exception as exc:
         logger.warning(f"Backtest failed for {race_name}: {exc}")
@@ -285,6 +293,75 @@ def run_single_race_backtest(
             "status": "skipped",
             "reason": f"prediction_error:{type(exc).__name__}",
         }
+
+
+def run_previous_race_naive_backtest(
+    *,
+    year: int,
+    race_names: Iterable[str],
+    results_fetcher: Any = fetch_actual_session_results,
+) -> dict[str, Any]:
+    """Evaluate a previous-race classification baseline across an ordered schedule."""
+    race_results: list[dict[str, Any]] = []
+    previous_qualifying_actual: list[dict[str, Any]] | None = None
+    previous_race_actual: list[dict[str, Any]] | None = None
+    previous_race_name: str | None = None
+
+    for race_name in race_names:
+        qualifying_actual = results_fetcher(year, race_name, "Q")
+        race_actual = results_fetcher(year, race_name, "R")
+
+        if not qualifying_actual or not race_actual:
+            race_results.append(
+                {
+                    "race_name": race_name,
+                    "status": "skipped",
+                    "reason": "missing_actual_results",
+                }
+            )
+            previous_qualifying_actual = None
+            previous_race_actual = None
+            previous_race_name = None
+            continue
+
+        if previous_qualifying_actual is None or previous_race_actual is None:
+            race_results.append(
+                {
+                    "race_name": race_name,
+                    "status": "skipped",
+                    "reason": "missing_previous_race_results",
+                }
+            )
+        else:
+            qualifying_metrics = _compute_ranked_metrics(
+                previous_qualifying_actual, qualifying_actual
+            )
+            race_metrics = _compute_ranked_metrics(previous_race_actual, race_actual)
+            race_results.append(
+                {
+                    "race_name": race_name,
+                    "status": "ok",
+                    "baseline_name": "previous_race_classification",
+                    "predicted_from_race": previous_race_name,
+                    "qualifying_mae": qualifying_metrics["mae"],
+                    "qualifying_exact_accuracy": qualifying_metrics["exact_accuracy"],
+                    "race_mae": race_metrics["mae"],
+                    "race_exact_accuracy": race_metrics["exact_accuracy"],
+                    "race_within_3": race_metrics["within_3"],
+                    "top3_accuracy": race_metrics["top3_accuracy"],
+                    "winner_correct": race_metrics["winner_correct"],
+                }
+            )
+
+        previous_qualifying_actual = list(qualifying_actual)
+        previous_race_actual = list(race_actual)
+        previous_race_name = race_name
+
+    return {
+        "name": "previous_race_classification",
+        "summary": aggregate_race_metrics(race_results),
+        "race_results": race_results,
+    }
 
 
 def aggregate_race_metrics(race_results: list[dict[str, Any]]) -> dict[str, Any]:

@@ -1,0 +1,202 @@
+{
+  "example_race": {
+    "actual_finish_top5": [
+      {
+        "driver": "VER",
+        "position": 1,
+        "team": "Red Bull Racing"
+      },
+      {
+        "driver": "NOR",
+        "position": 2,
+        "team": "McLaren"
+      },
+      {
+        "driver": "PIA",
+        "position": 3,
+        "team": "McLaren"
+      },
+      {
+        "driver": "LEC",
+        "position": 4,
+        "team": "Ferrari"
+      },
+      {
+        "driver": "RUS",
+        "position": 5,
+        "team": "Mercedes"
+      }
+    ],
+    "kind": "illustrative_rerun",
+    "notes": [
+      "This example reruns one race with the same default config because the season backtest summary does not persist full predicted orders."
+    ],
+    "predicted_finish_top5": [
+      {
+        "driver": "VER",
+        "position": 1,
+        "team": "Red Bull Racing"
+      },
+      {
+        "driver": "RUS",
+        "position": 2,
+        "team": "Mercedes"
+      },
+      {
+        "driver": "NOR",
+        "position": 3,
+        "team": "McLaren"
+      },
+      {
+        "driver": "LEC",
+        "position": 4,
+        "team": "Ferrari"
+      },
+      {
+        "driver": "HAM",
+        "position": 5,
+        "team": "Ferrari"
+      }
+    ],
+    "race_name": "Japanese Grand Prix",
+    "simulations": 60
+  },
+  "model": {
+    "name": "baseline",
+    "qualifying_exact_accuracy_mean": 10.454545454545455,
+    "qualifying_mae_mean": 3.9454545454545453,
+    "race_exact_accuracy_mean": 9.545454545454545,
+    "race_mae_mean": 3.9430622009569376,
+    "race_within_3_mean": 56.81818181818182,
+    "races_evaluated": 11,
+    "races_skipped": 13,
+    "races_total": 24,
+    "skipped_races": [
+      {
+        "race_name": "British Grand Prix",
+        "reason": "missing_actual_results"
+      },
+      {
+        "race_name": "Belgian Grand Prix",
+        "reason": "missing_actual_results"
+      },
+      {
+        "race_name": "Hungarian Grand Prix",
+        "reason": "missing_actual_results"
+      },
+      {
+        "race_name": "Dutch Grand Prix",
+        "reason": "missing_actual_results"
+      },
+      {
+        "race_name": "Italian Grand Prix",
+        "reason": "missing_actual_results"
+      },
+      {
+        "race_name": "Azerbaijan Grand Prix",
+        "reason": "missing_actual_results"
+      },
+      {
+        "race_name": "Singapore Grand Prix",
+        "reason": "missing_actual_results"
+      },
+      {
+        "race_name": "United States Grand Prix",
+        "reason": "missing_actual_results"
+      },
+      {
+        "race_name": "Mexico City Grand Prix",
+        "reason": "missing_actual_results"
+      },
+      {
+        "race_name": "S\u00e3o Paulo Grand Prix",
+        "reason": "missing_actual_results"
+      },
+      {
+        "race_name": "Las Vegas Grand Prix",
+        "reason": "missing_actual_results"
+      },
+      {
+        "race_name": "Qatar Grand Prix",
+        "reason": "missing_actual_results"
+      },
+      {
+        "race_name": "Abu Dhabi Grand Prix",
+        "reason": "missing_actual_results"
+      }
+    ],
+    "top3_accuracy_mean": 54.54545454545453,
+    "winner_accuracy_percent": 27.27272727272727
+  },
+  "naive_previous_race_baseline": {
+    "full_window": {
+      "qualifying_exact_accuracy_mean": 6.5,
+      "qualifying_mae_mean": 3.905263157894737,
+      "race_exact_accuracy_mean": 11.526315789473683,
+      "race_mae_mean": 4.193157894736842,
+      "race_within_3_mean": 54.26315789473684,
+      "races_evaluated": 10,
+      "races_skipped": 1,
+      "races_total": 11,
+      "skipped_races": [
+        {
+          "race_name": "Australian Grand Prix",
+          "reason": "missing_previous_race_results"
+        }
+      ],
+      "top3_accuracy_mean": 49.999999999999986,
+      "winner_accuracy_percent": 20.0
+    },
+    "scored_against_model_window": {
+      "qualifying_exact_accuracy_mean": 6.5,
+      "qualifying_mae_mean": 3.905263157894737,
+      "race_exact_accuracy_mean": 11.526315789473683,
+      "race_mae_mean": 4.193157894736842,
+      "race_within_3_mean": 54.26315789473684,
+      "races_evaluated": 10,
+      "races_skipped": 0,
+      "races_total": 10,
+      "skipped_races": [],
+      "top3_accuracy_mean": 49.999999999999986,
+      "winner_accuracy_percent": 20.0
+    }
+  },
+  "notes": [
+    "Backtest ran with the existing 2025 script against live FastF1 data.",
+    "FastF1 rate limits stopped actual-result fetching after the Austrian Grand Prix, so later races were skipped.",
+    "Naive baseline predicts each qualifying session from the previous race's qualifying order and each race from the previous grand prix finish order.",
+    "Overlap comparison uses the 10 races where both the model and naive baseline could be scored."
+  ],
+  "overlap_comparison": {
+    "model": {
+      "qualifying_exact_accuracy_mean": 9.5,
+      "qualifying_mae_mean": 3.96,
+      "race_exact_accuracy_mean": 9.5,
+      "race_mae_mean": 3.9273684210526314,
+      "race_within_3_mean": 57.0,
+      "races_evaluated": 10,
+      "races_skipped": 0,
+      "races_total": 10,
+      "skipped_races": [],
+      "top3_accuracy_mean": 53.33333333333333,
+      "winner_accuracy_percent": 20.0
+    },
+    "naive": {
+      "qualifying_exact_accuracy_mean": 6.5,
+      "qualifying_mae_mean": 3.905263157894737,
+      "race_exact_accuracy_mean": 11.526315789473683,
+      "race_mae_mean": 4.193157894736842,
+      "race_within_3_mean": 54.26315789473684,
+      "races_evaluated": 10,
+      "races_skipped": 0,
+      "races_total": 10,
+      "skipped_races": [],
+      "top3_accuracy_mean": 49.999999999999986,
+      "winner_accuracy_percent": 20.0
+    },
+    "qualifying_mae_improvement": -0.05473684210526297,
+    "race_mae_improvement": 0.2657894736842108,
+    "races_evaluated": 10
+  },
+  "season": 2025
+}
