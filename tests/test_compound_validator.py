@@ -2,10 +2,13 @@
 
 import json
 
+import src.data as data_package
 from src.data.compound_validator import (
     load_and_validate_compound_data,
     validate_compound_data,
+    validate_compound_data_or_raise,
     validate_pirelli_info,
+    validate_pirelli_info_or_raise,
 )
 
 
@@ -16,6 +19,20 @@ def _errors_from_validation(validator, data: dict) -> list[str]:
     except ValueError as exc:
         return str(exc).split("; ")
     return []
+
+
+def test_exception_validator_aliases_point_to_canonical_validators():
+    """Legacy exception-style names should remain direct aliases."""
+    assert validate_compound_data_or_raise is validate_compound_data
+    assert validate_pirelli_info_or_raise is validate_pirelli_info
+
+
+def test_data_package_exports_canonical_validator_names():
+    """Package exports should point callers to the canonical validator names."""
+    assert data_package.validate_compound_data is validate_compound_data
+    assert data_package.validate_pirelli_info is validate_pirelli_info
+    assert "validate_compound_data_or_raise" not in data_package.__all__
+    assert "validate_pirelli_info_or_raise" not in data_package.__all__
 
 
 class TestValidateCompoundData:

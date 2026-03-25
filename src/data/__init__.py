@@ -7,9 +7,7 @@ from .compound_performance import (
 from .compound_validator import (
     load_and_validate_compound_data,
     validate_compound_data,
-    validate_compound_data_or_raise,
     validate_pirelli_info,
-    validate_pirelli_info_or_raise,
 )
 from .data_generator import create_baseline_if_missing
 from .track_data_loader import (
@@ -68,7 +66,5 @@ __all__ = [
     "resolve_track_temperature_profile",
     "should_use_compound_adjustments",
     "validate_compound_data",
-    "validate_compound_data_or_raise",
     "validate_pirelli_info",
-    "validate_pirelli_info_or_raise",
 ]

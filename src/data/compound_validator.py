@@ -72,9 +72,7 @@ def validate_compound_data(compound_data: dict) -> None:
         raise ValueError("; ".join(errors))
 
 
-def validate_compound_data_or_raise(compound_data: dict) -> None:
-    """Compatibility wrapper for exception-based validation."""
-    validate_compound_data(compound_data)
+validate_compound_data_or_raise = validate_compound_data
 
 
 def _collect_pirelli_info_errors(pirelli_data: dict) -> list[str]:
@@ -126,9 +124,7 @@ def validate_pirelli_info(pirelli_data: dict) -> None:
         raise ValueError("; ".join(errors))
 
 
-def validate_pirelli_info_or_raise(pirelli_data: dict) -> None:
-    """Compatibility wrapper for exception-based validation."""
-    validate_pirelli_info(pirelli_data)
+validate_pirelli_info_or_raise = validate_pirelli_info
 
 
 def load_and_validate_compound_data(file_path: Path) -> dict | None:
