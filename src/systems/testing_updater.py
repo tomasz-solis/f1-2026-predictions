@@ -725,24 +725,12 @@ def replay_season_characteristics_from_cache(
     }
 
 
-def _normalize_name(value: str) -> str:
-    """Normalize names for fuzzy matching."""
-    return _normalize_name_impl(value)
-
-
-def _is_testing_event(event_name: str) -> bool:
-    """Best-effort detection of testing events from user-provided name."""
-    return _is_testing_event_impl(event_name)
-
-
-def _extract_testing_day(session_name: str) -> int | None:
-    """Map session label to a testing day number (1..3) if possible."""
-    return _extract_testing_day_impl(session_name)
-
-
-def _extract_testing_number(event_name: str) -> int | None:
-    """Parse explicit test number from event name (e.g., 'Testing 2')."""
-    return _extract_testing_number_impl(event_name)
+_normalize_name = _normalize_name_impl
+_is_testing_event = _is_testing_event_impl
+_extract_testing_day = _extract_testing_day_impl
+_extract_testing_number = _extract_testing_number_impl
+_coerce_utc_datetime = _coerce_utc_datetime_impl
+_normalize_testing_event_sessions = _normalize_testing_event_sessions_impl
 
 
 def _resolve_testing_backends(
@@ -766,11 +754,6 @@ def _resolve_testing_cache_dir(cache_dir: str | None = None) -> Path:
         default_cache_dir=_DEFAULT_TESTING_CACHE_DIR,
         cache_root=_TESTING_CACHE_ROOT,
     )
-
-
-def _coerce_utc_datetime(value) -> datetime | None:
-    """Convert FastF1 event datetime values to UTC-aware datetime."""
-    return _coerce_utc_datetime_impl(value)
 
 
 def _testing_session_has_started(
@@ -800,16 +783,6 @@ def _get_testing_event_with_backends(
         fastf1_get_testing_event=fastf1.get_testing_event,
         logger_obj=logger,
     )
-
-
-def _normalize_testing_event_sessions(event: fastf1.events.Event) -> None:
-    """
-    Normalize testing session labels to FastF1-compatible names.
-
-    Some schedules expose "Day 1/2/3". FastF1 Session initialization expects
-    canonical names like "Practice 1/2/3".
-    """
-    _normalize_testing_event_sessions_impl(event)
 
 
 def _load_testing_session_with_backends(
@@ -873,7 +846,7 @@ def _count_team_selected_laps(
     known_teams: set[str],
     run_profile: str = "all",
 ) -> dict[str, float]:
-    """Compatibility wrapper around extracted lap-count helper."""
+    """Count representative laps using the updater's current helper hooks."""
     return _count_team_selected_laps_impl(
         session=session,
         known_teams=known_teams,
@@ -888,7 +861,7 @@ def _count_team_valid_laps(
     session: fastf1.core.Session,
     known_teams: set[str],
 ) -> dict[str, float]:
-    """Compatibility wrapper around extracted valid-lap helper."""
+    """Count valid team laps using the updater's canonical team mapping."""
     return _count_team_valid_laps_impl(
         session=session,
         known_teams=known_teams,
@@ -904,7 +877,7 @@ def _collect_session_metrics(
     run_profile: str = "balanced",
     diagnostics: list[str] | None = None,
 ) -> tuple[dict[str, dict[str, float]], dict[str, dict[str, float]]]:
-    """Compatibility wrapper that preserves monkeypatchable module-level dependencies."""
+    """Collect session metrics through the updater's module-level helper seam."""
     return _collect_session_metrics_impl(
         session=session,
         session_key=session_key,
@@ -929,7 +902,7 @@ def _extract_session_compound_metrics(
     event_name: str,
     known_teams: set[str],
 ) -> dict[str, dict[str, dict[str, float | str | None]]]:
-    """Compatibility wrapper that keeps compound helpers patchable in this module."""
+    """Extract compound metrics while honoring patched compound helpers."""
     return _extract_session_compound_metrics_impl(
         session=session,
         event_name=event_name,
