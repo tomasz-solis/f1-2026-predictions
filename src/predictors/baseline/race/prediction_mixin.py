@@ -5,15 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.types.prediction_types import QualifyingGridEntry
-from src.utils import config_loader
-from src.utils.grid_validation import validate_qualifying_grid
-from src.utils.lap_by_lap_simulator import (
-    aggregate_simulation_results,
-    simulate_race_lap_by_lap,
-)
-from src.utils.pit_strategy import generate_pit_strategy
-from src.utils.track_data_loader import (
+from src.data.track_data_loader import (
     get_available_compounds,
     get_tire_stress_score,
     load_track_specific_params,
@@ -21,6 +13,14 @@ from src.utils.track_data_loader import (
     resolve_race_distance_laps,
     resolve_track_temperature_c,
     resolve_track_temperature_profile,
+)
+from src.simulation.pit_strategy import generate_pit_strategy
+from src.types.prediction_types import QualifyingGridEntry
+from src.utils import config_loader
+from src.utils.grid_validation import validate_qualifying_grid
+from src.utils.lap_by_lap_simulator import (
+    aggregate_simulation_results,
+    simulate_race_lap_by_lap,
 )
 from src.utils.validation_helpers import validate_enum, validate_positive_int
 

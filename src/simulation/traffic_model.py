@@ -10,11 +10,29 @@ TRACK_DOWNFORCE_LEVELS: dict[str, float] = {
     "Monaco Grand Prix": 1.00,
     "Hungarian Grand Prix": 0.95,
     "Singapore Grand Prix": 0.90,
+    "Azerbaijan Grand Prix": 0.85,
     "Japanese Grand Prix": 0.82,
     "Spanish Grand Prix": 0.80,
+    "Dutch Grand Prix": 0.78,
+    "Abu Dhabi Grand Prix": 0.75,
+    "Miami Grand Prix": 0.72,
     "Bahrain Grand Prix": 0.68,
+    "Saudi Arabian Grand Prix": 0.65,
+    "Australian Grand Prix": 0.65,
+    "Chinese Grand Prix": 0.62,
+    "British Grand Prix": 0.60,
+    "United States Grand Prix": 0.60,
+    "Canadian Grand Prix": 0.58,
+    "Austrian Grand Prix": 0.55,
+    "Mexico City Grand Prix": 0.55,
+    "Qatar Grand Prix": 0.52,
+    "Emilia Romagna Grand Prix": 0.50,
+    "Brazilian Grand Prix": 0.48,
+    "São Paulo Grand Prix": 0.48,
     "Belgian Grand Prix": 0.45,
+    "Las Vegas Grand Prix": 0.42,
     "Italian Grand Prix": 0.30,
+    "Pre-Season Testing": 0.68,
 }
 
 
@@ -58,7 +76,7 @@ def calculate_dirty_air_penalty(
     base_penalty = min_penalty_s + ((max_penalty_s - min_penalty_s) * (downforce**1.5))
 
     closeness = np.clip(1.0 - (gap / dirty_air_window_s), 0.0, 1.0)
-    gap_factor = closeness**0.2
+    gap_factor = closeness**1.5
 
     speed_factor = 1.0
     if car_speed_kph is not None:

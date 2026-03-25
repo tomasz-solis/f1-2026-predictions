@@ -10,6 +10,10 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from src.utils.config_loader import get
+
+MIN_SIGMA = 0.05
+
 
 @dataclass
 class DriverPrior:
@@ -38,17 +42,7 @@ class UpdateRecord:
 
 
 class BayesianDriverRanking:
-    """
-    Stateful engine for tracking driver ratings using Bayesian Inference.
-
-    Model:
-        Rating ~ Normal(mu, sigma^2)
-        Update Rule: Conjugate Normal-Normal update.
-
-    Key Features:
-        - Dynamic Volatility: Increases sigma when prediction error is high.
-        - Confidence Weighting: Trust Race results more than Practice.
-    """
+    """Track driver ratings with a volatility-aware Bayesian update."""
 
     def __init__(self, priors: dict[str, DriverPrior]):
         self.priors = priors
@@ -86,16 +80,12 @@ class BayesianDriverRanking:
         self, observations: dict[str, int], session_name: str, confidence: float = 1.0
     ) -> None:
         """Update driver ratings based on observed race results with specified confidence."""
-        # Load config for volatility and other parameters
         try:
-            from src.utils.config_loader import get
-
             BASE_VOLATILITY = get("bayesian.base_volatility", 0.1)
             SHOCK_THRESHOLD = get("bayesian.shock_threshold", 2.0)
             SHOCK_MULTIPLIER = get("bayesian.shock_multiplier", 0.5)
             BASE_OBS_NOISE = get("bayesian.base_observation_noise", 2.0)
-        except (ImportError, FileNotFoundError, KeyError):
-            # Fallback to defaults if config not available
+        except (FileNotFoundError, KeyError):
             BASE_VOLATILITY = 0.1
             SHOCK_THRESHOLD = 2.0
             SHOCK_MULTIPLIER = 0.5
@@ -107,21 +97,15 @@ class BayesianDriverRanking:
 
             prior_mu, prior_sigma = self.ratings[d_num]
 
-            # --- 1. Process Noise (Volatility Injection) ---
-            # Widen the prior slightly to account for development since last race
+            # Process noise: widen the prior for inter-race development.
             prior_sigma = np.sqrt(prior_sigma**2 + BASE_VOLATILITY**2)
 
-            # --- 2. Observation Logic ---
-            # Convert position to latent performance rating (High rating = Low Position)
-            # Map Position 1 -> Rating 20, Pos 20 -> Rating 1
+            # Convert finishing position into the latent rating scale.
             observed_rating = 21.0 - finish_pos
 
-            # Calculate Innovation (Prediction Error)
             innovation = abs(observed_rating - prior_mu)
 
-            # --- 3. Adaptive Shock Factor ---
-            # If result is > threshold std devs away, assume Concept Drift
-            # and inflate sigma further to learn faster.
+            # Inflate uncertainty for outlier results.
             shock = 0.0
             if innovation > (SHOCK_THRESHOLD * prior_sigma):
                 shock = SHOCK_MULTIPLIER * (innovation / prior_sigma)
@@ -132,19 +116,17 @@ class BayesianDriverRanking:
             # Inflate prior uncertainty if shocked
             effective_prior_sigma = prior_sigma * (1.0 + shock)
 
-            # --- 4. Bayesian Update (Normal-Normal Conjugate) ---
-            # Precision = 1 / variance
+            # Conjugate normal-normal update.
             prior_prec = 1.0 / (effective_prior_sigma**2)
             obs_prec = 1.0 / (obs_noise**2)
 
             posterior_sigma_sq = 1.0 / (prior_prec + obs_prec)
             posterior_mu = (prior_mu * prior_prec + observed_rating * obs_prec) * posterior_sigma_sq
             posterior_sigma = np.sqrt(posterior_sigma_sq)
+            posterior_sigma = max(posterior_sigma, MIN_SIGMA)
 
-            # Update State
             self.ratings[d_num] = (posterior_mu, posterior_sigma)
 
-            # Log for audit
             self.history.append(
                 UpdateRecord(
                     driver_number=d_num,

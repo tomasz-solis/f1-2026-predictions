@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
+from src.simulation.pit_strategy import generate_pit_strategy
 from src.utils.lap_by_lap_simulator import simulate_race_lap_by_lap
-from src.utils.pit_strategy import generate_pit_strategy
 
 try:
     from hypothesis import given, settings

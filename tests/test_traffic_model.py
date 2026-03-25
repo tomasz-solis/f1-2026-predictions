@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.utils.traffic_model import calculate_dirty_air_penalty, get_track_downforce_level
+from src.simulation.traffic_model import calculate_dirty_air_penalty, get_track_downforce_level
 
 
 def test_dirty_air_penalty_zero_outside_window():
@@ -18,13 +18,13 @@ def test_dirty_air_penalty_zero_outside_window():
 
 
 def test_dirty_air_penalty_monaco_close_following():
-    """At Monaco and ~1.0s gap, penalty should be around +0.04s/lap."""
+    """At Monaco and ~1.0s gap, penalty should reflect the steeper gap falloff."""
     penalty = calculate_dirty_air_penalty(
         gap_to_car_ahead_s=1.0,
         track_downforce_level=1.0,
         dirty_air_window_s=1.8,
     )
-    assert penalty == pytest.approx(0.04, abs=0.01)
+    assert penalty == pytest.approx(0.015, abs=0.005)
 
 
 def test_monaco_penalty_is_about_double_monza():
@@ -45,6 +45,7 @@ def test_monaco_penalty_is_about_double_monza():
 def test_get_track_downforce_level_fallbacks():
     """Known tracks should map directly, unknown tracks should fallback safely."""
     assert get_track_downforce_level("Monaco Grand Prix") == 1.0
+    assert get_track_downforce_level("Miami Grand Prix") == pytest.approx(0.72)
     assert get_track_downforce_level("Unknown Grand Prix", track_overtaking=0.66) == pytest.approx(
         0.66
     )

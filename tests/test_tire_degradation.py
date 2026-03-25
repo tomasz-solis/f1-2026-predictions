@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.utils.tire_degradation import (
+from src.simulation.tire_degradation import (
     calculate_fuel_delta,
     calculate_tire_deg_delta,
     estimate_stint_pace_degradation,
@@ -65,6 +65,18 @@ class TestCalculateTireDegDelta:
         # Full tank should have more degradation
         assert result_full > result_empty
         assert result_empty == pytest.approx(1.5, abs=0.01)  # 0.15 * 10 * 1.0
+
+    def test_non_positive_initial_fuel_falls_back_to_default(self):
+        """Non-positive initial fuel should not raise or divide by zero."""
+        result = calculate_tire_deg_delta(
+            tire_deg_slope=0.15,
+            laps_on_tire=10,
+            fuel_load_kg=50.0,
+            initial_fuel_kg=0.0,
+        )
+
+        expected = 0.15 * 10 * (1.0 + (0.10 * (50.0 / 110.0)))
+        assert result == pytest.approx(expected, abs=0.01)
 
     def test_track_temperature_increases_degradation_on_hot_track(self):
         """Higher track temperature should increase degradation penalty."""
@@ -196,7 +208,7 @@ class TestGetEffectiveTireDegSlope:
 
     def test_missing_base_slope_uses_config_default(self, monkeypatch):
         """Missing slope should fall back to configured default instead of crashing."""
-        import src.utils.tire_degradation as tire_degradation
+        import src.simulation.tire_degradation as tire_degradation
 
         def _mock_config_get(key, default=None):
             if key == "baseline_predictor.race.tire_physics.default_deg_slope":
@@ -234,6 +246,23 @@ class TestIntegrationScenarios:
         # Lap 20 should have higher penalty (no fresh advantage, high deg)
         lap20_net = lap20_deg - lap20_fresh + lap20_fuel
         assert lap20_net > 2.0  # Slower late in stint
+
+    def test_estimate_stint_pace_degradation_includes_compound_cliff(self):
+        """Long soft stints should degrade faster per lap once they run past the cliff."""
+        long_stint = estimate_stint_pace_degradation(
+            tire_deg_slope=0.05,
+            stint_length=35,
+            compound="SOFT",
+            fuel_load_start_kg=110.0,
+        )
+        short_stint = estimate_stint_pace_degradation(
+            tire_deg_slope=0.05,
+            stint_length=15,
+            compound="SOFT",
+            fuel_load_start_kg=110.0,
+        )
+
+        assert long_stint / 35 > short_stint / 15
 
     def test_red_bull_high_deg_scenario(self):
         """Test Red Bull's high SOFT degradation (0.421 s/lap)."""

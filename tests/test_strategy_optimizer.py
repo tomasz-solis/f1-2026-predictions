@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.utils.strategy_optimizer import (
+from src.simulation.strategy_optimizer import (
     calculate_pit_timing_bias_laps,
     calculate_undercut_window,
     evaluate_overcut,

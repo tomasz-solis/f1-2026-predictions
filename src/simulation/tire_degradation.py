@@ -94,6 +94,8 @@ def calculate_tire_deg_delta(
     # Load config
     if initial_fuel_kg is None:
         initial_fuel_kg = config_loader.get("baseline_predictor.race.fuel.initial_load_kg", 110.0)
+    if initial_fuel_kg <= 0:
+        initial_fuel_kg = 110.0
 
     fuel_deg_multiplier = config_loader.get("baseline_predictor.race.fuel.deg_multiplier", 0.10)
 
@@ -224,6 +226,7 @@ def estimate_stint_pace_degradation(
             laps_on_tire=lap_index,
             fuel_load_kg=fuel_remaining,
             initial_fuel_kg=fuel_load_start_kg,
+            compound=compound,
             track_temp=track_temp,
         )
 

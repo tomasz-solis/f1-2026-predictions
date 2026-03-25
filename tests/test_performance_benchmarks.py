@@ -5,8 +5,8 @@ import pytest
 
 pytest.importorskip("pytest_benchmark")
 
+from src.simulation.pit_strategy import generate_pit_strategy
 from src.utils.lap_by_lap_simulator import simulate_race_lap_by_lap
-from src.utils.pit_strategy import generate_pit_strategy
 
 
 @pytest.mark.benchmark

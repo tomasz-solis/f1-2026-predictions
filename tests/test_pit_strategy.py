@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from src.utils.pit_strategy import (
+from src.simulation.pit_strategy import (
     _get_default_strategy,
     _sample_compound_sequence,
     generate_pit_strategy,
@@ -397,7 +397,7 @@ class TestEdgeCases:
 
     def test_monaco_like_track_biases_later_than_monza_like(self):
         """Hard-to-pass tracks should bias pit timing later than easy-to-pass tracks."""
-        import src.utils.pit_strategy as pit_strategy_module
+        import src.simulation.pit_strategy as pit_strategy_module
 
         def _config_get(key: str, default=None):
             overrides = {

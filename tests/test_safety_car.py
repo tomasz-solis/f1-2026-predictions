@@ -1,8 +1,12 @@
 """Tests for safety car behavior in the lap-by-lap simulator."""
 
 import numpy as np
+import pytest
 
-from src.utils.lap_by_lap_simulator import simulate_race_lap_by_lap
+from src.utils.lap_by_lap_simulator import (
+    _calculate_safety_car_lap_probability,
+    simulate_race_lap_by_lap,
+)
 
 
 def _base_race_params() -> dict:
@@ -265,3 +269,14 @@ class TestSafetyCarProbabilityScaling:
 
         # With 50% SC probability, should see some effect but not every race
         assert sc_had_effect >= 0, "Test ran without errors"
+
+    def test_sc_probability_uses_geometric_conversion(self):
+        """Race-level SC probability should convert with a geometric per-lap hazard."""
+        sc_probability_race = 0.45
+        eligible_laps = 50
+
+        correct_prob = _calculate_safety_car_lap_probability(sc_probability_race, eligible_laps)
+        wrong_prob = sc_probability_race / eligible_laps
+
+        assert correct_prob > wrong_prob
+        assert correct_prob == pytest.approx(0.0119, abs=0.001)

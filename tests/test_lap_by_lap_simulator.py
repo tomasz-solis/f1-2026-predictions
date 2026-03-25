@@ -6,6 +6,7 @@ import pytest
 from src.utils.lap_by_lap_simulator import (
     _get_traffic_overtake_effect,
     _resolve_base_chaos_std,
+    _update_positions_from_times,
     simulate_race_lap_by_lap,
 )
 
@@ -128,6 +129,25 @@ def test_grid_gap_keeps_front_car_ahead_in_short_race():
     )
 
     assert result["finish_order"] == ["A", "B"]
+
+
+def test_dnf_position_ordering_uses_latest_retirement_first():
+    """A later DNF should classify ahead of an earlier retirement."""
+    driver_states = {
+        "driver_a": {"cumulative_time": 5400.0, "has_dnf": False, "position": 1},
+        "driver_b": {"cumulative_time": 5401.0, "has_dnf": False, "position": 2},
+        "driver_c": {"has_dnf": True, "dnf_lap": 45, "cumulative_time": 99999.0, "position": 3},
+        "driver_d": {"has_dnf": True, "dnf_lap": 20, "cumulative_time": 99999.0, "position": 4},
+        "driver_e": {"has_dnf": True, "dnf_lap": 5, "cumulative_time": 99999.0, "position": 5},
+    }
+
+    _update_positions_from_times(driver_states)
+
+    assert driver_states["driver_a"]["position"] == 1
+    assert driver_states["driver_b"]["position"] == 2
+    assert driver_states["driver_c"]["position"] == 3
+    assert driver_states["driver_d"]["position"] == 4
+    assert driver_states["driver_e"]["position"] == 5
 
 
 def test_fast_car_can_pass_on_easy_overtaking_track():
@@ -330,7 +350,7 @@ def test_dirty_air_penalty_is_stronger_on_monaco_than_monza():
 
     assert monaco_effect > monza_effect
     assert monaco_effect >= monza_effect * 1.8
-    assert monaco_effect == pytest.approx(0.04, abs=0.01)
+    assert monaco_effect == pytest.approx(0.015, abs=0.005)
 
 
 def test_dirty_air_penalty_not_applied_beyond_gap_window():

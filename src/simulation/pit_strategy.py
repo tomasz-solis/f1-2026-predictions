@@ -4,9 +4,9 @@ import logging
 
 import numpy as np
 
+from src.simulation.strategy_optimizer import calculate_pit_timing_bias_laps
 from src.types.prediction_types import PitStrategy
 from src.utils import config_loader
-from src.utils.strategy_optimizer import calculate_pit_timing_bias_laps
 
 logger = logging.getLogger(__name__)
 

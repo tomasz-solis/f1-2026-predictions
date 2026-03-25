@@ -192,6 +192,16 @@ class TestBayesianDriverRanking:
         assert final_sigma > 0.3
         assert final_sigma < 2.0
 
+    def test_sigma_floor_prevents_total_collapse(self, sample_priors):
+        """Repeated high-confidence updates should respect the sigma floor."""
+        ranker = BayesianDriverRanking(sample_priors)
+
+        for i in range(200):
+            ranker.update({"1": 1}, f"race_{i}", confidence=100.0)
+
+        _, final_sigma = ranker.ratings["1"]
+        assert final_sigma >= 0.05
+
     def test_consistent_loser_rating_drops(self, sample_priors):
         """Driver who consistently underperforms should see rating drop."""
         ranker = BayesianDriverRanking(sample_priors)
