@@ -1,60 +1,45 @@
-"""Feature pipeline orchestration."""
+"""Telemetry feature pipeline for driver summaries."""
+
+from __future__ import annotations
 
 import logging
 
 import numpy as np
 import pandas as pd
 
-from ..features.telemetry import LapFeatureExtractor, SessionFeatureAggregator
+from .telemetry import LapFeatureExtractor, SessionFeatureAggregator
 
 logger = logging.getLogger(__name__)
 
 
 class RelativePerformanceCalculator:
-    """Convert absolute features to relative performance vs field."""
+    """Convert absolute features into field-relative deltas and percentiles."""
 
-    def __init__(self, use_median=True):
-        """
-        use_median: If True, normalize to median (resistant to outliers).
-                   If False, normalize to mean.
-        """
+    def __init__(self, use_median: bool = True):
+        """Choose whether relative metrics are centered on the median or mean."""
         self.use_median = use_median
 
-    def normalize_features(self, features_df):
-        """
-        Add relative features: difference from field median/mean.
-        Prefix: 'fastest_lap_rel', 'avg_throttle_rel', etc.
-        """
+    def normalize_features(self, features_df: pd.DataFrame) -> pd.DataFrame:
+        """Add `<metric>_rel` columns based on the session baseline."""
         df = features_df.copy()
-
-        # Identify numeric columns (skip metadata like driver_code)
         numeric_cols = df.select_dtypes(include=[np.number]).columns
 
         for col in numeric_cols:
             if df[col].notna().sum() < 2:
-                continue  # Skip if not enough data
+                continue
 
-            if self.use_median:
-                baseline = df[col].median()
-            else:
-                baseline = df[col].mean()
-
+            baseline = df[col].median() if self.use_median else df[col].mean()
             df[f"{col}_rel"] = df[col] - baseline
 
         return df
 
-    def add_percentile_ranks(self, features_df):
-        """
-        Add percentile ranks for key features.
-        Example: fastest_lap_pct = 95 means faster than 95% of field.
-        """
+    def add_percentile_ranks(self, features_df: pd.DataFrame) -> pd.DataFrame:
+        """Add percentile columns for lap-time and speed-style metrics."""
         df = features_df.copy()
 
-        # Lower is better for lap times
         if "fastest_lap" in df.columns:
             df["fastest_lap_pct"] = df["fastest_lap"].rank(pct=True, ascending=True) * 100
 
-        # Higher is better for speed metrics
         speed_cols = [col for col in df.columns if "speed" in col.lower() and "_rel" not in col]
         for col in speed_cols:
             if col in df.columns:
@@ -64,36 +49,24 @@ class RelativePerformanceCalculator:
 
 
 class F1FeaturePipeline:
-    """
-    Complete feature extraction pipeline.
-
-    Usage:
-        pipeline = F1FeaturePipeline()
-        features = pipeline.process_session(session)
-    """
+    """Build a driver-level feature table from a FastF1 session object."""
 
     def __init__(self):
+        """Initialize the extractor, aggregator, and relative-metric calculator."""
         self.lap_extractor = LapFeatureExtractor()
         self.session_aggregator = SessionFeatureAggregator(self.lap_extractor)
         self.rel_calculator = RelativePerformanceCalculator(use_median=True)
 
-    def process_session(self, session, add_metadata=True):
-        """
-        Complete pipeline: Session → Features with relative performance.
-
-        Returns DataFrame with one row per driver.
-        """
-        # Step 1: Extract raw features
+    def process_session(self, session, add_metadata: bool = True) -> pd.DataFrame:
+        """Process one session into a feature table, optionally adding metadata."""
         features = self.session_aggregator.extract_all_drivers(session)
 
         if len(features) == 0:
             return pd.DataFrame()
 
-        # Step 2: Calculate relative performance
         normalized = self.rel_calculator.normalize_features(features)
         with_ranks = self.rel_calculator.add_percentile_ranks(normalized)
 
-        # Step 3: Add metadata
         if add_metadata:
             with_ranks["year"] = session.event["EventDate"].year
             with_ranks["event"] = session.event["EventName"]
@@ -102,9 +75,9 @@ class F1FeaturePipeline:
 
         return with_ranks
 
-    def process_multiple_sessions(self, sessions, verbose=True):
-        """Process multiple sessions and combine."""
-        all_features = []
+    def process_multiple_sessions(self, sessions, verbose: bool = True) -> pd.DataFrame:
+        """Process multiple sessions and concatenate their feature tables."""
+        all_features: list[pd.DataFrame] = []
 
         for i, session in enumerate(sessions):
             if verbose:

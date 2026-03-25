@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
-from src.pipelines.features import F1FeaturePipeline, RelativePerformanceCalculator
+from src.features import F1FeaturePipeline, RelativePerformanceCalculator
 
 
 def test_relative_performance_calculator_normalize_and_percentiles():
