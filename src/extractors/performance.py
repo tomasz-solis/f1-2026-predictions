@@ -1,8 +1,4 @@
-"""
-Performance Extraction - Clean Implementation
-
-Extracts and normalizes team performance RELATIVE to each other.
-"""
+"""Extract and normalize team performance relative to the field."""
 
 import numpy as np
 
@@ -38,7 +34,6 @@ def extract_all_teams_performance(
     all_team_data: dict[str, dict], session_name: str = "fp1"
 ) -> dict[str, dict]:
     """Extract and normalize team performance relative to each other from specified session."""
-    # Step 1: Extract raw metrics from all teams
     raw_metrics = {}
 
     for team, sessions in all_team_data.items():
@@ -54,7 +49,6 @@ def extract_all_teams_performance(
     if not raw_metrics:
         return {}
 
-    # Step 2: Normalize across all teams (z-scores)
     return _normalize_relative(raw_metrics)
 
 

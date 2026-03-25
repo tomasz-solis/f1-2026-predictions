@@ -73,7 +73,6 @@ class Config:
         except ImportError:
             logger.debug("Pydantic schemas not available, using legacy validation")
 
-        # 1. Check required sections exist
         required_sections = [
             "paths",
             "bayesian",
@@ -93,7 +92,6 @@ class Config:
                 "Check your config file structure."
             )
 
-        # 2. Validate baseline_predictor subsections
         baseline_predictor_config = config.get("baseline_predictor")
         if not isinstance(baseline_predictor_config, dict):
             raise ValueError(
@@ -104,7 +102,6 @@ class Config:
         if "race" not in baseline_predictor_config:
             raise ValueError("Config missing baseline_predictor.race section")
 
-        # 3. Type and range validation for critical parameters
         validations: list[ValidationSpec] = [
             # Bayesian model parameters
             ("bayesian.base_volatility", float, 0.0, 1.0),
@@ -214,7 +211,6 @@ class Config:
             error_msg = "Config validation failed:\n  - " + "\n  - ".join(errors)
             raise ValueError(error_msg)
 
-        # 4. Validate dependent parameter relationships.
         confidence_cap = self.get("baseline_predictor.qualifying.confidence_cap", 60)
         confidence_min = self.get("baseline_predictor.qualifying.confidence_min", 40)
         if confidence_min > confidence_cap:
@@ -270,7 +266,6 @@ class Config:
                 "front_threshold < upper_threshold < mid_threshold"
             )
 
-        # 5. Validate weight sums (qualifying)
         team_weight = self.get("baseline_predictor.qualifying.team_weight", 0.7)
         skill_weight = self.get("baseline_predictor.qualifying.skill_weight", 0.3)
         weight_sum = team_weight + skill_weight

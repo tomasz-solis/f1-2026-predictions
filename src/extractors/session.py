@@ -124,7 +124,7 @@ def extract_quali_order_from_positions(year, race_name, session_type):
             if "Position" not in results.columns:
                 continue
 
-            # Check we have enough valid positions
+            # Require enough valid positions to compare teams.
             valid_positions = results["Position"].notna().sum()
             if valid_positions < 5:
                 continue

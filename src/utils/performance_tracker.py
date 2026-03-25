@@ -1,9 +1,4 @@
-"""
-Legacy compatibility performance tracker.
-
-This lightweight class preserves imports for older scripts while keeping
-behavior intentionally minimal.
-"""
+"""Small metric tracker kept around for older scripts."""
 
 from __future__ import annotations
 
@@ -28,7 +23,7 @@ class PerformanceTracker:
             return None
         return float(mean(values))
 
-    # Backward-compatible aliases used by some archived scripts.
+    # Compatibility alias used by some archived scripts.
     add_result = record
 
     def to_dict(self) -> dict[str, dict[str, float | list[float] | None]]:

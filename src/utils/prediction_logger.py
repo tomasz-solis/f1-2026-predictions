@@ -366,7 +366,7 @@ class PredictionLogger:
 
     def reconcile_completed_prediction_actuals(self, year: int) -> int:
         """Attach saved target actuals to completed race weekends for a season."""
-        from src.utils.actual_results_fetcher import fetch_actual_session_results
+        from src.data.actual_results_fetcher import fetch_actual_session_results
         from src.utils.session_detector import SessionDetector
         from src.utils.weekend import is_sprint_weekend
 

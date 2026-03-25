@@ -14,9 +14,9 @@ from typing import Any
 import fastf1
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
-from src.utils.actual_results_fetcher import fetch_actual_session_results
+from src.data.actual_results_fetcher import fetch_actual_session_results
+from src.data.track_data_loader import KNOWN_MAIN_RACE_LAPS
 from src.utils.prediction_metrics import PredictionMetrics
-from src.utils.track_data_loader import KNOWN_MAIN_RACE_LAPS
 
 logger = logging.getLogger(__name__)
 

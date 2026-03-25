@@ -1,38 +1,10 @@
-"""
-
-Adapted from earlier internal team-mapping utilities for the 2026 prediction system.
-
-==============================================================================
-
-Team Name Canonicalization for F1 Data Pipeline
-
-Handles F1 team name variations across different data sources and years.
-Maps all variations to canonical team identifiers for consistent analysis.
-
-Key Features:
-- Handles team rebranding (AlphaTauri → RB, Alfa Romeo → Sauber)
-- Maps sponsor name changes to core team identity
-- Provides safe fallback for unknown teams
-- Logs unknown team names for manual review
-
-Example:
-    >>> from helpers.team_name_mapping import canonicalize_team, normalize_team_column
-    >>> canonicalize_team('Visa Cash App RB')
-    'RB'
-    >>> df = normalize_team_column(df, col='team')
-
-"""
+"""Map team names from different sources to a shared set of identifiers."""
 
 import logging
 
 import pandas as pd
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# TEAM NAME MAPPING
-# =============================================================================
 
 TEAM_NAME_MAP = {
     # Sauber lineage (Sauber → Alfa Romeo → Kick Sauber → Audi)
@@ -90,7 +62,7 @@ TEAM_NAME_MAP = {
     "Cadillac Racing": "CADILLAC",
 }
 
-# Mapping from canonical team IDs to team names used in car characteristics files.
+# Team names used in car-characteristics payloads.
 CHARACTERISTICS_TEAM_MAP = {
     "RED BULL": "Red Bull Racing",
     "MCLAREN": "McLaren",
@@ -104,11 +76,6 @@ CHARACTERISTICS_TEAM_MAP = {
     "AUDI": "Audi",
     "CADILLAC": "Cadillac F1",
 }
-
-
-# =============================================================================
-# CANONICALIZATION FUNCTIONS
-# =============================================================================
 
 
 def canonicalize_team(name: str) -> str:
@@ -206,8 +173,7 @@ def map_team_to_characteristics(name: str, known_teams: set[str] | None = None) 
 
     # Fuzzy fallback when an explicit known-team set is provided.
     if known_teams:
-        # Backward-compatible fallback when known teams still use legacy labels
-        # (for example, "Sauber" while canonical lineage is "Audi").
+        # Prefer a caller's known-team labels when they still use an older name.
         known_canonical_match = _resolve_known_team_by_canonical_id(canonical_id, known_teams)
         if known_canonical_match:
             return known_canonical_match

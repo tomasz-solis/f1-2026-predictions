@@ -1,30 +1,4 @@
-"""
-
-Originally from: Notebook 05 track characteristics extraction
-Adapted for 2026 Bayesian prediction system.
-
-==============================================================================
-
-Track characteristics extraction for F1 prediction system.
-
-This module provides functions to extract static track geometry characteristics
-from telemetry data for car-track matching in the prediction system.
-
-Key characteristics extracted:
-- Corner speed distribution (slow/medium/fast %)
-- Corner density and severity (corners/km, speed loss)
-- Power characteristics (full throttle %, top speed)
-- Tire stress proxy (energy score)
-- Track type (street circuit flag)
-
-Example:
-    >>> from helpers.track_extraction import extract_track_profile
-    >>> profile = extract_track_profile(2025, session)
-    >>> profile["corner_density"]
-
-Author: Tomasz Solis
-Date: December 2025
-"""
+"""Extract track-shape features from fastest-lap telemetry."""
 
 import logging
 
@@ -32,8 +6,7 @@ import pandas as pd
 from scipy.signal import find_peaks
 from sklearn.preprocessing import StandardScaler
 
-# NOTE: circuit.py moved to archive/ - contains legacy clustering/PCA analysis
-# We only use extract_track_metrics from it, which is now inlined below
+# Legacy clustering work lives in archived `circuit.py`; metric extraction stays here.
 
 logger = logging.getLogger(__name__)
 

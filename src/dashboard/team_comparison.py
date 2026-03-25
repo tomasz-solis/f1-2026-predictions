@@ -1,4 +1,4 @@
-"""Facade and Streamlit wrappers for team-comparison views."""
+"""Streamlit entry points for team-comparison views."""
 
 import json
 from hashlib import sha1

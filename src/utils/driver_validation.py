@@ -1,11 +1,4 @@
-"""
-Driver Data Validation (ERROR DETECTION ONLY)
-
-Validates driver characteristics for obvious extraction errors.
-Does NOT correct - only logs warnings if values seem wrong.
-
-If validation fails, FIX THE EXTRACTION, don't add caps!
-"""
+"""Validate driver characteristics for obvious extraction mistakes."""
 
 import logging
 
@@ -13,11 +6,7 @@ logger = logging.getLogger(__name__)
 
 
 def validate_driver_data(drivers: dict) -> list[str]:
-    """
-    Validate driver characteristics for obvious errors.
-
-    Returns list of error messages. Does NOT modify data.
-    """
+    """Validate driver characteristics and return any error messages."""
     errors = []
 
     for driver_code, driver_data in drivers.items():

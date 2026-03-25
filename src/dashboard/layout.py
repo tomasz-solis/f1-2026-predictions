@@ -9,7 +9,7 @@ import streamlit.components.v1 as components
 
 from .styles import CUSTOM_CSS
 
-# Brand asset config: update these filenames when you want to swap branding.
+# Brand asset filenames.
 BRAND_NAME = "Trackside Labs"
 BRAND_PAGE_TITLE = f"{BRAND_NAME} | Motorsport Forecasting"
 BRAND_ASSET_DIRS = (Path("assets/logos"),)

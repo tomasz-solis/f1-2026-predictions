@@ -474,7 +474,7 @@ def get_best_fp_performance_with_session_laps(
         logger.info(f"Using {session_label} for blending")
         return session_label, blended_data, blended_laps, session_laps_by_code
 
-    # Log why we're falling back to model-only
+    # Explain why practice data could not be blended.
     if errors_encountered:
         error_summary = ", ".join([f"{s}: {e.value}" for s, e in errors_encountered])
         logger.info(f"No valid practice data ({error_summary}) - using model-only predictions")
@@ -493,7 +493,7 @@ def blend_team_strength(
     if fp_performance is None:
         return model_strength
 
-    # Validate team name matches
+    # Check that both inputs cover the same teams.
     model_teams = set(model_strength.keys())
     fp_teams = set(fp_performance.keys())
 

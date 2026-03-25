@@ -58,7 +58,7 @@ def extract_race_data(year, race_name):
                 quali_pos = None
                 has_quali = False
 
-            # Calculate gain (only if we have quali)
+            # Calculate gained positions only when qualifying data is available.
             if has_quali and quali_pos is not None:
                 gain = quali_pos - race_pos
             else:

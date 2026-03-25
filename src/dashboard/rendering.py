@@ -1,4 +1,4 @@
-"""Facade module for dashboard prediction rendering helpers."""
+"""Convenience exports for dashboard prediction rendering helpers."""
 
 import pandas as pd
 

@@ -11,6 +11,8 @@ from pathlib import Path
 
 
 class LearningSystem:
+    """Store lightweight learning history and recent blend recommendations."""
+
     def __init__(self, data_dir="data/systems"):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -82,7 +84,6 @@ class LearningSystem:
         self, race: str, actual_results: dict, prediction_comparison: dict
     ) -> dict:
         """Update stats after a race weekend."""
-        # 1. Log the event
         self.state["history"].append(
             {
                 "race": race,
@@ -91,7 +92,6 @@ class LearningSystem:
             }
         )
 
-        # 2. Update Method Stats
         for _, data in prediction_comparison.items():
             method = data.get("method")
             mae = data.get("mae")

@@ -1,4 +1,4 @@
-"""Background warmup orchestration for precomputing dashboard predictions."""
+"""Background warmup helpers for precomputing dashboard predictions."""
 
 from __future__ import annotations
 

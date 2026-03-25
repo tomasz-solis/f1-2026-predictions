@@ -1,4 +1,4 @@
-"""Core orchestration helpers for race updater team-characteristics flow."""
+"""Shared helpers for race updater team-characteristics flow."""
 
 from __future__ import annotations
 

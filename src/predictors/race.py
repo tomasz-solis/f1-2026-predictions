@@ -1,9 +1,4 @@
-"""
-Legacy compatibility wrapper for race predictions.
-
-Older scripts import `RacePredictor` from this module; the active
-implementation now delegates to `Baseline2026Predictor`.
-"""
+"""Compatibility wrapper for older race prediction imports."""
 
 from __future__ import annotations
 
@@ -16,7 +11,7 @@ from src.types.prediction_types import QualifyingGridEntry
 
 
 class RacePredictor:
-    """Compat layer that preserves legacy constructor and predict signature."""
+    """Keep the old race predictor interface working."""
 
     def __init__(
         self,

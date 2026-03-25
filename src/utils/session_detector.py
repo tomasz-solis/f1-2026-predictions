@@ -100,7 +100,7 @@ class SessionDetector:
         return completed[-1] if completed else None
 
     def is_session_completed(self, year: int, race_name: str, session_name: str) -> bool:
-        """Backward-compatible completion check used by existing callers."""
+        """Return `True` when the requested session is complete."""
         return self.get_session_completion_state(year, race_name, session_name) == "completed"
 
     def get_session_completion_state(

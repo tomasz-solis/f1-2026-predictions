@@ -1,9 +1,4 @@
-"""Systematic learning loop for prediction calibration.
-
-This module updates persistent calibration state from completed prediction
-records (predicted vs actual results) and exposes lightweight adjustments
-that can be applied by qualifying/race predictors.
-"""
+"""Persistent calibration state derived from completed predictions."""
 
 from __future__ import annotations
 

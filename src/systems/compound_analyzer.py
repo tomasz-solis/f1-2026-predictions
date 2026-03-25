@@ -159,7 +159,7 @@ def extract_compound_metrics(
             )
             continue
 
-        # CONSISTENT SCHEMA: Always output same fields (None if unavailable)
+        # Keep the payload shape stable even when a metric is missing.
         metrics: dict[str, float | str | None] = {
             "laps_count": float(laps_count),
             "track_name": track_name,
@@ -177,7 +177,7 @@ def extract_compound_metrics(
         consistency = _calculate_compound_consistency(compound_laps)
         metrics["consistency"] = consistency if consistency is not None else None
 
-        # Only store if we have at least one meaningful metric
+        # Keep compounds that yielded at least one usable metric.
         has_data = (
             metrics["median_lap_time"] is not None
             or metrics["tire_deg_slope"] is not None

@@ -1,9 +1,4 @@
-"""
-Metrics and lap-selection helpers for testing updater flows.
-
-Kept as a separate module so the orchestration layer stays focused on loading
-sessions and writing outputs.
-"""
+"""Metrics and lap-selection helpers for testing updater flows."""
 
 from __future__ import annotations
 
@@ -53,7 +48,7 @@ def _filter_valid_laps(team_laps: pd.DataFrame) -> pd.DataFrame:
     if "LapTime" not in team_laps.columns:
         return team_laps.iloc[0:0].copy()
 
-    # For testing updates we prioritize availability over strict pit filtering.
+    # Testing updates favor coverage over strict pit filtering.
     # Timed laps are enough to infer early directionality.
     mask = team_laps["LapTime"].notna()
     # Testing sessions often have sparse/inconsistent IsAccurate flags.
@@ -579,9 +574,8 @@ def _extract_top_speed_capability(valid_laps: pd.DataFrame, quantile: float = 0.
     Estimate raw straight-line capability from the high end of a team's lap samples.
 
     Median trap speed is too conservative for mixed programs because it is pulled
-    down by cooldown, traffic, and heavy-fuel running. The snapshot UI needs a
-    better "what can the car do here?" signal, so we use a high percentile of the
-    per-lap trap maxima instead.
+    down by cooldown, traffic, and heavy-fuel running. Use a high percentile of
+    the per-lap trap maxima to better represent peak straight-line capability.
     """
     lap_top_speeds = _lap_top_speed_series(valid_laps)
     if lap_top_speeds.empty:

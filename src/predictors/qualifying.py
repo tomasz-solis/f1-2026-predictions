@@ -1,9 +1,4 @@
-"""
-Legacy compatibility wrapper for qualifying predictions.
-
-Older scripts import `QualifyingPredictor` from this module; the active
-implementation now delegates to `Baseline2026Predictor`.
-"""
+"""Compatibility wrapper for older qualifying prediction imports."""
 
 from __future__ import annotations
 
@@ -13,7 +8,7 @@ from src.predictors.baseline_2026 import Baseline2026Predictor
 
 
 class QualifyingPredictor:
-    """Compat layer that preserves legacy constructor and predict signature."""
+    """Keep the old qualifying predictor interface working."""
 
     def __init__(
         self,

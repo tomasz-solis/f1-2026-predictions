@@ -1,4 +1,4 @@
-"""Tests for legacy wrapper modules and small utility helpers."""
+"""Tests for predictor wrappers and small utility helpers."""
 
 from src.predictors import qualifying as qualifying_wrapper
 from src.predictors import race as race_wrapper
