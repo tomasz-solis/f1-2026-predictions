@@ -92,20 +92,19 @@ def load_static_configs():
 
 # --- SIMULATION ENGINE ---
 def run_simulation_loop(year=2026):
+    """Run a short season simulation using the canonical baseline predictor."""
     logger.info(f"  STARTING {year} SIMULATION ENGINE")
 
     # Imports inside function to avoid circular dependencies during setup
     from src.models.bayesian import BayesianDriverRanking
     from src.models.priors_factory import PriorsFactory  # <--- NEW IMPORT
     from src.models.regulations import apply_2026_regulations
-    from src.predictors.race import RacePredictor
+    from src.predictors import Baseline2026Predictor
     from src.systems.learning import LearningSystem
     from src.utils.lineups import get_lineups
-    from src.utils.performance_tracker import PerformanceTracker
     from src.utils.weekend import get_weekend_type
 
     # 1. Initialize Systems
-    tracker = PerformanceTracker()  # Tracks MAE
     learner = LearningSystem()  # Tracks Strategy (Blend vs Model)
 
     # 2. Build Priors (The Hierarchical Model)
@@ -118,16 +117,9 @@ def run_simulation_loop(year=2026):
     logger.info("   Applying 2026 regulation shocks...")
     current_priors = apply_2026_regulations(base_priors)
 
-    # 3. Spin up the Predictors
+    # 3. Spin up the predictor and the rating model
     ranker = BayesianDriverRanking(current_priors)
-
-    # FIX: Pass the raw driver characteristics dictionary, NOT the priors objects
-    # We also pass the path so the TirePredictor sub-module can load what it needs
-    predictor = RacePredictor(
-        driver_chars=factory.drivers,  # The stats (racecraft, consistency)
-        driver_chars_path=factory.driver_file,  # The path (for TirePredictor)
-        performance_tracker=tracker,
-    )
+    predictor = Baseline2026Predictor(season_year=year)
 
     # 4. Run a short season sample calendar
     calendar = [
@@ -149,14 +141,19 @@ def run_simulation_loop(year=2026):
         logger.info(f"   Format: {weekend_type.upper()} | Strategy: {strategy['method']}")
 
         # B. PREDICTION Phase (Mocking the grid)
-        # In real life: You'd run QualifyingPredictor here first
+        # In real life you would predict or observe qualifying first.
         mock_grid = [
             {"driver": d, "team": t, "position": i + 1}
             for i, (t, drivers) in enumerate(lineups.items())
             for d in drivers
         ][:20]
 
-        prediction = predictor.predict(year, race_name, mock_grid, verbose=False)
+        prediction = predictor.predict_race(
+            qualifying_grid=mock_grid,
+            weather="dry",
+            race_name=race_name,
+            year=year,
+        )
         predicted_winner = prediction["finish_order"][0]["driver"]
 
         logger.info(
@@ -166,10 +163,10 @@ def run_simulation_loop(year=2026):
         # C. REALITY Phase (Mocking results for the simulation)
         # Scenario: McLaren starts strong, Ferrari catches up
         if round_num <= 2:
-            actual_winner = "NOR"
+            actual_winner = "Lando Norris"
             podium = {"4": 1, "81": 2, "1": 3}
         else:
-            actual_winner = "LEC"
+            actual_winner = "Charles Leclerc"
             podium = {"16": 1, "4": 2, "44": 3}
 
         logger.info(f"   Actual winner: {actual_winner}")

@@ -1,3 +1,5 @@
+"""CLI helpers for live weekend prediction snapshots."""
+
 import argparse
 import importlib
 import logging
@@ -11,15 +13,10 @@ try:
 except ModuleNotFoundError:
     _tabulate = None
 
-from src.extractors.race_pace import extract_fp2_pace
 from src.extractors.session import extract_session_order_safe
-from src.models.priors_factory import PriorsFactory
-from src.models.regulations import apply_2026_regulations
-from src.predictors.qualifying import QualifyingPredictor
-from src.predictors.race import RacePredictor
+from src.predictors import Baseline2026Predictor
 from src.systems.learning import LearningSystem
 from src.utils.lineups import get_lineups
-from src.utils.performance_tracker import PerformanceTracker
 from src.utils.weekend import get_weekend_type
 
 # Logging Setup
@@ -120,36 +117,24 @@ def get_available_data(year, race_name, weekend_type):
 
 
 def run_weekend_predictions(year, race_name, weather="dry"):
+    """Run one qualifying and race prediction pass for the selected weekend."""
     # 1. Initialize & Auto-Learn
-    factory = PriorsFactory()
-    priors = apply_2026_regulations(factory.create_priors())
-    tracker = PerformanceTracker()
     learner = LearningSystem()
+    predictor = Baseline2026Predictor(season_year=year)
 
     # AUTO-CATCHUP: Learn from history before predicting today
     auto_catchup_history(year, learner)
-
-    from src.models.bayesian import BayesianDriverRanking
-
-    ranker = BayesianDriverRanking(priors)
-
-    quali_predictor = QualifyingPredictor(driver_ranker=ranker, performance_tracker=tracker)
-    race_predictor = RacePredictor(
-        driver_chars=factory.drivers,
-        driver_chars_path=factory.driver_file,
-        performance_tracker=tracker,
-    )
 
     # 2. Context
     weekend_type = get_weekend_type(year, race_name)
     data = get_available_data(year, race_name, weekend_type)
 
-    # Learning system can suggest blend weight, but legacy predictor wrappers
-    # currently delegate to baseline logic with fixed internal blending.
+    # The learning system still gives a useful confidence hint, but the
+    # baseline predictor now owns the actual session blending logic.
     blend_weight = learner.get_optimal_blend_weight(default=0.7)
     logger.info(
         "   Adaptive blend suggestion: "
-        f"{blend_weight:.2f} (compatibility path currently uses baseline internal blend)"
+        f"{blend_weight:.2f} (baseline predictor resolves session blending internally)"
     )
 
     # =========================================================
@@ -157,30 +142,21 @@ def run_weekend_predictions(year, race_name, weather="dry"):
     # =========================================================
     logger.info("\nPredicting qualifying...")
 
-    # Decide confidence label based on what we have.
-    # NOTE: method/blend args are kept for compatibility with older interfaces.
     if data["quali"]:
-        method, conf = (
-            "blend",
-            "Post-Quali Analysis",
-        )  # We predict to compare with reality
+        conf = "Post-Quali Analysis"
     elif data["fp3"] or data["sprint_quali"]:
-        method, conf = "blend", "High Confidence"
+        conf = "High Confidence"
     elif data["fp2"]:
-        method, conf = "blend", "Medium Confidence"
+        conf = "Medium Confidence"
     elif data["fp1"]:
-        method, conf = "blend", "Low Confidence"
+        conf = "Low Confidence"
     else:
-        method, conf = "model", "Baseline"
-        blend_weight = 0.0
+        conf = "Baseline"
     logger.info(f"   Qualifying confidence mode: {conf}")
 
-    q_result = quali_predictor.predict(
+    q_result = predictor.predict_qualifying(
         year=year,
         race_name=race_name,
-        method=method,
-        blend_weight=blend_weight,
-        verbose=False,
     )
 
     q_df = pd.DataFrame(q_result["grid"])
@@ -200,21 +176,12 @@ def run_weekend_predictions(year, race_name, weather="dry"):
         # Convert Quali Prediction DF to Grid list format
         grid = q_df.rename(columns={"position": "position"}).to_dict("records")
 
-    # 2. Get Pace Data
-    fp2_pace = extract_fp2_pace(year, race_name, verbose=False)
-    if fp2_pace:
-        logger.info("   [OK] Using Real FP2 Pace")
-    else:
-        logger.info("   [INFO]  Using Estimated Pace")
-
-    # 3. Predict
-    r_result = race_predictor.predict(
-        year=year,
-        race_name=race_name,
+    # 2. Predict
+    r_result = predictor.predict_race(
         qualifying_grid=grid,
-        fp2_pace=fp2_pace,
-        weather_forecast=weather,
-        verbose=False,
+        weather=weather,
+        race_name=race_name,
+        year=year,
     )
 
     r_df = pd.DataFrame(r_result["finish_order"])
