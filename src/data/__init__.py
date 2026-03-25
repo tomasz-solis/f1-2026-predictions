@@ -1,27 +1,27 @@
-"""Data domain package — track loading, data generation, results fetching, and compounds.
+"""Data domain package for track loading, results fetching, and compound helpers."""
 
-Re-exports the canonical implementations from ``src.utils`` so that new
-code can ``from src.data import load_track_specific_params`` while existing
-imports in ``src.utils`` keep working without any change.
-
-Heavy dependencies (actual_results_fetcher) are imported lazily so that the
-package can be loaded in lightweight environments.
-"""
-
-from src.utils.compound_performance import (
+from .compound_performance import (
     get_compound_performance_modifier,
     should_use_compound_adjustments,
 )
-from src.utils.compound_validator import (
+from .compound_validator import (
+    load_and_validate_compound_data,
     validate_compound_data,
     validate_compound_data_or_raise,
+    validate_pirelli_info,
+    validate_pirelli_info_or_raise,
 )
-from src.utils.data_generator import create_baseline_if_missing
-from src.utils.track_data_loader import (
+from .data_generator import create_baseline_if_missing
+from .track_data_loader import (
+    KNOWN_MAIN_RACE_LAPS,
+    KNOWN_SPRINT_LAPS,
     get_available_compounds,
     get_tire_stress_score,
     load_track_specific_params,
+    resolve_non_competitive_weather_features,
     resolve_race_distance_laps,
+    resolve_track_temperature_c,
+    resolve_track_temperature_profile,
 )
 
 
@@ -29,15 +29,15 @@ def __getattr__(name: str):
     """Lazily import heavy modules on first access."""
     _LAZY = {
         "fetch_actual_session_results": (
-            "src.utils.actual_results_fetcher",
+            "src.data.actual_results_fetcher",
             "fetch_actual_session_results",
         ),
         "get_competitive_session_completion_state": (
-            "src.utils.actual_results_fetcher",
+            "src.data.actual_results_fetcher",
             "get_competitive_session_completion_state",
         ),
         "is_competitive_session_completed": (
-            "src.utils.actual_results_fetcher",
+            "src.data.actual_results_fetcher",
             "is_competitive_session_completed",
         ),
     }
@@ -53,14 +53,22 @@ def __getattr__(name: str):
 __all__ = [
     "create_baseline_if_missing",
     "fetch_actual_session_results",
+    "KNOWN_MAIN_RACE_LAPS",
+    "KNOWN_SPRINT_LAPS",
     "get_available_compounds",
     "get_competitive_session_completion_state",
     "get_compound_performance_modifier",
     "get_tire_stress_score",
     "is_competitive_session_completed",
+    "load_and_validate_compound_data",
     "load_track_specific_params",
+    "resolve_non_competitive_weather_features",
     "resolve_race_distance_laps",
+    "resolve_track_temperature_c",
+    "resolve_track_temperature_profile",
     "should_use_compound_adjustments",
     "validate_compound_data",
     "validate_compound_data_or_raise",
+    "validate_pirelli_info",
+    "validate_pirelli_info_or_raise",
 ]

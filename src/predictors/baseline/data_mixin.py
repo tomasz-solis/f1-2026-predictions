@@ -9,6 +9,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from src.data.compound_performance import (
+    get_compound_performance_modifier,
+    should_use_compound_adjustments,
+)
 from src.persistence.artifact_store import ArtifactStore
 from src.predictors.baseline.compound_updates import update_compound_characteristics_from_session
 from src.predictors.baseline.data_support import (
@@ -44,10 +48,6 @@ from src.systems.weight_schedule import (
     get_recommended_schedule,
 )
 from src.utils import config_loader
-from src.utils.compound_performance import (
-    get_compound_performance_modifier,
-    should_use_compound_adjustments,
-)
 from src.utils.schema_validation import (
     validate_driver_characteristics,
     validate_team_characteristics,

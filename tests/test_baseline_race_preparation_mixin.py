@@ -156,7 +156,7 @@ def test_prepare_driver_info_with_compounds_builds_per_compound_strengths():
         }
     }
     with patch(
-        "src.utils.compound_performance.get_compound_performance_modifier",
+        "src.data.compound_performance.get_compound_performance_modifier",
         lambda team_compound_chars, compound: 0.05 if compound == "SOFT" else 0.0,
     ):
         info_map, long_profile_count = prep._prepare_driver_info_with_compounds(
@@ -201,7 +201,7 @@ def test_prepare_driver_info_with_compounds_defaults_missing_tire_deg_slope():
     }
 
     with patch(
-        "src.utils.compound_performance.get_compound_performance_modifier",
+        "src.data.compound_performance.get_compound_performance_modifier",
         lambda team_compound_chars, compound: 0.0,
     ):
         info_map, _ = prep._prepare_driver_info_with_compounds(
@@ -271,7 +271,7 @@ def test_prepare_driver_info_with_compounds_resolves_team_alias_for_compound_dat
     }
 
     with patch(
-        "src.utils.compound_performance.get_compound_performance_modifier",
+        "src.data.compound_performance.get_compound_performance_modifier",
         lambda team_compound_chars, compound: 0.05 if compound == "SOFT" else 0.0,
     ):
         info_map, _ = prep._prepare_driver_info_with_compounds(

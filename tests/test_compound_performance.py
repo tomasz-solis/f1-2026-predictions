@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.utils.compound_performance import (
+from src.data.compound_performance import (
     get_compound_performance_modifier,
     get_compound_tire_deg_factor,
     get_team_compound_advantage,

@@ -73,7 +73,7 @@ def validate_compound_data(compound_data: dict) -> None:
 
 
 def validate_compound_data_or_raise(compound_data: dict) -> None:
-    """Backward-compatible wrapper for exception-based validation."""
+    """Compatibility wrapper for exception-based validation."""
     validate_compound_data(compound_data)
 
 
@@ -127,7 +127,7 @@ def validate_pirelli_info(pirelli_data: dict) -> None:
 
 
 def validate_pirelli_info_or_raise(pirelli_data: dict) -> None:
-    """Backward-compatible wrapper for exception-based validation."""
+    """Compatibility wrapper for exception-based validation."""
     validate_pirelli_info(pirelli_data)
 
 

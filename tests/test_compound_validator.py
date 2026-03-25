@@ -2,7 +2,7 @@
 
 import json
 
-from src.utils.compound_validator import (
+from src.data.compound_validator import (
     load_and_validate_compound_data,
     validate_compound_data,
     validate_pirelli_info,

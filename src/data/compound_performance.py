@@ -77,7 +77,7 @@ def get_compound_tire_deg_factor(
     if tire_deg_perf is None:
         return 0.5
 
-    # Invert: we want 0.0 = best (low deg), 1.0 = worst (high deg)
+    # Invert the metric so lower degradation maps to a lower factor.
     return 1.0 - float(tire_deg_perf)
 
 

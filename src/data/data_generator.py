@@ -1,9 +1,4 @@
-"""
-Automatic Data Generation for Baseline Predictor
-
-This module automatically generates baseline characteristics if they don't exist
-or are outdated. Called automatically by Baseline2026Predictor on first use.
-"""
+"""Generate baseline artifacts when preseason data is missing or stale."""
 
 import json
 import logging
@@ -15,12 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_baseline_if_missing(data_dir: Path) -> None:
-    """
-    Create baseline data when files are missing or outdated.
-
-    This is called automatically when Baseline2026Predictor is initialized.
-    No manual script running required!
-    """
+    """Create baseline data when the required artifacts are missing or stale."""
     logger.info("Checking baseline data status...")
 
     # Check all required files
@@ -66,11 +56,7 @@ def create_baseline_if_missing(data_dir: Path) -> None:
 
 
 def generate_quick_baseline(data_dir: Path) -> None:
-    """
-    Generate quick baseline without expensive historical analysis.
-
-    Uses typical F1 values for teams and tracks.
-    """
+    """Generate a lightweight baseline without expensive historical analysis."""
     logger.info("Generating neutral team baseline...")
     generate_neutral_team_characteristics(data_dir)
 
@@ -85,14 +71,8 @@ def generate_quick_baseline(data_dir: Path) -> None:
 
 
 def generate_neutral_team_characteristics(data_dir: Path) -> None:
-    """
-    Generate team characteristics for 2026 based on 2025 final standings.
-
-    Uses 2025 constructor standings as starting point with HIGH uncertainty.
-    Still acknowledges we don't know 2026, but better than pure random.
-    """
-    # 2025 Constructor Standings (as of end of season)
-    # These are STARTING POINTS with high uncertainty - regulations changed!
+    """Generate 2026 team characteristics from 2025 constructor standings."""
+    # Use the 2025 standings as a preseason anchor with deliberately high uncertainty.
     team_2025_standings = {
         "McLaren": {"position": 1, "performance": 0.85},  # Champions
         "Mercedes": {"position": 2, "performance": 0.75},

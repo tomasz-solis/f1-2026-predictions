@@ -1,4 +1,4 @@
-"""2026 baseline predictor facade with explicit public delegation."""
+"""Entry point for the 2026 baseline predictor."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from src.data.data_generator import create_baseline_if_missing
 from src.persistence.artifact_store import ArtifactStore
 from src.predictors.baseline import (
     BaselineDataMixin,
@@ -22,7 +23,6 @@ from src.predictors.baseline.components import (
 from src.systems.systematic_learning import SystematicLearningSystem
 from src.types.prediction_types import QualifyingGridEntry
 from src.utils.config_loader import Config
-from src.utils.data_generator import create_baseline_if_missing
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class Baseline2026Predictor(
     BaselineQualifyingMixin,
     BaselineRaceMixin,
 ):
-    """Facade coordinating 2026 prediction components."""
+    """Wire together the baseline predictor components."""
 
     def __init__(
         self,
@@ -42,7 +42,7 @@ class Baseline2026Predictor(
         config: Config | None = None,
         artifact_store: ArtifactStore | None = None,
     ):
-        """Initialize predictor state and component delegates."""
+        """Initialize predictor state and supporting components."""
         BaselineDataMixin.__init__(self)
 
         self.seed = seed
@@ -74,7 +74,6 @@ class Baseline2026Predictor(
         )
         self.config = config or Config()
 
-        # Facade components keep responsibilities explicit while preserving existing logic.
         self.data_loader = BaselineDataLoader(self)
         self.strength_calculator = BaselineStrengthCalculator(self)
         self.qualifying_engine = BaselineQualifyingEngine(self)
@@ -82,25 +81,20 @@ class Baseline2026Predictor(
 
         self.load_data()
 
-    # ------------------------------------------------------------------
-    # Public API — explicit delegation to components.
-    # Internal helpers come from normal mixin inheritance.
-    # ------------------------------------------------------------------
-
     def load_data(self) -> None:
-        """Load team/driver/track data through the data loader component."""
+        """Load team, driver, and track data."""
         self.data_loader.load_data()
 
     def calculate_track_suitability(self, team: str, race_name: str) -> float:
-        """Delegate track suitability calculation to the strength component."""
+        """Return track suitability for a team at a given race."""
         return self.strength_calculator.calculate_track_suitability(team=team, race_name=race_name)
 
     def get_blended_team_strength(self, team: str, race_name: str) -> float:
-        """Delegate blended strength calculation to the strength component."""
+        """Return the blended team strength for a given race."""
         return self.strength_calculator.get_blended_team_strength(team=team, race_name=race_name)
 
     def _select_race_compound(self, race_name: str) -> str:
-        """Delegate race compound selection to the strength component."""
+        """Return the likely primary race compound."""
         return self.strength_calculator.select_race_compound(race_name=race_name)
 
     def get_compound_adjusted_team_strength(
@@ -109,7 +103,7 @@ class Baseline2026Predictor(
         race_name: str,
         compound: str = "MEDIUM",
     ) -> float:
-        """Delegate compound-adjusted strength calculation to the strength component."""
+        """Return team strength adjusted for the selected compound."""
         return self.strength_calculator.get_compound_adjusted_team_strength(
             team=team,
             race_name=race_name,
@@ -125,7 +119,7 @@ class Baseline2026Predictor(
         practice_signal_mode: str = "auto",
         checkpoint_session_name: str | None = None,
     ) -> dict[str, Any]:
-        """Delegate qualifying prediction to the qualifying engine."""
+        """Predict the qualifying order for a race weekend."""
         return self.qualifying_engine.predict(
             year=year,
             race_name=race_name,

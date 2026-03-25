@@ -138,7 +138,7 @@ def fetch_actual_competitive_results_if_completed(
     session_name: str,
 ) -> tuple[list[QualifyingGridEntry] | None, str]:
     """Return actual competitive-session results when the session is complete."""
-    from src.utils.actual_results_fetcher import (
+    from src.data.actual_results_fetcher import (
         fetch_actual_session_results,
         get_competitive_session_completion_state,
     )
@@ -240,7 +240,7 @@ def fetch_grid_if_available(
     predicted_grid: list,
 ) -> tuple[list, str]:
     """Fetch actual grid if session completed, otherwise use predicted grid."""
-    from src.utils.actual_results_fetcher import (
+    from src.data.actual_results_fetcher import (
         fetch_actual_session_results,
         get_competitive_session_completion_state,
     )

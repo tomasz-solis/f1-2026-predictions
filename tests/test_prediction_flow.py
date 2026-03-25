@@ -608,7 +608,7 @@ def test_run_prediction_uses_actual_sprint_race_section_after_completion(patcher
 
 
 def test_fetch_grid_if_available_uses_actual_grid_for_completed_session(patcher):
-    from src.utils import actual_results_fetcher
+    import src.data.actual_results_fetcher as actual_results_fetcher
 
     patcher.setattr(
         actual_results_fetcher,
@@ -635,7 +635,7 @@ def test_fetch_grid_if_available_uses_actual_grid_for_completed_session(patcher)
 
 
 def test_fetch_grid_if_available_fails_closed_when_completed_results_missing(patcher):
-    from src.utils import actual_results_fetcher
+    import src.data.actual_results_fetcher as actual_results_fetcher
 
     patcher.setattr(
         actual_results_fetcher,
@@ -658,7 +658,7 @@ def test_fetch_grid_if_available_fails_closed_when_completed_results_missing(pat
 
 
 def test_fetch_grid_if_available_raises_when_completion_state_is_unknown(patcher):
-    from src.utils import actual_results_fetcher
+    import src.data.actual_results_fetcher as actual_results_fetcher
 
     patcher.setattr(
         actual_results_fetcher,

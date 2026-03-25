@@ -262,11 +262,7 @@ def get_competitive_session_completion_state(
     race_name: str,
     session_name: str,
 ) -> SessionCompletionState:
-    """
-    Get competitive-session completion state.
-
-    Only checks COMPETITIVE sessions (SQ, Sprint, Quali, Race).
-    """
+    """Return the completion state for a competitive session."""
     from src.utils.session_detector import SessionDetector
 
     detector = SessionDetector()
@@ -274,5 +270,5 @@ def get_competitive_session_completion_state(
 
 
 def is_competitive_session_completed(year: int, race_name: str, session_name: str) -> bool:
-    """Backward-compatible boolean completion check for competitive sessions."""
+    """Return `True` when a competitive session is complete."""
     return get_competitive_session_completion_state(year, race_name, session_name) == "completed"

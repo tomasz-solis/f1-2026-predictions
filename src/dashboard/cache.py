@@ -116,8 +116,9 @@ def get_predictor(_artifact_versions: dict[str, tuple[int, str]], year: int = _D
     from src.predictors.baseline_2026 import Baseline2026Predictor
     from src.utils.config_loader import Config
 
-    original_level = logging.getLogger("src.utils.data_generator").level
-    logging.getLogger("src.utils.data_generator").setLevel(logging.WARNING)
+    canonical_logger = logging.getLogger("src.data.data_generator")
+    original_canonical_level = canonical_logger.level
+    canonical_logger.setLevel(logging.WARNING)
 
     # Refresh singleton config so cache invalidation on config/default.yaml
     # actually propagates into newly created predictors.
@@ -128,6 +129,6 @@ def get_predictor(_artifact_versions: dict[str, tuple[int, str]], year: int = _D
 
     predictor = Baseline2026Predictor(season_year=year)
 
-    logging.getLogger("src.utils.data_generator").setLevel(original_level)
+    canonical_logger.setLevel(original_canonical_level)
 
     return predictor

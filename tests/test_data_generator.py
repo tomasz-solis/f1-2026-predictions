@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import src.utils.data_generator as data_generator
+import src.data.data_generator as data_generator
 
 
 def _write_baseline_artifacts(data_dir: Path, team_freshness: str, track_freshness: str) -> None:

@@ -22,6 +22,7 @@ from src.dashboard.update_flow import (
     auto_update_practice_characteristics_if_needed,
     detect_event_boundary_refresh_if_needed,
 )
+from src.data.actual_results_fetcher import fetch_actual_session_results
 from src.persistence.artifact_store import ArtifactStore
 from src.persistence.config import should_read_db_first, should_write_to_db, should_write_to_file
 from src.persistence.runtime_state_store import RuntimeStateStore
@@ -33,7 +34,6 @@ from src.utils.accuracy_targets import (
     synthesize_legacy_targets,
     weekend_format_name,
 )
-from src.utils.actual_results_fetcher import fetch_actual_session_results
 from src.utils.auto_updater import auto_update_from_races, needs_update
 from src.utils.prediction_logger import PredictionLogger
 from src.utils.prediction_metrics import PredictionMetrics

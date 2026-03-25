@@ -254,7 +254,7 @@ class BaselineRacePreparationMixin:
         race_name: str | None,
     ) -> tuple[dict[str, DriverRaceInfo], int]:
         """Build driver info map with per-compound team strengths for lap-by-lap simulation."""
-        from src.utils.compound_performance import get_compound_performance_modifier
+        from src.data.compound_performance import get_compound_performance_modifier
 
         driver_info_map, profile_count = prepare_driver_info_with_compounds_core(
             qualifying_grid=qualifying_grid,

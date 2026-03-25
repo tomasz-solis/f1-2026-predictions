@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
-from src.utils.actual_results_fetcher import fetch_actual_session_results
+from src.data.actual_results_fetcher import fetch_actual_session_results
 
 
 def test_fetch_actual_session_results_canonicalizes_teams_and_positions():
@@ -29,7 +29,7 @@ def test_fetch_actual_session_results_canonicalizes_teams_and_positions():
     mock_session = MagicMock()
     mock_session.results = pd.DataFrame(rows)
 
-    with patch("src.utils.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
+    with patch("src.data.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
         results = fetch_actual_session_results(2026, "Bahrain Grand Prix", "Q")
 
     assert results is not None
@@ -48,7 +48,7 @@ def test_fetch_actual_session_results_fails_closed_on_malformed_row():
         ]
     )
 
-    with patch("src.utils.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
+    with patch("src.data.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
         results = fetch_actual_session_results(2026, "Bahrain Grand Prix", "Q")
 
     assert results is None
@@ -80,7 +80,7 @@ def test_fetch_actual_session_results_fails_closed_on_missing_position():
     mock_session = MagicMock()
     mock_session.results = pd.DataFrame(rows)
 
-    with patch("src.utils.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
+    with patch("src.data.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
         results = fetch_actual_session_results(2026, "Bahrain Grand Prix", "Q")
 
     assert results is None
@@ -95,7 +95,7 @@ def test_fetch_actual_session_results_fails_closed_on_too_few_entries():
         ]
     )
 
-    with patch("src.utils.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
+    with patch("src.data.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
         results = fetch_actual_session_results(2026, "Bahrain Grand Prix", "Q")
 
     assert results is None
@@ -118,7 +118,7 @@ def test_fetch_actual_session_results_rejects_partial_competitive_grid():
     mock_session = MagicMock()
     mock_session.results = pd.DataFrame(rows)
 
-    with patch("src.utils.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
+    with patch("src.data.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
         results = fetch_actual_session_results(2026, "Bahrain Grand Prix", "Q")
 
     assert results is None
@@ -148,7 +148,7 @@ def test_fetch_actual_session_results_infers_trailing_qualifying_positions():
     mock_session = MagicMock()
     mock_session.results = pd.DataFrame(rows)
 
-    with patch("src.utils.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
+    with patch("src.data.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
         results = fetch_actual_session_results(2026, "Australian Grand Prix", "Q")
 
     assert results is not None
@@ -197,7 +197,7 @@ def test_fetch_actual_session_results_recomputes_partial_qualifying_positions_be
 
     mock_session._calculate_quali_like_session_results.side_effect = _recompute_results
 
-    with patch("src.utils.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
+    with patch("src.data.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
         results = fetch_actual_session_results(2026, "Australian Grand Prix", "Q")
 
     assert results is not None

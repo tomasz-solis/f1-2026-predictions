@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from fastf1.exceptions import DataNotLoadedError
 
-from src.utils.track_data_loader import (
+from src.data.track_data_loader import (
     get_available_compounds,
     get_tire_stress_score,
     load_track_specific_params,
@@ -50,7 +50,7 @@ def test_resolve_race_distance_uses_fastf1_metadata_for_unknown_tracks():
     mock_session = MagicMock()
     mock_session.total_laps = 63
 
-    with patch("src.utils.track_data_loader.fastf1.get_session", return_value=mock_session):
+    with patch("src.data.track_data_loader.fastf1.get_session", return_value=mock_session):
         laps = resolve_race_distance_laps(2026, "Imaginary Grand Prix", is_sprint=False)
 
     assert laps == 63
@@ -58,7 +58,7 @@ def test_resolve_race_distance_uses_fastf1_metadata_for_unknown_tracks():
 
 
 def test_resolve_race_distance_falls_back_when_fastf1_fails():
-    with patch("src.utils.track_data_loader.fastf1.get_session", side_effect=RuntimeError("boom")):
+    with patch("src.data.track_data_loader.fastf1.get_session", side_effect=RuntimeError("boom")):
         assert resolve_race_distance_laps(2026, "Unknown Grand Prix", is_sprint=False) == 60
         assert resolve_race_distance_laps(2026, "Unknown Grand Prix", is_sprint=True) == 20
 
@@ -82,7 +82,7 @@ def test_load_track_specific_params_uses_requested_year_payload(tmp_path):
     )
 
     with patch(
-        "src.utils.track_data_loader.config_loader.get",
+        "src.data.track_data_loader.config_loader.get",
         side_effect=lambda key, default=None: (
             str(processed_root) if key == "paths.processed" else default
         ),
@@ -113,7 +113,7 @@ def test_load_track_specific_params_falls_back_to_previous_available_year(tmp_pa
     )
 
     with patch(
-        "src.utils.track_data_loader.config_loader.get",
+        "src.data.track_data_loader.config_loader.get",
         side_effect=lambda key, default=None: (
             str(processed_root) if key == "paths.processed" else default
         ),
@@ -144,7 +144,7 @@ def test_load_track_specific_params_normalizes_underscaled_overtaking_values(tmp
     )
 
     with patch(
-        "src.utils.track_data_loader.config_loader.get",
+        "src.data.track_data_loader.config_loader.get",
         side_effect=lambda key, default=None: (
             str(processed_root) if key == "paths.processed" else default
         ),
@@ -173,7 +173,7 @@ def test_load_track_specific_params_accepts_categorical_overtaking_difficulty(tm
     )
 
     with patch(
-        "src.utils.track_data_loader.config_loader.get",
+        "src.data.track_data_loader.config_loader.get",
         side_effect=lambda key, default=None: (
             str(processed_root) if key == "paths.processed" else default
         ),
@@ -203,7 +203,7 @@ def test_load_track_specific_params_infers_overtaking_from_likelihood_when_neede
     )
 
     with patch(
-        "src.utils.track_data_loader.config_loader.get",
+        "src.data.track_data_loader.config_loader.get",
         side_effect=lambda key, default=None: (
             str(processed_root) if key == "paths.processed" else default
         ),
@@ -238,7 +238,7 @@ def test_load_track_specific_params_uses_default_baseline_for_unknown_under_scal
             return 0.46
         return default
 
-    with patch("src.utils.track_data_loader.config_loader.get", side_effect=_cfg_get):
+    with patch("src.data.track_data_loader.config_loader.get", side_effect=_cfg_get):
         params = load_track_specific_params("Imaginary Grand Prix", year=2026)
 
     assert params["track_overtaking"] == pytest.approx(0.46)
@@ -264,7 +264,7 @@ def test_load_track_specific_params_blends_observed_overtaking_gradually(tmp_pat
     )
 
     with patch(
-        "src.utils.track_data_loader.config_loader.get",
+        "src.data.track_data_loader.config_loader.get",
         side_effect=lambda key, default=None: (
             str(processed_root) if key == "paths.processed" else default
         ),
@@ -292,7 +292,7 @@ def test_get_tire_stress_score_uses_resolved_year_file(tmp_path):
         )
     )
 
-    with patch("src.utils.track_data_loader._resolve_pirelli_path", return_value=pirelli_path):
+    with patch("src.data.track_data_loader._resolve_pirelli_path", return_value=pirelli_path):
         stress = get_tire_stress_score("Bahrain Grand Prix", year=2027)
 
     assert stress == 3.5
@@ -314,9 +314,9 @@ def test_resolve_track_temperature_prefers_latest_completed_session_weather():
     quali_session.session_status = pd.DataFrame({"Status": ["Finished"]})
 
     with (
-        patch("src.utils.track_data_loader.fastf1.get_event", return_value=event),
+        patch("src.data.track_data_loader.fastf1.get_event", return_value=event),
         patch(
-            "src.utils.track_data_loader.fastf1.get_session", return_value=quali_session
+            "src.data.track_data_loader.fastf1.get_session", return_value=quali_session
         ) as get_session,
     ):
         resolved = resolve_track_temperature_c(
@@ -351,11 +351,11 @@ def test_resolve_track_temperature_uses_air_temp_when_track_temp_missing():
         return default
 
     with (
-        patch("src.utils.track_data_loader.fastf1.get_event", return_value=event),
+        patch("src.data.track_data_loader.fastf1.get_event", return_value=event),
         patch(
-            "src.utils.track_data_loader.fastf1.get_session", return_value=fp1_session
+            "src.data.track_data_loader.fastf1.get_session", return_value=fp1_session
         ) as get_session,
-        patch("src.utils.track_data_loader.config_loader.get", side_effect=_cfg_get),
+        patch("src.data.track_data_loader.config_loader.get", side_effect=_cfg_get),
     ):
         resolved = resolve_track_temperature_c(
             year=2026,
@@ -370,7 +370,7 @@ def test_resolve_track_temperature_uses_air_temp_when_track_temp_missing():
 
 def test_resolve_track_temperature_falls_back_when_fastf1_unavailable():
     with patch(
-        "src.utils.track_data_loader.fastf1.get_event",
+        "src.data.track_data_loader.fastf1.get_event",
         side_effect=RuntimeError("network unavailable"),
     ):
         resolved = resolve_track_temperature_c(
@@ -409,8 +409,8 @@ def test_resolve_track_temperature_handles_unloaded_session_status():
             raise DataNotLoadedError("The data you are trying to access has not been loaded yet.")
 
     with (
-        patch("src.utils.track_data_loader.fastf1.get_event", return_value=event),
-        patch("src.utils.track_data_loader.fastf1.get_session", return_value=_WeatherOnlySession()),
+        patch("src.data.track_data_loader.fastf1.get_event", return_value=event),
+        patch("src.data.track_data_loader.fastf1.get_session", return_value=_WeatherOnlySession()),
     ):
         resolved = resolve_track_temperature_c(
             year=2026,
@@ -438,8 +438,8 @@ def test_resolve_track_temperature_profile_reports_session_blend_metadata():
     quali_session.session_status = pd.DataFrame({"Status": ["Finished"]})
 
     with (
-        patch("src.utils.track_data_loader.fastf1.get_event", return_value=event),
-        patch("src.utils.track_data_loader.fastf1.get_session", return_value=quali_session),
+        patch("src.data.track_data_loader.fastf1.get_event", return_value=event),
+        patch("src.data.track_data_loader.fastf1.get_session", return_value=quali_session),
     ):
         profile = resolve_track_temperature_profile(
             year=2026,
@@ -479,9 +479,9 @@ def test_resolve_track_temperature_profile_reports_air_temp_inferred_source():
         return default
 
     with (
-        patch("src.utils.track_data_loader.fastf1.get_event", return_value=event),
-        patch("src.utils.track_data_loader.fastf1.get_session", return_value=fp1_session),
-        patch("src.utils.track_data_loader.config_loader.get", side_effect=_cfg_get),
+        patch("src.data.track_data_loader.fastf1.get_event", return_value=event),
+        patch("src.data.track_data_loader.fastf1.get_session", return_value=fp1_session),
+        patch("src.data.track_data_loader.config_loader.get", side_effect=_cfg_get),
     ):
         profile = resolve_track_temperature_profile(
             year=2026,
@@ -521,9 +521,9 @@ def test_resolve_non_competitive_weather_features_uses_latest_completed_practice
     fp3_session.session_status = pd.DataFrame({"Status": ["Finished"]})
 
     with (
-        patch("src.utils.track_data_loader.fastf1.get_event", return_value=event),
+        patch("src.data.track_data_loader.fastf1.get_event", return_value=event),
         patch(
-            "src.utils.track_data_loader.fastf1.get_session", return_value=fp3_session
+            "src.data.track_data_loader.fastf1.get_session", return_value=fp3_session
         ) as get_session,
     ):
         features = resolve_non_competitive_weather_features(
@@ -545,7 +545,7 @@ def test_resolve_non_competitive_weather_features_uses_latest_completed_practice
 
 def test_resolve_non_competitive_weather_features_falls_back_when_event_unavailable():
     with patch(
-        "src.utils.track_data_loader.fastf1.get_event",
+        "src.data.track_data_loader.fastf1.get_event",
         side_effect=RuntimeError("network unavailable"),
     ):
         features = resolve_non_competitive_weather_features(
