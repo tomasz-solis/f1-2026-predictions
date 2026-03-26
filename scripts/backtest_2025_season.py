@@ -22,7 +22,7 @@ import fastf1
 # Add project root to path when run as a script.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.predictors.baseline_2026 import Baseline2026Predictor
+from src.predictors import Baseline2026Predictor
 from src.utils.backtesting import (
     NestedDictConfig,
     aggregate_race_metrics,

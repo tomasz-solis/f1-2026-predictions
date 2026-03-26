@@ -92,7 +92,7 @@ def load_static_configs():
 
 # --- SIMULATION ENGINE ---
 def run_simulation_loop(year=2026):
-    """Run a short season simulation using the canonical baseline predictor."""
+    """Run a short season simulation using the shared baseline predictor."""
     logger.info(f"  STARTING {year} SIMULATION ENGINE")
 
     # Imports inside function to avoid circular dependencies during setup

@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.persistence.config import USE_DB_STORAGE
-from src.predictors.baseline_2026 import Baseline2026Predictor
+from src.predictors import Baseline2026Predictor
 
 
 def main():

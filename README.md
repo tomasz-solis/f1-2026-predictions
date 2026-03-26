@@ -31,8 +31,8 @@ Core prediction services on the active runtime path:
 - `src/systems/weight_schedule.py`
 - `src/utils/fp_blending.py`
 
-`src/predictors/qualifying.py` and `src/predictors/race.py` are compatibility wrappers that delegate to `Baseline2026Predictor`.
-The user-facing tab is called `Prediction`, but the route is still handled by `render_live_prediction_page()` in code for backwards compatibility.
+`src/predictors/__init__.py` re-exports `Baseline2026Predictor` so scripts can import from the package root.
+The user-facing tab is called `Prediction`, but the route is still handled by `render_live_prediction_page()` in code for backward compatibility.
 
 Current dashboard tabs:
 

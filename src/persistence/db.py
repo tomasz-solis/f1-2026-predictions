@@ -1,8 +1,4 @@
-"""
-Supabase client wrapper for database operations.
-
-Provides a singleton Supabase client with automatic connection pooling.
-"""
+"""Supabase client access for database-backed storage."""
 
 import logging
 
@@ -12,16 +8,11 @@ from .config import get_supabase_key, get_supabase_url, is_db_enabled
 
 logger = logging.getLogger(__name__)
 
-# Singleton Supabase client instance
 _supabase_client: Client | None = None
 
 
 def get_supabase_client() -> Client:
-    """
-    Get or create Supabase client (singleton pattern).
-
-    Raises RuntimeError if DB storage not enabled or credentials missing.
-    """
+    """Return the shared Supabase client for this process."""
     global _supabase_client
 
     if not is_db_enabled():
@@ -46,14 +37,9 @@ def get_supabase_client() -> Client:
 
 
 def check_connection() -> str:
-    """Health check: Verify Supabase connection is working.
-
-    Raises:
-        RuntimeError: If the connection health check fails.
-    """
+    """Run a simple read to confirm the Supabase connection works."""
     try:
         client = get_supabase_client()
-        # Quick health check: query for any artifact (limit 1)
         result = client.table("artifacts").select("id").limit(1).execute()
         return f"Supabase connection healthy ({len(result.data)} row(s) accessible)"
     except Exception as e:
@@ -61,15 +47,8 @@ def check_connection() -> str:
 
 
 def close_client() -> None:
-    """
-    Close Supabase client connection.
-
-    Note: Supabase Python client manages connections internally,
-    so this is primarily for cleanup during testing or shutdown.
-    """
+    """Clear the cached client so tests or shutdown paths can start fresh."""
     global _supabase_client
     if _supabase_client is not None:
-        # Supabase client doesn't have explicit close method
-        # Connection pooling is handled automatically
         _supabase_client = None
         logger.info("Supabase client closed")

@@ -15,6 +15,7 @@ def _load_runtime_dependencies() -> tuple[object, ...]:
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
 
+    from src.data.actual_results_fetcher import fetch_actual_session_results
     from src.utils.accuracy_targets import (
         explicit_target_predictions,
         fastf1_session_name,
@@ -22,7 +23,6 @@ def _load_runtime_dependencies() -> tuple[object, ...]:
         synthesize_legacy_targets,
         target_session_name,
     )
-    from src.utils.actual_results_fetcher import fetch_actual_session_results
     from src.utils.prediction_logger import PredictionLogger
     from src.utils.weekend import is_sprint_weekend
 

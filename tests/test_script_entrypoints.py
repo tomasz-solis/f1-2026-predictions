@@ -1,4 +1,4 @@
-"""Smoke tests for script entry points that should follow canonical imports."""
+"""Import checks for executable helper scripts."""
 
 from __future__ import annotations
 
@@ -6,10 +6,11 @@ import importlib.util
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 
 def _load_module(module_name: str, relative_path: str):
-    """Load a repo script as a module for lightweight smoke testing."""
+    """Load a repo script as a module so tests can inspect its imports."""
     script_path = Path(__file__).resolve().parents[1] / relative_path
     spec = importlib.util.spec_from_file_location(module_name, script_path)
     module = importlib.util.module_from_spec(spec)
@@ -19,8 +20,8 @@ def _load_module(module_name: str, relative_path: str):
     return module
 
 
-def test_predict_weekend_run_uses_canonical_predictor(monkeypatch):
-    """The live weekend helper should call the canonical baseline predictor."""
+def test_predict_weekend_run_uses_shared_predictor(monkeypatch):
+    """The weekend helper should build predictions through the shared predictor entry point."""
     module = _load_module("predict_weekend_script", "predict_weekend.py")
 
     class FakeLearner:
@@ -102,8 +103,8 @@ def test_predict_weekend_run_uses_canonical_predictor(monkeypatch):
     ]
 
 
-def test_simulator_run_loop_uses_canonical_predictor(monkeypatch):
-    """The season simulator should import and call the canonical baseline predictor."""
+def test_simulator_run_loop_uses_shared_predictor(monkeypatch):
+    """The season simulator should call the shared predictor entry point."""
     module = _load_module("season_simulator_script", "scripts/simulator.py")
 
     class FakeFactory:
@@ -178,3 +179,46 @@ def test_simulator_run_loop_uses_canonical_predictor(monkeypatch):
     assert predictor.calls[0]["race_name"] == "Bahrain Grand Prix"
     assert predictor.calls[0]["year"] == 2026
     assert predictor.calls[0]["weather"] == "dry"
+
+
+def test_update_prediction_actuals_uses_shared_results_fetcher():
+    """The prediction-actuals script should import the shared results fetcher."""
+    module = _load_module(
+        "update_prediction_actuals_script",
+        "scripts/update_prediction_actuals.py",
+    )
+
+    assert module.fetch_actual_session_results.__module__ == "src.data.actual_results_fetcher"
+
+
+def test_blend_weight_script_uses_shared_results_fetcher():
+    """The blend-weight helper should import the shared results fetcher."""
+    module = _load_module("blend_weight_script", "scripts/test_blend_weights.py")
+
+    assert module.fetch_actual_session_results.__module__ == "src.data.actual_results_fetcher"
+
+
+@pytest.mark.parametrize(
+    ("module_name", "relative_path"),
+    [
+        ("blend_weight_script_predictor", "scripts/test_blend_weights.py"),
+        ("predictor_db_script", "scripts/test_predictor_with_db.py"),
+        ("backtest_script", "scripts/backtest_2025_season.py"),
+    ],
+)
+def test_helper_scripts_import_predictor_from_package_root(
+    monkeypatch,
+    module_name: str,
+    relative_path: str,
+):
+    """Helper scripts should import the predictor from the package root."""
+    import src.predictors as predictors_module
+
+    class SentinelPredictor:
+        """Marker class used to confirm which predictor object the script imported."""
+
+    monkeypatch.setattr(predictors_module, "Baseline2026Predictor", SentinelPredictor)
+
+    module = _load_module(module_name, relative_path)
+
+    assert module.Baseline2026Predictor is SentinelPredictor

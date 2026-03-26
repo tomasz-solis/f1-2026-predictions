@@ -1,7 +1,7 @@
-"""Tests for predictor package exports and small utility helpers."""
+"""Tests for predictor imports and a few small utility modules."""
 
 from src.predictors import Baseline2026Predictor
-from src.predictors.baseline_2026 import Baseline2026Predictor as CanonicalPredictor
+from src.predictors.baseline_2026 import Baseline2026Predictor as PredictorImpl
 from src.utils.driver_numbers import (
     get_all_drivers_2026,
     get_driver_from_abbreviation,
@@ -11,9 +11,9 @@ from src.utils.driver_numbers import (
 from src.utils.performance_tracker import PerformanceTracker
 
 
-def test_predictor_package_exports_canonical_predictor():
-    """The predictor package should expose the canonical baseline entry point."""
-    assert Baseline2026Predictor is CanonicalPredictor
+def test_predictor_package_exports_baseline_predictor():
+    """The predictor package should re-export the baseline predictor at the top level."""
+    assert Baseline2026Predictor is PredictorImpl
 
 
 def test_driver_number_utilities():

@@ -1,16 +1,4 @@
-"""
-Update Team/Driver Characteristics After a 2026 Race
-
-Thin wrapper around src/systems/updater.py for command-line usage.
-
-USAGE:
-    python scripts/update_from_race.py "Bahrain Grand Prix" --year 2026
-
-WORKFLOW:
-    1. After each race → Run this script
-    2. System learns from actual results via src/systems/updater
-    3. Next prediction uses updated characteristics
-"""
+"""Update team and driver characteristics after one race weekend."""
 
 import argparse
 import logging
@@ -27,7 +15,8 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def main():
+def main() -> None:
+    """Run the race-update command-line entry point."""
     parser = argparse.ArgumentParser(description="Update characteristics after a race")
     parser.add_argument("race_name", help="Race name (e.g., 'Bahrain Grand Prix')")
     parser.add_argument("--year", type=int, default=2026, help="Season year")
@@ -35,7 +24,6 @@ def main():
 
     args = parser.parse_args()
 
-    # Delegate to src/systems/updater.py
     try:
         update_from_race(args.year, args.race_name, args.data_dir)
     except Exception as e:

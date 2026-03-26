@@ -57,7 +57,7 @@ def _resolve_experience_tier_from_years(years_experience: int) -> str:
 def resolve_effective_experience_tier_for_race(driver_data: dict, current_year: int) -> str:
     """Resolve experience tier for the current prediction year.
 
-    Delegates to the canonical qualifying-side implementation to avoid duplication.
+    Reuse the same tier logic as qualifying so both paths stay in sync.
     """
     from src.predictors.baseline.qualifying_preparation import resolve_effective_experience_tier
 

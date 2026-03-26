@@ -42,7 +42,7 @@ def _copy_payload(payload: dict[str, Any] | None) -> dict[str, Any] | None:
 
 
 class SnapshotOverlayArtifactStore:
-    """Delegate artifact store reads while overriding season car characteristics."""
+    """Artifact store view that swaps in one car-characteristics payload."""
 
     def __init__(
         self,
@@ -51,7 +51,7 @@ class SnapshotOverlayArtifactStore:
         season_year: int,
         car_characteristics_payload: dict[str, Any],
     ) -> None:
-        """Initialize the wrapper with one overlaid car-characteristics payload."""
+        """Initialize the overlay store with one replacement car-characteristics payload."""
         self.base_store = base_store
         self.season_year = int(season_year)
         self.car_characteristics_payload = deepcopy(car_characteristics_payload)
@@ -65,7 +65,7 @@ class SnapshotOverlayArtifactStore:
         version: str | int = "latest",
         run_id: str | None = None,
     ) -> dict[str, Any] | None:
-        """Return overlaid season characteristics while delegating every other read."""
+        """Return the replacement season artifact and pass every other read through."""
         if (
             artifact_type == "car_characteristics"
             and artifact_key == f"{self.season_year}::car_characteristics"
@@ -86,7 +86,7 @@ class SnapshotOverlayArtifactStore:
         version: int | None = None,
         run_id: str | None = None,
     ) -> dict[str, Any]:
-        """Delegate writes to the wrapped artifact store."""
+        """Write artifacts through to the underlying store."""
         return self.base_store.save_artifact(
             artifact_type,
             artifact_key,

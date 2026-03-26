@@ -477,24 +477,32 @@ def test_run_prediction_falls_back_when_predict_race_signature_is_legacy(patcher
 
 
 def test_run_prediction_accepts_real_baseline_predictor_signatures(patcher):
-    """Guard against signature drift between dashboard orchestration and predictor facade."""
+    """Dashboard prediction flow should keep calling the predictor's public methods correctly."""
+    from src.predictors.baseline.qualifying_mixin import BaselineQualifyingMixin
+    from src.predictors.baseline.race_mixin import BaselineRaceMixin
     from src.predictors.baseline_2026 import Baseline2026Predictor
 
     predictor = Baseline2026Predictor.__new__(Baseline2026Predictor)
     calls: dict[str, dict] = {}
 
-    class _QualifyingEngine:
-        def predict(self, **kwargs):
-            calls["qualifying"] = kwargs
-            return {"grid": [{"driver": "NOR", "team": "McLaren", "position": 1}]}
+    def _fake_predict_qualifying(self, **kwargs):
+        calls["qualifying"] = kwargs
+        return {"grid": [{"driver": "NOR", "team": "McLaren", "position": 1}]}
 
-    class _RaceEngine:
-        def predict(self, **kwargs):
-            calls["race"] = kwargs
-            return {"finish_order": [{"driver": "NOR", "team": "McLaren", "position": 1}]}
+    def _fake_predict_race(self, **kwargs):
+        calls["race"] = kwargs
+        return {"finish_order": [{"driver": "NOR", "team": "McLaren", "position": 1}]}
 
-    predictor.qualifying_engine = _QualifyingEngine()
-    predictor.race_engine = _RaceEngine()
+    patcher.setattr(
+        BaselineQualifyingMixin,
+        "predict_qualifying",
+        _fake_predict_qualifying,
+    )
+    patcher.setattr(
+        BaselineRaceMixin,
+        "predict_race",
+        _fake_predict_race,
+    )
 
     patcher.setattr(prediction_flow, "get_predictor", lambda _versions, year=2026: predictor)
     patcher.setattr(
