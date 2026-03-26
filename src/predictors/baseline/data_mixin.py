@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -59,6 +60,17 @@ logger = logging.getLogger("src.predictors.baseline_2026")
 
 class BaselineDataMixin:
     """Shared data and team-strength methods for Baseline2026Predictor."""
+
+    if TYPE_CHECKING:
+        artifact_store: ArtifactStore | None
+        car_characteristics_snapshot: dict[str, Any]
+        config: Any
+        data_dir: Path
+        drivers: dict[str, dict[str, Any]]
+        season_year: int
+        teams: dict[str, dict[str, Any]]
+        tracks: dict[str, dict[str, Any]]
+        year: int
 
     def __init__(self):
         """Initialize data mixin with compound extraction cache."""
@@ -275,12 +287,14 @@ class BaselineDataMixin:
         if inferred_races <= 0:
             return races_completed
 
-        teams_with_scores = {
-            str(team_name)
-            for record in race_records
-            for team_name in (record.get("team_scores", {}) or {}).keys()
-            if team_name in self.teams
-        }
+        teams_with_scores = set()
+        for record in race_records:
+            team_scores = record.get("team_scores", {})
+            if not isinstance(team_scores, dict):
+                continue
+            for team_name in team_scores:
+                if team_name in self.teams:
+                    teams_with_scores.add(str(team_name))
 
         logger.info(
             "Recovered current-season team form from saved actuals: %s race(s), %s team(s)",

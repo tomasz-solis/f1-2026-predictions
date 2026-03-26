@@ -61,6 +61,5 @@ python_version = "3.11"
 files = ["src"]
 ignore_missing_imports = true
 implicit_optional = true
-disable_error_code = ["attr-defined", "var-annotated"]
 warn_unused_ignores = true
 warn_redundant_casts = true

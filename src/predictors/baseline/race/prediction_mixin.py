@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from src.data.track_data_loader import (
     get_available_compounds,
@@ -31,6 +31,21 @@ logger = logging.getLogger("src.predictors.baseline_2026")
 
 class BaselineRacePredictionMixin:
     """Race prediction method implementation for Baseline2026Predictor."""
+
+    if TYPE_CHECKING:
+        calibration_system: Any
+        config: Any
+        season_year: int
+        seed: int
+        year: int
+
+        def _load_race_params(self) -> dict: ...
+
+        def _prepare_driver_info_with_compounds(
+            self,
+            qualifying_grid: list[QualifyingGridEntry],
+            race_name: str | None,
+        ) -> tuple[dict[str, Any], int]: ...
 
     @staticmethod
     def _enforce_non_increasing(values: list[float]) -> list[float]:

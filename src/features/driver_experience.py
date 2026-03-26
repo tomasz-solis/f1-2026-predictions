@@ -214,7 +214,12 @@ def enrich_driver_characteristics(
 
 def analyze_experience_distribution(enriched_data: dict) -> dict:
     """Analyze distribution of drivers across experience tiers with summary statistics."""
-    tiers = {"rookie": [], "developing": [], "established": [], "veteran": []}
+    tiers: dict[str, list[str]] = {
+        "rookie": [],
+        "developing": [],
+        "established": [],
+        "veteran": [],
+    }
 
     for driver_abbr, driver in enriched_data["drivers"].items():
         tier = driver["experience"]["tier"]

@@ -34,7 +34,7 @@ def _runtime_message(
     pipeline_timing: Mapping[str, Any] | None,
 ) -> str:
     """Build the summary message shown above rendered prediction sections."""
-    first_result = next(iter(prediction_results.values()), {})
+    first_result: object = next(iter(prediction_results.values()), {})
     timing = first_result.get("timing", {}) if isinstance(first_result, Mapping) else {}
     total_runtime = (
         float(pipeline_timing["total"])

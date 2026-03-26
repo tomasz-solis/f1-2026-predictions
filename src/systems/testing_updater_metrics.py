@@ -391,7 +391,7 @@ def _normalize_lower_better(metric_values: dict[str, float]) -> dict[str, float]
 
 def _attach_raw_snapshot_metrics(
     performance_by_team: dict[str, dict[str, float]],
-    per_team_payload: dict[str, dict[str, dict[str, dict[str, float]]]],
+    per_team_payload: dict[str, dict[str, float]],
     lap_pace_seconds: dict[str, float],
     raw_top_speed_by_team: dict[str, float],
 ) -> dict[str, dict[str, float]]:
@@ -405,14 +405,11 @@ def _attach_raw_snapshot_metrics(
         if isinstance(metrics, dict)
     }
 
-    for team_name, session_payloads in per_team_payload.items():
-        if not isinstance(session_payloads, dict) or not session_payloads:
+    for team_name, session_payload in per_team_payload.items():
+        if not isinstance(session_payload, dict) or not session_payload:
             continue
 
         team_payload = merged.setdefault(str(team_name), {})
-        session_payload = next(iter(session_payloads.values()))
-        if not isinstance(session_payload, dict):
-            continue
 
         sector_times = session_payload.get("sector_times")
         if isinstance(sector_times, dict):
@@ -623,10 +620,10 @@ def _collect_session_metrics(
             diagnostics.append(f"{session_key}: laps missing Team column")
         return {}, {}
 
-    per_team_payload = {}
-    tire_deg_slopes = {}
-    lap_pace_seconds = {}
-    raw_top_speed_by_team = {}
+    per_team_payload: dict[str, dict[str, float]] = {}
+    tire_deg_slopes: dict[str, float] = {}
+    lap_pace_seconds: dict[str, float] = {}
+    raw_top_speed_by_team: dict[str, float] = {}
     raw_teams = laps["Team"].dropna().unique()
     mapped_team_count = 0
     selected_lap_count = 0

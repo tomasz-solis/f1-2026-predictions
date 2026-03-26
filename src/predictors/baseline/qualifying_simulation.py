@@ -106,7 +106,7 @@ def run_qualifying_simulations(
     regularization stack and inject a small driver-specific weekend-form spread
     so early-season fallback runs do not collapse into rigid team blocks.
     """
-    position_records = {d["driver"]: [] for d in all_drivers}
+    position_records: dict[str, list[int]] = {d["driver"]: [] for d in all_drivers}
     # Testing fallback provides team-level pace guidance but no direct driver-level
     # weekend telemetry. Keep low-data weighting/noise behavior, but avoid full
     # teammate regularization when fallback is available.

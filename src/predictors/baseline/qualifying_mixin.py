@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from hashlib import sha256
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -52,6 +52,48 @@ _PRACTICE_SIGNAL_MODES = ("auto", "raw_sessions", "stored_profiles")
 
 class BaselineQualifyingMixin:
     """Shared qualifying and sprint-race methods for Baseline2026Predictor."""
+
+    if TYPE_CHECKING:
+        car_characteristics_snapshot: dict[str, Any]
+        config: Any
+        drivers: dict[str, dict[str, Any]]
+        seed: int
+
+        def _compute_testing_profile_modifier(
+            self,
+            team: str,
+            profile: str,
+            metric_weights: dict[str, float],
+            scale: float,
+        ) -> tuple[float, bool]: ...
+
+        def _get_testing_characteristics_for_profile(
+            self,
+            team: str,
+            profile: str,
+        ) -> dict[str, float]: ...
+
+        def _update_compound_characteristics_from_session(
+            self,
+            session_laps: Any,
+            race_name: str,
+            year: int,
+            is_sprint: bool,
+        ) -> None: ...
+
+        def get_blended_team_strength(self, team: str, race_name: str) -> float: ...
+
+        def predict_race(
+            self,
+            qualifying_grid: list[QualifyingGridEntry],
+            weather: str = "dry",
+            race_name: str | None = None,
+            n_simulations: int = 50,
+            is_sprint: bool = False,
+            race_compound: str = "MEDIUM",
+            year: int | None = None,
+            input_confidence: float | None = None,
+        ) -> dict[str, Any]: ...
 
     def _stored_profile_data_source_label(
         self,
@@ -637,7 +679,7 @@ class BaselineQualifyingMixin:
 
     def predict_sprint_race(
         self,
-        sprint_quali_grid: list[dict],
+        sprint_quali_grid: list[QualifyingGridEntry],
         weather: str = "dry",
         race_name: str | None = None,
         n_simulations: int = 50,

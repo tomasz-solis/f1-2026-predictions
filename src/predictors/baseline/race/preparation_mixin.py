@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
+from src.persistence.artifact_store import ArtifactStore
 from src.types.prediction_types import DriverRaceInfo, QualifyingGridEntry
 from src.utils import config_loader
 from src.utils.schema_validation import validate_track_characteristics
@@ -23,6 +25,31 @@ logger = logging.getLogger("src.predictors.baseline_2026")
 
 class BaselineRacePreparationMixin:
     """Race preparation methods for Baseline2026Predictor."""
+
+    if TYPE_CHECKING:
+        artifact_store: ArtifactStore | None
+        config: Any
+        drivers: dict[str, dict[str, Any]]
+        season_year: int
+        teams: dict[str, dict[str, Any]]
+        year: int
+
+        def _compute_testing_profile_modifier(
+            self,
+            team: str,
+            profile: str,
+            metric_weights: dict[str, float],
+            scale: float,
+        ) -> tuple[float, bool]: ...
+
+        def get_blended_team_strength(self, team: str, race_name: str) -> float: ...
+
+        def get_compound_adjusted_team_strength(
+            self,
+            team: str,
+            race_name: str,
+            compound: str = "MEDIUM",
+        ) -> float: ...
 
     def _load_current_lineups_for_preparation(self) -> dict[str, list[str]]:
         """Load and cache current lineups for custom-grid context checks."""

@@ -649,10 +649,10 @@ def aggregate_simulation_results(
     """
     from collections import defaultdict
 
-    position_data = defaultdict(list)
-    dnf_counts = defaultdict(int)
-    strategy_counts = defaultdict(int)
-    pit_lap_counts = defaultdict(int)
+    position_data: defaultdict[str, list[int]] = defaultdict(list)
+    dnf_counts: defaultdict[str, int] = defaultdict(int)
+    strategy_counts: defaultdict[str, int] = defaultdict(int)
+    pit_lap_counts: defaultdict[str, int] = defaultdict(int)
 
     total_simulations = len(simulation_results)
 

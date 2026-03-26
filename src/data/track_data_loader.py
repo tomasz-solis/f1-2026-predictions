@@ -206,8 +206,8 @@ def _coerce_utc_datetime(value: object) -> datetime | None:
 def _session_status_completed(session: object) -> bool | None:
     """Return completion status from FastF1 session status feed when available."""
     try:
-        status_feed = session.session_status
-    except (AttributeError, DataNotLoadedError):
+        status_feed = getattr(session, "session_status", None)
+    except DataNotLoadedError:
         return None
 
     if status_feed is None or getattr(status_feed, "empty", False):
@@ -306,8 +306,12 @@ def _resolve_session_temperature_blend_weight(session_name: str) -> float:
 
 def _session_scheduled_end_passed(event: object, session_name: str, now_utc: datetime) -> bool:
     """Return whether scheduled session end has passed based on FastF1 event metadata."""
+    get_session_date = getattr(event, "get_session_date", None)
+    if not callable(get_session_date):
+        return True
+
     try:
-        raw_start = event.get_session_date(session_name)
+        raw_start = get_session_date(session_name)
     except Exception:
         return True
 
@@ -923,12 +927,7 @@ def resolve_track_temperature_c(
     weather: str = "dry",
     is_sprint: bool = False,
 ) -> float:
-    """
-    Resolve scalar track temperature for simulation backward compatibility.
-
-    This wrapper delegates to the profile resolver and returns only the final
-    temperature consumed by lap-by-lap simulation.
-    """
+    """Return the scalar track temperature used by race simulation code."""
     profile = resolve_track_temperature_profile(
         year=year,
         race_name=race_name,
