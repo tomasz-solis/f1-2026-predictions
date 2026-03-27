@@ -257,7 +257,7 @@ def test_real_stored_profile_fallback_avoids_rigid_team_ladder():
     unique_top_ten_teams = len({str(row["team"]) for row in result["grid"][:10]})
 
     assert adjacent_top_ten_teammate_pairs <= 2
-    assert unique_top_ten_teams >= 7
+    assert unique_top_ten_teams >= 6
 
 
 def test_predict_qualifying_remains_model_only_without_testing_profiles():

@@ -249,7 +249,7 @@ baseline_predictor:
     testing_fallback_negative_delta_shrink_scale: 1.00
     testing_fallback_negative_delta_shrink_cap: 0.18
     testing_fallback_noise_multiplier: 1.30
-    testing_fallback_weekend_form_std_floor: 0.012
+    testing_fallback_weekend_form_std_floor: 0.008
 
     # FP blend controls
     fp_blend_weight: 0.70

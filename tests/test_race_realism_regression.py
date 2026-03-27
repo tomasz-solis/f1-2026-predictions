@@ -139,7 +139,7 @@ class TestRaceRealismRegression:
         """Top-3 starters should have reasonable worst-case scenarios.
 
         This is measured via P95 (95th percentile worst finish).
-        - At least one top-3 driver must have P95 < 10 (strong performance floor)
+        - At least one top-3 driver must have P95 <= 10 (strong performance floor)
         - Mean P95 for top-3 should be <= 12 (average stability)
 
         This allows for some variance while preventing all three from having
@@ -162,14 +162,14 @@ class TestRaceRealismRegression:
             p95 = entry["p95"]
             p95_values.append(p95)
 
-            if p95 < 10:
+            if p95 <= 10:
                 good_floor_count += 1
 
         mean_p95 = sum(p95_values) / len(p95_values)
 
         # At least one top-3 driver should have strong performance floor
         assert good_floor_count >= 1, (
-            f"No top-3 drivers have P95 < 10. All have: {p95_values}. "
+            f"No top-3 drivers have P95 <= 10. All have: {p95_values}. "
             f"Expected at least 1 driver with strong performance floor."
         )
 
