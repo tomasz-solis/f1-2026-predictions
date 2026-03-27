@@ -212,10 +212,9 @@ baseline_predictor:
     # Soft teammate guard for testing-fallback mode.
     # Keeps early-weekend teammate flips possible, but requires stronger signal.
     testing_fallback_teammate_guard_enabled: true
-    # Pre-weekend fallback was over-packing teammates into team blocks.
-    # Lower shrink, a slightly wider offset cap, and a modest driver-signal tilt
-    # keep the car anchor while letting one-lap driver differences surface
-    # before practice data arrives.
+    # Pre-weekend fallback can get too tidy when the only live signal is a stored
+    # team profile. Keep the car anchor, but leave enough weekend spread for the
+    # field to mix rather than falling into clean teammate ladders.
     testing_fallback_driver_signal_shrink: 0.02
     testing_fallback_driver_offset_cap_multiplier: 1.33
     testing_fallback_team_weight_multiplier: 0.92
@@ -234,7 +233,7 @@ baseline_predictor:
       developing: 0.80
       sunset: 1.00
       unknown: 0.70
-    testing_fallback_teammate_setup_multiplier: 1.10
+    testing_fallback_teammate_setup_multiplier: 1.20
     testing_fallback_teammate_gap_cap_by_experience:
       rookie: 0.18
       second_year: 0.14
@@ -249,6 +248,8 @@ baseline_predictor:
     testing_fallback_negative_delta_threshold: 0.08
     testing_fallback_negative_delta_shrink_scale: 1.00
     testing_fallback_negative_delta_shrink_cap: 0.18
+    testing_fallback_noise_multiplier: 1.30
+    testing_fallback_weekend_form_std_floor: 0.022
 
     # FP blend controls
     fp_blend_weight: 0.70

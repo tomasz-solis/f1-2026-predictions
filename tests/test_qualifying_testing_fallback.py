@@ -9,6 +9,7 @@ import pytest
 import src.predictors.baseline.qualifying_mixin as qualifying_module
 from src.predictors.baseline.data_mixin import BaselineDataMixin
 from src.predictors.baseline.qualifying_mixin import BaselineQualifyingMixin
+from src.predictors.baseline_2026 import Baseline2026Predictor
 
 
 class DummyConfig:
@@ -227,6 +228,34 @@ def test_predict_qualifying_can_force_stored_checkpoint_profiles():
     assert result["data_confidence_score"] == pytest.approx(0.5)
 
 
+def test_real_stored_profile_fallback_avoids_rigid_team_ladder():
+    """Stored-profile PRE fallback should leave visible inter-team mixing in the grid."""
+    predictor = Baseline2026Predictor(data_dir="data/processed", season_year=2026)
+
+    result = predictor.predict_qualifying(
+        2026,
+        "Canadian Grand Prix",
+        n_simulations=300,
+        qualifying_stage="main",
+        practice_signal_mode="stored_profiles",
+        checkpoint_session_name="PRE",
+    )
+
+    positions_by_team: dict[str, list[int]] = {}
+    for row in result["grid"]:
+        positions_by_team.setdefault(str(row["team"]), []).append(int(row["position"]))
+
+    adjacent_teammate_pairs = sum(
+        1
+        for positions in positions_by_team.values()
+        if len(positions) >= 2 and (sorted(positions)[1] - sorted(positions)[0] == 1)
+    )
+    unique_top_ten_teams = len({str(row["team"]) for row in result["grid"][:10]})
+
+    assert adjacent_teammate_pairs <= 2
+    assert unique_top_ten_teams >= 7
+
+
 def test_predict_qualifying_remains_model_only_without_testing_profiles():
     predictor = DummyQualifyingPredictor(
         {
@@ -433,6 +462,17 @@ def test_testing_fallback_teammate_guard_reduces_extreme_inversions():
     base_overrides = {
         "baseline_predictor.qualifying.noise_std_normal": 0.018,
         "baseline_predictor.qualifying.teammate_setup_std": 0.008,
+        "baseline_predictor.qualifying.testing_fallback_noise_multiplier": 1.0,
+        "baseline_predictor.qualifying.testing_fallback_teammate_setup_multiplier": 1.0,
+        "baseline_predictor.qualifying.testing_fallback_weekend_form_std_floor": 0.0,
+        "baseline_predictor.qualifying.testing_fallback_driver_signal_shrink": 0.18,
+        "baseline_predictor.qualifying.testing_fallback_teammate_anchor_scale": 0.10,
+        "baseline_predictor.qualifying.testing_fallback_teammate_anchor_cap": 0.03,
+        "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_by_experience": {
+            "rookie": 0.12,
+            "unknown": 0.12,
+        },
+        "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_max_races_by_experience": {},
     }
     predictor_without_guard = DummyQualifyingPredictor(
         {
@@ -512,10 +552,18 @@ def test_testing_fallback_driver_offset_multiplier_reduces_team_block_clustering
     base_overrides = {
         "baseline_predictor.qualifying.noise_std_normal": 0.018,
         "baseline_predictor.qualifying.teammate_setup_std": 0.008,
+        "baseline_predictor.qualifying.testing_fallback_noise_multiplier": 1.0,
+        "baseline_predictor.qualifying.testing_fallback_teammate_setup_multiplier": 1.0,
+        "baseline_predictor.qualifying.testing_fallback_weekend_form_std_floor": 0.0,
         "baseline_predictor.qualifying.testing_fallback_teammate_guard_enabled": True,
         "baseline_predictor.qualifying.testing_fallback_driver_signal_shrink": 0.10,
     }
-    predictor_without_multiplier = DummyQualifyingPredictor(base_overrides)
+    predictor_without_multiplier = DummyQualifyingPredictor(
+        {
+            **base_overrides,
+            "baseline_predictor.qualifying.testing_fallback_driver_offset_cap_multiplier": 1.0,
+        }
+    )
     predictor_with_multiplier = DummyQualifyingPredictor(
         {
             **base_overrides,

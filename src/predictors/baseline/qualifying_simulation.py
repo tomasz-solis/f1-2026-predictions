@@ -103,8 +103,8 @@ def run_qualifying_simulations(
 
     Testing fallback data provides team-level signal even when weekend practice
     laps are unavailable. In that case, avoid the strict model-only teammate
-    regularization stack and inject a small driver-specific weekend-form spread
-    so early-season fallback runs do not collapse into rigid team blocks.
+    regularization stack and inject a real weekend-form spread so early-season
+    fallback runs do not collapse into rigid team blocks.
     """
     position_records: dict[str, list[int]] = {d["driver"]: [] for d in all_drivers}
     # Testing fallback provides team-level pace guidance but no direct driver-level
@@ -343,14 +343,15 @@ def run_qualifying_simulations(
 
     if has_testing_fallback_data and not has_practice_data:
         # Testing fallback has team-level signal but weaker direct driver calibration.
-        # Keep a stronger team anchor so fallback poles stay realistic.
+        # Do not over-dampen variance here, or the pre-weekend grid turns into a
+        # near-pure team ladder.
         team_weight *= cfg.get(
             "baseline_predictor.qualifying.testing_fallback_team_weight_multiplier",
-            1.10,
+            0.92,
         )
         skill_weight *= cfg.get(
             "baseline_predictor.qualifying.testing_fallback_skill_weight_multiplier",
-            0.90,
+            1.08,
         )
         total_weight = team_weight + skill_weight
         if total_weight <= 0:
@@ -361,16 +362,16 @@ def run_qualifying_simulations(
 
         driver_offset_cap *= cfg.get(
             "baseline_predictor.qualifying.testing_fallback_driver_offset_cap_multiplier",
-            1.0,
+            1.33,
         )
         driver_offset_cap = float(np.clip(driver_offset_cap, 0.05, 0.30))
 
         noise_std *= cfg.get(
-            "baseline_predictor.qualifying.testing_fallback_noise_multiplier", 0.95
+            "baseline_predictor.qualifying.testing_fallback_noise_multiplier", 1.30
         )
         teammate_setup_std *= cfg.get(
             "baseline_predictor.qualifying.testing_fallback_teammate_setup_multiplier",
-            0.95,
+            1.20,
         )
 
     weekend_form_std = cfg.get("baseline_predictor.qualifying.weekend_form_std", 0.0)
@@ -382,7 +383,7 @@ def run_qualifying_simulations(
         weekend_form_floor = float(
             cfg.get(
                 "baseline_predictor.qualifying.testing_fallback_weekend_form_std_floor",
-                0.0,
+                0.022,
             )
         )
         weekend_form_std = max(float(weekend_form_std), weekend_form_floor)
