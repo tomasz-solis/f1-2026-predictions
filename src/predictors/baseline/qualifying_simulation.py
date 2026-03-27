@@ -383,7 +383,7 @@ def run_qualifying_simulations(
         weekend_form_floor = float(
             cfg.get(
                 "baseline_predictor.qualifying.testing_fallback_weekend_form_std_floor",
-                0.022,
+                0.012,
             )
         )
         weekend_form_std = max(float(weekend_form_std), weekend_form_floor)

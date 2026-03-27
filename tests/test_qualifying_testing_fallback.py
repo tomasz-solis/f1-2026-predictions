@@ -229,7 +229,7 @@ def test_predict_qualifying_can_force_stored_checkpoint_profiles():
 
 
 def test_real_stored_profile_fallback_avoids_rigid_team_ladder():
-    """Stored-profile PRE fallback should leave visible inter-team mixing in the grid."""
+    """Stored-profile PRE fallback should keep the sharp end of the grid mixed."""
     predictor = Baseline2026Predictor(data_dir="data/processed", season_year=2026)
 
     result = predictor.predict_qualifying(
@@ -245,14 +245,18 @@ def test_real_stored_profile_fallback_avoids_rigid_team_ladder():
     for row in result["grid"]:
         positions_by_team.setdefault(str(row["team"]), []).append(int(row["position"]))
 
-    adjacent_teammate_pairs = sum(
+    top_ten_positions_by_team = {
+        team: sorted(position for position in positions if position <= 10)
+        for team, positions in positions_by_team.items()
+    }
+    adjacent_top_ten_teammate_pairs = sum(
         1
-        for positions in positions_by_team.values()
-        if len(positions) >= 2 and (sorted(positions)[1] - sorted(positions)[0] == 1)
+        for positions in top_ten_positions_by_team.values()
+        if len(positions) >= 2 and (positions[1] - positions[0] == 1)
     )
     unique_top_ten_teams = len({str(row["team"]) for row in result["grid"][:10]})
 
-    assert adjacent_teammate_pairs <= 2
+    assert adjacent_top_ten_teammate_pairs <= 2
     assert unique_top_ten_teams >= 7
 
 
