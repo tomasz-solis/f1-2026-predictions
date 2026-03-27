@@ -331,6 +331,13 @@ def build_driver_list_with_strengths_core(
         and practice_like_blend_weight is not None
         and testing_fallback_performance is not None
     )
+    checkpoint_practice_blend_weight: float | None = None
+    checkpoint_testing_fallback_performance: dict[str, float] | None = None
+    if uses_checkpoint_practice_profiles:
+        assert practice_like_blend_weight is not None
+        assert testing_fallback_performance is not None
+        checkpoint_practice_blend_weight = float(np.clip(practice_like_blend_weight, 0.0, 1.0))
+        checkpoint_testing_fallback_performance = testing_fallback_performance
     short_profile_scale = cfg.get(
         "baseline_predictor.qualifying.testing_short_run_modifier_scale", 0.04
     )
@@ -358,10 +365,12 @@ def build_driver_list_with_strengths_core(
             blend_weight=fp_blend_weight,
         )
     elif uses_checkpoint_practice_profiles:
+        assert checkpoint_practice_blend_weight is not None
+        assert checkpoint_testing_fallback_performance is not None
         blended_strengths = blend_team_strength_fn(
             model_strengths,
-            testing_fallback_performance,
-            blend_weight=float(np.clip(practice_like_blend_weight, 0.0, 1.0)),
+            checkpoint_testing_fallback_performance,
+            blend_weight=checkpoint_practice_blend_weight,
         )
     else:
         blended_strengths = apply_testing_fallback_adjustment_fn(
@@ -393,6 +402,7 @@ def build_driver_list_with_strengths_core(
                     driver_code,
                 )
                 if checkpoint_driver_delta_seconds is not None:
+                    assert checkpoint_practice_blend_weight is not None
                     smoothing_seconds = float(
                         cfg.get(
                             "baseline_predictor.qualifying.checkpoint_driver_profile_smoothing_seconds",
@@ -407,7 +417,7 @@ def build_driver_list_with_strengths_core(
                             1.0,
                         )
                     )
-                    checkpoint_weight = float(np.clip(practice_like_blend_weight, 0.0, 1.0))
+                    checkpoint_weight = checkpoint_practice_blend_weight
                     quali_scale = float(
                         cfg.get(
                             "baseline_predictor.qualifying.checkpoint_driver_profile_quali_scale",
