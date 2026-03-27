@@ -225,6 +225,8 @@ def _short_data_source_label(data_source: object, *, blend_used: bool) -> str:
     """Return a concise label for the qualifying data source."""
     source_text = str(data_source).strip()
     normalized = source_text.lower()
+    if "checkpoint profile blend" in normalized:
+        return "Checkpoint blend"
     if blend_used:
         return "Practice blend"
     if "model-only" in normalized:

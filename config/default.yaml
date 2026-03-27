@@ -124,7 +124,7 @@ dashboard:
     weather_scenarios: ["dry", "mixed", "rain"]
     max_file_entries: 2048
     qualifying_n_simulations: 300
-    race_n_simulations: 100
+    race_n_simulations: 300
 
 # Baseline 2026 Predictor Parameters (used before real season data)
 baseline_predictor:
@@ -203,6 +203,20 @@ baseline_predictor:
     testing_fallback_absolute_blend_weight: 0.10
     testing_fallback_modifier_scale: 0.03
     testing_fallback_modifier_clip_range: [-0.015, 0.015]
+    # Stored checkpoint profiles from the current weekend should matter more than
+    # generic preseason/testing fallback. These scales let FP/SQ snapshot overlays
+    # move team strength toward observed short-run pace without fully replacing priors.
+    testing_fallback_checkpoint_blend_weight_scale: 0.65
+    testing_fallback_checkpoint_blend_weight_cap: 0.55
+    testing_fallback_checkpoint_modifier_scale: 0.10
+    testing_fallback_checkpoint_modifier_cap: 0.08
+    testing_fallback_checkpoint_clip_scale: 0.055
+    testing_fallback_checkpoint_clip_cap: 0.045
+    stored_checkpoint_blend_weight_multiplier: 1.12
+    stored_checkpoint_blend_weight_cap: 0.90
+    checkpoint_driver_profile_smoothing_seconds: 0.35
+    checkpoint_driver_profile_quali_scale: 0.10
+    checkpoint_driver_profile_skill_scale: 0.02
     testing_fallback_short_weight_min: 0.35
     testing_fallback_short_weight_max: 0.85
     testing_fallback_divergence_scale: 1.4
@@ -257,6 +271,11 @@ baseline_predictor:
     fp_blend_weight_max: 0.85
     fp_blend_confidence_scale: 0.30
     fp_blend_weight_testing: true
+    practice_data_team_weight_multiplier: 0.94
+    practice_data_skill_weight_multiplier: 1.12
+    practice_data_team_compression_multiplier: 0.88
+    practice_data_driver_offset_cap_multiplier: 1.33
+    practice_data_teammate_setup_multiplier: 1.05
 
     # Data-quality confidence progression (used when no direct FP session confidence exists)
     data_confidence:
@@ -529,6 +548,16 @@ baseline_predictor:
     # Driver race-pace signal impact per lap (higher = more racecraft influence)
     race_advantage_lap_impact: 0.20
 
+    # How much qualifying-grid uncertainty should carry into the race model.
+    # Wide checkpoint-based grids should still matter, but they should not make
+    # the race intervals explode on top of normal race variance.
+    grid_uncertainty:
+      base_std: 0.25
+      interval_divisor: 4.5
+      confidence_scale: 0.75
+      input_confidence_scale: 0.30
+      position_delta_scale: 0.20
+
     # Final ranking blend after lap-by-lap simulation
     # Keep sprint races grid-stable, but allow main races to evolve from qualifying.
     grid_anchor:
@@ -538,6 +567,16 @@ baseline_predictor:
       main_max: 0.70
       sprint_min: 0.78
       low_confidence_scale: 0.30
+
+    # Extra damping when the starting grid is itself probabilistic.
+    # This keeps low-confidence checkpoint race runs from compounding grid
+    # uncertainty and race variance into overly wide finish ranges.
+    predicted_grid_uncertainty:
+      activation_width: 2.0
+      width_scale: 5.0
+      anchor_scale: 0.18
+      racecraft_damp_scale: 0.24
+      max_gain_damp_scale: 0.30
 
     # Guardrail to prevent over-anchoring in full-distance races.
     # If movement is too low, re-rank with an upside quantile from simulation samples.

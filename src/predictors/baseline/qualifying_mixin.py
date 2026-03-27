@@ -73,6 +73,13 @@ class BaselineQualifyingMixin:
             profile: str,
         ) -> dict[str, float]: ...
 
+        def _get_checkpoint_driver_delta_seconds(
+            self,
+            team: str,
+            driver: str,
+            preferred_profiles: tuple[str, ...] = ("short_run", "balanced", "long_run"),
+        ) -> float | None: ...
+
         def _update_compound_characteristics_from_session(
             self,
             session_laps: Any,
@@ -137,6 +144,29 @@ class BaselineQualifyingMixin:
         if checkpoint == "SPRINT":
             return "Sprint pace signal"
         return None
+
+    def _resolve_weekend_snapshot_session_name(
+        self,
+        *,
+        race_name: str,
+    ) -> str | None:
+        """Return the current-weekend snapshot session when stored profiles are checkpoint-backed."""
+        snapshot_meta = getattr(self, "car_characteristics_snapshot", {})
+        if not isinstance(snapshot_meta, dict) or not snapshot_meta:
+            raw_car_payload = getattr(self, "car_characteristics", None)
+            snapshot_meta = (
+                raw_car_payload.get("checkpoint_snapshot", {})
+                if isinstance(raw_car_payload, dict)
+                else {}
+            )
+
+        snapshot_event = str(snapshot_meta.get("event_name", "")).strip()
+        snapshot_session = str(snapshot_meta.get("session_name", "")).strip().upper()
+        if not snapshot_event or not snapshot_session:
+            return None
+        if snapshot_event.casefold() != str(race_name).strip().casefold():
+            return None
+        return snapshot_session
 
     def _resolve_data_confidence_score(
         self,
@@ -205,6 +235,24 @@ class BaselineQualifyingMixin:
         adjusted_weight = base_weight + ((float(data_confidence_score) - 0.5) * blend_scale)
         return float(np.clip(adjusted_weight, lower, upper))
 
+    def _adjust_stored_checkpoint_blend_weight(self, blend_weight: float) -> float:
+        """Give current-weekend stored checkpoints a modest extra blend boost."""
+        cfg = getattr(self, "config", config_loader)
+        multiplier = float(
+            cfg.get(
+                "baseline_predictor.qualifying.stored_checkpoint_blend_weight_multiplier",
+                1.12,
+            )
+        )
+        cap = float(
+            cfg.get(
+                "baseline_predictor.qualifying.stored_checkpoint_blend_weight_cap",
+                0.90,
+            )
+        )
+        adjusted_weight = float(blend_weight) * multiplier
+        return float(np.clip(adjusted_weight, 0.0, max(0.0, cap)))
+
     def _get_testing_profile_weights(
         self, profile: str, defaults: dict[str, float]
     ) -> dict[str, float]:
@@ -249,6 +297,9 @@ class BaselineQualifyingMixin:
         self,
         model_strengths: dict[str, float],
         testing_fallback_performance: dict[str, float] | None,
+        *,
+        practice_like_profile_label: str | None = None,
+        reference_blend_weight: float | None = None,
     ) -> dict[str, float]:
         """
         Apply a conservative testing-derived adjustment on top of model strengths.
@@ -261,6 +312,8 @@ class BaselineQualifyingMixin:
             model_strengths=model_strengths,
             testing_fallback_performance=testing_fallback_performance,
             cfg=cfg,
+            practice_like_profile_label=practice_like_profile_label,
+            reference_blend_weight=reference_blend_weight,
         )
 
     def _get_learned_position_adjustment(
@@ -328,6 +381,8 @@ class BaselineQualifyingMixin:
         lineups: dict[str, list[str]],
         fp_performance: dict[str, float] | None,
         testing_fallback_performance: dict[str, float] | None,
+        practice_like_profile_label: str | None,
+        practice_like_blend_weight: float | None,
         race_name: str,
         is_sprint: bool,
         fp_blend_weight: float,
@@ -345,6 +400,8 @@ class BaselineQualifyingMixin:
             lineups=lineups,
             fp_performance=fp_performance,
             testing_fallback_performance=testing_fallback_performance,
+            practice_like_profile_label=practice_like_profile_label,
+            practice_like_blend_weight=practice_like_blend_weight,
             race_name=race_name,
             prediction_year=prediction_year,
             drivers=self.drivers,
@@ -358,6 +415,7 @@ class BaselineQualifyingMixin:
             resolve_effective_experience_tier_fn=self._resolve_effective_experience_tier,
             extract_experience_total_races_fn=self._extract_experience_total_races,
             get_learned_position_adjustment_fn=self._get_learned_position_adjustment,
+            get_checkpoint_driver_delta_seconds_fn=self._get_checkpoint_driver_delta_seconds,
             get_driver_data_or_fallback_fn=(fallback_loader if callable(fallback_loader) else None),
         )
 
@@ -588,26 +646,39 @@ class BaselineQualifyingMixin:
             )
         testing_fallback_used = testing_fallback_performance is not None
         confidence_session_name = session_name
+        weekend_snapshot_session_name = None
         if normalized_practice_signal_mode == "stored_profiles" and testing_fallback_used:
+            weekend_snapshot_session_name = self._resolve_weekend_snapshot_session_name(
+                race_name=race_name
+            )
             confidence_session_name = self._checkpoint_profile_confidence_label(
-                checkpoint_session_name
+                weekend_snapshot_session_name
             )
         data_confidence_score = self._resolve_data_confidence_score(
             confidence_session_name,
             testing_fallback_used=testing_fallback_used,
         )
         effective_fp_blend_weight = self._resolve_fp_blend_weight(data_confidence_score)
+        practice_like_stored_profiles = weekend_snapshot_session_name is not None
+        if practice_like_stored_profiles:
+            effective_fp_blend_weight = self._adjust_stored_checkpoint_blend_weight(
+                effective_fp_blend_weight
+            )
 
         all_drivers, teams_with_short_profile = self._build_driver_list_with_strengths(
             lineups,
             fp_performance,
             testing_fallback_performance,
+            (confidence_session_name if practice_like_stored_profiles else None),
+            (effective_fp_blend_weight if practice_like_stored_profiles else None),
             race_name,
             is_sprint,
             effective_fp_blend_weight,
             prediction_year=year,
         )
-        if cfg.get("baseline_predictor.qualifying.enable_driver_fp_adjustment", True):
+        if cfg.get("baseline_predictor.qualifying.enable_driver_fp_adjustment", True) and (
+            normalized_practice_signal_mode != "stored_profiles"
+        ):
             from src.utils.driver_fp_adjustment import calculate_driver_fp_modifiers
 
             fp_session_types = ["FP1"] if is_sprint else ["FP1", "FP2", "FP3"]
@@ -635,9 +706,9 @@ class BaselineQualifyingMixin:
             all_drivers,
             n_simulations,
             is_sprint,
-            session_name is not None,
+            session_name is not None or practice_like_stored_profiles,
             rng,
-            testing_fallback_used,
+            (testing_fallback_used and not practice_like_stored_profiles),
         )
 
         grid = self._aggregate_grid_results(
@@ -661,12 +732,14 @@ class BaselineQualifyingMixin:
             position_records=position_records,
             all_drivers=all_drivers,
         )
+        uses_practice_like_blend = session_name is not None or practice_like_stored_profiles
+        uses_testing_fallback = testing_fallback_used and not practice_like_stored_profiles
 
         return {
             "grid": grid,
             "data_source": data_source,
-            "blend_used": session_name is not None,
-            "testing_fallback_used": testing_fallback_used,
+            "blend_used": uses_practice_like_blend,
+            "testing_fallback_used": uses_testing_fallback,
             "data_confidence_score": round(float(data_confidence_score), 3),
             "fp_blend_weight_used": round(float(effective_fp_blend_weight), 3),
             "qualifying_stage": qualifying_stage,

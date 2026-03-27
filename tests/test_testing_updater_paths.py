@@ -241,6 +241,38 @@ def test_count_team_selected_laps_handles_laps_errors_and_invalid_profile(patche
         tu._count_team_selected_laps(session, {"Ferrari"}, run_profile="invalid")
 
 
+def test_extract_session_driver_deltas_tracks_teammate_form():
+    session = SimpleNamespace(
+        laps=pd.DataFrame(
+            {
+                "Team": ["Mercedes"] * 8,
+                "Driver": ["RUS"] * 4 + ["ANT"] * 4,
+                "LapTime": [
+                    pd.to_timedelta("0:01:31.000"),
+                    pd.to_timedelta("0:01:31.100"),
+                    pd.to_timedelta("0:01:31.200"),
+                    pd.to_timedelta("0:01:31.100"),
+                    pd.to_timedelta("0:01:31.500"),
+                    pd.to_timedelta("0:01:31.600"),
+                    pd.to_timedelta("0:01:31.700"),
+                    pd.to_timedelta("0:01:31.600"),
+                ],
+                "Stint": [1] * 8,
+                "Compound": ["SOFT"] * 8,
+            }
+        )
+    )
+
+    deltas = tu._extract_session_driver_deltas(
+        session=session,
+        known_teams={"Mercedes"},
+        run_profile="balanced",
+    )
+
+    assert deltas["Mercedes"]["RUS"] == pytest.approx(-0.25)
+    assert deltas["Mercedes"]["ANT"] == pytest.approx(0.25)
+
+
 def test_metric_helpers_and_payload_extraction():
     assert tu._median_timedelta_seconds(pd.Series([], dtype=object)) is None
     assert tu._median_lap_seconds(pd.DataFrame()) is None
@@ -451,6 +483,11 @@ def test_update_from_testing_sessions_writes_file_when_not_dry_run(tmp_path, pat
         tu, "_collect_session_metrics", lambda **kwargs: ({"Ferrari": {"overall_pace": 0.7}}, {})
     )
     patcher.setattr(
+        tu,
+        "_extract_session_driver_deltas",
+        lambda **kwargs: {"Ferrari": {"LEC": -0.11, "HAM": 0.11}},
+    )
+    patcher.setattr(
         tu, "_count_team_selected_laps", lambda session, known_teams, run_profile: {"Ferrari": 10.0}
     )
     patcher.setattr(tu, "extract_compound_metrics", lambda team_laps, canonical_team, race_name: {})
@@ -480,6 +517,9 @@ def test_update_from_testing_sessions_writes_file_when_not_dry_run(tmp_path, pat
     assert snapshot_payload["event_name"] == "Bahrain Grand Prix"
     assert snapshot_payload["session_name"] == "FP1"
     assert snapshot_payload["teams"]["Ferrari"]["profiles"]["balanced"]["overall_pace"] == 0.7
+    assert snapshot_payload["teams"]["Ferrari"]["driver_deltas_seconds"]["balanced"][
+        "LEC"
+    ] == pytest.approx(-0.11)
 
 
 def test_update_from_testing_sessions_persists_to_artifact_store_when_db_enabled(tmp_path, patcher):
@@ -507,6 +547,11 @@ def test_update_from_testing_sessions_persists_to_artifact_store_when_db_enabled
     patcher.setattr(tu, "_load_sessions_for_event", lambda **kwargs: [("FP1", session)])
     patcher.setattr(
         tu, "_collect_session_metrics", lambda **kwargs: ({"Ferrari": {"overall_pace": 0.7}}, {})
+    )
+    patcher.setattr(
+        tu,
+        "_extract_session_driver_deltas",
+        lambda **kwargs: {"Ferrari": {"LEC": -0.11, "HAM": 0.11}},
     )
     patcher.setattr(
         tu, "_count_team_selected_laps", lambda session, known_teams, run_profile: {"Ferrari": 10.0}

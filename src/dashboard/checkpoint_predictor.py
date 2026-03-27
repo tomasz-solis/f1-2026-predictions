@@ -77,10 +77,20 @@ def build_checkpoint_overlay_predictor(
         )
         return base_predictor
 
-    overlay_payload = build_snapshot_overlay_car_characteristics(
-        base_car_payload=base_car_payload,
-        snapshot_payload=snapshot_payload,
-    )
+    try:
+        overlay_payload = build_snapshot_overlay_car_characteristics(
+            base_car_payload=base_car_payload,
+            snapshot_payload=snapshot_payload,
+        )
+    except ValueError as exc:
+        logger.warning(
+            "Checkpoint overlay skipped: invalid stored snapshot for %s %s %s: %s",
+            race_name,
+            year,
+            checkpoint_session_upper,
+            exc,
+        )
+        return base_predictor
     overlay_store = SnapshotOverlayArtifactStore(
         base_store=artifact_store,
         season_year=int(year),

@@ -2,7 +2,16 @@
 
 import pytest
 
-from src.utils.race_input_confidence import cap_predicted_main_race_input_confidence
+from src.dashboard.prediction_flow import (
+    _derive_race_input_confidence as derive_live_race_input_confidence,
+)
+from src.utils.checkpoint_reconstruction import (
+    _derive_race_input_confidence as derive_reconstructed_race_input_confidence,
+)
+from src.utils.race_input_confidence import (
+    cap_predicted_main_race_input_confidence,
+    derive_race_input_confidence,
+)
 
 
 class _ConfigStub:
@@ -73,3 +82,39 @@ def test_cap_predicted_main_race_input_confidence_skips_normal_weekends():
     )
 
     assert unchanged == pytest.approx(0.8)
+
+
+def test_derive_race_input_confidence_penalizes_checkpoint_profile_blend():
+    """Checkpoint-backed predicted grids should stay slightly below true lap-backed confidence."""
+    confidence = derive_race_input_confidence(
+        {
+            "data_confidence_score": 0.85,
+            "data_source": (
+                "FP2 checkpoint profile blend (latest stored snapshot: Australian Grand Prix / FP2)"
+            ),
+            "testing_fallback_used": False,
+        },
+        grid_source="PREDICTED",
+    )
+
+    assert confidence == pytest.approx(0.8)
+
+
+def test_reconstruction_and_live_race_input_confidence_stay_aligned():
+    """Reconstruction should use the same race-confidence heuristic as live serving."""
+    qualifying_result = {
+        "data_confidence_score": 0.85,
+        "data_source": (
+            "FP2 checkpoint profile blend (latest stored snapshot: Australian Grand Prix / FP2)"
+        ),
+        "testing_fallback_used": False,
+    }
+
+    assert derive_live_race_input_confidence(
+        qualifying_result,
+        grid_source="PREDICTED",
+    ) == pytest.approx(0.8)
+    assert derive_reconstructed_race_input_confidence(
+        qualifying_result,
+        grid_source="PREDICTED",
+    ) == pytest.approx(0.8)

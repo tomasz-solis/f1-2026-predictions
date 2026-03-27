@@ -84,20 +84,23 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
         fp_blend_weight_used = result.get("fp_blend_weight_used")
 
         if blend_used:
+            source_label = "practice data"
+            if isinstance(data_source, str) and "checkpoint profile blend" in data_source.lower():
+                source_label = "stored checkpoint snapshot"
             if isinstance(fp_blend_weight_used, int | float):
                 practice_share = int(round(float(fp_blend_weight_used) * 100))
                 model_share = max(0, 100 - practice_share)
                 render_notice_banner(
                     (
                         f"Data source: {data_source} "
-                        f"({practice_share}% practice data + {model_share}% model)."
+                        f"({practice_share}% {source_label} + {model_share}% model)."
                     ),
                     tone="info",
                     label="Input mix",
                 )
             else:
                 render_notice_banner(
-                    f"Data source: {data_source} (70% practice data + 30% model).",
+                    f"Data source: {data_source} (70% {source_label} + 30% model).",
                     tone="info",
                     label="Input mix",
                 )

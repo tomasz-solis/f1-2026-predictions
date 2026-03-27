@@ -88,6 +88,20 @@ def _fallback_experience_multiplier(
     return float(mapping.get(tier, default))
 
 
+def _rebalance_component_weights(
+    *,
+    team_weight: float,
+    skill_weight: float,
+    fallback_team_weight: float,
+    fallback_skill_weight: float,
+) -> tuple[float, float]:
+    """Normalize team and driver weights after context-specific multipliers."""
+    total_weight = team_weight + skill_weight
+    if total_weight <= 0:
+        return fallback_team_weight, fallback_skill_weight
+    return team_weight / total_weight, skill_weight / total_weight
+
+
 def run_qualifying_simulations(
     *,
     all_drivers: list[dict],
@@ -312,6 +326,42 @@ def run_qualifying_simulations(
         cfg.get("baseline_predictor.qualifying.testing_fallback_negative_delta_shrink_cap", 0.12)
     )
 
+    if has_practice_data:
+        # Practice-backed qualifying runs should not collapse into a pure team ladder.
+        # Once we have real weekend pace input, widen driver dispersion enough for the
+        # whole field to mix naturally instead of pairing teammates in blocks.
+        team_weight *= cfg.get(
+            "baseline_predictor.qualifying.practice_data_team_weight_multiplier",
+            0.94,
+        )
+        skill_weight *= cfg.get(
+            "baseline_predictor.qualifying.practice_data_skill_weight_multiplier",
+            1.12,
+        )
+        team_weight, skill_weight = _rebalance_component_weights(
+            team_weight=team_weight,
+            skill_weight=skill_weight,
+            fallback_team_weight=0.62,
+            fallback_skill_weight=0.38,
+        )
+
+        team_strength_compression *= cfg.get(
+            "baseline_predictor.qualifying.practice_data_team_compression_multiplier",
+            0.88,
+        )
+        team_strength_compression = float(np.clip(team_strength_compression, 0.20, 1.0))
+
+        driver_offset_cap *= cfg.get(
+            "baseline_predictor.qualifying.practice_data_driver_offset_cap_multiplier",
+            1.33,
+        )
+        driver_offset_cap = float(np.clip(driver_offset_cap, 0.05, 0.24))
+
+        teammate_setup_std *= cfg.get(
+            "baseline_predictor.qualifying.practice_data_teammate_setup_multiplier",
+            1.05,
+        )
+
     if use_model_only_profile:
         team_weight *= cfg.get(
             "baseline_predictor.qualifying.model_only_team_weight_multiplier", 0.82
@@ -319,12 +369,12 @@ def run_qualifying_simulations(
         skill_weight *= cfg.get(
             "baseline_predictor.qualifying.model_only_skill_weight_multiplier", 1.35
         )
-        total_weight = team_weight + skill_weight
-        if total_weight <= 0:
-            team_weight, skill_weight = 0.66, 0.34
-        else:
-            team_weight /= total_weight
-            skill_weight /= total_weight
+        team_weight, skill_weight = _rebalance_component_weights(
+            team_weight=team_weight,
+            skill_weight=skill_weight,
+            fallback_team_weight=0.66,
+            fallback_skill_weight=0.34,
+        )
 
         team_strength_compression *= cfg.get(
             "baseline_predictor.qualifying.model_only_team_compression_multiplier", 0.87
@@ -353,12 +403,12 @@ def run_qualifying_simulations(
             "baseline_predictor.qualifying.testing_fallback_skill_weight_multiplier",
             1.08,
         )
-        total_weight = team_weight + skill_weight
-        if total_weight <= 0:
-            team_weight, skill_weight = 0.52, 0.48
-        else:
-            team_weight /= total_weight
-            skill_weight /= total_weight
+        team_weight, skill_weight = _rebalance_component_weights(
+            team_weight=team_weight,
+            skill_weight=skill_weight,
+            fallback_team_weight=0.52,
+            fallback_skill_weight=0.48,
+        )
 
         driver_offset_cap *= cfg.get(
             "baseline_predictor.qualifying.testing_fallback_driver_offset_cap_multiplier",

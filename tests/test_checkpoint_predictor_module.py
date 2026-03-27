@@ -64,7 +64,10 @@ def test_build_checkpoint_overlay_predictor_uses_snapshot_profiles(patcher):
                 "profiles": {
                     "balanced": {"overall_pace": 0.92},
                     "short_run": {"overall_pace": 0.95},
-                }
+                },
+                "driver_deltas_seconds": {
+                    "short_run": {"NOR": -0.11, "PIA": 0.11},
+                },
             }
         },
     }
@@ -127,6 +130,12 @@ def test_build_checkpoint_overlay_predictor_uses_snapshot_profiles(patcher):
         ]["overall_pace"]
         == 0.95
     )
+    assert (
+        result.car_characteristics["teams"]["McLaren"]["checkpoint_driver_deltas_seconds"][
+            "short_run"
+        ]["NOR"]
+        == -0.11
+    )
     assert result.car_characteristics["checkpoint_snapshot"]["session_name"] == "FP1"
 
 
@@ -154,6 +163,46 @@ def test_build_checkpoint_overlay_predictor_returns_base_predictor_when_snapshot
         year=2026,
         race_name="Australian Grand Prix",
         checkpoint_session="PRE",
+        is_sprint=False,
+    )
+
+    assert result is base_predictor
+
+
+def test_build_checkpoint_overlay_predictor_returns_base_predictor_for_invalid_snapshot(patcher):
+    """Invalid stored snapshots should not silently promote checkpoint-backed confidence."""
+    base_predictor = type(
+        "_BasePredictor",
+        (),
+        {
+            "artifact_store": _ArtifactStore({"year": 2026, "teams": {"McLaren": {}}}),
+            "data_dir": Path("data/processed"),
+            "seed": 11,
+            "config": object(),
+        },
+    )()
+
+    patcher.setattr(
+        checkpoint_predictor,
+        "load_checkpoint_snapshot_payload",
+        lambda **kwargs: {
+            "event_name": "Australian Grand Prix",
+            "session_name": "FP2",
+            "teams": {
+                "McLaren": {
+                    "driver_deltas_seconds": {
+                        "short_run": {"NOR": -0.11, "PIA": 0.11},
+                    }
+                }
+            },
+        },
+    )
+
+    result = checkpoint_predictor.build_checkpoint_overlay_predictor(
+        base_predictor=base_predictor,
+        year=2026,
+        race_name="Australian Grand Prix",
+        checkpoint_session="FP2",
         is_sprint=False,
     )
 

@@ -149,8 +149,14 @@ def test_predict_qualifying_can_force_stored_checkpoint_profiles():
             "baseline_predictor.qualifying.testing_fallback_modifier_scale": 0.10,
             "baseline_predictor.qualifying.testing_fallback_modifier_clip_range": [-0.05, 0.05],
             "baseline_predictor.race.testing_profile_weights.short_run": {"overall_pace": 1.0},
+            "baseline_predictor.qualifying.checkpoint_driver_profile_smoothing_seconds": 0.35,
+            "baseline_predictor.qualifying.checkpoint_driver_profile_quali_scale": 0.08,
+            "baseline_predictor.qualifying.checkpoint_driver_profile_skill_scale": 0.02,
         }
     )
+    predictor.teams["Team A"]["checkpoint_driver_deltas_seconds"] = {
+        "short_run": {"AAA": -0.21},
+    }
     predictor.car_characteristics = {
         "checkpoint_snapshot": {
             "event_name": "Australian Grand Prix",
@@ -216,9 +222,9 @@ def test_predict_qualifying_can_force_stored_checkpoint_profiles():
                     checkpoint_session_name="FP2",
                 )
 
-    assert captured["has_practice_data"] is False
-    assert result["blend_used"] is False
-    assert result["testing_fallback_used"] is True
+    assert captured["has_practice_data"] is True
+    assert result["blend_used"] is True
+    assert result["testing_fallback_used"] is False
     assert result["practice_signal_mode_used"] == "stored_profiles"
     assert result["practice_signal_checkpoint"] == "FP2"
     assert (
@@ -226,6 +232,83 @@ def test_predict_qualifying_can_force_stored_checkpoint_profiles():
         == "FP2 checkpoint profile blend (latest stored snapshot: Australian Grand Prix / FP2)"
     )
     assert result["data_confidence_score"] == pytest.approx(0.5)
+    strengths = {driver["team"]: driver["team_strength"] for driver in captured["all_drivers"]}
+    quali_paces = {driver["driver"]: driver["quali_pace"] for driver in captured["all_drivers"]}
+    assert strengths["Team A"] == pytest.approx(0.792)
+    assert strengths["Team B"] == pytest.approx(0.208)
+    assert quali_paces["AAA"] > 0.53
+
+
+def test_predict_qualifying_stored_profiles_without_snapshot_stays_fallback_like():
+    """Stored profiles should stay conservative when no current-weekend snapshot is loaded."""
+    predictor = DummyQualifyingPredictor(
+        {
+            "baseline_predictor.qualifying.enable_driver_fp_adjustment": False,
+            "baseline_predictor.qualifying.testing_short_run_modifier_scale": 0.0,
+            "baseline_predictor.qualifying.testing_fallback_min_teams": 2,
+            "baseline_predictor.qualifying.testing_fallback_modifier_scale": 0.10,
+            "baseline_predictor.qualifying.testing_fallback_modifier_clip_range": [-0.05, 0.05],
+            "baseline_predictor.race.testing_profile_weights.short_run": {"overall_pace": 1.0},
+        }
+    )
+
+    captured: dict[str, object] = {}
+
+    def _fake_run(
+        all_drivers,
+        n_simulations,
+        is_sprint,
+        has_practice_data,
+        rng,
+        has_testing_fallback_data,
+    ):
+        _ = (all_drivers, n_simulations, is_sprint, rng, has_testing_fallback_data)
+        captured["has_practice_data"] = has_practice_data
+        return {"AAA": [1], "BBB": [2]}
+
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch.object(qualifying_module, "is_sprint_weekend", lambda year, race_name: False)
+        )
+        stack.enter_context(
+            patch.object(
+                qualifying_module,
+                "get_lineups",
+                lambda year, race_name: {"Team A": ["AAA"], "Team B": ["BBB"]},
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                qualifying_module,
+                "get_best_fp_performance_with_session_laps",
+                side_effect=AssertionError("raw practice extraction should be bypassed"),
+            )
+        )
+        with patch.object(predictor, "_run_qualifying_simulations", _fake_run):
+            with patch.object(
+                predictor,
+                "_aggregate_grid_results",
+                lambda position_records, all_drivers, *, data_confidence_score=None: [
+                    {
+                        "position": 1,
+                        "driver": all_drivers[0]["driver"],
+                        "team": all_drivers[0]["team"],
+                        "median_position": 1,
+                        "position_distribution": [1],
+                    }
+                ],
+            ):
+                result = predictor.predict_qualifying(
+                    2026,
+                    "Australian Grand Prix",
+                    n_simulations=1,
+                    practice_signal_mode="stored_profiles",
+                    checkpoint_session_name="FP2",
+                )
+
+    assert captured["has_practice_data"] is False
+    assert result["testing_fallback_used"] is True
+    assert result["data_confidence_score"] == pytest.approx(0.45)
 
 
 def test_real_stored_profile_fallback_avoids_rigid_team_ladder():
@@ -653,6 +736,123 @@ def test_testing_fallback_driver_offset_multiplier_reduces_team_block_clustering
     )
 
     assert cross_team_interleave_with_multiplier > (cross_team_interleave_without_multiplier + 0.02)
+
+
+def test_practice_data_multipliers_reduce_full_grid_teammate_blocking():
+    """Practice-backed runs should mix the whole field more than a neutral ladder."""
+    neutral_predictor = DummyQualifyingPredictor(
+        {
+            "baseline_predictor.qualifying.noise_std_normal": 0.018,
+            "baseline_predictor.qualifying.teammate_setup_std": 0.008,
+            "baseline_predictor.qualifying.practice_data_team_weight_multiplier": 1.0,
+            "baseline_predictor.qualifying.practice_data_skill_weight_multiplier": 1.0,
+            "baseline_predictor.qualifying.practice_data_team_compression_multiplier": 1.0,
+            "baseline_predictor.qualifying.practice_data_driver_offset_cap_multiplier": 1.0,
+            "baseline_predictor.qualifying.practice_data_teammate_setup_multiplier": 1.0,
+        }
+    )
+    tuned_predictor = DummyQualifyingPredictor(
+        {
+            "baseline_predictor.qualifying.noise_std_normal": 0.018,
+            "baseline_predictor.qualifying.teammate_setup_std": 0.008,
+        }
+    )
+
+    all_drivers = [
+        {
+            "driver": "AAA",
+            "team": "Team A",
+            "team_strength": 0.78,
+            "skill": 0.92,
+            "quali_pace": 0.92,
+            "experience_tier": "veteran",
+            "experience_total_races": 160,
+        },
+        {
+            "driver": "AAB",
+            "team": "Team A",
+            "team_strength": 0.78,
+            "skill": 0.66,
+            "quali_pace": 0.67,
+            "experience_tier": "established",
+            "experience_total_races": 90,
+        },
+        {
+            "driver": "BBB",
+            "team": "Team B",
+            "team_strength": 0.75,
+            "skill": 0.90,
+            "quali_pace": 0.90,
+            "experience_tier": "veteran",
+            "experience_total_races": 150,
+        },
+        {
+            "driver": "BBC",
+            "team": "Team B",
+            "team_strength": 0.75,
+            "skill": 0.64,
+            "quali_pace": 0.65,
+            "experience_tier": "established",
+            "experience_total_races": 85,
+        },
+        {
+            "driver": "CCC",
+            "team": "Team C",
+            "team_strength": 0.72,
+            "skill": 0.88,
+            "quali_pace": 0.88,
+            "experience_tier": "veteran",
+            "experience_total_races": 140,
+        },
+        {
+            "driver": "CCD",
+            "team": "Team C",
+            "team_strength": 0.72,
+            "skill": 0.62,
+            "quali_pace": 0.63,
+            "experience_tier": "established",
+            "experience_total_races": 80,
+        },
+    ]
+    driver_to_team = {driver["driver"]: driver["team"] for driver in all_drivers}
+
+    def _average_adjacent_teammate_pairs(position_records: dict[str, list[int]]) -> float:
+        sample_count = len(next(iter(position_records.values())))
+        total_adjacent_pairs = 0
+        for sample_index in range(sample_count):
+            positions_by_team: dict[str, list[int]] = {}
+            for driver, positions in position_records.items():
+                positions_by_team.setdefault(driver_to_team[driver], []).append(
+                    positions[sample_index]
+                )
+            total_adjacent_pairs += sum(
+                1
+                for positions in positions_by_team.values()
+                if len(positions) >= 2 and (sorted(positions)[1] - sorted(positions)[0] == 1)
+            )
+        return total_adjacent_pairs / sample_count
+
+    neutral_records = neutral_predictor._run_qualifying_simulations(
+        all_drivers=all_drivers,
+        n_simulations=4000,
+        is_sprint=False,
+        has_practice_data=True,
+        rng=np.random.default_rng(42),
+        has_testing_fallback_data=False,
+    )
+    tuned_records = tuned_predictor._run_qualifying_simulations(
+        all_drivers=all_drivers,
+        n_simulations=4000,
+        is_sprint=False,
+        has_practice_data=True,
+        rng=np.random.default_rng(42),
+        has_testing_fallback_data=False,
+    )
+
+    neutral_average = _average_adjacent_teammate_pairs(neutral_records)
+    tuned_average = _average_adjacent_teammate_pairs(tuned_records)
+
+    assert tuned_average < (neutral_average - 0.10)
 
 
 def test_run_qualifying_simulations_applies_learned_position_adjustments():

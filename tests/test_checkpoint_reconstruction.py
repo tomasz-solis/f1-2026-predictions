@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.dashboard.accuracy import AccuracyPipeline
+from src.utils.car_snapshot_history import build_car_characteristics_snapshot_payload
 from src.utils.checkpoint_reconstruction import (
     SnapshotOverlayArtifactStore,
     build_reconstructed_prediction_results,
@@ -39,7 +40,10 @@ def test_build_snapshot_overlay_car_characteristics_preserves_priors_and_replace
                 "profiles": {
                     "balanced": {"overall_pace": 0.91},
                     "short_run": {"overall_pace": 0.93},
-                }
+                },
+                "driver_deltas_seconds": {
+                    "short_run": {"NOR": -0.12, "PIA": 0.12},
+                },
             }
         },
     }
@@ -55,7 +59,64 @@ def test_build_snapshot_overlay_car_characteristics_preserves_priors_and_replace
         merged["teams"]["McLaren"]["testing_characteristics_profiles"]["short_run"]["overall_pace"]
         == 0.93
     )
+    assert merged["teams"]["McLaren"]["checkpoint_driver_deltas_seconds"]["short_run"]["NOR"] == (
+        pytest.approx(-0.12)
+    )
     assert merged["checkpoint_snapshot"]["session_name"] == "FP1"
+
+
+def test_build_snapshot_overlay_car_characteristics_rejects_snapshots_without_team_profiles():
+    """Checkpoint overlays should fail closed when a snapshot has no usable team profiles."""
+    base_payload = {
+        "year": 2026,
+        "teams": {
+            "McLaren": {
+                "overall_performance": 0.81,
+                "testing_characteristics": {"overall_pace": 0.42},
+            }
+        },
+    }
+    snapshot_payload = {
+        "event_name": "Australian Grand Prix",
+        "session_name": "FP2",
+        "teams": {
+            "McLaren": {
+                "driver_deltas_seconds": {
+                    "short_run": {"NOR": -0.12, "PIA": 0.12},
+                }
+            }
+        },
+    }
+
+    with pytest.raises(ValueError, match="valid team profiles"):
+        build_snapshot_overlay_car_characteristics(
+            base_car_payload=base_payload,
+            snapshot_payload=snapshot_payload,
+        )
+
+
+def test_build_car_characteristics_snapshot_payload_ignores_delta_only_teams():
+    """Snapshot payloads should only persist teams that have real profile data."""
+    payload = build_car_characteristics_snapshot_payload(
+        year=2026,
+        event_name="Australian Grand Prix",
+        session_name="FP2",
+        team_profiles={
+            "McLaren": {
+                "balanced": {"overall_pace": 0.91},
+            }
+        },
+        team_driver_deltas_seconds={
+            "McLaren": {"short_run": {"NOR": -0.12, "PIA": 0.12}},
+            "Ferrari": {"short_run": {"LEC": -0.03, "HAM": 0.03}},
+        },
+        source="snapshot_history_backfill",
+    )
+
+    assert set(payload["teams"]) == {"McLaren"}
+    assert payload["teams"]["McLaren"]["driver_deltas_seconds"]["short_run"]["NOR"] == (
+        pytest.approx(-0.12)
+    )
 
 
 def test_accuracy_pipeline_uses_information_cutoff_for_reconstructed_predictions(patcher):
@@ -188,6 +249,74 @@ def test_build_reconstructed_prediction_results_caps_sprint_main_race_confidence
 
     assert reconstructed_is_sprint is True
     assert results["main_race"]["input_confidence"] == pytest.approx(0.5)
+
+
+def test_build_reconstructed_prediction_results_penalizes_checkpoint_profile_blend(patcher):
+    """Normal-weekend reconstruction should keep the checkpoint-blend confidence penalty."""
+
+    class _Predictor:
+        def predict_qualifying(self, **kwargs):
+            qualifying_stage = kwargs["qualifying_stage"]
+            return {
+                "grid": [{"position": 1, "driver": "NOR", "team": "McLaren"}],
+                "grid_source": "PREDICTED",
+                "qualifying_stage": qualifying_stage,
+                "data_confidence_score": 0.9,
+                "data_source": (
+                    "FP2 checkpoint profile blend "
+                    "(latest stored snapshot: Australian Grand Prix / FP2)"
+                ),
+                "testing_fallback_used": False,
+            }
+
+        def predict_race(self, **kwargs):
+            return {
+                "finish_order": [{"position": 1, "driver": "NOR", "team": "McLaren"}],
+                "captured_input_confidence": kwargs["input_confidence"],
+            }
+
+    patcher.setattr(
+        "src.utils.checkpoint_reconstruction.Baseline2026Predictor",
+        lambda *args, **kwargs: _Predictor(),
+    )
+    patcher.setattr(
+        "src.utils.checkpoint_reconstruction.is_sprint_weekend",
+        lambda year, race_name: False,
+    )
+
+    artifact_store = MagicMock(spec=SnapshotOverlayArtifactStore)
+    artifact_store.data_root = "data"
+    artifact_store.load_artifact.side_effect = [
+        {
+            "year": 2026,
+            "teams": {"McLaren": {"testing_characteristics_profiles": {}}},
+        },
+        {
+            "event_name": "Australian Grand Prix",
+            "session_name": "FP2",
+            "captured_at": "2026-03-14T23:32:08+00:00",
+            "session_started_at": "2026-03-14T22:30:00+00:00",
+            "teams": {
+                "McLaren": {
+                    "profiles": {
+                        "balanced": {"overall_pace": 0.9},
+                        "short_run": {"overall_pace": 0.92},
+                    }
+                }
+            },
+        },
+    ]
+
+    results, reconstructed_is_sprint = build_reconstructed_prediction_results(
+        year=2026,
+        race_name="Australian Grand Prix",
+        checkpoint_session="FP2",
+        weather="dry",
+        artifact_store=artifact_store,
+    )
+
+    assert reconstructed_is_sprint is False
+    assert results["race"]["input_confidence"] == pytest.approx(0.85)
 
 
 def test_load_checkpoint_snapshot_payload_falls_back_to_latest_prior_snapshot_for_pre(patcher):

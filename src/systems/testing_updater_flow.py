@@ -123,14 +123,25 @@ def _build_session_snapshot_record(
     session_name: str,
     session: Any,
     profile_results: dict[str, tuple[dict[str, dict[str, float]], dict[str, dict[str, float]]]],
+    driver_profile_results: dict[str, dict[str, dict[str, float]]] | None = None,
 ) -> dict[str, Any] | None:
     """Build a raw session snapshot record from extracted per-profile metrics."""
     team_profiles: dict[str, dict[str, dict[str, float]]] = {}
+    team_driver_deltas_seconds: dict[str, dict[str, dict[str, float]]] = {}
 
     for profile_name, (perf_by_profile, tire_by_profile) in profile_results.items():
         merged_metrics = merge_snapshot_team_metrics(perf_by_profile, tire_by_profile)
         for team_name, team_metrics in merged_metrics.items():
             team_profiles.setdefault(team_name, {})[profile_name] = team_metrics
+
+    if isinstance(driver_profile_results, dict):
+        for profile_name, team_driver_deltas in driver_profile_results.items():
+            if not isinstance(team_driver_deltas, dict):
+                continue
+            for team_name, driver_deltas in team_driver_deltas.items():
+                if not isinstance(driver_deltas, dict) or not driver_deltas:
+                    continue
+                team_driver_deltas_seconds.setdefault(team_name, {})[profile_name] = driver_deltas
 
     if not team_profiles:
         return None
@@ -140,6 +151,7 @@ def _build_session_snapshot_record(
         "event_name": event_name,
         "session_name": session_name,
         "team_profiles": team_profiles,
+        "team_driver_deltas_seconds": team_driver_deltas_seconds,
         **metadata,
     }
 
@@ -157,6 +169,7 @@ def collect_sessions_for_events(
     collect_session_metrics: Callable[
         ..., tuple[dict[str, dict[str, float]], dict[str, dict[str, float]]]
     ],
+    extract_session_driver_deltas: Callable[..., dict[str, dict[str, float]]],
     count_team_selected_laps: Callable[..., dict[str, float]],
     extract_session_compound_metrics: Callable[
         [Any, str, set[str]], dict[str, dict[str, dict[str, float | str | None]]]
@@ -185,6 +198,7 @@ def collect_sessions_for_events(
             profile_results: dict[
                 str, tuple[dict[str, dict[str, float]], dict[str, dict[str, float]]]
             ] = {}
+            driver_profile_results: dict[str, dict[str, dict[str, float]]] = {}
             for profile in _profiles_to_collect(run_profile, profiles_for_storage):
                 perf_by_profile, tire_by_profile = collect_session_metrics(
                     session=session,
@@ -194,6 +208,11 @@ def collect_sessions_for_events(
                     diagnostics=(result.extraction_diagnostics if profile == run_profile else None),
                 )
                 profile_results[profile] = (perf_by_profile, tire_by_profile)
+                driver_profile_results[profile] = extract_session_driver_deltas(
+                    session=session,
+                    known_teams=known_teams,
+                    run_profile=profile,
+                )
 
                 if profile in profiles_for_storage and (perf_by_profile or tire_by_profile):
                     profile_weights = count_team_selected_laps(
@@ -216,6 +235,7 @@ def collect_sessions_for_events(
                 session_name=session_name,
                 session=session,
                 profile_results=profile_results,
+                driver_profile_results=driver_profile_results,
             )
             if snapshot_record is not None:
                 result.session_snapshot_records[session_id] = snapshot_record

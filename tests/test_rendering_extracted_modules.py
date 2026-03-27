@@ -21,6 +21,15 @@ def test_rendering_html_build_surface_header_html_escapes_inputs() -> None:
     assert "Weekend" in html
 
 
+def test_rendering_html_short_data_source_label_prefers_checkpoint_blend() -> None:
+    label = rendering_html._short_data_source_label(
+        "FP2 checkpoint profile blend (latest stored snapshot: Australian Grand Prix / FP2)",
+        blend_used=True,
+    )
+
+    assert label == "Checkpoint blend"
+
+
 def test_rendering_race_build_position_change_frame_merges_and_sorts_rows() -> None:
     finish_df = pd.DataFrame(
         [

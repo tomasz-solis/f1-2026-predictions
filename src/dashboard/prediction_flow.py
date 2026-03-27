@@ -5,7 +5,10 @@ import time
 from typing import Any
 
 from src.types.prediction_types import QualifyingGridEntry
-from src.utils.race_input_confidence import cap_predicted_main_race_input_confidence
+from src.utils.race_input_confidence import (
+    cap_predicted_main_race_input_confidence,
+    derive_race_input_confidence,
+)
 
 from .cache import get_predictor
 from .checkpoint_predictor import build_checkpoint_overlay_predictor
@@ -86,24 +89,7 @@ def _derive_race_input_confidence(
     grid_source: str,
 ) -> float:
     """Estimate race input confidence from qualifying data quality and grid source."""
-    if str(grid_source).upper() == "ACTUAL":
-        return 1.0
-
-    base_confidence = float(qualifying_result.get("data_confidence_score", 0.5))
-    base_confidence = float(max(0.0, min(base_confidence, 1.0)))
-
-    data_source = str(qualifying_result.get("data_source", "")).lower()
-    source_adjustment = 0.0
-    if "model-only" in data_source:
-        source_adjustment = -0.10
-    elif bool(qualifying_result.get("testing_fallback_used")) or (
-        "checkpoint profile blend" in data_source
-        or "testing short-run profile blend" in data_source
-    ):
-        source_adjustment = -0.05
-
-    grid_adjustment = 0.20 if str(grid_source).upper() == "ACTUAL" else 0.0
-    return float(max(0.0, min(base_confidence + source_adjustment + grid_adjustment, 1.0)))
+    return derive_race_input_confidence(qualifying_result, grid_source=grid_source)
 
 
 def _resolve_dashboard_simulation_count(kind: str) -> int:

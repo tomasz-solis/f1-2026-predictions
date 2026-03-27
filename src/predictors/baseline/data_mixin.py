@@ -656,6 +656,38 @@ class BaselineDataMixin:
             profile=profile,
         )
 
+    def _get_checkpoint_driver_delta_seconds(
+        self,
+        team: str,
+        driver: str,
+        preferred_profiles: tuple[str, ...] = ("short_run", "balanced", "long_run"),
+    ) -> float | None:
+        """Return one checkpoint-backed driver lap-time delta when a snapshot provides it."""
+        team_data = self._resolve_team_data(team)
+        checkpoint_driver_deltas = team_data.get("checkpoint_driver_deltas_seconds")
+        if not isinstance(checkpoint_driver_deltas, dict) or not checkpoint_driver_deltas:
+            return None
+
+        driver_code = str(driver).strip().upper()
+        if not driver_code:
+            return None
+
+        for profile_name in preferred_profiles:
+            profile_deltas = checkpoint_driver_deltas.get(profile_name)
+            if not isinstance(profile_deltas, dict):
+                continue
+            raw_delta = profile_deltas.get(driver_code)
+            if not isinstance(raw_delta, int | float | str):
+                continue
+            try:
+                delta_seconds = float(raw_delta)
+            except (TypeError, ValueError):
+                continue
+            if np.isfinite(delta_seconds):
+                return delta_seconds
+
+        return None
+
     def _compute_testing_profile_modifier(
         self,
         team: str,

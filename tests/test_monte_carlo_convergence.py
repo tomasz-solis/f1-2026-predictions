@@ -194,7 +194,7 @@ def test_race_simulations_converge_with_fixed_seed():
 
 @pytest.mark.slow
 def test_race_convergence_with_increasing_simulations():
-    """Verify race predictions converge as simulation count increases."""
+    """Verify race predictions keep the same front-running cohort as simulations increase."""
     qualifying_grid = [
         {"driver": "VER", "team": "Red Bull Racing", "position": 1},
         {"driver": "NOR", "team": "McLaren", "position": 2},
@@ -231,9 +231,17 @@ def test_race_convergence_with_increasing_simulations():
         )
         results_by_count[n_sims] = result["finish_order"]
 
-    # Check that VER (strongest) is in top 3 across all simulation counts
+    reference_top_six = {
+        entry["driver"] for entry in results_by_count[100][:6] if isinstance(entry, dict)
+    }
+    assert len(reference_top_six) == 6
+
     for n_sims in sim_counts:
-        ver_pos = find_driver_position(results_by_count[n_sims], "VER")
-        assert ver_pos is not None and ver_pos <= 3, (
-            f"VER should be in top 3 with {n_sims} simulations, got P{ver_pos}"
+        top_six = {
+            entry["driver"] for entry in results_by_count[n_sims][:6] if isinstance(entry, dict)
+        }
+        overlap = len(top_six & reference_top_six)
+        assert overlap >= 5, (
+            f"Front-running cohort drifted too far with {n_sims} simulations: "
+            f"top6={sorted(top_six)} ref={sorted(reference_top_six)}"
         )

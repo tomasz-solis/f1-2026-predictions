@@ -1,10 +1,12 @@
 """Extract and blend FP session performance with model predictions."""
 
 import logging
+import os
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 import fastf1 as ff1
@@ -19,6 +21,7 @@ from src.utils.team_mapping import map_team_to_characteristics
 
 logging.getLogger("fastf1").setLevel(logging.CRITICAL)
 logger = logging.getLogger(__name__)
+_ENABLED_FASTF1_CACHE_DIR: Path | None = None
 
 _SESSION_DURATION_HOURS: dict[str, float] = {
     "FP1": 1.5,
@@ -28,6 +31,120 @@ _SESSION_DURATION_HOURS: dict[str, float] = {
     "Sprint": 1.0,
     "Sprint Qualifying": 1.5,
 }
+
+
+def _iter_fastf1_cache_dirs() -> tuple[Path, ...]:
+    """Return candidate FastF1 cache roots in priority order."""
+    candidates: list[Path] = []
+    env_cache_dir = os.getenv("F1_CACHE_DIR")
+    if env_cache_dir:
+        candidates.append(Path(env_cache_dir).expanduser())
+    candidates.extend(
+        [
+            Path("data/raw/.fastf1_cache"),
+            Path("data/raw/.fastf1_cache_testing"),
+        ]
+    )
+
+    unique_candidates: list[Path] = []
+    seen: set[Path] = set()
+    for candidate in candidates:
+        resolved = candidate.expanduser()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        unique_candidates.append(resolved)
+
+    return tuple(unique_candidates)
+
+
+def _enable_fastf1_cache(cache_dir: Path) -> None:
+    """Enable one FastF1 cache directory if it is not already active."""
+    global _ENABLED_FASTF1_CACHE_DIR
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    if _ENABLED_FASTF1_CACHE_DIR == cache_dir:
+        return
+
+    ff1.Cache.enable_cache(str(cache_dir))
+    _ENABLED_FASTF1_CACHE_DIR = cache_dir
+
+
+def _load_session_with_cache_fallback(
+    *,
+    year: int,
+    race_name: str,
+    session_type: str,
+    weather: bool,
+) -> Any:
+    """Load one FastF1 session while falling back across known local cache roots."""
+    last_error: Exception | None = None
+
+    def load_session_metadata() -> Any:
+        """Fetch one FastF1 session object for the requested event."""
+        return ff1.get_session(year, race_name, session_type)
+
+    for cache_dir in _iter_fastf1_cache_dirs():
+        try:
+            _enable_fastf1_cache(cache_dir)
+            session = _fastf1_with_retry(load_session_metadata)
+            if session is None:
+                continue
+
+            def load_session_laps(current_session: Any = session) -> Any:
+                """Load the requested session payload without telemetry/messages."""
+                return current_session.load(
+                    laps=True,
+                    telemetry=False,
+                    weather=weather,
+                    messages=False,
+                )
+
+            _fastf1_with_retry(load_session_laps)
+            return session
+        except Exception as exc:
+            last_error = exc
+            logger.debug(
+                "FastF1 load failed for %s %s %s via cache %s: %s",
+                year,
+                race_name,
+                session_type,
+                cache_dir,
+                exc,
+            )
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("No FastF1 cache directories are configured")
+
+
+def _get_event_with_cache_fallback(year: int, race_name: str) -> Any:
+    """Load one FastF1 event while reusing known local cache roots."""
+    last_error: Exception | None = None
+
+    def load_event_metadata() -> Any:
+        """Fetch one FastF1 event object for the requested race."""
+        return ff1.get_event(year, race_name)
+
+    for cache_dir in _iter_fastf1_cache_dirs():
+        try:
+            _enable_fastf1_cache(cache_dir)
+            event = _fastf1_with_retry(load_event_metadata, max_retries=1)
+            if event is not None:
+                return event
+        except Exception as exc:
+            last_error = exc
+            logger.debug(
+                "FastF1 event lookup failed for %s %s via cache %s: %s",
+                year,
+                race_name,
+                cache_dir,
+                exc,
+            )
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("No FastF1 cache directories are configured")
 
 
 class CircuitBreaker:
@@ -257,15 +374,13 @@ def get_fp_team_performance(
         raise ValueError("run_focus must be one of: 'short', 'long'")
 
     try:
-        session = _fastf1_with_retry(lambda: ff1.get_session(year, race_name, session_type))
-        if session is None:
-            return None, None, FPDataError.API_FAILURE
-
-        load_result = _fastf1_with_retry(
-            lambda: session.load(laps=True, telemetry=False, weather=False)
+        session = _load_session_with_cache_fallback(
+            year=year,
+            race_name=race_name,
+            session_type=session_type,
+            weather=False,
         )
-        if load_result is None:
-            logger.debug(f"session.load() returned None for {session_type} at {race_name}")
+        if session is None:
             return None, None, FPDataError.API_FAILURE
 
         if not hasattr(session, "laps") or session.laps is None or session.laps.empty:
@@ -333,14 +448,13 @@ def get_fp_team_performance(
 def get_fp_session_weather(year: int, race_name: str, session_type: str) -> str | None:
     """Infer FP session weather context from compound usage."""
     try:
-        session = _fastf1_with_retry(lambda: ff1.get_session(year, race_name, session_type))
-        if session is None:
-            return None
-
-        load_result = _fastf1_with_retry(
-            lambda: session.load(laps=True, telemetry=False, weather=True)
+        session = _load_session_with_cache_fallback(
+            year=year,
+            race_name=race_name,
+            session_type=session_type,
+            weather=True,
         )
-        if load_result is None or not hasattr(session, "laps"):
+        if session is None or not hasattr(session, "laps"):
             return None
 
         laps = session.laps
@@ -412,7 +526,7 @@ def get_best_fp_performance_with_session_laps(
 
     event = None
     try:
-        event = _fastf1_with_retry(lambda: ff1.get_event(year, race_name), max_retries=1)
+        event = _get_event_with_cache_fallback(year, race_name)
     except Exception:
         event = None
 

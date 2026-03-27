@@ -6,7 +6,9 @@ from unittest.mock import patch
 import pytest
 
 import src.predictors.baseline.race.prediction_mixin as prediction_module
+from src.predictors.baseline.race.grid_uncertainty import prepare_grid_uncertainty_profile
 from src.predictors.baseline.race.prediction_mixin import BaselineRacePredictionMixin
+from src.predictors.baseline.race.result_processing import estimate_predicted_grid_uncertainty_share
 
 
 class DummyRacePredictor(BaselineRacePredictionMixin):
@@ -864,7 +866,6 @@ def test_predict_race_samples_predicted_grid_uncertainty():
                 },
             )
         )
-
         result = predictor.predict_race(
             qualifying_grid=qualifying_grid,
             weather="dry",
@@ -877,6 +878,132 @@ def test_predict_race_samples_predicted_grid_uncertainty():
     by_driver = {entry["driver"]: entry for entry in result["finish_order"]}
     assert by_driver["A"]["p95"] > 1
     assert by_driver["A"]["position_blend_score"] > 1.1
+
+
+def test_race_grid_uncertainty_tuning_reduces_predicted_starting_grid_spread():
+    """Race-side grid sampling should be tighter than the legacy uncertainty tuning."""
+
+    class _Config:
+        def __init__(self, overrides: dict[str, float] | None = None):
+            self.overrides = overrides or {}
+
+        def get(self, key, default=None):
+            if key in self.overrides:
+                return self.overrides[key]
+            return prediction_module.config_loader.get(key, default)
+
+    qualifying_grid = [
+        {
+            "driver": "A",
+            "team": "TeamA",
+            "position": 1,
+            "median_position": 2,
+            "p5": 1,
+            "p95": 8,
+            "confidence": 46.0,
+        },
+        {
+            "driver": "B",
+            "team": "TeamB",
+            "position": 2,
+            "median_position": 3,
+            "p5": 1,
+            "p95": 9,
+            "confidence": 45.5,
+        },
+        {
+            "driver": "C",
+            "team": "TeamC",
+            "position": 3,
+            "median_position": 4,
+            "p5": 2,
+            "p95": 10,
+            "confidence": 45.0,
+        },
+        {
+            "driver": "D",
+            "team": "TeamD",
+            "position": 4,
+            "median_position": 5,
+            "p5": 2,
+            "p95": 11,
+            "confidence": 44.5,
+        },
+        {
+            "driver": "E",
+            "team": "TeamE",
+            "position": 5,
+            "median_position": 6,
+            "p5": 3,
+            "p95": 12,
+            "confidence": 44.0,
+        },
+        {
+            "driver": "F",
+            "team": "TeamF",
+            "position": 6,
+            "median_position": 7,
+            "p5": 4,
+            "p95": 12,
+            "confidence": 43.5,
+        },
+    ]
+    tuned_profile = prepare_grid_uncertainty_profile(
+        validated_grid=qualifying_grid,
+        input_confidence=0.45,
+        cfg=_Config({"baseline_predictor.race.grid_uncertainty.max_std": 5.0}),
+    )
+    legacy_profile = prepare_grid_uncertainty_profile(
+        validated_grid=qualifying_grid,
+        input_confidence=0.45,
+        cfg=_Config(
+            {
+                "baseline_predictor.race.grid_uncertainty.max_std": 5.0,
+                "baseline_predictor.race.grid_uncertainty.base_std": 0.35,
+                "baseline_predictor.race.grid_uncertainty.interval_divisor": 3.29,
+                "baseline_predictor.race.grid_uncertainty.confidence_scale": 0.90,
+                "baseline_predictor.race.grid_uncertainty.input_confidence_scale": 0.60,
+                "baseline_predictor.race.grid_uncertainty.position_delta_scale": 0.35,
+            }
+        ),
+    )
+
+    tuned_mean_std = sum(entry["std"] for entry in tuned_profile.values()) / len(tuned_profile)
+    legacy_mean_std = sum(entry["std"] for entry in legacy_profile.values()) / len(legacy_profile)
+
+    assert tuned_mean_std < legacy_mean_std
+
+
+def test_estimate_predicted_grid_uncertainty_share_tracks_wide_sampled_grids():
+    """Sampled grid permutations should report more uncertainty than fixed grids."""
+
+    class _Config:
+        def get(self, key, default=None):
+            overrides = {
+                "baseline_predictor.race.predicted_grid_uncertainty.activation_width": 2.0,
+                "baseline_predictor.race.predicted_grid_uncertainty.width_scale": 5.0,
+            }
+            return overrides.get(key, default)
+
+    wide_share = estimate_predicted_grid_uncertainty_share(
+        grid_position_samples_by_driver={
+            "A": [1.0, 2.0, 3.0, 4.0, 5.0],
+            "B": [2.0, 3.0, 4.0, 5.0, 6.0],
+        },
+        field_size=6,
+        cfg=_Config(),
+    )
+    fixed_share = estimate_predicted_grid_uncertainty_share(
+        grid_position_samples_by_driver={
+            "A": [1.0, 1.0, 1.0, 1.0, 1.0],
+            "B": [2.0, 2.0, 2.0, 2.0, 2.0],
+        },
+        field_size=6,
+        cfg=_Config(),
+    )
+
+    assert wide_share > 0.0
+    assert fixed_share == pytest.approx(0.0)
 
 
 def test_predict_race_applies_learned_position_adjustment():

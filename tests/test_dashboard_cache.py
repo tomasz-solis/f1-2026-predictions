@@ -67,6 +67,10 @@ def test_get_file_timestamps_reports_existing_and_missing_files(patcher):
     )
     assert timestamps["data/2026_pirelli_info.json"] == (0, "")
     assert timestamps["src/predictors/baseline_2026.py"] == (0, "")
+    assert timestamps["src/dashboard/prediction_flow.py"] == (0, "")
+    assert timestamps["src/predictors/baseline/race/grid_uncertainty.py"] == (0, "")
+    assert timestamps["src/predictors/baseline/race/result_processing.py"] == (0, "")
+    assert timestamps["src/utils/race_input_confidence.py"] == (0, "")
 
 
 def test_get_artifact_versions_combines_store_and_file_timestamps(patcher):

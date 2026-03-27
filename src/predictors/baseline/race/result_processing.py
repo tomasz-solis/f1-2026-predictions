@@ -7,6 +7,43 @@ from typing import Any
 import numpy as np
 
 
+def estimate_predicted_grid_uncertainty_share(
+    *,
+    grid_position_samples_by_driver: dict[str, list[float]],
+    field_size: int,
+    cfg: Any,
+) -> float:
+    """Estimate how uncertain the sampled starting grid is on a 0-1 scale."""
+    if field_size <= 1 or not grid_position_samples_by_driver:
+        return 0.0
+
+    interval_widths: list[float] = []
+    for samples in grid_position_samples_by_driver.values():
+        if len(samples) < 2:
+            continue
+        p5 = float(np.percentile(samples, 5))
+        p95 = float(np.percentile(samples, 95))
+        interval_widths.append(max(0.0, p95 - p5))
+
+    if not interval_widths:
+        return 0.0
+
+    activation_width = float(
+        cfg.get("baseline_predictor.race.predicted_grid_uncertainty.activation_width", 2.0)
+    )
+    width_scale = float(
+        max(
+            1e-6,
+            cfg.get(
+                "baseline_predictor.race.predicted_grid_uncertainty.width_scale",
+                max(3.0, field_size / 3.0),
+            ),
+        )
+    )
+    mean_width = float(np.mean(interval_widths))
+    return float(np.clip((mean_width - activation_width) / width_scale, 0.0, 1.0))
+
+
 def apply_low_confidence_interval_floor(
     *,
     finish_order: list[dict[str, Any]],
@@ -182,6 +219,11 @@ def build_finish_order(
         else 0.0
     )
     weather_penalty += float(weather_feature_modifiers.get("confidence_adjustment", 0.0))
+    predicted_grid_uncertainty_share = estimate_predicted_grid_uncertainty_share(
+        grid_position_samples_by_driver=grid_position_samples_by_driver,
+        field_size=field_size,
+        cfg=cfg,
+    )
 
     track_overtaking = race_params.get("track_overtaking", 0.5)
     grid_anchor_weight = np.clip(
@@ -204,6 +246,17 @@ def build_finish_order(
         grid_anchor_weight = float(
             np.clip(
                 grid_anchor_weight + (low_confidence_share * grid_anchor_low_confidence_scale),
+                grid_anchor_min,
+                main_grid_anchor_max,
+            )
+        )
+        predicted_grid_anchor_scale = float(
+            cfg.get("baseline_predictor.race.predicted_grid_uncertainty.anchor_scale", 0.0)
+        )
+        grid_anchor_weight = float(
+            np.clip(
+                grid_anchor_weight
+                + (predicted_grid_uncertainty_share * predicted_grid_anchor_scale),
                 grid_anchor_min,
                 main_grid_anchor_max,
             )
@@ -268,6 +321,38 @@ def build_finish_order(
             1.0,
         )
     )
+    predicted_grid_racecraft_scale = float(
+        np.clip(
+            1.0
+            - (
+                predicted_grid_uncertainty_share
+                * float(
+                    cfg.get(
+                        "baseline_predictor.race.predicted_grid_uncertainty.racecraft_damp_scale",
+                        0.0,
+                    )
+                )
+            ),
+            0.0,
+            1.0,
+        )
+    )
+    predicted_grid_max_gain_scale = float(
+        np.clip(
+            1.0
+            - (
+                predicted_grid_uncertainty_share
+                * float(
+                    cfg.get(
+                        "baseline_predictor.race.predicted_grid_uncertainty.max_gain_damp_scale",
+                        0.0,
+                    )
+                )
+            ),
+            0.0,
+            1.0,
+        )
+    )
     dnf_probability_output_cap = float(cfg.get("baseline_predictor.race.dnf_rate_final_cap", 0.35))
 
     finish_order: list[dict[str, Any]] = []
@@ -326,6 +411,7 @@ def build_finish_order(
         )
         racecraft_adjustment += elite_driver_adjustment
         racecraft_adjustment *= racecraft_confidence_scale
+        racecraft_adjustment *= predicted_grid_racecraft_scale
 
         is_elite_driver = info["skill"] >= elite_skill_threshold
         if reference_grid_pos <= 3.0 and not is_elite_driver:
@@ -350,6 +436,7 @@ def build_finish_order(
             + (max(0.0, info["race_advantage"]) * race_adv_gain_scale)
         )
         max_gain *= max_gain_confidence_scale
+        max_gain *= predicted_grid_max_gain_scale
         max_gain = np.clip(max_gain, max_gain_floor, max_gain_ceiling)
         min_position_score = max(1.0, reference_grid_pos - max_gain)
 

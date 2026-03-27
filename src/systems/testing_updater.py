@@ -210,7 +210,13 @@ def _persist_session_snapshot_records(
         event_name = str(snapshot_record.get("event_name", "")).strip()
         session_name = str(snapshot_record.get("session_name", "")).strip()
         team_profiles = snapshot_record.get("team_profiles")
-        if not event_name or not session_name or not isinstance(team_profiles, dict):
+        team_driver_deltas_seconds = snapshot_record.get("team_driver_deltas_seconds")
+        if (
+            not event_name
+            or not session_name
+            or not isinstance(team_profiles, dict)
+            or not isinstance(team_driver_deltas_seconds, dict)
+        ):
             continue
 
         artifact_key = snapshot_artifact_key(year, event_name, session_name)
@@ -219,6 +225,7 @@ def _persist_session_snapshot_records(
             event_name=event_name,
             session_name=session_name,
             team_profiles=team_profiles,
+            team_driver_deltas_seconds=team_driver_deltas_seconds,
             source=source,
             captured_at=captured_at,
             round_number=snapshot_record.get("round_number"),
@@ -285,6 +292,7 @@ def backfill_session_snapshot_history(
         profiles_for_storage=_PROFILES_FOR_STORAGE,
         load_sessions_for_event=_load_sessions_for_event,
         collect_session_metrics=_collect_session_metrics,
+        extract_session_driver_deltas=_extract_session_driver_deltas,
         count_team_selected_laps=_count_team_selected_laps,
         extract_session_compound_metrics=_extract_session_compound_metrics,
         logger=logger,
@@ -897,6 +905,61 @@ def _collect_session_metrics(
     )
 
 
+def _extract_session_driver_deltas(
+    session: fastf1.core.Session,
+    known_teams: set[str],
+    run_profile: str = "balanced",
+) -> dict[str, dict[str, float]]:
+    """Estimate teammate-relative driver pace deltas for one session profile."""
+    try:
+        laps = session.laps
+    except Exception:
+        return {}
+
+    if laps is None or laps.empty or "Team" not in laps.columns or "Driver" not in laps.columns:
+        return {}
+
+    driver_deltas_by_team: dict[str, dict[str, float]] = {}
+
+    raw_teams = laps["Team"].dropna().unique()
+    for raw_team in raw_teams:
+        canonical_team = _canonicalize_team_name(str(raw_team), known_teams)
+        if not canonical_team:
+            continue
+
+        team_laps = laps[laps["Team"] == raw_team]
+        valid_laps = _filter_valid_laps(team_laps)
+        if valid_laps.empty:
+            continue
+
+        selected_laps = _select_program_aware_laps(valid_laps, run_profile=run_profile)
+        if selected_laps.empty:
+            continue
+
+        driver_medians: dict[str, float] = {}
+        for raw_driver, driver_laps in selected_laps.groupby("Driver", dropna=False):
+            driver_code = str(raw_driver or "").strip().upper()
+            if not driver_code:
+                continue
+            median_seconds = _median_lap_seconds(driver_laps)
+            if median_seconds is None:
+                continue
+            driver_medians[driver_code] = float(median_seconds)
+
+        if len(driver_medians) < 2:
+            continue
+
+        team_reference = float(sum(driver_medians.values()) / len(driver_medians))
+        driver_deltas = {
+            driver_code: round(driver_time - team_reference, 4)
+            for driver_code, driver_time in driver_medians.items()
+        }
+        if driver_deltas:
+            driver_deltas_by_team[canonical_team] = driver_deltas
+
+    return driver_deltas_by_team
+
+
 def _extract_session_compound_metrics(
     session: fastf1.core.Session,
     event_name: str,
@@ -966,6 +1029,7 @@ def update_from_testing_sessions(
         profiles_for_storage=_PROFILES_FOR_STORAGE,
         load_sessions_for_event=_load_sessions_for_event,
         collect_session_metrics=_collect_session_metrics,
+        extract_session_driver_deltas=_extract_session_driver_deltas,
         count_team_selected_laps=_count_team_selected_laps,
         extract_session_compound_metrics=_extract_session_compound_metrics,
         logger=logger,

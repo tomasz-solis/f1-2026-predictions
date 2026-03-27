@@ -91,6 +91,7 @@ def build_car_characteristics_snapshot_payload(
     event_name: str,
     session_name: str,
     team_profiles: dict[str, dict[str, dict[str, float]]],
+    team_driver_deltas_seconds: dict[str, dict[str, dict[str, float]]] | None = None,
     source: str,
     captured_at: str | None = None,
     round_number: int | None = None,
@@ -98,6 +99,7 @@ def build_car_characteristics_snapshot_payload(
     season_characteristics_version: int | None = None,
 ) -> dict[str, Any]:
     """Build a persisted payload for one session-level car profile snapshot."""
+    normalized_team_driver_deltas = team_driver_deltas_seconds or {}
     payload: dict[str, Any] = {
         "year": int(year),
         "event_name": str(event_name).strip(),
@@ -105,13 +107,28 @@ def build_car_characteristics_snapshot_payload(
         "session_order": session_order_index(session_name),
         "source": str(source).strip(),
         "captured_at": str(captured_at or datetime.now(UTC).isoformat()),
-        "teams": {
-            str(team_name): {"profiles": profiles}
-            for team_name, profiles in sorted(team_profiles.items())
-            if isinstance(profiles, dict) and profiles
-        },
+        "teams": {},
         "version": 1,
     }
+
+    team_names = {
+        str(team_name)
+        for team_name in team_profiles.keys()
+        if isinstance(team_name, str) and str(team_name).strip()
+    }
+    for team_name in sorted(team_names):
+        team_entry: dict[str, Any] = {}
+
+        profiles = team_profiles.get(team_name)
+        if isinstance(profiles, dict) and profiles:
+            team_entry["profiles"] = profiles
+
+        driver_deltas_seconds = normalized_team_driver_deltas.get(team_name)
+        if isinstance(driver_deltas_seconds, dict) and driver_deltas_seconds:
+            team_entry["driver_deltas_seconds"] = driver_deltas_seconds
+
+        if team_entry:
+            payload["teams"][team_name] = team_entry
 
     if round_number is not None:
         payload["round_number"] = int(round_number)

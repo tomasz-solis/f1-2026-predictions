@@ -29,7 +29,10 @@ from src.utils.car_snapshot_history import (
 )
 from src.utils.prediction_logger import ActualResultRows, PredictionLogger
 from src.utils.prediction_metrics import PredictionMetrics
-from src.utils.race_input_confidence import cap_predicted_main_race_input_confidence
+from src.utils.race_input_confidence import (
+    cap_predicted_main_race_input_confidence,
+    derive_race_input_confidence,
+)
 from src.utils.team_mapping import map_team_to_characteristics
 from src.utils.weekend import is_sprint_weekend
 
@@ -226,6 +229,11 @@ def build_snapshot_overlay_car_characteristics(
     if not isinstance(snapshot_teams, dict) or not snapshot_teams:
         raise ValueError("Snapshot payload does not contain any team profiles")
 
+    for team_payload in base_teams.values():
+        if isinstance(team_payload, dict):
+            team_payload.pop("checkpoint_driver_deltas_seconds", None)
+
+    applied_snapshot_profiles = False
     for raw_team_name, raw_team_payload in snapshot_teams.items():
         if not isinstance(raw_team_payload, dict):
             continue
@@ -244,6 +252,14 @@ def build_snapshot_overlay_car_characteristics(
         balanced_profile = profiles.get("balanced")
         if isinstance(balanced_profile, dict) and balanced_profile:
             team_payload["testing_characteristics"] = deepcopy(balanced_profile)
+        applied_snapshot_profiles = True
+
+        driver_deltas_seconds = raw_team_payload.get("driver_deltas_seconds")
+        if isinstance(driver_deltas_seconds, dict) and driver_deltas_seconds:
+            team_payload["checkpoint_driver_deltas_seconds"] = deepcopy(driver_deltas_seconds)
+
+    if not applied_snapshot_profiles:
+        raise ValueError("Snapshot payload does not contain any valid team profiles")
 
     merged_payload["checkpoint_snapshot"] = {
         "event_name": str(snapshot_payload.get("event_name", "")).strip(),
@@ -268,24 +284,7 @@ def _derive_race_input_confidence(
     grid_source: str,
 ) -> float:
     """Match the dashboard race-input confidence heuristic for reconstructed runs."""
-    if str(grid_source).strip().upper() == "ACTUAL":
-        return 1.0
-
-    try:
-        base_confidence = float(qualifying_result.get("data_confidence_score", 0.5))
-    except (TypeError, ValueError):
-        base_confidence = 0.5
-    base_confidence = max(0.0, min(base_confidence, 1.0))
-
-    data_source = str(qualifying_result.get("data_source", "")).lower()
-    source_adjustment = 0.0
-    if "model-only" in data_source:
-        source_adjustment = -0.10
-    elif "testing short-run profile blend" in data_source:
-        source_adjustment = -0.05
-
-    grid_adjustment = 0.20 if str(grid_source).strip().upper() == "ACTUAL" else 0.0
-    return max(0.0, min(base_confidence + source_adjustment + grid_adjustment, 1.0))
+    return derive_race_input_confidence(qualifying_result, grid_source=grid_source)
 
 
 def _mark_predicted_qualifying_section(section: dict[str, Any]) -> dict[str, Any]:

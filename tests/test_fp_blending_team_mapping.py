@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from src.utils.fp_blending import FPDataError, _circuit_breaker, get_fp_team_performance
+from src.utils.fp_blending import _circuit_breaker, get_fp_team_performance
 
 
 @pytest.fixture(autouse=True)
@@ -66,10 +66,20 @@ def test_get_fp_team_performance_maps_fastf1_team_names():
     assert "Ferrari" in perf
 
 
-def test_get_fp_team_performance_load_none_does_not_emit_warning(caplog):
-    """load(None) should quietly return API failure (warning is emitted upstream once)."""
+def test_get_fp_team_performance_load_none_can_still_use_loaded_laps(caplog):
+    """FastF1 loads in place, so a `None` return value should not discard valid laps."""
+    laps = pd.DataFrame(
+        {
+            "Driver": ["NOR"] * 5 + ["PIA"] * 5,
+            "Team": ["McLaren"] * 10,
+            "LapTime": [pd.Timedelta(seconds=90 + (lap * 0.1)) for lap in range(10)],
+            "Compound": ["SOFT"] * 10,
+        }
+    )
     mock_session = MagicMock()
     mock_session.load.return_value = None
+    mock_session.laps = laps
+    mock_session.date = datetime.now(tz=UTC)
 
     with patch("src.utils.fp_blending.ff1.get_session", return_value=mock_session):
         with caplog.at_level(logging.WARNING):
@@ -77,7 +87,7 @@ def test_get_fp_team_performance_load_none_does_not_emit_warning(caplog):
                 2026, "Australian Grand Prix", "FP1"
             )
 
-    assert perf is None
-    assert session_laps is None
-    assert error == FPDataError.API_FAILURE
-    assert "session.load() returned None" not in caplog.text
+    assert perf is not None
+    assert session_laps is not None
+    assert error is None
+    assert "session load failed" not in caplog.text

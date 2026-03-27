@@ -232,7 +232,7 @@ def test_run_prediction_keeps_checkpoint_profile_confidence_penalty(patcher):
         "data_source": (
             "FP2 checkpoint profile blend (latest stored snapshot: Australian Grand Prix / FP2)"
         ),
-        "testing_fallback_used": True,
+        "testing_fallback_used": False,
     }
     mock_predictor.predict_race.return_value = {
         "finish_order": [{"driver": "VER", "team": "Red Bull Racing", "position": 1}]

@@ -158,6 +158,20 @@ _TESTING_CHARACTERISTICS_SCHEMA = {
     "additionalProperties": False,
 }
 
+_CHECKPOINT_DRIVER_DELTAS_SCHEMA = {
+    "type": "object",
+    "propertyNames": {
+        "enum": ["balanced", "short_run", "long_run"],
+    },
+    "additionalProperties": {
+        "type": "object",
+        "patternProperties": {
+            "^[A-Z0-9_]+$": {"type": "number", "minimum": -10.0, "maximum": 10.0},
+        },
+        "additionalProperties": False,
+    },
+}
+
 _COMPOUND_CHARACTERISTICS_SCHEMA = {
     "type": "object",
     "properties": {
@@ -254,6 +268,7 @@ TEAM_CHARACTERISTICS_SCHEMA = {
                             },
                             "additionalProperties": _TESTING_CHARACTERISTICS_SCHEMA,
                         },
+                        "checkpoint_driver_deltas_seconds": _CHECKPOINT_DRIVER_DELTAS_SCHEMA,
                         "compound_characteristics": {
                             "type": "object",
                             "propertyNames": {"pattern": "^[A-Z_]+$"},
