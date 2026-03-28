@@ -607,7 +607,7 @@ def auto_update_practice_characteristics_if_needed(
         # Keep legacy key name for compatibility with dashboard renderers/tests.
         return {"updated": False, "completed_fp_sessions": focus_completed_sessions}
 
-    practice_new_weight = config_loader.get("baseline_predictor.practice_capture.new_weight", 0.35)
+    practice_new_weight = config_loader.get("baseline_predictor.practice_capture.new_weight", 0.25)
     practice_directionality_scale = config_loader.get(
         "baseline_predictor.practice_capture.directionality_scale", 0.08
     )

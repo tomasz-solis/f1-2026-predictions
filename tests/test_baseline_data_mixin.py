@@ -435,17 +435,17 @@ def test_load_data_infers_current_season_form_from_saved_actuals(
         team_name="McLaren",
         team_data=predictor.teams["McLaren"],
         race_name="Chinese Grand Prix",
-    ) == pytest.approx([5.0 / 6.0])
+    ) == pytest.approx([1.0])
     assert predictor._get_current_season_observations(
         team_name="McLaren",
         team_data=predictor.teams["McLaren"],
         race_name="Japanese Grand Prix",
-    ) == pytest.approx([5.0 / 6.0, 1.0 / 6.0])
+    ) == pytest.approx([1.0, 0.0])
     assert predictor._get_current_season_observations(
         team_name="Ferrari",
         team_data=predictor.teams["Ferrari"],
         race_name="Japanese Grand Prix",
-    ) == pytest.approx([1.0 / 6.0, 5.0 / 6.0])
+    ) == pytest.approx([0.0, 1.0])
 
 
 def test_calculate_track_suitability_variants(tmp_path):
@@ -726,7 +726,7 @@ def test_get_current_season_observations_prefers_full_saved_actual_history_over_
         team_name="McLaren",
         team_data=predictor.teams["McLaren"],
         race_name="Japanese Grand Prix",
-    ) == pytest.approx([0.9, 1.0 / 14.0])
+    ) == pytest.approx([1.0, 0.0])
 
 
 def test_get_current_season_observations_blends_saved_qualifying_and_race_actuals(
@@ -810,7 +810,7 @@ def test_get_current_season_observations_blends_saved_qualifying_and_race_actual
         team_name="McLaren",
         team_data=predictor.teams["McLaren"],
         race_name="Japanese Grand Prix",
-    ) == pytest.approx([1.0 / 3.0, 2.0 / 3.0])
+    ) == pytest.approx([0.25, 0.75])
 
 
 def test_get_blended_team_strength_stabilizes_current_score_for_tiny_samples(tmp_path, patcher):

@@ -28,6 +28,8 @@ _RUN_PROFILE_MODES = ("balanced", "all", "short_run", "long_run")
 _SHORT_STINT_MAX_LAPS = 5
 _LONG_STINT_MIN_LAPS = 8
 _STINT_OUTLIER_BUFFER_SECONDS = 5.0
+_MIN_VALID_TEAM_LAPS = 5
+_WET_SESSION_RAIN_THRESHOLD = 0.30
 _RAW_TOP_SPEED_METRIC = "top_speed_kph"
 _RAW_OVERALL_PACE_METRIC = "overall_pace_seconds"
 _RAW_SLOW_CORNER_METRIC = "slow_corner_seconds"
@@ -60,6 +62,37 @@ def _filter_valid_laps(team_laps: pd.DataFrame) -> pd.DataFrame:
             mask &= accurate_true
 
     return team_laps[mask].copy()
+
+
+def _session_rain_fraction(session: fastf1.core.Session) -> float | None:
+    """Return the share of a session affected by rainfall when weather data exists."""
+    weather_data = getattr(session, "weather_data", None)
+    if not isinstance(weather_data, pd.DataFrame) or weather_data.empty:
+        return None
+    if "Rainfall" not in weather_data.columns:
+        return None
+
+    rainfall = weather_data["Rainfall"]
+    try:
+        rainfall_fraction = rainfall.astype(bool).mean()
+    except (TypeError, ValueError):
+        rainfall_numeric = pd.to_numeric(rainfall, errors="coerce").dropna()
+        if rainfall_numeric.empty:
+            return None
+        rainfall_fraction = rainfall_numeric.gt(0).mean()
+
+    return float(rainfall_fraction)
+
+
+def _session_is_predominantly_wet(
+    session: fastf1.core.Session,
+    rain_threshold: float = _WET_SESSION_RAIN_THRESHOLD,
+) -> bool:
+    """Return True when a session has too much rain to trust dry-pace inference."""
+    rain_fraction = _session_rain_fraction(session)
+    if rain_fraction is None:
+        return False
+    return rain_fraction > float(rain_threshold)
 
 
 def _strip_in_out_laps(team_laps: pd.DataFrame) -> pd.DataFrame:
@@ -602,6 +635,17 @@ def _collect_session_metrics(
     normalize_tire_deg_scores_fn=_normalize_tire_deg_scores,
 ) -> tuple[dict[str, dict[str, float]], dict[str, dict[str, float]]]:
     """Collect normalized directionality metrics and tire degradation metrics per team."""
+    if _session_is_predominantly_wet(session):
+        if diagnostics is not None:
+            rain_fraction = _session_rain_fraction(session) or 0.0
+            diagnostics.append(
+                f"{session_key}: rejected wet session ({rain_fraction * 100:.0f}% rainfall)"
+            )
+        logger.warning(
+            "Skipping %s because rainfall exceeded the dry-session threshold", session_key
+        )
+        return {}, {}
+
     try:
         laps = session.laps
     except Exception as exc:
@@ -636,8 +680,7 @@ def _collect_session_metrics(
 
         team_laps = laps[laps["Team"] == raw_team]
         valid_laps = filter_valid_laps_fn(team_laps)
-        # Allow early-session partial data (e.g., testing day in progress).
-        if len(valid_laps) < 1:
+        if len(valid_laps) < _MIN_VALID_TEAM_LAPS:
             continue
 
         representative_laps = select_program_aware_laps_fn(valid_laps, run_profile=run_profile)
@@ -803,6 +846,9 @@ def _extract_session_compound_metrics(
     normalize_compound_metrics_across_teams_fn=normalize_compound_metrics_across_teams,
 ) -> dict[str, dict[str, dict[str, float | str | None]]]:
     """Extract and normalize compound metrics for one session."""
+    if _session_is_predominantly_wet(session):
+        return {}
+
     laps = session.laps
     if laps is None or laps.empty or "Team" not in laps.columns:
         return {}

@@ -985,7 +985,7 @@ def update_from_testing_sessions(
     testing_backend: str | None = "auto",
     cache_dir: str = str(_DEFAULT_TESTING_CACHE_DIR),
     force_renew_cache: bool = False,
-    new_weight: float = 0.7,
+    new_weight: float = 0.25,
     directionality_scale: float = 0.10,
     session_aggregation: str = "mean",
     run_profile: str = "balanced",

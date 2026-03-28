@@ -184,8 +184,10 @@ class TestUpdaterCore:
 
         assert updated_uncertainty < initial_uncertainty, "Uncertainty should decrease after update"
 
-    def test_update_preserves_baseline(self, temp_data_dir, mock_race_results, mock_session):
-        """Test that baseline (overall_performance) is never modified."""
+    def test_update_moves_baseline_toward_observed_form(
+        self, temp_data_dir, mock_race_results, mock_session
+    ):
+        """Repeated race updates should nudge baseline performance toward observed form."""
         from src.systems.updater import update_from_race
 
         char_file = Path(temp_data_dir) / "car_characteristics" / "2026_car_characteristics.json"
@@ -199,20 +201,21 @@ class TestUpdaterCore:
             with patch(
                 "src.systems.updater.extract_team_performance_from_telemetry"
             ) as mock_extract:
-                mock_extract.return_value = {
-                    "Red Bull": 0.95,
-                    "McLaren": 0.60,  # Very different from baseline
-                }
+                mock_extract.side_effect = [
+                    {"Red Bull": 0.95, "McLaren": 0.60},
+                    {"Red Bull": 0.95, "McLaren": 0.50},
+                ]
 
                 update_from_race(2026, "Bahrain Grand Prix", temp_data_dir)
+                update_from_race(2026, "Saudi Arabian Grand Prix", temp_data_dir)
 
-        # Verify baseline unchanged
         with open(char_file) as f:
             updated_data = json.load(f)
         updated_baseline = updated_data["teams"]["McLaren"]["overall_performance"]
 
-        assert updated_baseline == initial_baseline, "Baseline should never change"
-        assert updated_baseline == 0.85, "Baseline should still be 0.85"
+        assert updated_baseline < initial_baseline
+        assert updated_baseline > 0.50
+        assert updated_data["teams"]["McLaren"]["current_season_performance"] == [0.6, 0.5]
 
 
 class TestUpdaterEdgeCases:

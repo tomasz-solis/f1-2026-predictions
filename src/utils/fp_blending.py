@@ -226,6 +226,26 @@ class FPDataError(Enum):
     API_FAILURE = "api_failure"
     STALE_DATA = "stale_data"
     INSUFFICIENT_LAPS = "insufficient_laps"
+    WET_SESSION = "wet_session"
+
+
+def _session_rain_fraction(session: Any) -> float | None:
+    """Return the fraction of weather samples that reported rainfall."""
+    weather_data = getattr(session, "weather_data", None)
+    if not isinstance(weather_data, pd.DataFrame) or weather_data.empty:
+        return None
+    if "Rainfall" not in weather_data.columns:
+        return None
+
+    rainfall = weather_data["Rainfall"]
+    try:
+        rainfall_fraction = rainfall.astype(bool).mean()
+    except (TypeError, ValueError):
+        rainfall_numeric = pd.to_numeric(rainfall, errors="coerce").dropna()
+        if rainfall_numeric.empty:
+            return None
+        rainfall_fraction = rainfall_numeric.gt(0).mean()
+    return float(rainfall_fraction)
 
 
 def _remove_outlier_laps(laps: pd.DataFrame, threshold: float = 1.5) -> pd.DataFrame:
@@ -378,7 +398,7 @@ def get_fp_team_performance(
             year=year,
             race_name=race_name,
             session_type=session_type,
-            weather=False,
+            weather=True,
         )
         if session is None:
             return None, None, FPDataError.API_FAILURE
@@ -403,6 +423,15 @@ def get_fp_team_performance(
                 return None, None, FPDataError.STALE_DATA
 
         laps = session.laps
+        rain_fraction = _session_rain_fraction(session)
+        if rain_fraction is not None and rain_fraction > 0.30:
+            logger.warning(
+                "%s for %s had %.0f%% rainfall - rejecting wet session data",
+                session_type,
+                race_name,
+                rain_fraction * 100,
+            )
+            return None, None, FPDataError.WET_SESSION
         min_long_run_laps = int(
             config_loader.get("baseline_predictor.race.weekend_long_run_min_laps", 12)
         )

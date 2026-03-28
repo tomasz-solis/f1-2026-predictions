@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from src.utils.car_snapshot_history import (
     merge_snapshot_team_metrics,
     resolve_session_snapshot_metadata,
@@ -354,6 +356,37 @@ def _collect_aggregated_metrics(
     return aggregated_metrics
 
 
+def _coerce_non_negative_int(value: object, default: int = 0) -> int:
+    """Parse a non-negative integer with a safe default."""
+    if not isinstance(value, int | float | str | bytes | bytearray):
+        return default
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(parsed, 0)
+
+
+def _merge_circuits_observed(
+    existing_circuits: object,
+    session_ids: set[str],
+) -> list[str]:
+    """Merge prior circuit provenance with the circuits seen in this update."""
+    merged: list[str] = []
+    if isinstance(existing_circuits, list):
+        for raw_circuit in existing_circuits:
+            circuit_name = str(raw_circuit).strip()
+            if circuit_name and circuit_name not in merged:
+                merged.append(circuit_name)
+
+    for session_id in sorted(session_ids):
+        event_name = str(session_id).split("::", 1)[0].strip()
+        if event_name and event_name not in merged:
+            merged.append(event_name)
+
+    return merged
+
+
 def apply_team_updates(
     *,
     characteristics: dict,
@@ -376,7 +409,13 @@ def apply_team_updates(
     blend_directionality: Callable[[dict[str, float], dict[str, float], float], dict[str, float]],
     aggregate_compound_samples: Callable[..., dict],
 ) -> list[str]:
-    """Apply extracted metrics back into characteristics payload."""
+    """Apply extracted metrics back into characteristics payload.
+
+    Practice metrics should evolve cumulatively across the season. A new FP
+    session is informative, but it should not wipe out the profile built from
+    earlier circuits, especially once several rounds have already contributed
+    to the stored car picture.
+    """
     updated_teams = []
 
     for team_name, samples in metric_samples.items():
@@ -400,28 +439,54 @@ def apply_team_updates(
         current_directionality = team_data.get("directionality")
         if not isinstance(current_directionality, dict):
             current_directionality = {}
+        existing_testing_characteristics = team_data.get("testing_characteristics")
+        if not isinstance(existing_testing_characteristics, dict):
+            existing_testing_characteristics = {}
+        previous_sessions_blended = _coerce_non_negative_int(
+            existing_testing_characteristics.get("sessions_blended")
+            or existing_testing_characteristics.get("sessions_used")
+        )
+        current_session_ids = team_sessions_used.get(team_name, set())
+        current_session_count = len(current_session_ids)
+        effective_weight = float(
+            np.clip(
+                new_weight / max((max(previous_sessions_blended, 0) + 1) ** 0.5, 1.0),
+                0.0,
+                1.0,
+            )
+        )
         blended_directionality = blend_directionality(
             current_directionality,
             extracted_directionality,
-            new_weight,
+            effective_weight,
         )
 
         team_data["directionality"] = blended_directionality
         team_data["last_updated"] = now_iso
 
-        testing_characteristics = team_data.get("testing_characteristics")
-        if not isinstance(testing_characteristics, dict):
-            testing_characteristics = {}
+        testing_characteristics = existing_testing_characteristics
         for metric_name in testing_characteristic_metrics:
             if metric_name in averaged_metrics:
-                testing_characteristics[metric_name] = round(
-                    float(averaged_metrics[metric_name]), 4
-                )
+                new_metric_value = float(averaged_metrics[metric_name])
+                existing_metric_value = testing_characteristics.get(metric_name)
+                if isinstance(existing_metric_value, int | float):
+                    new_metric_value = ((1.0 - effective_weight) * float(existing_metric_value)) + (
+                        effective_weight * new_metric_value
+                    )
+                testing_characteristics[metric_name] = round(float(new_metric_value), 4)
 
         testing_characteristics["last_updated"] = now_iso
-        testing_characteristics["sessions_used"] = len(team_sessions_used.get(team_name, set()))
+        testing_characteristics["sessions_used"] = previous_sessions_blended + current_session_count
+        testing_characteristics["sessions_blended"] = (
+            previous_sessions_blended + current_session_count
+        )
         testing_characteristics["session_aggregation"] = session_aggregation
         testing_characteristics["run_profile"] = run_profile
+        testing_characteristics["effective_blend_weight"] = round(effective_weight, 4)
+        testing_characteristics["circuits_observed"] = _merge_circuits_observed(
+            testing_characteristics.get("circuits_observed"),
+            current_session_ids,
+        )
         team_data["testing_characteristics"] = testing_characteristics
 
         existing_profiles = team_data.get("testing_characteristics_profiles")
@@ -441,17 +506,42 @@ def apply_team_updates(
             profile_data = existing_profiles.get(profile)
             if not isinstance(profile_data, dict):
                 profile_data = {}
+            previous_profile_sessions_blended = _coerce_non_negative_int(
+                profile_data.get("sessions_blended") or profile_data.get("sessions_used")
+            )
+            current_profile_session_ids = team_profile_sessions_used[team_name].get(profile, set())
+            effective_profile_weight = float(
+                np.clip(
+                    new_weight / max((max(previous_profile_sessions_blended, 0) + 1) ** 0.5, 1.0),
+                    0.0,
+                    1.0,
+                )
+            )
 
             for metric_name in testing_characteristic_metrics:
                 if metric_name in profile_metrics:
-                    profile_data[metric_name] = round(float(profile_metrics[metric_name]), 4)
+                    new_metric_value = float(profile_metrics[metric_name])
+                    existing_metric_value = profile_data.get(metric_name)
+                    if isinstance(existing_metric_value, int | float):
+                        new_metric_value = (
+                            (1.0 - effective_profile_weight) * float(existing_metric_value)
+                        ) + (effective_profile_weight * new_metric_value)
+                    profile_data[metric_name] = round(float(new_metric_value), 4)
 
             profile_data["last_updated"] = now_iso
-            profile_data["sessions_used"] = len(
-                team_profile_sessions_used[team_name].get(profile, set())
+            profile_data["sessions_used"] = previous_profile_sessions_blended + len(
+                current_profile_session_ids
+            )
+            profile_data["sessions_blended"] = previous_profile_sessions_blended + len(
+                current_profile_session_ids
             )
             profile_data["session_aggregation"] = session_aggregation
             profile_data["run_profile"] = profile
+            profile_data["effective_blend_weight"] = round(effective_profile_weight, 4)
+            profile_data["circuits_observed"] = _merge_circuits_observed(
+                profile_data.get("circuits_observed"),
+                current_profile_session_ids,
+            )
             existing_profiles[profile] = profile_data
 
         team_data["testing_characteristics_profiles"] = existing_profiles
@@ -467,7 +557,7 @@ def apply_team_updates(
             existing_compound_chars = aggregate_compound_samples(
                 existing_compound_chars,
                 session_compounds[team_name],
-                blend_weight=new_weight,
+                blend_weight=effective_weight,
                 race_name=session_event_name,
             )
 

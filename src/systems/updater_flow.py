@@ -55,7 +55,7 @@ def _build_position_fallback_race_pace(
     map_team_to_characteristics_fn: MapTeamToCharacteristicsFn,
     logger: logging.Logger,
 ) -> RacePaceMap:
-    """Fallback race pace estimate using finishing positions."""
+    """Fallback race pace estimate using rank-based team finishing order."""
     logger.warning("No telemetry data, using positions as fallback")
     race_pace: dict[str, float] = {}
     known_teams = set(team_names)
@@ -67,14 +67,25 @@ def _build_position_fallback_race_pace(
     else:
         canonical_results["_canonical_team"] = None
 
+    team_average_positions: dict[str, float] = {}
+
     for team in team_names:
         team_results = canonical_results[canonical_results["_canonical_team"] == team]
         if len(team_results) > 0:
             positions = pd.to_numeric(team_results["Position"], errors="coerce").dropna()
             if positions.empty:
                 continue
-            avg_position = positions.mean()
-            race_pace[team] = 1.0 - (avg_position - 1) / 19
+            team_average_positions[team] = float(positions.mean())
+
+    ranked_teams = sorted(team_average_positions, key=lambda team: team_average_positions[team])
+    team_count = len(ranked_teams)
+    if team_count == 1:
+        return {ranked_teams[0]: 0.5}
+    if team_count < 1:
+        return {}
+
+    for rank_index, team in enumerate(ranked_teams):
+        race_pace[team] = float(1.0 - (rank_index / max(team_count - 1, 1)))
 
     return race_pace
 
@@ -83,10 +94,18 @@ def _apply_team_performance_updates(
     *,
     char_data: CharacteristicPayload,
     race_pace: RacePaceMap,
+    config_get_fn: ConfigGetFn,
     logger: logging.Logger,
     now_iso: str,
 ) -> None:
     """Apply race-performance updates to team payload."""
+    baseline_learning_rate = float(
+        np.clip(
+            config_get_fn("baseline_predictor.baseline_learning_rate", 0.3),
+            0.0,
+            1.0,
+        )
+    )
     for team, new_performance in race_pace.items():
         if team in char_data["teams"]:
             team_data = char_data["teams"][team]
@@ -99,14 +118,21 @@ def _apply_team_performance_updates(
             running_avg = np.mean(team_data["current_season_performance"])
             old_uncertainty = team_data["uncertainty"]
             updated_uncertainty = max(0.10, old_uncertainty * 0.9)
+            old_baseline = float(team_data.get("overall_performance", 0.5))
+            updated_baseline = old_baseline + (
+                baseline_learning_rate * (float(running_avg) - old_baseline)
+            )
 
             team_data["uncertainty"] = round(updated_uncertainty, 3)
+            team_data["overall_performance"] = round(float(updated_baseline), 4)
             team_data["last_updated"] = now_iso
             team_data["races_completed"] = len(team_data["current_season_performance"])
 
             logger.info(
                 f"  {team}: Race {new_performance:.3f} → Avg {running_avg:.3f} "
-                f"({team_data['races_completed']} races, uncertainty {old_uncertainty:.2f}→{updated_uncertainty:.2f})"
+                f"(baseline {old_baseline:.3f}→{updated_baseline:.3f}, "
+                f"{team_data['races_completed']} races, "
+                f"uncertainty {old_uncertainty:.2f}→{updated_uncertainty:.2f})"
             )
 
 
@@ -266,6 +292,7 @@ def update_team_characteristics_core(
     _apply_team_performance_updates(
         char_data=char_data,
         race_pace=race_pace,
+        config_get_fn=config_get_fn,
         logger=logger,
         now_iso=now_iso,
     )

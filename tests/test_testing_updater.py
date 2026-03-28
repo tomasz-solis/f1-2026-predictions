@@ -13,6 +13,7 @@ from src.systems.testing_updater import (
     _canonicalize_team_name,
     _classify_run_laps,
     _coerce_utc_datetime,
+    _collect_session_metrics,
     _count_team_selected_laps,
     _count_team_valid_laps,
     _estimate_tire_deg_slope,
@@ -185,6 +186,58 @@ def test_count_team_selected_laps_respects_run_profile():
     assert short_counts["McLaren"] > 0
     assert long_counts["McLaren"] > 0
     assert short_counts["McLaren"] != long_counts["McLaren"]
+
+
+def test_collect_session_metrics_skips_wet_sessions():
+    class DummySession:
+        def __init__(self, laps):
+            self.laps = laps
+            self.weather_data = pd.DataFrame({"Rainfall": [1, 1, 0, 1]})
+
+    laps = pd.DataFrame(
+        {
+            "Team": ["McLaren"] * 6,
+            "Driver": ["NOR"] * 6,
+            "LapTime": [pd.to_timedelta(f"0:01:{30 + i:02d}") for i in range(6)],
+        }
+    )
+    diagnostics: list[str] = []
+
+    perf, tire = _collect_session_metrics(
+        session=DummySession(laps),
+        session_key="FP2",
+        known_teams={"McLaren"},
+        diagnostics=diagnostics,
+    )
+
+    assert perf == {}
+    assert tire == {}
+    assert diagnostics
+    assert "wet session" in diagnostics[0]
+
+
+def test_collect_session_metrics_requires_minimum_valid_team_laps():
+    class DummySession:
+        def __init__(self, laps):
+            self.laps = laps
+            self.weather_data = pd.DataFrame({"Rainfall": [0, 0, 0]})
+
+    laps = pd.DataFrame(
+        {
+            "Team": ["McLaren"] * 4,
+            "Driver": ["NOR"] * 4,
+            "LapTime": [pd.to_timedelta(f"0:01:{30 + i:02d}") for i in range(4)],
+        }
+    )
+
+    perf, tire = _collect_session_metrics(
+        session=DummySession(laps),
+        session_key="FP1",
+        known_teams={"McLaren"},
+    )
+
+    assert perf == {}
+    assert tire == {}
 
 
 def test_classify_run_laps_by_stint_length():
@@ -846,3 +899,83 @@ def test_update_from_testing_sessions_uses_session_event_name_for_compounds(tmp_
 
     assert summary["updated_teams"] == ["McLaren"]
     assert race_names == ["Event One", "Event Two"]
+
+
+def test_update_from_testing_sessions_blends_profiles_cumulatively_across_circuits(
+    tmp_path, patcher
+):
+    from src.systems import testing_updater
+
+    data_dir = tmp_path / "data" / "processed" / "car_characteristics"
+    data_dir.mkdir(parents=True)
+    characteristics_file = data_dir / "2026_car_characteristics.json"
+    characteristics_file.write_text(
+        json.dumps(
+            {
+                "teams": {
+                    "McLaren": {
+                        "directionality": {
+                            "max_speed": 0.0,
+                            "slow_corner_speed": 0.0,
+                            "medium_corner_speed": 0.0,
+                            "high_corner_speed": 0.0,
+                        },
+                        "testing_characteristics": {},
+                        "testing_characteristics_profiles": {},
+                    }
+                }
+            }
+        )
+    )
+
+    class DummySession:
+        def __init__(self, event_name: str):
+            self.event_name = event_name
+            self.laps = pd.DataFrame(
+                {
+                    "Team": ["McLaren"] * 6,
+                    "Driver": ["NOR"] * 6,
+                    "LapTime": [pd.to_timedelta(f"0:01:{30 + i:02d}") for i in range(6)],
+                }
+            )
+
+    patcher.setattr(
+        testing_updater,
+        "_load_sessions_for_event",
+        lambda **kwargs: [("FP1", DummySession(kwargs["event_name"]))],
+    )
+
+    def _mock_collect_session_metrics(**kwargs):
+        session = kwargs["session"]
+        pace = 0.60 if session.event_name == "Bahrain Grand Prix" else 0.80
+        return {"McLaren": {"overall_pace": pace}}, {}
+
+    patcher.setattr(testing_updater, "_collect_session_metrics", _mock_collect_session_metrics)
+    patcher.setattr(
+        testing_updater,
+        "_count_team_selected_laps",
+        lambda session, known_teams, run_profile: {"McLaren": 8.0},
+    )
+
+    testing_updater.update_from_testing_sessions(
+        year=2026,
+        events=["Bahrain Grand Prix"],
+        data_dir=str(tmp_path / "data" / "processed"),
+        new_weight=0.25,
+        dry_run=False,
+    )
+    testing_updater.update_from_testing_sessions(
+        year=2026,
+        events=["Monaco Grand Prix"],
+        data_dir=str(tmp_path / "data" / "processed"),
+        new_weight=0.25,
+        dry_run=False,
+    )
+
+    updated = json.loads(characteristics_file.read_text())
+    team_payload = updated["teams"]["McLaren"]["testing_characteristics"]
+
+    assert team_payload["sessions_blended"] == 2
+    assert team_payload["sessions_used"] == 2
+    assert team_payload["circuits_observed"] == ["Bahrain Grand Prix", "Monaco Grand Prix"]
+    assert 0.60 < team_payload["overall_pace"] < 0.65

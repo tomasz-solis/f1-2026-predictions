@@ -81,9 +81,8 @@ def score_teams_from_actual_rows(
     *,
     known_teams: set[str],
 ) -> dict[str, float]:
-    """Convert classified positions into normalized team-form scores."""
+    """Convert classified positions into rank-based team-form scores."""
     team_positions: dict[str, list[int]] = {}
-    field_size = 0
 
     for row in actual_rows:
         raw_team = row.get("team")
@@ -97,19 +96,26 @@ def score_teams_from_actual_rows(
             continue
 
         team_positions.setdefault(team_name, []).append(position)
-        field_size = max(field_size, position)
 
-    if field_size < 2:
+    if not team_positions:
+        return {}
+    if len(team_positions) == 1:
+        team_name = next(iter(team_positions))
+        return {team_name: 0.5}
+
+    team_avg = {
+        team_name: float(np.mean(positions))
+        for team_name, positions in team_positions.items()
+        if positions
+    }
+    if not team_avg:
         return {}
 
+    sorted_teams = sorted(team_avg, key=lambda team_name: team_avg[team_name])
+    team_count = len(sorted_teams)
     scored_teams: dict[str, float] = {}
-    denominator = float(field_size - 1)
-    for team_name, positions in team_positions.items():
-        if not positions:
-            continue
-        average_position = float(np.mean(positions))
-        normalized_score = 1.0 - ((average_position - 1.0) / denominator)
-        scored_teams[team_name] = float(np.clip(normalized_score, 0.0, 1.0))
+    for rank_index, team_name in enumerate(sorted_teams):
+        scored_teams[team_name] = float(1.0 - (rank_index / max(team_count - 1, 1)))
 
     return scored_teams
 

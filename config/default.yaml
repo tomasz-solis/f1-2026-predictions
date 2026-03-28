@@ -638,7 +638,7 @@ baseline_predictor:
 
   # Dashboard auto-capture settings for completed FP sessions
   practice_capture:
-    new_weight: 0.35
+    new_weight: 0.25
     directionality_scale: 0.08
     session_aggregation: "laps_weighted"
     run_profile: "balanced"

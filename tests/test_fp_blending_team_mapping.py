@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from src.utils.fp_blending import _circuit_breaker, get_fp_team_performance
+from src.utils.fp_blending import FPDataError, _circuit_breaker, get_fp_team_performance
 
 
 @pytest.fixture(autouse=True)
@@ -91,3 +91,26 @@ def test_get_fp_team_performance_load_none_can_still_use_loaded_laps(caplog):
     assert session_laps is not None
     assert error is None
     assert "session load failed" not in caplog.text
+
+
+def test_get_fp_team_performance_rejects_predominantly_wet_sessions():
+    """Weather-data rainfall should block dry-pace inference from wet practice."""
+    laps = pd.DataFrame(
+        {
+            "Driver": ["NOR"] * 5 + ["PIA"] * 5,
+            "Team": ["McLaren"] * 10,
+            "LapTime": [pd.Timedelta(seconds=90 + (lap * 0.1)) for lap in range(10)],
+            "Compound": ["INTERMEDIATE"] * 10,
+        }
+    )
+    mock_session = MagicMock()
+    mock_session.laps = laps
+    mock_session.date = datetime.now(tz=UTC)
+    mock_session.weather_data = pd.DataFrame({"Rainfall": [1, 1, 1, 1, 0]})
+
+    with patch("src.utils.fp_blending.ff1.get_session", return_value=mock_session):
+        perf, session_laps, error = get_fp_team_performance(2026, "Silverstone Grand Prix", "FP1")
+
+    assert perf is None
+    assert session_laps is None
+    assert error is FPDataError.WET_SESSION
