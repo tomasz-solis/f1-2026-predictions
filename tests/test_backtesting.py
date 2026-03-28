@@ -12,6 +12,7 @@ from src.utils.backtesting import (
     run_previous_race_naive_backtest,
     run_single_race_backtest,
     summarize_generalization,
+    warm_fastf1_results_cache,
 )
 
 
@@ -116,6 +117,8 @@ def test_run_single_race_backtest_returns_metrics_for_successful_race():
     assert result["race_mae"] == pytest.approx(0.0)
     assert result["top3_accuracy"] == pytest.approx(100.0)
     assert result["winner_correct"] is True
+    assert result["qualifying_predicted_top10"][0]["driver"] == "VER"
+    assert result["race_actual_top10"][0]["driver"] == "VER"
 
 
 def test_run_single_race_backtest_marks_missing_actuals_as_skipped():
@@ -134,6 +137,41 @@ def test_run_single_race_backtest_marks_missing_actuals_as_skipped():
 
     assert result["status"] == "skipped"
     assert result["reason"] == "missing_actual_results"
+
+
+def test_warm_fastf1_results_cache_collects_success_and_failure_rows(patcher):
+    class _Session:
+        def __init__(self, rows: int):
+            self.results = [object()] * rows
+
+        def load(self, **kwargs):
+            assert kwargs == {
+                "laps": False,
+                "telemetry": False,
+                "weather": False,
+                "messages": False,
+            }
+
+    def _get_session(year: int, race_name: str, session_name: str):
+        assert year == 2025
+        if race_name == "Bad Race":
+            raise RuntimeError("cache miss")
+        return _Session(20 if session_name == "Q" else 22)
+
+    from src.utils import backtesting
+
+    patcher.setattr(backtesting.fastf1, "get_session", _get_session)
+
+    report = warm_fastf1_results_cache(
+        year=2025,
+        race_names=["Good Race", "Bad Race"],
+        session_names=("Q",),
+    )
+
+    assert report[0]["status"] == "ok"
+    assert report[0]["rows_loaded"] == 20
+    assert report[1]["status"] == "error"
+    assert "cache miss" in report[1]["reason"]
 
 
 def test_run_previous_race_naive_backtest_uses_prior_actual_results():

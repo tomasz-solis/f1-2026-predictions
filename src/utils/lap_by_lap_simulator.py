@@ -1,4 +1,19 @@
-"""Lap-by-lap race simulation engine with tire degradation and pit stops."""
+"""Lap-by-lap Monte Carlo race simulation for 2026-style F1 weekends.
+
+Race pace in F1 is path-dependent. The same car can win comfortably in clean
+air, get trapped behind traffic, or lose a race to one badly timed safety car.
+That is why this model uses Monte Carlo rather than a neat analytical formula:
+pit timing, lap-one variance, tire warm-up, safety car timing, and overtaking
+windows all interact in ways that are hard to compress without losing the feel
+of an actual Sunday.
+
+The code intentionally keeps those moving parts explicit. Grid position matters,
+but it is not destiny. Faster cars can pass if the active-aero window opens,
+fresh tires create short-lived undercut opportunities, and a chaotic race
+should look different from a straightforward one. The production predictor
+aggregates many runs rather than trusting one simulated race, which is the same
+reason teams run thousands of strategy scenarios before a grand prix.
+"""
 
 import logging
 from typing import Any, cast
@@ -38,7 +53,7 @@ def _expand_overtake_cfg(compact: dict) -> dict:
     """Expand 5 user-facing overtake params into the full internal set.
 
     The 5 exposed params and their defaults:
-        dirty_air_window_s  (1.8)  – DRS/slipstream proximity window
+        dirty_air_window_s  (1.8)  – active aero / slipstream proximity window
         pace_weight         (0.55) – importance of raw pace delta
         racecraft_weight    (0.25) – combined attacker/defender skill weight
         track_factor        (0.35) – track influence on passing difficulty

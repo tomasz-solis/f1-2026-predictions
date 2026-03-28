@@ -33,6 +33,7 @@ from src.utils.backtesting import (
     rank_experiments_for_generalization,
     run_single_race_backtest,
     summarize_generalization,
+    warm_fastf1_results_cache,
     write_csv,
     write_json,
 )
@@ -238,6 +239,11 @@ def main() -> int:
         action="store_true",
         help="Exit non-zero if zero races were evaluated",
     )
+    parser.add_argument(
+        "--fetch-missing",
+        action="store_true",
+        help="Attempt to prefetch missing Q/R FastF1 sessions into the local cache first",
+    )
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -261,6 +267,27 @@ def main() -> int:
         return 1
 
     logger.info(f"Running backtest for {len(races)} races: {races}")
+
+    if args.fetch_missing:
+        preload_report = warm_fastf1_results_cache(
+            year=args.year,
+            race_names=races,
+            session_names=("Q", "R"),
+        )
+        cache_hits = sum(1 for row in preload_report if row["status"] == "ok")
+        cache_errors = [row for row in preload_report if row["status"] != "ok"]
+        logger.info(
+            "Prefetched %s FastF1 result sessions before backtest (%s issues)",
+            cache_hits,
+            len(cache_errors),
+        )
+        for row in cache_errors[:10]:
+            logger.warning(
+                "Prefetch failed for %s %s: %s",
+                row["race_name"],
+                row["session_name"],
+                row.get("reason", "unknown"),
+            )
 
     experiment_specs: list[tuple[str, dict[str, Any]]] = [("baseline", {})]
     seen_names = {"baseline"}
@@ -336,6 +363,7 @@ def main() -> int:
                 "winner_correct",
             ],
         )
+        write_json(experiment_dir / "race_results_detailed.json", {"races": race_results})
 
     ranked = rank_experiments_for_generalization(
         reports,

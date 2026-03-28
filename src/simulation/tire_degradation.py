@@ -1,4 +1,13 @@
-"""Tire degradation and fuel effect modeling for lap-by-lap race simulation."""
+"""Tire degradation and fuel-effect modeling for lap-by-lap race simulation.
+
+Modern F1 tire behavior is not just "older tire equals slower tire." Since the
+move to 18-inch wheels in 2022, teams have dealt with stiffer carcasses, a more
+defined warm-up window, and compounds that can run longer before they finally
+fall off a cliff. This model mirrors that race engineer view: wear builds lap
+after lap, softs pay back fresh-tire pace early, heavy fuel punishes the tires
+more at the start of a stint, and once a compound goes past its working window
+the pace loss accelerates instead of staying linear.
+"""
 
 import math
 

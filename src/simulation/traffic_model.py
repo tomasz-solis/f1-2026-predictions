@@ -1,4 +1,10 @@
-"""Traffic and dirty-air modeling utilities."""
+"""Traffic, dirty-air, and active-aero modeling utilities.
+
+In 2026 the overtaking aid is no longer classic DRS. Cars can switch into
+active-aero modes, so the following car has a better chance of staying close
+through the wake. Dirty air still matters, especially on high-downforce tracks,
+but the penalty should be milder than the early ground-effect era.
+"""
 
 from __future__ import annotations
 

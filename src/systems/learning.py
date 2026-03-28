@@ -1,8 +1,8 @@
-"""
-Adaptive learning state for method-performance history.
+"""Legacy adaptive-learning state for historical blend recommendations.
 
-Stores race analysis records and can recommend a blend weight from historical MAE.
-In the current baseline dashboard path, this recommendation is advisory.
+This module predates the current checkpoint-aware prediction flow. It still
+backs a few scripts and tests, but it is no longer the main production learning
+path. The current dashboard relies on ``SystematicLearningSystem`` instead.
 """
 
 import json
@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 class LearningSystem:
-    """Store lightweight learning history and recent blend recommendations."""
+    """Store lightweight historical MAE summaries for legacy callers."""
 
     def __init__(self, data_dir="data/systems"):
         self.data_dir = Path(data_dir)
@@ -20,6 +20,7 @@ class LearningSystem:
         self.state = self._load_state()
 
     def _load_state(self) -> dict:
+        """Load persisted state if it exists, otherwise return an empty shell."""
         if self.state_file.exists():
             with open(self.state_file) as f:
                 return json.load(f)
@@ -30,6 +31,7 @@ class LearningSystem:
         }
 
     def save_state(self):
+        """Persist the current learning snapshot to disk."""
         self.state["last_updated"] = datetime.now().isoformat()
         with open(self.state_file, "w") as f:
             json.dump(self.state, f, indent=2)

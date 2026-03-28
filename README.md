@@ -307,8 +307,12 @@ Rollout guidance:
 - Legacy learning-history module (`src/systems/learning.py`)
 - Additional scripts and legacy-compatible interfaces
 
-These are still useful for experiments and extensions, but the dashboard runtime
+These are still useful for experiments and extensions, but the live prediction
 path is the baseline predictor stack listed above.
+
+The Bayesian module updates driver skill after completed races. It is not the
+main live prediction engine. Weekend predictions come from the Monte Carlo
+qualifying and race pipeline plus the early-season team-strength blending logic.
 
 ## Documentation
 

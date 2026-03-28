@@ -1,20 +1,18 @@
-"""
-Weight Schedule System for Regulation Change Years
+"""Weight schedules for regulation-reset seasons.
 
-Based on validation using 2021→2022 transition:
-- Extreme schedule: 0.809 correlation
-- Ultra-aggressive schedule: 0.790 correlation
-- Aggressive schedule: 0.740 correlation
+The idea is simple: after a big rules change, testing data can lie to you.
+Teams run different fuel loads, hide engine modes, and split their programs so
+aggressively that a headline lap time often says less than people think. Once
+the points-paying weekends start, that gamesmanship drops away fast. By races
+two and three the true competitive order is usually much clearer than it was in
+February, even if the exact gaps are still moving.
 
-Key finding: Trust current season results quickly, minimize reliance on
-previous year's standings. By Race 3, you should be 95% data-driven from
-current season performance.
-
-Usage:
-    from src.systems.weight_schedule import get_schedule_weights
-
-    weights = get_schedule_weights(race_number=1, schedule='extreme')
-    # {'baseline': 0.30, 'testing': 0.20, 'current': 0.50}
+These schedules were tuned against the 2021 to 2022 reset because that is the
+closest recent example of the field being forced onto genuinely new machinery.
+The aggressive schedules reflect the same racing logic for 2026: keep a small
+anchor from preseason and prior-year form, but let live race evidence take over
+before the model gets stuck defending a story that the track has already
+disproved.
 """
 
 import logging

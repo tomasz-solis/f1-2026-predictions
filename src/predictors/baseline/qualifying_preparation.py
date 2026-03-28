@@ -110,7 +110,15 @@ def build_testing_short_run_fallback(
     checkpoint_session_name: str | None = None,
     qualifying_stage: str = "auto",
 ) -> dict[str, float] | None:
-    """Build a team-pace fallback from stored short-run testing profiles."""
+    """Build a qualifying fallback from stored short-run testing profiles.
+
+    Qualifying is mostly about single-lap bite: tire warm-up, rotation on low
+    fuel, and how much peak grip the car can unlock in a short window. That is
+    why the fallback leans on the stored short-run profile first and only uses a
+    balanced profile as a stabilizer when the short-run signal looks noisy.
+    Race-style long-run behavior still matters later on Sunday, but it is the
+    wrong thing to anchor a one-lap prediction to.
+    """
     min_teams = int(cfg.get("baseline_predictor.qualifying.testing_fallback_min_teams", 8))
     if min_teams < 2:
         min_teams = 2

@@ -1,4 +1,13 @@
-"""Pit stop strategy generation and validation for race simulation."""
+"""Pit-stop strategy generation and validation for race simulation.
+
+Dry grands prix still have the FIA two-compound mandate, so a legal strategy is
+never just about the fastest single tire. The generator starts from that rule,
+then picks between one-stop and two-stop shapes based on tire stress, with just
+enough randomness to represent real race engineering tradeoffs. That is where
+undercuts, overcuts, and conservative "cover the car behind" calls come from in
+practice: the same race can support multiple valid plans even when one is
+slightly faster on paper.
+"""
 
 import logging
 

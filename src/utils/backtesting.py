@@ -195,6 +195,45 @@ def get_races_for_year(year: int, max_races: int | None = None) -> list[str]:
     return deduped
 
 
+def warm_fastf1_results_cache(
+    *,
+    year: int,
+    race_names: Iterable[str],
+    session_names: Iterable[str] = ("Q", "R"),
+) -> list[dict[str, Any]]:
+    """Attempt to prefetch result sessions into the local FastF1 cache.
+
+    This is mainly for season backtests where we would rather fail early on one
+    race than discover half a season later that the cache never filled.
+    """
+    reports: list[dict[str, Any]] = []
+    for race_name in race_names:
+        for session_name in session_names:
+            try:
+                session = fastf1.get_session(year, race_name, session_name)
+                session.load(laps=False, telemetry=False, weather=False, messages=False)
+                results = getattr(session, "results", None)
+                row_count = len(results) if results is not None else 0
+                reports.append(
+                    {
+                        "race_name": race_name,
+                        "session_name": session_name,
+                        "status": "ok",
+                        "rows_loaded": row_count,
+                    }
+                )
+            except Exception as exc:
+                reports.append(
+                    {
+                        "race_name": race_name,
+                        "session_name": session_name,
+                        "status": "error",
+                        "reason": f"{type(exc).__name__}: {exc}",
+                    }
+                )
+    return reports
+
+
 def _normalize_ranked_entries(entries: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     """Normalize result rows to include required fields for metric computation."""
     normalized: list[dict[str, Any]] = []
@@ -212,6 +251,11 @@ def _normalize_ranked_entries(entries: Iterable[dict[str, Any]]) -> list[dict[st
             }
         )
     return normalized
+
+
+def _top_n_entries(entries: Iterable[dict[str, Any]], *, n: int = 10) -> list[dict[str, Any]]:
+    """Return the first ``n`` normalized rows for human-readable backtest output."""
+    return _normalize_ranked_entries(list(entries))[:n]
 
 
 def _compute_ranked_metrics(
@@ -280,11 +324,15 @@ def run_single_race_backtest(
             "status": "ok",
             "qualifying_mae": qualifying_metrics["mae"],
             "qualifying_exact_accuracy": qualifying_metrics["exact_accuracy"],
+            "qualifying_predicted_top10": _top_n_entries(qualifying_prediction["grid"]),
+            "qualifying_actual_top10": _top_n_entries(qualifying_actual),
             "race_mae": race_metrics["mae"],
             "race_exact_accuracy": race_metrics["exact_accuracy"],
             "race_within_3": race_metrics["within_3"],
             "top3_accuracy": race_metrics["top3_accuracy"],
             "winner_correct": race_metrics["winner_correct"],
+            "race_predicted_top10": _top_n_entries(race_prediction["finish_order"]),
+            "race_actual_top10": _top_n_entries(race_actual),
         }
     except Exception as exc:
         logger.warning(f"Backtest failed for {race_name}: {exc}")
