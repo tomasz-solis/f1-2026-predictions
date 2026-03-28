@@ -114,6 +114,12 @@ def test_build_car_characteristics_snapshot_payload_ignores_delta_only_teams():
     )
 
     assert set(payload["teams"]) == {"McLaren"}
+    assert payload["teams"]["McLaren"]["testing_characteristics"]["overall_pace"] == pytest.approx(
+        0.91
+    )
+    assert payload["teams"]["McLaren"]["testing_characteristics_profiles"]["balanced"][
+        "overall_pace"
+    ] == pytest.approx(0.91)
     assert payload["teams"]["McLaren"]["driver_deltas_seconds"]["short_run"]["NOR"] == (
         pytest.approx(-0.12)
     )

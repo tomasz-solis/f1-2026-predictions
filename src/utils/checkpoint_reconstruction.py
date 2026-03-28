@@ -237,7 +237,9 @@ def build_snapshot_overlay_car_characteristics(
     for raw_team_name, raw_team_payload in snapshot_teams.items():
         if not isinstance(raw_team_payload, dict):
             continue
-        profiles = raw_team_payload.get("profiles")
+        profiles = raw_team_payload.get("testing_characteristics_profiles")
+        if not isinstance(profiles, dict) or not profiles:
+            profiles = raw_team_payload.get("profiles")
         if not isinstance(profiles, dict) or not profiles:
             continue
 
@@ -249,7 +251,9 @@ def build_snapshot_overlay_car_characteristics(
             base_teams[team_name] = team_payload
 
         team_payload["testing_characteristics_profiles"] = deepcopy(profiles)
-        balanced_profile = profiles.get("balanced")
+        balanced_profile = raw_team_payload.get("testing_characteristics")
+        if not isinstance(balanced_profile, dict) or not balanced_profile:
+            balanced_profile = profiles.get("balanced")
         if isinstance(balanced_profile, dict) and balanced_profile:
             team_payload["testing_characteristics"] = deepcopy(balanced_profile)
         applied_snapshot_profiles = True

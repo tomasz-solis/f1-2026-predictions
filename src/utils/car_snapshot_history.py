@@ -98,7 +98,13 @@ def build_car_characteristics_snapshot_payload(
     session_started_at: str | None = None,
     season_characteristics_version: int | None = None,
 ) -> dict[str, Any]:
-    """Build a persisted payload for one session-level car profile snapshot."""
+    """Build a persisted payload for one session-level car profile snapshot.
+
+    Snapshot artifacts now mirror the season artifact naming where practical.
+    ``testing_characteristics_profiles`` and ``testing_characteristics`` match the
+    live team schema, while ``profiles`` stays as a compatibility alias for
+    older readers and already-saved snapshot consumers.
+    """
     normalized_team_driver_deltas = team_driver_deltas_seconds or {}
     payload: dict[str, Any] = {
         "year": int(year),
@@ -121,7 +127,11 @@ def build_car_characteristics_snapshot_payload(
 
         profiles = team_profiles.get(team_name)
         if isinstance(profiles, dict) and profiles:
+            balanced_profile = profiles.get("balanced")
             team_entry["profiles"] = profiles
+            team_entry["testing_characteristics_profiles"] = profiles
+            if isinstance(balanced_profile, dict) and balanced_profile:
+                team_entry["testing_characteristics"] = balanced_profile
 
         driver_deltas_seconds = normalized_team_driver_deltas.get(team_name)
         if isinstance(driver_deltas_seconds, dict) and driver_deltas_seconds:
