@@ -55,15 +55,15 @@ class TestBayesianDriverRanking:
         ranker = BayesianDriverRanking(sample_priors)
 
         # BOT (backmarker with mu=10) finishes P3 (way better than expected)
-        # Expected rating for P3 = 21 - 3 = 18
+        # On a 22-car grid, P3 maps close to the front of the latent rating scale.
         ranker.update({"77": 3}, "test_race", confidence=1.0)
 
         updated_mu, _ = ranker.ratings["77"]
 
         # Mu should increase (BOT performed better than prior)
         assert updated_mu > 10.0
-        # But not jump all the way to 18 in one update
-        assert updated_mu < 18.0
+        # But not jump all the way to the observed latent rating in one update
+        assert updated_mu < 20.0
 
     def test_high_confidence_update_stronger_than_low(self, sample_priors):
         """High confidence observations should move beliefs more."""
@@ -122,13 +122,13 @@ class TestBayesianDriverRanking:
         ranker = BayesianDriverRanking(sample_priors)
         df = ranker.get_current_ratings()
 
-        # VER has mu=18, expected pos should be ~3 (21-18)
+        # VER has mu=18, expected position should still be near the front on a 22-car grid.
         ver_row = df[df["driver_code"] == "VER"].iloc[0]
         assert 1 <= ver_row["expected_position"] <= 5
 
-        # BOT has mu=10, expected pos should be ~11 (21-10)
+        # BOT has mu=10, so he should still project around the lower midfield.
         bot_row = df[df["driver_code"] == "BOT"].iloc[0]
-        assert 9 <= bot_row["expected_position"] <= 13
+        assert 11 <= bot_row["expected_position"] <= 14
 
     def test_confidence_intervals_calculated(self, sample_priors):
         """CI bounds should exist and be reasonable."""
@@ -137,9 +137,22 @@ class TestBayesianDriverRanking:
 
         for _, row in df.iterrows():
             assert row["lower_ci"] >= 1
-            assert row["upper_ci"] <= 20
+            assert row["upper_ci"] <= 22
             assert row["lower_ci"] <= row["expected_position"]
             assert row["upper_ci"] >= row["expected_position"]
+
+    def test_grid_size_controls_position_clipping(self, sample_priors):
+        """Expected positions should clip to the configured field size."""
+        ranker = BayesianDriverRanking(sample_priors, grid_size=22)
+        ranker.ratings["1"] = (40.0, 0.1)
+        ranker.ratings["77"] = (-5.0, 0.1)
+
+        df = ranker.get_current_ratings()
+        ver_row = df[df["driver_code"] == "VER"].iloc[0]
+        bot_row = df[df["driver_code"] == "BOT"].iloc[0]
+
+        assert ver_row["expected_position"] == 1.0
+        assert bot_row["expected_position"] == 22.0
 
     def test_get_history_df_returns_updates(self, sample_priors):
         """History export should work."""

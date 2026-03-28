@@ -83,16 +83,18 @@ def test_apply_2026_regulations_adjusts_mu_and_sigma():
     priors = {
         "44": DriverPrior("44", "HAM", "Ferrari", "top", mu=14.0, sigma=2.0),
         "63": DriverPrior("63", "RUS", "Mercedes", "top", mu=13.5, sigma=2.1),
-        "77": DriverPrior("77", "BOT", "Kick Sauber", "midfield", mu=10.0, sigma=2.5),
-        "18": DriverPrior("18", "STR", "Aston Martin", "Customer", mu=11.0, sigma=2.2),
+        "27": DriverPrior("27", "HUL", "Audi", "midfield", mu=10.0, sigma=2.5),
+        "18": DriverPrior("18", "STR", "Aston Martin", "midfield", mu=11.0, sigma=2.2),
+        "12": DriverPrior("12", "CAD", "Cadillac F1", "backmarker", mu=9.0, sigma=2.4),
     }
 
     adjusted = apply_2026_regulations(priors)
 
-    assert adjusted["44"].mu == 15.5
-    assert adjusted["63"].mu == 15.0
-    assert adjusted["77"].mu == 8.0
-    assert adjusted["18"].mu == 10.5
+    assert adjusted["44"].mu == pytest.approx(15.0)
+    assert adjusted["63"].mu == pytest.approx(14.5)
+    assert adjusted["27"].mu == pytest.approx(11.0)
+    assert adjusted["18"].mu == pytest.approx(10.7)
+    assert adjusted["12"].mu == pytest.approx(7.5)
     assert adjusted["44"].sigma == 3.0
     assert priors["44"].mu == 14.0
 

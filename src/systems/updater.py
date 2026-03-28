@@ -275,8 +275,10 @@ def update_bayesian_driver_ratings(race_results: pd.DataFrame) -> None:
     season_year = _coerce_season_year(race_results)
     factory = PriorsFactory(season_year=season_year)
     priors = factory.create_priors()
+    configured_grid_size = int(config_loader.get("grid.size", len(priors) or 22))
+    grid_size = max(configured_grid_size, len(priors) or configured_grid_size)
 
-    bayesian = BayesianDriverRanking(priors)
+    bayesian = BayesianDriverRanking(priors, grid_size=grid_size)
     observations: dict[str, int] = {}
     for driver, position in zip(
         race_results["Abbreviation"].tolist(),
@@ -326,7 +328,7 @@ def update_bayesian_driver_ratings(race_results: pd.DataFrame) -> None:
             existing_skill = 0.5
         existing_skill = float(max(0.0, min(existing_skill, 1.0)))
 
-        bayesian_skill = float(max(0.0, min((float(mu) - 1.0) / 19.0, 1.0)))
+        bayesian_skill = float(max(0.0, min((float(mu) - 1.0) / max(grid_size - 1, 1), 1.0)))
         blended_skill = ((1.0 - blend_weight) * existing_skill) + (blend_weight * bayesian_skill)
         blended_skill = float(max(0.0, min(blended_skill, 1.0)))
         racecraft_payload["skill_score"] = blended_skill

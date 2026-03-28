@@ -5,6 +5,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from src.types.prediction_types import QualifyingGridEntry
+from src.utils import config_loader
 from src.utils.validation_helpers import validate_position
 
 
@@ -13,6 +14,7 @@ def validate_qualifying_grid(
     *,
     min_entries: int = 1,
     require_sequential_positions: bool = False,
+    max_position: int | None = None,
 ) -> list[QualifyingGridEntry]:
     """Validate and normalize a qualifying grid payload.
 
@@ -21,6 +23,10 @@ def validate_qualifying_grid(
     """
     if not grid:
         raise ValueError("Grid cannot be empty")
+
+    if max_position is None:
+        max_position = int(config_loader.get("grid.size", 22))
+    max_position = max(int(max_position), 1)
 
     validated_grid: list[QualifyingGridEntry] = []
     seen_positions: set[int] = set()
@@ -42,7 +48,7 @@ def validate_qualifying_grid(
         if not team:
             raise ValueError("Grid entry team cannot be empty")
 
-        validate_position(position, "position", min_pos=1, max_pos=22)
+        validate_position(position, "position", min_pos=1, max_pos=max_position)
 
         if position in seen_positions:
             raise ValueError(f"Duplicate position {position} in grid")
@@ -59,15 +65,20 @@ def validate_qualifying_grid(
         }
 
         if "median_position" in entry and entry["median_position"] is not None:
-            validate_position(entry["median_position"], "median_position", min_pos=1, max_pos=22)
+            validate_position(
+                entry["median_position"],
+                "median_position",
+                min_pos=1,
+                max_pos=max_position,
+            )
             validated_entry["median_position"] = int(entry["median_position"])
 
         if "p5" in entry and entry["p5"] is not None:
-            validate_position(entry["p5"], "p5", min_pos=1, max_pos=22)
+            validate_position(entry["p5"], "p5", min_pos=1, max_pos=max_position)
             validated_entry["p5"] = int(entry["p5"])
 
         if "p95" in entry and entry["p95"] is not None:
-            validate_position(entry["p95"], "p95", min_pos=1, max_pos=22)
+            validate_position(entry["p95"], "p95", min_pos=1, max_pos=max_position)
             validated_entry["p95"] = int(entry["p95"])
 
         if "p5" in validated_entry and "p95" in validated_entry:

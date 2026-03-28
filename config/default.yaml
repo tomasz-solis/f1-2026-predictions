@@ -10,6 +10,9 @@ paths:
   lineups: "data/current_lineups.json"
   cache: ".fastf1_cache"
 
+grid:
+  size: 22  # 11 teams x 2 drivers in the 2026 field
+
 # Bayesian Model Parameters
 bayesian:
   # Process noise injected between races to prevent overconfidence
@@ -131,6 +134,7 @@ baseline_predictor:
   # Team-strength blending schedule across early season races.
   # rapid_adaptive reaches ~70-90% current-season influence by races 2-3.
   team_strength_schedule: rapid_adaptive
+  baseline_learning_rate: 0.3
   current_season_form:
     infer_from_saved_actuals: true
     recency_exponent: 1.5
@@ -434,7 +438,8 @@ baseline_predictor:
     # Lap-by-lap simulation controls
     safety_car_trigger_lap: 10
 
-    # Lap-by-lap overtaking model
+    # 2026 overtaking model. DRS is gone; active aero now changes how close a
+    # following car can stay through the wake before a pass.
     overtake_model:
       # Position-zone scaling (target car position) for pass realism:
       # harder at the front, easier in midfield/backfield.

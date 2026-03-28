@@ -44,8 +44,10 @@ class UpdateRecord:
 class BayesianDriverRanking:
     """Track driver ratings with a volatility-aware Bayesian update."""
 
-    def __init__(self, priors: dict[str, DriverPrior]):
+    def __init__(self, priors: dict[str, DriverPrior], grid_size: int = 22):
+        """Initialize Bayesian state for one championship field size."""
         self.priors = priors
+        self.grid_size = max(int(grid_size), 2)
         # State: {driver_number: (mu, sigma)}
         self.ratings: dict[str, tuple[float, float]] = {
             d: (p.mu, p.sigma) for d, p in priors.items()
@@ -57,9 +59,8 @@ class BayesianDriverRanking:
         data = []
         for d_num, (mu, sigma) in self.ratings.items():
             prior = self.priors[d_num]
-            # Convert latent rating to expected position (approximate inverse)
-            # Simple heuristic: Position ~= 21 - mu (clamped 1-20)
-            expected_pos = np.clip(21 - mu, 1, 20)
+            # Convert latent rating to expected position on the active grid size.
+            expected_pos = np.clip((self.grid_size + 1) - mu, 1, self.grid_size)
 
             data.append(
                 {
@@ -69,8 +70,14 @@ class BayesianDriverRanking:
                     "rating_mu": round(mu, 2),
                     "rating_sigma": round(sigma, 2),
                     "expected_position": round(expected_pos, 1),
-                    "lower_ci": round(np.clip(21 - (mu + 1.96 * sigma), 1, 20), 1),
-                    "upper_ci": round(np.clip(21 - (mu - 1.96 * sigma), 1, 20), 1),
+                    "lower_ci": round(
+                        np.clip((self.grid_size + 1) - (mu + 1.96 * sigma), 1, self.grid_size),
+                        1,
+                    ),
+                    "upper_ci": round(
+                        np.clip((self.grid_size + 1) - (mu - 1.96 * sigma), 1, self.grid_size),
+                        1,
+                    ),
                 }
             )
 
@@ -101,7 +108,7 @@ class BayesianDriverRanking:
             prior_sigma = np.sqrt(prior_sigma**2 + BASE_VOLATILITY**2)
 
             # Convert finishing position into the latent rating scale.
-            observed_rating = 21.0 - finish_pos
+            observed_rating = float(self.grid_size + 1) - finish_pos
 
             innovation = abs(observed_rating - prior_mu)
 

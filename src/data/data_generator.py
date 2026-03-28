@@ -83,7 +83,7 @@ def generate_neutral_team_characteristics(data_dir: Path) -> None:
         "Aston Martin": {"position": 7, "performance": 0.47},
         "Haas F1 Team": {"position": 8, "performance": 0.43},
         "Alpine": {"position": 9, "performance": 0.40},
-        "Sauber": {"position": 10, "performance": 0.38},
+        "Audi": {"position": 10, "performance": 0.38},
         "Cadillac F1": {
             "position": 11,
             "performance": 0.35,

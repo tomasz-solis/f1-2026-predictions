@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from src.models.bayesian import DriverPrior
+from src.models.regulations import apply_2026_regulations
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ class PriorsFactory:
             self.cars = self._derive_tiers_from_drivers()
 
     def create_priors(self) -> dict:
-        """Synthesize priors."""
+        """Synthesize priors and apply the 2026 regulation-reset adjustment."""
         self.load_data()
         priors = {}
 
@@ -102,7 +103,7 @@ class PriorsFactory:
                 sigma=sigma,
             )
 
-        return priors
+        return apply_2026_regulations(priors)
 
     def _get_car_performance(self, team_name):
         """Get car score from loaded data (Testing or Derived)."""
