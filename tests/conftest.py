@@ -12,6 +12,16 @@ import pytest
 from src.models.bayesian import DriverPrior
 
 
+def pytest_addoption(parser):
+    """Register repo-local pytest options used by regression tests."""
+    parser.addoption(
+        "--update-golden",
+        action="store_true",
+        default=False,
+        help="Refresh golden regression fixtures instead of asserting current output.",
+    )
+
+
 class TestPatcher:
     """Small patch helper backed by unittest.mock for test-only replacements."""
 
@@ -167,3 +177,9 @@ def temp_data_dir(tmp_path):
     (processed / "track_characteristics.json").write_text('{"tracks": {}}')
 
     return data_dir
+
+
+@pytest.fixture
+def update_golden_files(request):
+    """Return whether the current pytest run should rewrite golden fixtures."""
+    return bool(request.config.getoption("--update-golden"))
