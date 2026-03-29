@@ -10,6 +10,7 @@ from src.dashboard.accuracy_view import (
     build_progression_checkpoint_state,
     build_progression_line_series,
     build_progression_series,
+    build_target_metric_cards,
 )
 from src.utils.accuracy_snapshots import accuracy_snapshot_artifact_key
 
@@ -514,3 +515,29 @@ def test_build_progression_checkpoint_state_returns_excluded_checkpoints():
     assert result["scored_checkpoints"] == ["FP2"]
     assert result["excluded_checkpoints"] == ["FP3"]
     assert result["pending_checkpoints"] == []
+
+
+def test_build_target_metric_cards_surfaces_qualifying_summary_values():
+    """Selected-target cards should expose qualifying accuracy metrics directly."""
+    target_summary = TargetAccuracySummary(
+        target_key="main_qualifying",
+        label="Main Qualifying",
+        aggregate={
+            "overall_mae": {"mean": 2.41},
+            "exact_accuracy": {"mean": 18.0},
+            "within_1": {"mean": 44.0},
+            "within_3": {"mean": 71.0},
+            "correlation": {"mean": 0.82},
+        },
+    )
+
+    cards = build_target_metric_cards(target_summary)
+
+    assert [card["label"] for card in cards] == [
+        "MAE",
+        "Exact",
+        "Within 1",
+        "Within 3",
+        "Correlation",
+    ]
+    assert [card["value"] for card in cards] == [2.41, 18.0, 44.0, 71.0, 0.82]

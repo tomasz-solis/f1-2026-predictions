@@ -2036,6 +2036,60 @@ def test_build_snapshot_history_dataframe_keeps_partial_overall_points():
     assert round(float(frame.iloc[1]["Slow Corners"]), 2) == 0.70
 
 
+def test_build_snapshot_history_dataframe_exposes_qualifying_and_race_pace_columns():
+    snapshots = [
+        {
+            "event_name": "Bahrain Grand Prix",
+            "session_name": "FP1",
+            "teams": {
+                "McLaren": {
+                    "profiles": {
+                        "balanced": {"overall_pace": 0.70},
+                        "short_run": {"overall_pace_seconds": 89.0, "overall_pace": 0.78},
+                        "long_run": {"overall_pace_seconds": 91.0, "overall_pace": 0.72},
+                    }
+                },
+                "Ferrari": {
+                    "profiles": {
+                        "balanced": {"overall_pace": 0.66},
+                        "short_run": {"overall_pace_seconds": 89.6, "overall_pace": 0.72},
+                        "long_run": {"overall_pace_seconds": 91.8, "overall_pace": 0.68},
+                    }
+                },
+            },
+        }
+    ]
+
+    frame = team_comparison._build_snapshot_history_dataframe(
+        snapshots=snapshots,
+        selected_teams=["McLaren"],
+        profile="balanced",
+    )
+
+    assert "Qualifying Pace" in frame.columns
+    assert "Race Pace" in frame.columns
+    assert frame.iloc[0]["Qualifying Pace"] == pytest.approx(1.0)
+    assert frame.iloc[0]["Race Pace"] == pytest.approx(1.0)
+
+
+def test_development_metric_options_include_profile_specific_pace_columns_when_available():
+    history_df = pd.DataFrame(
+        {
+            "Overall": [0.71],
+            "Overall Pace": [0.74],
+            "Qualifying Pace": [0.81],
+            "Race Pace": [0.77],
+        }
+    )
+
+    assert team_comparison._development_metric_options(history_df)[:4] == [
+        "Overall",
+        "Overall Pace",
+        "Qualifying Pace",
+        "Race Pace",
+    ]
+
+
 def test_latest_snapshot_payload_skips_sprint_only_sessions():
     snapshots = [
         {

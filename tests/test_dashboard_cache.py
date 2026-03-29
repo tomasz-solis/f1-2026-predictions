@@ -66,10 +66,13 @@ def test_get_file_timestamps_reports_existing_and_missing_files(patcher):
         hashlib.sha1(existing_files["config/default.yaml"]).hexdigest(),
     )
     assert timestamps["data/2026_pirelli_info.json"] == (0, "")
+    assert timestamps["src/models/regulations.py"] == (0, "")
     assert timestamps["src/predictors/baseline_2026.py"] == (0, "")
+    assert timestamps["src/predictors/baseline/data_support.py"] == (0, "")
     assert timestamps["src/dashboard/prediction_flow.py"] == (0, "")
     assert timestamps["src/predictors/baseline/race/grid_uncertainty.py"] == (0, "")
     assert timestamps["src/predictors/baseline/race/result_processing.py"] == (0, "")
+    assert timestamps["src/systems/testing_updater_metrics.py"] == (0, "")
     assert timestamps["src/utils/race_input_confidence.py"] == (0, "")
 
 

@@ -23,6 +23,13 @@ METRIC_OPTIONS = {
     "within_3": "Within 3 positions %",
     "correlation": "Correlation",
 }
+_TARGET_HIGHLIGHT_METRICS = (
+    ("overall_mae", "MAE", "{:.2f}"),
+    ("exact_accuracy", "Exact", "{:.1f}%"),
+    ("within_1", "Within 1", "{:.1f}%"),
+    ("within_3", "Within 3", "{:.1f}%"),
+    ("correlation", "Correlation", "{:.2f}"),
+)
 
 
 def render_overall_accuracy_metrics(summary: SeasonAccuracySummary) -> None:
@@ -110,6 +117,46 @@ def _render_metric_card(
             st.metric(label, "N/A")
 
 
+def build_target_metric_cards(target_summary: TargetAccuracySummary) -> list[dict[str, Any]]:
+    """Return formatted metric-card payloads for the selected target summary."""
+    cards: list[dict[str, Any]] = []
+    for metric_name, label, template in _TARGET_HIGHLIGHT_METRICS:
+        value = None
+        metric_payload = target_summary.aggregate.get(metric_name)
+        if isinstance(metric_payload, dict):
+            raw_value = metric_payload.get("mean")
+            if isinstance(raw_value, int | float):
+                value = float(raw_value)
+        cards.append(
+            {
+                "metric_name": metric_name,
+                "label": label,
+                "template": template,
+                "value": value,
+            }
+        )
+    return cards
+
+
+def _render_target_metric_cards(target_summary: TargetAccuracySummary) -> None:
+    """Render a compact summary row for the currently selected target."""
+    cards = build_target_metric_cards(target_summary)
+    if not cards:
+        return
+
+    st.markdown("**Target Summary**")
+    columns = st.columns(len(cards))
+    for column, card in zip(columns, cards, strict=False):
+        with column:
+            value = card.get("value")
+            template = str(card.get("template", "{:.2f}"))
+            label = str(card.get("label", "Metric"))
+            if isinstance(value, int | float):
+                st.metric(label, template.format(float(value)))
+            else:
+                st.metric(label, "N/A")
+
+
 def _render_target_section(
     *,
     title: str,
@@ -129,6 +176,7 @@ def _render_target_section(
         selected_target_key,
         TargetAccuracySummary(selected_target_key, selected_target_key),
     )
+    _render_target_metric_cards(target_summary)
     _render_progression_charts(target_summary, metric_name)
     _render_trend_charts(target_summary, metric_name)
 

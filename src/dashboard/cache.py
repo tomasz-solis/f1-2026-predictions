@@ -13,6 +13,43 @@ from src.persistence.config import should_read_db_first
 logger = logging.getLogger(__name__)
 _FASTF1_CACHE_DIR = Path("data/raw/.fastf1_cache")
 _DEFAULT_SEASON = 2026
+_PREDICTION_CODE_FINGERPRINT_FILES = [
+    "src/dashboard/checkpoint_predictor.py",
+    "src/dashboard/prediction_flow.py",
+    "src/dashboard/warmup_prediction_builders.py",
+    "src/data/data_generator.py",
+    "src/models/bayesian.py",
+    "src/models/priors_factory.py",
+    "src/models/regulations.py",
+    "src/predictors/baseline/data_mixin.py",
+    "src/predictors/baseline/data_support.py",
+    "src/predictors/baseline/qualifying_mixin.py",
+    "src/predictors/baseline/qualifying_preparation.py",
+    "src/predictors/baseline/qualifying_simulation.py",
+    "src/predictors/baseline/race/grid_uncertainty.py",
+    "src/predictors/baseline/race/prediction_flow.py",
+    "src/predictors/baseline/race/preparation_flow.py",
+    "src/predictors/baseline/race/result_processing.py",
+    "src/predictors/baseline/team_strength.py",
+    "src/predictors/baseline_2026.py",
+    "src/systems/testing_updater.py",
+    "src/systems/testing_updater_flow.py",
+    "src/systems/testing_updater_metrics.py",
+    "src/systems/updater.py",
+    "src/systems/updater_flow.py",
+    "src/utils/checkpoint_reconstruction.py",
+    "src/utils/driver_fp_adjustment.py",
+    "src/utils/fp_blending.py",
+    "src/utils/grid_validation.py",
+    "src/utils/race_input_confidence.py",
+]
+_RUNTIME_PREDICTION_INPUT_FILES = [
+    "data/processed/car_characteristics/{year}_car_characteristics.json",
+    "data/processed/driver_characteristics/{year}_driver_characteristics.json",
+    "data/processed/driver_characteristics.json",
+    "data/processed/track_characteristics/{year}_track_characteristics.json",
+    "data/systems/practice_characteristics_state.json",
+]
 
 
 def enable_fastf1_cache() -> None:
@@ -68,36 +105,17 @@ def _get_file_timestamps(
     *,
     include_runtime_files: bool = True,
 ) -> dict[str, tuple[int, str]]:
-    """Get deterministic file fingerprints for non-DB artifacts."""
+    """Get deterministic file fingerprints for cache-relevant local artifacts."""
     season_year = int(year)
     previous_year = max(season_year - 1, 0)
     static_files = [
         f"data/{previous_year}_pirelli_info.json",
         f"data/{season_year}_pirelli_info.json",
         "config/default.yaml",
-        "src/predictors/baseline_2026.py",
-        "src/dashboard/checkpoint_predictor.py",
-        "src/predictors/baseline/data_mixin.py",
-        "src/predictors/baseline/qualifying_mixin.py",
-        "src/predictors/baseline/qualifying_preparation.py",
-        "src/predictors/baseline/qualifying_simulation.py",
-        "src/predictors/baseline/team_strength.py",
-        "src/dashboard/prediction_flow.py",
-        "src/predictors/baseline/race/preparation_flow.py",
-        "src/predictors/baseline/race/prediction_flow.py",
-        "src/predictors/baseline/race/grid_uncertainty.py",
-        "src/predictors/baseline/race/result_processing.py",
-        "src/utils/checkpoint_reconstruction.py",
-        "src/utils/driver_fp_adjustment.py",
-        "src/utils/fp_blending.py",
-        "src/utils/race_input_confidence.py",
+        *_PREDICTION_CODE_FINGERPRINT_FILES,
     ]
     runtime_files = [
-        f"data/processed/car_characteristics/{season_year}_car_characteristics.json",
-        f"data/processed/driver_characteristics/{season_year}_driver_characteristics.json",
-        "data/processed/driver_characteristics.json",
-        f"data/processed/track_characteristics/{season_year}_track_characteristics.json",
-        "data/systems/practice_characteristics_state.json",
+        file_template.format(year=season_year) for file_template in _RUNTIME_PREDICTION_INPUT_FILES
     ]
     files = static_files + (runtime_files if include_runtime_files else [])
 

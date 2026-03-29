@@ -23,6 +23,11 @@ from src.dashboard.team_radar import (
 from src.utils.car_snapshot_history import session_order_index, snapshot_sort_timestamp
 from src.utils.team_mapping import canonicalize_team, map_team_to_characteristics
 
+_PROFILE_DEVELOPMENT_PACE_LABELS = {
+    "short_run": "Qualifying Pace",
+    "long_run": "Race Pace",
+}
+
 
 def _snapshot_label(snapshot_payload: dict[str, Any]) -> str:
     """Build a compact label for one stored snapshot."""
@@ -561,6 +566,14 @@ def _build_snapshot_history_dataframe(
             )
             if overall_pace is not None:
                 row["Overall Pace"] = overall_pace
+            for profile_name, label_name in _PROFILE_DEVELOPMENT_PACE_LABELS.items():
+                profile_pace = _resolve_development_profile_pace_value(
+                    snapshot_team_payload=snapshot_team_payload,
+                    team_payload=team_payload,
+                    profile_name=profile_name,
+                )
+                if profile_pace is not None:
+                    row[label_name] = profile_pace
             metric_count = len(metric_values)
             if metric_count:
                 row["Overall"] = float(sum(metric_values) / metric_count)
@@ -573,6 +586,32 @@ def _build_snapshot_history_dataframe(
         return pd.DataFrame()
 
     return pd.DataFrame(rows)
+
+
+def _resolve_development_profile_pace_value(
+    *,
+    snapshot_team_payload: dict[str, dict[str, Any]],
+    team_payload: dict[str, Any],
+    profile_name: str,
+) -> float | None:
+    """Resolve one named profile pace so history charts can show quali and race trends."""
+    metrics_payload = _resolve_profile_metrics(team_payload, profile_name)
+    if not isinstance(metrics_payload, dict) or not metrics_payload:
+        return None
+
+    raw_metric_key, _higher_is_better, min_padding = _RAW_METRIC_FIELDS["overall_pace"]
+    raw_metric_display_scales = {
+        "overall_pace": _build_raw_metric_display_scale(
+            snapshot_team_payload,
+            profile_name,
+            raw_metric_key=raw_metric_key,
+            min_padding=min_padding,
+        )
+    }
+    return _resolve_profile_overall_pace_display_value(
+        metrics_payload,
+        raw_metric_display_scales=raw_metric_display_scales,
+    )
 
 
 def _ordered_snapshot_labels(history_df: pd.DataFrame) -> list[str]:

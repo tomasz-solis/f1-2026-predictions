@@ -129,6 +129,16 @@ def _run_characteristics_season_sync(year: int, payload: dict[str, Any]) -> dict
     )
 
 
+def _development_metric_options(history_df: Any) -> list[str]:
+    """Return development metrics that make sense for the available history payload."""
+    options = ["Overall", "Overall Pace"]
+    for label_name in ("Qualifying Pace", "Race Pace"):
+        if label_name in getattr(history_df, "columns", []):
+            options.append(label_name)
+    options.extend(label for _, label in _TEAM_RADAR_METRICS)
+    return options
+
+
 def _snapshot_history_cache_token(year: int) -> str:
     """
     Return a freshness token for stored session snapshots.
@@ -261,15 +271,16 @@ def _render_development_history_section(
         )
         return
 
-    metric_options = ["Overall", "Overall Pace", *[label for _, label in _TEAM_RADAR_METRICS]]
+    metric_options = _development_metric_options(history_df)
     metric_label = st.selectbox(
         "Development metric",
         options=metric_options,
         index=0,
         help=(
             "Overall averages the radar metrics that are available in each snapshot. "
-            "Overall Pace tracks the stored pace score separately, and the other options show "
-            "one feature at a time."
+            "Overall Pace follows the selected comparison profile. Qualifying Pace always uses "
+            "the short-run profile when snapshots store it, Race Pace uses long-run, and the "
+            "other options show one feature at a time."
         ),
     )
 
@@ -285,7 +296,7 @@ def _render_development_history_section(
         st.info(f"No stored `{metric_label}` values are available for this selection yet.")
         return
     category_order = _ordered_snapshot_labels(history_df)
-    missing_history_points = bool((~history_df["Has Data"].fillna(False)).any())
+    missing_history_points = bool(metric_frame[metric_label].isna().any())
 
     try:
         import plotly.graph_objects as go
@@ -362,6 +373,21 @@ def _render_development_history_section(
         st.caption(
             "Each point is one session snapshot. Overall averages the available radar metrics, "
             "and the hover shows how complete each session snapshot is."
+        )
+    elif metric_label == "Overall Pace":
+        st.caption(
+            "Each point is one session snapshot. Overall Pace follows the currently selected "
+            "comparison profile."
+        )
+    elif metric_label == "Qualifying Pace":
+        st.caption(
+            "Each point is one session snapshot. Qualifying Pace always tracks the short-run "
+            "profile when that snapshot stores one."
+        )
+    elif metric_label == "Race Pace":
+        st.caption(
+            "Each point is one session snapshot. Race Pace always tracks the long-run profile "
+            "when that snapshot stores one."
         )
     else:
         st.caption(
