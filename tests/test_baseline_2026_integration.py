@@ -27,8 +27,8 @@ class TestBaseline2026Integration:
         assert "Cadillac F1" in predictor.teams
 
     def test_qualifying_prediction_format(self, predictor):
-        """Test qualifying prediction returns correct format"""
-        result = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=10)
+        """Test qualifying prediction returns correct format."""
+        result = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=10)
 
         assert "grid" in result
         assert len(result["grid"]) == 22  # 11 teams × 2 drivers
@@ -43,9 +43,9 @@ class TestBaseline2026Integration:
             assert 40 <= entry["confidence"] <= 60  # Baseline confidence range
 
     def test_race_prediction_format(self, predictor):
-        """Test race prediction returns correct format"""
+        """Test race prediction returns correct format."""
         # First get qualifying grid
-        quali = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=10)
+        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=10)
 
         # Then predict race
         result = predictor.predict_race(quali["grid"], weather="dry", n_simulations=10)
@@ -67,10 +67,10 @@ class TestBaseline2026Integration:
             assert 0 <= entry["dnf_probability"] <= 0.35
 
     def test_monte_carlo_stability(self, predictor):
-        """Test that multiple simulations produce stable results"""
+        """Test that multiple simulations produce stable results."""
         # Run prediction twice with same inputs
-        result1 = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=50)
-        result2 = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=50)
+        result1 = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=50)
+        result2 = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=50)
 
         # Extract positions
         pos1 = {entry["driver"]: entry["position"] for entry in result1["grid"]}
@@ -85,15 +85,15 @@ class TestBaseline2026Integration:
         assert np.mean(differences) < 3.0
 
     def test_team_hierarchy_respected(self, predictor):
-        """Test that blended team strength still shows up in Bahrain qualifying."""
-        result = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=50)
+        """Test that blended team strength still shows up in Australia qualifying."""
+        result = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=50)
 
         team_positions: dict[str, list[int]] = {}
         for entry in result["grid"]:
             team_positions.setdefault(entry["team"], []).append(entry["position"])
 
         blended_strengths = {
-            team: predictor.get_blended_team_strength(team, "Bahrain Grand Prix")
+            team: predictor.get_blended_team_strength(team, "Australian Grand Prix")
             for team in team_positions
         }
         ranked_teams = [
@@ -117,13 +117,13 @@ class TestBaseline2026Integration:
         )
 
     def test_sprint_weekend_detection(self, predictor):
-        """Test that sprint weekends have slightly higher variance"""
+        """Test that sprint weekends have slightly higher variance."""
         # This tests the internal sprint detection logic
         sprint_result = predictor.predict_qualifying(
             2026, "Chinese Grand Prix", n_simulations=50
         )  # Sprint
         normal_result = predictor.predict_qualifying(
-            2026, "Bahrain Grand Prix", n_simulations=50
+            2026, "Australian Grand Prix", n_simulations=50
         )  # Normal
 
         # Both should work and return valid results
@@ -136,8 +136,8 @@ class TestBaseline2026Integration:
         assert sprint_conf <= normal_conf + 1.0  # Allow small difference
 
     def test_dnf_risk_calculation(self, predictor):
-        """Test DNF risk is calculated appropriately"""
-        quali = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=10)
+        """Test DNF risk is calculated appropriately."""
+        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=10)
         race = predictor.predict_race(quali["grid"], weather="dry", n_simulations=10)
 
         # Count high DNF risk drivers (>15% - adjusted for crash-only DNF rates)
@@ -150,8 +150,8 @@ class TestBaseline2026Integration:
         assert all(0 <= e["dnf_probability"] <= 0.35 for e in race["finish_order"])
 
     def test_weather_impact(self, predictor):
-        """Test that rain increases race unpredictability"""
-        quali = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=10)
+        """Test that rain increases race unpredictability."""
+        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=10)
 
         # Run race with different weather
         dry_race = predictor.predict_race(quali["grid"], weather="dry", n_simulations=10)
@@ -165,16 +165,16 @@ class TestBaseline2026Integration:
         assert rain_conf <= dry_conf + 2.0
 
     def test_grid_position_impact(self, predictor):
-        """Test that grid position heavily influences race result"""
+        """Test that grid position heavily influences race result."""
         # Create a qualifying grid (increase simulations for stability)
-        quali = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=500)
+        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=500)
 
         # Run race (increase simulations for stability)
         race = predictor.predict_race(
             quali["grid"],
             weather="dry",
             n_simulations=500,
-            race_name="Bahrain Grand Prix",
+            race_name="Australian Grand Prix",
         )
 
         # Driver starting P1 should have high chance of finishing in top 5
@@ -207,7 +207,7 @@ class TestBaseline2026Integration:
 
     def test_qualifying_order_is_not_over_clustered_by_team(self, predictor):
         """Qualifying top 10 should avoid near-perfect teammate block ordering."""
-        quali = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=300)
+        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=300)
         grid = sorted(quali["grid"], key=lambda e: e["position"])
         top10_adjacent_teammates = sum(
             1 for idx in range(9) if grid[idx]["team"] == grid[idx + 1]["team"]
@@ -219,11 +219,16 @@ class TestBaseline2026Integration:
 
     def test_sprint_race_uses_no_pit_stop_model(self, predictor):
         """Sprint races should run without scheduled pit stops."""
-        quali = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=20)
+        quali = predictor.predict_qualifying(
+            2026,
+            "Chinese Grand Prix",
+            qualifying_stage="sprint",
+            n_simulations=20,
+        )
         sprint = predictor.predict_sprint_race(
             sprint_quali_grid=quali["grid"],
             weather="dry",
-            race_name="Bahrain Grand Prix",
+            race_name="Chinese Grand Prix",
             n_simulations=20,
         )
 
@@ -236,7 +241,7 @@ class TestBaseline2026EdgeCases:
     """Test edge cases and error handling"""
 
     def test_invalid_race_name(self):
-        """Test handling of invalid race name"""
+        """Test handling of invalid race name."""
         predictor = Baseline2026Predictor()
 
         # Should not crash, but may have lower confidence or fallback behavior
@@ -260,9 +265,9 @@ class TestBaseline2026EdgeCases:
             predictor.predict_qualifying(2026, "Mystery Grand Prix", n_simulations=1)
 
     def test_extreme_weather(self):
-        """Test mixed weather condition"""
+        """Test mixed weather condition."""
         predictor = Baseline2026Predictor()
-        quali = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=10)
+        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=10)
         race = predictor.predict_race(quali["grid"], weather="mixed", n_simulations=10)
 
         # Should still produce valid results
@@ -270,9 +275,9 @@ class TestBaseline2026EdgeCases:
         assert all(e["confidence"] >= 40 for e in race["finish_order"])
 
     def test_minimal_simulations(self):
-        """Test prediction with minimal simulations (edge case)"""
+        """Test prediction with minimal simulations (edge case)."""
         predictor = Baseline2026Predictor()
-        result = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=5)
+        result = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=5)
 
         # Should still work but with lower confidence
         assert len(result["grid"]) == 22

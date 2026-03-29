@@ -81,11 +81,11 @@ def test_predict_weekend_run_uses_shared_predictor(monkeypatch):
     )
     monkeypatch.setattr(module, "_print_table", lambda df, columns: None)
 
-    module.run_weekend_predictions(2026, "Bahrain Grand Prix")
+    module.run_weekend_predictions(2026, "Australian Grand Prix")
 
     predictor = FakePredictor.instances[0]
     assert predictor.season_year == 2026
-    assert predictor.qualifying_calls == [{"year": 2026, "race_name": "Bahrain Grand Prix"}]
+    assert predictor.qualifying_calls == [{"year": 2026, "race_name": "Australian Grand Prix"}]
     assert predictor.race_calls == [
         {
             "qualifying_grid": [
@@ -97,7 +97,7 @@ def test_predict_weekend_run_uses_shared_predictor(monkeypatch):
                 }
             ],
             "weather": "dry",
-            "race_name": "Bahrain Grand Prix",
+            "race_name": "Australian Grand Prix",
             "year": 2026,
         }
     ]
@@ -176,7 +176,7 @@ def test_simulator_run_loop_uses_shared_predictor(monkeypatch):
     predictor = FakePredictor.instances[0]
     assert predictor.season_year == 2026
     assert len(predictor.calls) == 4
-    assert predictor.calls[0]["race_name"] == "Bahrain Grand Prix"
+    assert predictor.calls[0]["race_name"] == "Australian Grand Prix"
     assert predictor.calls[0]["year"] == 2026
     assert predictor.calls[0]["weather"] == "dry"
 
@@ -189,6 +189,37 @@ def test_update_prediction_actuals_uses_shared_results_fetcher():
     )
 
     assert module.fetch_actual_session_results.__module__ == "src.data.actual_results_fetcher"
+
+
+def test_update_from_race_script_reconciles_saved_prediction_actuals(monkeypatch):
+    """The race-update script should refresh saved prediction actuals after learning updates."""
+    module = _load_module("update_from_race_script", "scripts/update_from_race.py")
+    calls: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        module,
+        "update_from_race",
+        lambda year, race_name, data_dir: calls.update(
+            update=(int(year), str(race_name), str(data_dir))
+        ),
+    )
+
+    class _Logger:
+        def reconcile_completed_prediction_actuals(self, year: int) -> int:
+            calls["reconciled_year"] = int(year)
+            return 3
+
+    monkeypatch.setattr(module, "PredictionLogger", lambda: _Logger())
+    monkeypatch.setattr(
+        module.sys,
+        "argv",
+        ["update_from_race.py", "Australian Grand Prix", "--year", "2026"],
+    )
+
+    module.main()
+
+    assert calls["update"] == (2026, "Australian Grand Prix", "data/processed")
+    assert calls["reconciled_year"] == 2026
 
 
 def test_blend_weight_script_uses_shared_results_fetcher():

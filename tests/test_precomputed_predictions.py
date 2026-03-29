@@ -16,18 +16,18 @@ def test_save_and_load_precompute_horizon_index_file_roundtrip(patcher, tmp_path
         year=2026,
         artifact_hash="artifact_hash",
         boundary_signature="boundary_sig",
-        anchor_race_name="Bahrain Grand Prix",
+        anchor_race_name="Australian Grand Prix",
         anchor_session_name="FP1",
         expected_targets=[
-            "Bahrain Grand Prix",
-            "Saudi Arabian Grand Prix",
             "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
         ],
-        ready_races=["Bahrain Grand Prix", "Saudi Arabian Grand Prix"],
+        ready_races=["Australian Grand Prix", "Chinese Grand Prix"],
         weather_scenarios=["dry", "mixed", "rain"],
         race_boundaries={
-            "Bahrain Grand Prix": "sig_anchor",
-            "Saudi Arabian Grand Prix": "sig_future",
+            "Australian Grand Prix": "sig_anchor",
+            "Chinese Grand Prix": "sig_future",
         },
     )
 
@@ -35,12 +35,12 @@ def test_save_and_load_precompute_horizon_index_file_roundtrip(patcher, tmp_path
 
     assert loaded is not None
     assert loaded["boundary_signature"] == "boundary_sig"
-    assert loaded["anchor_race_name"] == "Bahrain Grand Prix"
+    assert loaded["anchor_race_name"] == "Australian Grand Prix"
     assert loaded["anchor_session_name"] == "FP1"
-    assert loaded["ready_races"] == ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"]
+    assert loaded["ready_races"] == ["Australian Grand Prix", "Chinese Grand Prix"]
     assert loaded["race_boundaries"] == {
-        "Bahrain Grand Prix": "sig_anchor",
-        "Saudi Arabian Grand Prix": "sig_future",
+        "Australian Grand Prix": "sig_anchor",
+        "Chinese Grand Prix": "sig_future",
     }
 
 
@@ -61,10 +61,10 @@ def test_load_precompute_horizon_index_db_only_does_not_merge_file_fallback(patc
                         "year": 2026,
                         "artifact_hash": "artifact_hash",
                         "boundary_signature": "sig_db",
-                        "anchor_race_name": "Bahrain Grand Prix",
+                        "anchor_race_name": "Australian Grand Prix",
                         "anchor_session_name": "FP2",
-                        "expected_targets": ["Bahrain Grand Prix"],
-                        "ready_races": ["Bahrain Grand Prix"],
+                        "expected_targets": ["Australian Grand Prix"],
+                        "ready_races": ["Australian Grand Prix"],
                     }
                 )
             },
@@ -131,7 +131,7 @@ def test_list_precomputed_race_names_filters_by_year_hash_and_boundary(patcher, 
 
     store.save_precomputed_prediction(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         weather="dry",
         artifact_hash="artifact_hash",
         boundary_signature="sig_a",
@@ -167,8 +167,8 @@ def test_list_precomputed_race_names_filters_by_year_hash_and_boundary(patcher, 
         boundary_signature="sig_a",
     )
 
-    assert listed_all == ["Bahrain Grand Prix", "Chinese Grand Prix"]
-    assert listed_boundary == ["Bahrain Grand Prix"]
+    assert listed_all == ["Australian Grand Prix", "Chinese Grand Prix"]
+    assert listed_boundary == ["Australian Grand Prix"]
 
 
 def test_save_precomputed_prediction_raises_in_db_only_when_db_write_fails(patcher):
@@ -195,7 +195,7 @@ def test_save_precomputed_prediction_raises_in_db_only_when_db_write_fails(patch
     try:
         store.save_precomputed_prediction(
             year=2026,
-            race_name="Bahrain Grand Prix",
+            race_name="Australian Grand Prix",
             weather="dry",
             artifact_hash="artifact_hash",
             boundary_signature="sig_a",
@@ -233,12 +233,12 @@ def test_save_precompute_horizon_index_raises_in_db_only_when_db_write_fails(pat
             year=2026,
             artifact_hash="artifact_hash",
             boundary_signature="sig_a",
-            anchor_race_name="Bahrain Grand Prix",
+            anchor_race_name="Australian Grand Prix",
             anchor_session_name="FP1",
-            expected_targets=["Bahrain Grand Prix"],
-            ready_races=["Bahrain Grand Prix"],
+            expected_targets=["Australian Grand Prix"],
+            ready_races=["Australian Grand Prix"],
             weather_scenarios=["dry"],
-            race_boundaries={"Bahrain Grand Prix": "sig_a"},
+            race_boundaries={"Australian Grand Prix": "sig_a"},
         )
         raise AssertionError("Expected RuntimeError in db_only mode.")
     except RuntimeError as exc:
@@ -263,7 +263,7 @@ def test_list_precomputed_race_names_db_only_does_not_merge_file_fallback(patche
                             "year": 2026,
                             "artifact_hash": "artifact_hash",
                             "boundary_signature": "sig_a",
-                            "race_name": "Bahrain Grand Prix",
+                            "race_name": "Australian Grand Prix",
                         }
                     }
                 )
@@ -282,7 +282,7 @@ def test_list_precomputed_race_names_db_only_does_not_merge_file_fallback(patche
         boundary_signature="sig_a",
     )
 
-    assert listed == ["Bahrain Grand Prix"]
+    assert listed == ["Australian Grand Prix"]
 
 
 def test_prune_db_namespace_entries_uses_key_only_strategy_when_available():

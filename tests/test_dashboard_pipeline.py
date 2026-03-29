@@ -50,7 +50,7 @@ def _reset_prediction_cache(patcher):
 def _base_core_kwargs(**overrides):
     """Build default request-path callbacks for persisted-only pipeline tests."""
     kwargs = {
-        "race_name": "Bahrain Grand Prix",
+        "race_name": "Australian Grand Prix",
         "weather": "dry",
         "year": 2026,
         "force_refresh": False,
@@ -156,7 +156,7 @@ def test_execute_live_prediction_pipeline_fails_closed_when_weekend_lookup_break
 
     with pytest.raises(
         live_prediction_flow.PrecomputedPredictionUnavailableError,
-        match="Could not resolve weekend format for Bahrain Grand Prix 2026",
+        match="Could not resolve weekend format for Australian Grand Prix 2026",
     ):
         live_prediction_flow.execute_live_prediction_pipeline_core(
             **_base_core_kwargs(
@@ -424,9 +424,9 @@ def test_execute_live_prediction_pipeline_ignores_stale_horizon_summary_metadata
         "load_precompute_horizon_index",
         lambda **kwargs: {
             "boundary_signature": "stale_sig",
-            "anchor_race_name": "Bahrain Grand Prix",
-            "expected_targets": ["Bahrain Grand Prix"],
-            "ready_races": ["Bahrain Grand Prix"],
+            "anchor_race_name": "Australian Grand Prix",
+            "expected_targets": ["Australian Grand Prix"],
+            "ready_races": ["Australian Grand Prix"],
         },
     )
 
@@ -503,17 +503,17 @@ def test_resolve_precompute_targets_skips_testing_by_event_format(patcher):
         "src.utils.weekend.get_schedule_rows",
         lambda year: (
             ("Pre-Season Track Day", "testing"),
-            ("Bahrain Grand Prix", "conventional"),
-            ("Saudi Arabian Grand Prix", "conventional"),
-            ("In-Season Testing", "conventional"),
             ("Australian Grand Prix", "conventional"),
+            ("Chinese Grand Prix", "sprint"),
+            ("In-Season Testing", "conventional"),
+            ("Japanese Grand Prix", "conventional"),
         ),
     )
 
     targets = live_prediction_flow._resolve_precompute_targets(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         horizon_races=3,
     )
 
-    assert targets == ["Bahrain Grand Prix", "Saudi Arabian Grand Prix", "Australian Grand Prix"]
+    assert targets == ["Australian Grand Prix", "Chinese Grand Prix", "Japanese Grand Prix"]

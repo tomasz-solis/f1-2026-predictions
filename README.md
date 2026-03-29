@@ -198,7 +198,7 @@ used by the accuracy dashboard.
 ### 2. Manual race update
 
 ```bash
-python scripts/update_from_race.py "Bahrain Grand Prix" --year 2026
+python scripts/update_from_race.py "Australian Grand Prix" --year 2026
 ```
 
 ### 3. Manual testing/practice directionality update
@@ -234,6 +234,9 @@ If testing/practice profiles are missing, Team Comparison shows an availability
 message instead of neutral placeholder radar values.
 
 Testing cache defaults to `data/raw/.fastf1_cache_testing`.
+
+Testing note: Bahrain 2026 test data is useful for seeding car-characteristic
+baselines, but raw test pace should not be treated as representative team order.
 
 ## Important Data Files
 

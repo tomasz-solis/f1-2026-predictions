@@ -68,7 +68,7 @@ class TestAutoUpdaterDetection:
         from src.utils.auto_updater import needs_update
 
         with patch("src.utils.auto_updater.get_completed_races") as mock_completed:
-            mock_completed.return_value = ["Bahrain Grand Prix"]
+            mock_completed.return_value = ["Australian Grand Prix"]
 
             with patch("src.utils.auto_updater.get_learned_races") as mock_learned:
                 mock_learned.return_value = []
@@ -76,7 +76,7 @@ class TestAutoUpdaterDetection:
                 result, new_races = needs_update()
 
         assert result is True
-        assert "Bahrain Grand Prix" in new_races
+        assert "Australian Grand Prix" in new_races
 
     def test_needs_update_all_learned(self, temp_data_dir):
         """Test needs_update returns False when all races already learned."""
@@ -84,14 +84,14 @@ class TestAutoUpdaterDetection:
 
         with patch("src.utils.auto_updater.get_completed_races") as mock_completed:
             mock_completed.return_value = [
-                "Bahrain Grand Prix",
-                "Saudi Arabian Grand Prix",
+                "Australian Grand Prix",
+                "Chinese Grand Prix",
             ]
 
             with patch("src.utils.auto_updater.get_learned_races") as mock_learned:
                 mock_learned.return_value = [
-                    "Bahrain Grand Prix",
-                    "Saudi Arabian Grand Prix",
+                    "Australian Grand Prix",
+                    "Chinese Grand Prix",
                 ]
 
                 result, new_races = needs_update()
@@ -120,7 +120,7 @@ class TestAutoUpdaterExecution:
         from src.utils.auto_updater import auto_update_from_races
 
         with patch("src.utils.auto_updater.needs_update") as mock_needs:
-            mock_needs.return_value = (True, ["Bahrain Grand Prix"])
+            mock_needs.return_value = (True, ["Australian Grand Prix"])
 
             with patch("src.systems.updater.update_from_race") as mock_update:
                 with patch("src.utils.auto_updater.mark_race_as_learned"):
@@ -131,7 +131,7 @@ class TestAutoUpdaterExecution:
                     updated_count = auto_update_from_races(progress_callback=progress_callback)
 
         assert updated_count == 1
-        mock_update.assert_called_once_with(2026, "Bahrain Grand Prix")
+        mock_update.assert_called_once_with(2026, "Australian Grand Prix")
 
     def test_auto_update_multiple_races(self, temp_data_dir):
         """Test auto-update handles multiple races."""
@@ -141,9 +141,9 @@ class TestAutoUpdaterExecution:
             mock_needs.return_value = (
                 True,
                 [
-                    "Bahrain Grand Prix",
-                    "Saudi Arabian Grand Prix",
                     "Australian Grand Prix",
+                    "Chinese Grand Prix",
+                    "Japanese Grand Prix",
                 ],
             )
 
@@ -165,7 +165,7 @@ class TestAutoUpdaterExecution:
         with patch("src.utils.auto_updater.needs_update") as mock_needs:
             mock_needs.return_value = (
                 True,
-                ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"],
+                ["Australian Grand Prix", "Chinese Grand Prix"],
             )
 
             with patch("src.systems.updater.update_from_race") as mock_update:
@@ -185,13 +185,13 @@ class TestAutoUpdaterExecution:
         from src.utils.auto_updater import auto_update_from_races
 
         with patch("src.utils.auto_updater.needs_update") as mock_needs:
-            mock_needs.return_value = (True, ["Bahrain Grand Prix"])
+            mock_needs.return_value = (True, ["Australian Grand Prix"])
             with patch("src.systems.updater.update_from_race") as mock_update:
                 with patch("src.utils.auto_updater.mark_race_as_learned"):
                     updated_count = auto_update_from_races(year=2027)
 
         assert updated_count == 1
-        mock_update.assert_called_once_with(2027, "Bahrain Grand Prix")
+        mock_update.assert_called_once_with(2027, "Australian Grand Prix")
 
     def test_auto_update_from_races_uses_explicit_race_list(self, temp_data_dir):
         """Explicit race lists should bypass needs_update recomputation."""
@@ -205,16 +205,16 @@ class TestAutoUpdaterExecution:
                 with patch("src.utils.auto_updater.mark_race_as_learned"):
                     updated_count = auto_update_from_races(
                         races_to_update=[
-                            "Bahrain Grand Prix",
-                            "Bahrain Grand Prix",
-                            "Saudi Arabian Grand Prix",
+                            "Australian Grand Prix",
+                            "Chinese Grand Prix",
+                            "Australian Grand Prix",
                         ]
                     )
 
         assert updated_count == 2
         assert mock_update.call_count == 2
-        assert mock_update.call_args_list[0].args == (2026, "Bahrain Grand Prix")
-        assert mock_update.call_args_list[1].args == (2026, "Saudi Arabian Grand Prix")
+        assert mock_update.call_args_list[0].args == (2026, "Australian Grand Prix")
+        assert mock_update.call_args_list[1].args == (2026, "Chinese Grand Prix")
 
 
 class TestCompletedRacesDetection:
@@ -228,9 +228,9 @@ class TestCompletedRacesDetection:
         mock_schedule = pd.DataFrame(
             {
                 "EventName": [
-                    "Bahrain Grand Prix",
-                    "Saudi Arabian Grand Prix",
                     "Australian Grand Prix",
+                    "Chinese Grand Prix",
+                    "Japanese Grand Prix",
                 ],
                 "EventDate": [
                     datetime.now() - timedelta(days=10),  # Completed
@@ -250,9 +250,9 @@ class TestCompletedRacesDetection:
                 completed = get_completed_races(year=2026)
 
         assert len(completed) == 2
-        assert "Bahrain Grand Prix" in completed
-        assert "Saudi Arabian Grand Prix" in completed
-        assert "Australian Grand Prix" not in completed
+        assert "Australian Grand Prix" in completed
+        assert "Chinese Grand Prix" in completed
+        assert "Japanese Grand Prix" not in completed
 
     def test_get_completed_races_handles_timezone_aware_dates(self, temp_data_dir):
         """Timezone-aware event dates should be handled without naive/aware comparison errors."""
@@ -260,7 +260,7 @@ class TestCompletedRacesDetection:
 
         mock_schedule = pd.DataFrame(
             {
-                "EventName": ["Bahrain Grand Prix", "Australian Grand Prix"],
+                "EventName": ["Australian Grand Prix", "Japanese Grand Prix"],
                 "EventDate": [
                     datetime.now(UTC) - timedelta(days=2),
                     datetime.now(UTC) + timedelta(days=2),
@@ -277,7 +277,7 @@ class TestCompletedRacesDetection:
 
                 completed = get_completed_races(year=2026)
 
-        assert completed == ["Bahrain Grand Prix"]
+        assert completed == ["Australian Grand Prix"]
 
     def test_get_completed_races_requires_session_load(self, temp_data_dir):
         """Race is treated as completed only after FastF1 session load succeeds."""
@@ -285,7 +285,7 @@ class TestCompletedRacesDetection:
 
         mock_schedule = pd.DataFrame(
             {
-                "EventName": ["Bahrain Grand Prix"],
+                "EventName": ["Australian Grand Prix"],
                 "EventDate": [datetime.now() - timedelta(days=2)],
             }
         )
@@ -299,7 +299,7 @@ class TestCompletedRacesDetection:
 
                 completed = get_completed_races(year=2026)
 
-        assert completed == ["Bahrain Grand Prix"]
+        assert completed == ["Australian Grand Prix"]
         mock_session.load.assert_called_once_with(
             laps=False,
             telemetry=False,
@@ -313,7 +313,7 @@ class TestCompletedRacesDetection:
 
         mock_schedule = pd.DataFrame(
             {
-                "EventName": ["Bahrain Grand Prix"],
+                "EventName": ["Australian Grand Prix"],
                 "EventDate": [datetime.now() - timedelta(days=2)],
             }
         )
@@ -335,7 +335,7 @@ class TestCompletedRacesDetection:
 
         mock_schedule = pd.DataFrame(
             {
-                "EventName": ["Bahrain Grand Prix"],
+                "EventName": ["Australian Grand Prix"],
                 "EventDate": [datetime.now() - timedelta(days=2)],
             }
         )
@@ -359,7 +359,7 @@ class TestCompletedRacesDetection:
             {
                 "EventName": [
                     "Pre-Season Testing",
-                    "Bahrain Grand Prix",
+                    "Australian Grand Prix",
                 ],
                 "EventFormat": [
                     "testing",
@@ -382,7 +382,7 @@ class TestCompletedRacesDetection:
 
                 completed = get_completed_races(year=2026)
 
-        assert completed == ["Bahrain Grand Prix"]
+        assert completed == ["Australian Grand Prix"]
 
 
 class TestLearnedRacesTracking:
@@ -398,8 +398,8 @@ class TestLearnedRacesTracking:
 
         learning_data = {
             "history": [
-                {"race": "Bahrain Grand Prix", "date": "2026-03-15"},
-                {"race": "Saudi Arabian Grand Prix", "date": "2026-03-22"},
+                {"race": "Australian Grand Prix", "date": "2026-03-08"},
+                {"race": "Chinese Grand Prix", "date": "2026-03-15"},
             ]
         }
 
@@ -411,8 +411,8 @@ class TestLearnedRacesTracking:
 
             # Should have 2 learned races
             assert len(learned) == 2
-            assert "Bahrain Grand Prix" in learned
-            assert "Saudi Arabian Grand Prix" in learned
+            assert "Australian Grand Prix" in learned
+            assert "Chinese Grand Prix" in learned
         finally:
             # Cleanup
             if learning_file.exists():
@@ -435,11 +435,13 @@ class TestLearnedRacesTracking:
         learning_file.write_text("{not: valid json")
 
         try:
-            mark_race_as_learned("Bahrain Grand Prix")
+            mark_race_as_learned("Australian Grand Prix")
 
             with open(learning_file) as f:
                 repaired = json.load(f)
-            assert any(entry.get("race") == "Bahrain Grand Prix" for entry in repaired["history"])
+            assert any(
+                entry.get("race") == "Australian Grand Prix" for entry in repaired["history"]
+            )
         finally:
             if learning_file.exists():
                 learning_file.unlink()
@@ -456,14 +458,14 @@ class TestLearnedRacesTracking:
             json.dumps(
                 {
                     "season": 2026,
-                    "history": [{"race": "Bahrain Grand Prix", "date": "2026-03-15T00:00:00"}],
+                    "history": [{"race": "Australian Grand Prix", "date": "2026-03-08T00:00:00"}],
                     "races_completed": 1,
                 }
             )
         )
 
         try:
-            mark_race_as_learned("Bahrain Grand Prix", year=2027)
+            mark_race_as_learned("Australian Grand Prix", year=2027)
 
             with open(learning_file) as f:
                 state = json.load(f)
@@ -471,7 +473,7 @@ class TestLearnedRacesTracking:
             history = state.get("history", [])
             assert len(history) == 2
             assert any(
-                entry.get("race") == "Bahrain Grand Prix" and entry.get("year") == 2027
+                entry.get("race") == "Australian Grand Prix" and entry.get("year") == 2027
                 for entry in history
             )
         finally:
@@ -488,16 +490,14 @@ class TestLearnedRacesTracking:
             json.dumps(
                 {
                     "season": 2027,
-                    "history": [
-                        {"race": "Saudi Arabian Grand Prix", "date": "2026-03-22T00:00:00"}
-                    ],
+                    "history": [{"race": "Chinese Grand Prix", "date": "2026-03-15T00:00:00"}],
                     "races_completed": 1,
                 }
             )
         )
 
         try:
-            mark_race_as_learned("Saudi Arabian Grand Prix", year=2027)
+            mark_race_as_learned("Chinese Grand Prix", year=2027)
 
             with open(learning_file) as f:
                 state = json.load(f)
@@ -505,7 +505,7 @@ class TestLearnedRacesTracking:
             history = state.get("history", [])
             assert len(history) == 2
             assert any(
-                entry.get("race") == "Saudi Arabian Grand Prix" and entry.get("year") == 2027
+                entry.get("race") == "Chinese Grand Prix" and entry.get("year") == 2027
                 for entry in history
             )
         finally:
@@ -522,8 +522,8 @@ class TestLearnedRacesTracking:
                 return {
                     "season": 2027,
                     "history": [
-                        {"race": "Bahrain Grand Prix", "year": 2027},
-                        {"race": "Saudi Arabian Grand Prix", "year": 2026},
+                        {"race": "Australian Grand Prix", "year": 2027},
+                        {"race": "Chinese Grand Prix", "year": 2026},
                     ],
                 }
 
@@ -532,7 +532,7 @@ class TestLearnedRacesTracking:
                 with patch("src.utils.auto_updater._get_runtime_state_store", lambda: _Store()):
                     learned = get_learned_races(year=2027)
 
-        assert learned == ["Bahrain Grand Prix"]
+        assert learned == ["Australian Grand Prix"]
 
     def test_mark_race_as_learned_writes_runtime_state_store_when_db_writes_enabled(self):
         from src.utils.auto_updater import mark_race_as_learned
@@ -554,10 +554,10 @@ class TestLearnedRacesTracking:
             with patch("src.utils.auto_updater.should_write_to_db", lambda: True):
                 with patch("src.utils.auto_updater.should_write_to_file", lambda: False):
                     with patch("src.utils.auto_updater._get_runtime_state_store", lambda: _Store()):
-                        mark_race_as_learned("Bahrain Grand Prix", year=2027)
+                        mark_race_as_learned("Australian Grand Prix", year=2027)
 
         assert captured["namespace"]["value"] == "race_learning"
         assert captured["state_key"]["value"] == "2027"
         assert captured["payload"]["season"] == 2027
         assert captured["payload"]["races_completed"] == 1
-        assert captured["payload"]["history"][0]["race"] == "Bahrain Grand Prix"
+        assert captured["payload"]["history"][0]["race"] == "Australian Grand Prix"

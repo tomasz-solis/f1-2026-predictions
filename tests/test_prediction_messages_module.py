@@ -7,19 +7,19 @@ def test_build_precompute_horizon_message_reports_boundary_fallback():
     message, tone = prediction_messages.build_precompute_horizon_message(
         {
             "applied": True,
-            "ready_races": ["Bahrain Grand Prix"],
-            "expected_targets": ["Bahrain Grand Prix", "Chinese Grand Prix"],
-            "anchor_race_name": "Bahrain Grand Prix",
+            "ready_races": ["Australian Grand Prix"],
+            "expected_targets": ["Australian Grand Prix", "Chinese Grand Prix"],
+            "anchor_race_name": "Australian Grand Prix",
             "anchor_session_name": "FP2",
             "fallback_boundary_active": True,
         },
-        race_options=["Bahrain Grand Prix"],
+        race_options=["Australian Grand Prix"],
         selected_race_prediction_available=True,
     )
 
     assert tone == "success"
     assert "latest warmed persisted checkpoint" in message
-    assert "Bahrain Grand Prix checkpoint FP2" in message
+    assert "Australian Grand Prix checkpoint FP2" in message
 
 
 def test_build_runtime_messages_collects_key_runtime_notices():

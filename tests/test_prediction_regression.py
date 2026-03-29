@@ -87,11 +87,11 @@ def _assert_cross_environment_regression(
 def _qualifying_payload() -> dict[str, Any]:
     """Build the fixed-seed qualifying payload used for regression checks."""
     predictor = _build_test_predictor()
-    result = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=40)
+    result = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=40)
     return {
         "seed": 42,
         "year": 2026,
-        "race_name": "Bahrain Grand Prix",
+        "race_name": "Australian Grand Prix",
         "n_simulations": 40,
         "grid": [_normalize_row(row) for row in result["grid"]],
     }
@@ -100,17 +100,17 @@ def _qualifying_payload() -> dict[str, Any]:
 def _race_payload() -> dict[str, Any]:
     """Build the fixed-seed race payload used for regression checks."""
     predictor = _build_test_predictor()
-    qualifying = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=40)
+    qualifying = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=40)
     result = predictor.predict_race(
         qualifying["grid"],
         weather="dry",
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         n_simulations=40,
     )
     return {
         "seed": 42,
         "year": 2026,
-        "race_name": "Bahrain Grand Prix",
+        "race_name": "Australian Grand Prix",
         "weather": "dry",
         "n_simulations": 40,
         "finish_order": [_normalize_row(row) for row in result["finish_order"]],
@@ -148,10 +148,10 @@ def _assert_matches_or_update(
 
 
 def test_qualifying_regression(update_golden_files):
-    """Fixed-seed Bahrain qualifying output should stay stable."""
+    """Fixed-seed Australia qualifying output should stay stable."""
     payload = _qualifying_payload()
     _assert_matches_or_update(
-        golden_path=GOLDEN_DIR / "golden_qualifying_bahrain.json",
+        golden_path=GOLDEN_DIR / "golden_qualifying_australia.json",
         payload=payload,
         update_golden_files=update_golden_files,
         row_key="grid",
@@ -161,10 +161,10 @@ def test_qualifying_regression(update_golden_files):
 
 
 def test_race_regression(update_golden_files):
-    """Fixed-seed Bahrain race output should stay stable."""
+    """Fixed-seed Australia race output should stay stable."""
     payload = _race_payload()
     _assert_matches_or_update(
-        golden_path=GOLDEN_DIR / "golden_race_bahrain.json",
+        golden_path=GOLDEN_DIR / "golden_race_australia.json",
         payload=payload,
         update_golden_files=update_golden_files,
         row_key="finish_order",

@@ -75,9 +75,9 @@ class TestDashboardComponents:
         mock_data = pd.DataFrame(
             {
                 "EventName": [
-                    "Bahrain Grand Prix",
+                    "Australian Grand Prix",
                     "Pre-Season Testing",
-                    "Saudi Arabian Grand Prix",
+                    "Chinese Grand Prix",
                 ],
                 "EventFormat": ["conventional", None, "conventional"],
             }
@@ -102,7 +102,7 @@ class TestDashboardComponents:
         predictor = Baseline2026Predictor()
 
         # Test qualifying prediction
-        quali_result = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=5)
+        quali_result = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=5)
         assert "grid" in quali_result
         assert len(quali_result["grid"]) == 22
 
@@ -173,5 +173,5 @@ class TestDashboardEdgeCases:
         predictor = Baseline2026Predictor()
 
         # Should still produce results
-        result = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=1)
+        result = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=1)
         assert len(result["grid"]) > 0

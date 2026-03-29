@@ -97,7 +97,7 @@ def test_auto_update_if_needed_runs_update_and_clears_cache(patcher):
         "src.utils.auto_updater.needs_update",
         lambda year=2026, force_recheck=False: (
             True,
-            ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"],
+            ["Australian Grand Prix", "Chinese Grand Prix"],
         ),
     )
 
@@ -125,7 +125,7 @@ def test_auto_update_if_needed_warns_when_update_is_incomplete(patcher):
 
     patcher.setattr(
         "src.utils.auto_updater.needs_update",
-        lambda year=2026, force_recheck=False: (True, ["Bahrain Grand Prix"]),
+        lambda year=2026, force_recheck=False: (True, ["Australian Grand Prix"]),
     )
     patcher.setattr(
         "src.utils.auto_updater.auto_update_from_races",
@@ -150,7 +150,7 @@ def test_auto_update_if_needed_force_recheck_passes_explicit_race_list(patcher):
     def _needs_update(year=2026, force_recheck=False):
         _ = year
         seen_force_recheck.append(force_recheck)
-        return True, ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"]
+        return True, ["Australian Grand Prix", "Chinese Grand Prix"]
 
     def _auto_update_from_races(progress_callback=None, races_to_update=None, year=2026):
         _ = (progress_callback, year)
@@ -163,7 +163,7 @@ def test_auto_update_if_needed_force_recheck_passes_explicit_race_list(patcher):
     update_flow.auto_update_if_needed(force_recheck=True)
 
     assert seen_force_recheck == [True]
-    assert captured_races == ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"]
+    assert captured_races == ["Australian Grand Prix", "Chinese Grand Prix"]
 
 
 def test_auto_update_if_needed_passes_year_to_updater_dependencies(patcher):
@@ -174,7 +174,7 @@ def test_auto_update_if_needed_passes_year_to_updater_dependencies(patcher):
     def _needs_update(year=2026, force_recheck=False):
         del force_recheck
         seen_years.append(year)
-        return True, ["Bahrain Grand Prix"]
+        return True, ["Australian Grand Prix"]
 
     def _auto_update_from_races(progress_callback=None, races_to_update=None, year=2026):
         del progress_callback, races_to_update
@@ -202,14 +202,14 @@ def test_practice_state_loads_from_supabase_when_db_reads_enabled(patcher):
     class _Store:
         def load_namespace(self, namespace: str):
             assert namespace == "practice_characteristics"
-            return {"2026::Bahrain Grand Prix": {"sessions": ["FP1"]}}
+            return {"2026::Australian Grand Prix": {"sessions": ["FP1"]}}
 
     patcher.setattr(update_flow, "should_read_db_first", lambda: True)
     patcher.setattr(update_flow, "should_write_to_db", lambda: True)
     patcher.setattr(update_flow, "_get_runtime_state_store", lambda: _Store())
 
     loaded = update_flow._load_practice_update_state()
-    assert loaded["races"]["2026::Bahrain Grand Prix"]["sessions"] == ["FP1"]
+    assert loaded["races"]["2026::Australian Grand Prix"]["sessions"] == ["FP1"]
 
 
 def test_practice_state_saves_to_supabase_when_db_writes_enabled(patcher):
@@ -225,11 +225,11 @@ def test_practice_state_saves_to_supabase_when_db_writes_enabled(patcher):
     patcher.setattr(update_flow, "_get_runtime_state_store", lambda: _Store())
 
     update_flow._save_practice_update_state(
-        {"races": {"2026::Bahrain Grand Prix": {"sessions": ["FP1", "FP2"]}}}
+        {"races": {"2026::Australian Grand Prix": {"sessions": ["FP1", "FP2"]}}}
     )
 
     assert observed["namespace"]["value"] == "practice_characteristics"
-    assert observed["records"]["2026::Bahrain Grand Prix"]["sessions"] == ["FP1", "FP2"]
+    assert observed["records"]["2026::Australian Grand Prix"]["sessions"] == ["FP1", "FP2"]
 
 
 def test_auto_update_practice_characteristics_no_completed_fp(patcher, tmp_path):
@@ -244,7 +244,7 @@ def test_auto_update_practice_characteristics_no_completed_fp(patcher, tmp_path)
 
     result = update_flow.auto_update_practice_characteristics_if_needed(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         is_sprint=False,
     )
 
@@ -260,7 +260,7 @@ def test_auto_update_practice_characteristics_skips_if_sessions_already_processe
         json.dumps(
             {
                 "races": {
-                    "2026::Bahrain Grand Prix": {
+                    "2026::Australian Grand Prix": {
                         "sessions": ["FP1", "FP2"],
                     }
                 }
@@ -281,7 +281,7 @@ def test_auto_update_practice_characteristics_skips_if_sessions_already_processe
 
     result = update_flow.auto_update_practice_characteristics_if_needed(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         is_sprint=False,
     )
 
@@ -322,7 +322,7 @@ def test_auto_update_practice_characteristics_updates_state(patcher, tmp_path):
 
     result = update_flow.auto_update_practice_characteristics_if_needed(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         is_sprint=False,
     )
 
@@ -332,7 +332,7 @@ def test_auto_update_practice_characteristics_updates_state(patcher, tmp_path):
     assert update_calls == [["FP1"], ["FP2"]]
 
     persisted = json.loads(state_file.read_text())
-    race_state = persisted["races"]["2026::Bahrain Grand Prix"]
+    race_state = persisted["races"]["2026::Australian Grand Prix"]
     assert race_state["sessions"] == ["FP1", "FP2"]
     assert race_state["teams_updated"] == 3
 
@@ -340,7 +340,7 @@ def test_auto_update_practice_characteristics_updates_state(patcher, tmp_path):
 def test_auto_update_practice_characteristics_updates_only_new_sessions(patcher, tmp_path):
     state_file = tmp_path / "practice_state.json"
     state_file.write_text(
-        json.dumps({"races": {"2026::Bahrain Grand Prix": {"sessions": ["FP1"]}}})
+        json.dumps({"races": {"2026::Australian Grand Prix": {"sessions": ["FP1"]}}})
     )
     patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
 
@@ -363,14 +363,14 @@ def test_auto_update_practice_characteristics_updates_only_new_sessions(patcher,
 
     result = update_flow.auto_update_practice_characteristics_if_needed(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         is_sprint=False,
     )
 
     assert result["updated"] is True
     assert captured_kwargs["sessions"] == ["FP2"]
     persisted = json.loads(state_file.read_text())
-    assert persisted["races"]["2026::Bahrain Grand Prix"]["sessions"] == ["FP1", "FP2"]
+    assert persisted["races"]["2026::Australian Grand Prix"]["sessions"] == ["FP1", "FP2"]
 
 
 def test_auto_update_practice_characteristics_includes_qualifying_and_race(patcher, tmp_path):
@@ -398,7 +398,7 @@ def test_auto_update_practice_characteristics_includes_qualifying_and_race(patch
 
     result = update_flow.auto_update_practice_characteristics_if_needed(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         is_sprint=False,
     )
 
@@ -453,7 +453,7 @@ def test_auto_update_practice_characteristics_force_recheck_processes_all_comple
 ):
     state_file = tmp_path / "practice_state.json"
     state_file.write_text(
-        json.dumps({"races": {"2026::Bahrain Grand Prix": {"sessions": ["FP1"]}}})
+        json.dumps({"races": {"2026::Australian Grand Prix": {"sessions": ["FP1"]}}})
     )
     patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
 
@@ -476,7 +476,7 @@ def test_auto_update_practice_characteristics_force_recheck_processes_all_comple
 
     result = update_flow.auto_update_practice_characteristics_if_needed(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         is_sprint=False,
         force_recheck=True,
     )
@@ -561,14 +561,14 @@ def test_auto_update_practice_characteristics_processes_backlog_across_raceweeke
 ):
     state_file = tmp_path / "practice_state.json"
     state_file.write_text(
-        json.dumps({"races": {"2026::Bahrain Grand Prix": {"sessions": ["FP1"]}}})
+        json.dumps({"races": {"2026::Australian Grand Prix": {"sessions": ["FP1"]}}})
     )
     patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
 
     now_utc = datetime.now(UTC)
     schedule = pd.DataFrame(
         {
-            "EventName": ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"],
+            "EventName": ["Australian Grand Prix", "Chinese Grand Prix"],
             "EventFormat": ["conventional", "sprint"],
             "EventDate": [now_utc - timedelta(days=10), now_utc - timedelta(days=3)],
         }
@@ -577,10 +577,10 @@ def test_auto_update_practice_characteristics_processes_backlog_across_raceweeke
 
     class _Detector:
         def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool):
-            if race_name == "Bahrain Grand Prix":
+            if race_name == "Australian Grand Prix":
                 assert is_sprint is False
                 return ["FP1", "FP2"]
-            if race_name == "Saudi Arabian Grand Prix":
+            if race_name == "Chinese Grand Prix":
                 assert is_sprint is True
                 return ["FP1"]
             return []
@@ -600,15 +600,15 @@ def test_auto_update_practice_characteristics_processes_backlog_across_raceweeke
 
     result = update_flow.auto_update_practice_characteristics_if_needed(
         year=2026,
-        race_name="Saudi Arabian Grand Prix",
+        race_name="Chinese Grand Prix",
         is_sprint=True,
     )
 
     assert result["updated"] is True
-    assert result["updated_events"] == ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"]
+    assert result["updated_events"] == ["Australian Grand Prix", "Chinese Grand Prix"]
     assert update_calls == [
-        (["Bahrain Grand Prix"], ["FP2"]),
-        (["Saudi Arabian Grand Prix"], ["FP1"]),
+        (["Australian Grand Prix"], ["FP2"]),
+        (["Chinese Grand Prix"], ["FP1"]),
     ]
 
 
@@ -621,7 +621,7 @@ def test_auto_update_practice_characteristics_persists_progress_during_backlog_f
     now_utc = datetime.now(UTC)
     schedule = pd.DataFrame(
         {
-            "EventName": ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"],
+            "EventName": ["Australian Grand Prix", "Chinese Grand Prix"],
             "EventFormat": ["conventional", "sprint"],
             "EventDate": [now_utc - timedelta(days=8), now_utc - timedelta(days=3)],
         }
@@ -631,9 +631,9 @@ def test_auto_update_practice_characteristics_persists_progress_during_backlog_f
     class _Detector:
         def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool):
             del year, is_sprint
-            if race_name == "Bahrain Grand Prix":
+            if race_name == "Australian Grand Prix":
                 return ["FP1"]
-            if race_name == "Saudi Arabian Grand Prix":
+            if race_name == "Chinese Grand Prix":
                 return ["FP1"]
             return []
 
@@ -641,7 +641,7 @@ def test_auto_update_practice_characteristics_persists_progress_during_backlog_f
 
     def _failing_update_from_testing_sessions(**kwargs):
         event_name = kwargs["events"][0]
-        if event_name == "Saudi Arabian Grand Prix":
+        if event_name == "Chinese Grand Prix":
             raise RuntimeError("practice refresh failed")
         return {"updated_teams": ["Ferrari"]}
 
@@ -653,13 +653,13 @@ def test_auto_update_practice_characteristics_persists_progress_during_backlog_f
     with pytest.raises(RuntimeError, match="practice refresh failed"):
         update_flow.auto_update_practice_characteristics_if_needed(
             year=2026,
-            race_name="Saudi Arabian Grand Prix",
+            race_name="Chinese Grand Prix",
             is_sprint=True,
         )
 
     persisted_after_failure = json.loads(state_file.read_text())
-    assert "2026::Bahrain Grand Prix" in persisted_after_failure["races"]
-    assert "2026::Saudi Arabian Grand Prix" not in persisted_after_failure["races"]
+    assert "2026::Australian Grand Prix" in persisted_after_failure["races"]
+    assert "2026::Chinese Grand Prix" not in persisted_after_failure["races"]
 
     resumed_updates: list[str] = []
 
@@ -674,13 +674,13 @@ def test_auto_update_practice_characteristics_persists_progress_during_backlog_f
 
     result = update_flow.auto_update_practice_characteristics_if_needed(
         year=2026,
-        race_name="Saudi Arabian Grand Prix",
+        race_name="Chinese Grand Prix",
         is_sprint=True,
     )
 
     assert result["updated"] is True
-    assert result["updated_events"] == ["Saudi Arabian Grand Prix"]
-    assert resumed_updates == ["Saudi Arabian Grand Prix"]
+    assert result["updated_events"] == ["Chinese Grand Prix"]
+    assert resumed_updates == ["Chinese Grand Prix"]
 
 
 def test_auto_update_practice_characteristics_retries_when_supabase_lock_busy(patcher, tmp_path):
@@ -707,12 +707,12 @@ def test_auto_update_practice_characteristics_retries_when_supabase_lock_busy(pa
 
     result = update_flow.auto_update_practice_characteristics_if_needed(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         is_sprint=False,
     )
 
     assert result["updated"] is False
-    assert result["retried_events"] == ["Bahrain Grand Prix"]
+    assert result["retried_events"] == ["Australian Grand Prix"]
 
 
 class _FakeEvent:
@@ -748,7 +748,7 @@ def test_detect_event_boundary_refresh_first_seen_elapsed_session(patcher, tmp_p
 
     result = update_flow.detect_event_boundary_refresh_if_needed(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         is_sprint=False,
         now_utc=now_utc,
     )
@@ -759,7 +759,7 @@ def test_detect_event_boundary_refresh_first_seen_elapsed_session(patcher, tmp_p
 
     second_result = update_flow.detect_event_boundary_refresh_if_needed(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         is_sprint=False,
         now_utc=now_utc,
     )
@@ -795,7 +795,7 @@ def test_detect_event_boundary_refresh_triggers_on_session_delta(patcher, tmp_pa
     first_now = reference - timedelta(minutes=15)
     first_result = update_flow.detect_event_boundary_refresh_if_needed(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         is_sprint=False,
         now_utc=first_now,
     )
@@ -805,7 +805,7 @@ def test_detect_event_boundary_refresh_triggers_on_session_delta(patcher, tmp_pa
     second_now = reference + timedelta(hours=1)
     second_result = update_flow.detect_event_boundary_refresh_if_needed(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         is_sprint=False,
         now_utc=second_now,
     )
@@ -857,7 +857,7 @@ def test_detect_event_boundary_refresh_triggers_on_schedule_change(patcher, tmp_
 
     first_result = update_flow.detect_event_boundary_refresh_if_needed(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         is_sprint=False,
         now_utc=now_utc,
     )
@@ -865,7 +865,7 @@ def test_detect_event_boundary_refresh_triggers_on_schedule_change(patcher, tmp_
 
     second_result = update_flow.detect_event_boundary_refresh_if_needed(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         is_sprint=False,
         now_utc=now_utc,
     )

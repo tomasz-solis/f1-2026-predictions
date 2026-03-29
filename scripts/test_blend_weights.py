@@ -10,9 +10,9 @@ def main() -> None:
     predictor.load_data()
 
     races = [
-        "Bahrain Grand Prix",
-        "Saudi Arabian Grand Prix",
         "Australian Grand Prix",
+        "Chinese Grand Prix",
+        "Japanese Grand Prix",
     ]
 
     for race in races:

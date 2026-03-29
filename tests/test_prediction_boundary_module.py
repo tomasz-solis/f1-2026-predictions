@@ -23,19 +23,19 @@ def test_get_prediction_precompute_settings_normalizes_weather_and_numeric_field
 def test_resolve_precompute_targets_skips_testing_rows():
     targets = prediction_boundary.resolve_precompute_targets(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         horizon_races=3,
         get_schedule_rows_fn=lambda year: (
             ("Pre-Season Testing", "testing"),
-            ("Bahrain Grand Prix", "conventional"),
-            ("Saudi Arabian Grand Prix", "conventional"),
-            ("In-Season Track Test", "testing"),
             ("Australian Grand Prix", "conventional"),
+            ("Chinese Grand Prix", "sprint"),
+            ("In-Season Track Test", "testing"),
+            ("Japanese Grand Prix", "conventional"),
         ),
         logger=logging.getLogger("test"),
     )
 
-    assert targets == ["Bahrain Grand Prix", "Saudi Arabian Grand Prix", "Australian Grand Prix"]
+    assert targets == ["Australian Grand Prix", "Chinese Grand Prix", "Japanese Grand Prix"]
 
 
 def test_resolve_persisted_boundary_fallback_prefers_race_specific_boundary():

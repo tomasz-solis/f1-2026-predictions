@@ -15,7 +15,7 @@ def test_load_race_options_filters_testing_and_tags_sprint(patcher):
     schedule = pd.DataFrame(
         {
             "EventName": [
-                "Bahrain Grand Prix",
+                "Australian Grand Prix",
                 "Chinese Grand Prix",
                 "Pre-Season Testing",
             ],
@@ -28,7 +28,7 @@ def test_load_race_options_filters_testing_and_tags_sprint(patcher):
 
     options = pages._load_race_options()
 
-    assert options == ["Bahrain Grand Prix", "Chinese Grand Prix (Sprint)"]
+    assert options == ["Australian Grand Prix", "Chinese Grand Prix (Sprint)"]
 
 
 def test_load_race_options_uses_fallback_when_schedule_fails(patcher):
@@ -43,7 +43,7 @@ def test_load_race_options_uses_fallback_when_schedule_fails(patcher):
     patcher.setattr(
         pages,
         "_get_schedule_rows",
-        lambda _year: (("Bahrain Grand Prix", "conventional"), ("Chinese Grand Prix", "sprint")),
+        lambda _year: (("Australian Grand Prix", "conventional"), ("Chinese Grand Prix", "sprint")),
     )
     patcher.setattr(pages.st, "warning", lambda message: warnings.append(str(message)))
     patcher.setattr(pages.st, "error", lambda _message: (_ for _ in ()).throw(AssertionError))
@@ -51,7 +51,7 @@ def test_load_race_options_uses_fallback_when_schedule_fails(patcher):
     options = pages._load_race_options()
 
     assert warnings == []
-    assert options == ["Bahrain Grand Prix", "Chinese Grand Prix (Sprint)"]
+    assert options == ["Australian Grand Prix", "Chinese Grand Prix (Sprint)"]
 
 
 def test_load_race_options_warns_when_fastf1_and_fallback_unavailable(patcher):
@@ -70,7 +70,7 @@ def test_load_race_options_warns_when_fastf1_and_fallback_unavailable(patcher):
 
     assert warnings
     assert "Failed to load 2026 calendar" in warnings[0]
-    assert "Bahrain Grand Prix" in options
+    assert "Australian Grand Prix" in options
 
 
 def test_load_race_options_uses_requested_year(patcher):
@@ -82,7 +82,7 @@ def test_load_race_options_uses_requested_year(patcher):
         years_seen.append(year)
         return pd.DataFrame(
             {
-                "EventName": ["Bahrain Grand Prix"],
+                "EventName": ["Australian Grand Prix"],
                 "EventFormat": ["conventional"],
             }
         )
@@ -93,7 +93,7 @@ def test_load_race_options_uses_requested_year(patcher):
     options = pages._load_race_options(2027)
 
     assert years_seen == [2027]
-    assert options == ["Bahrain Grand Prix"]
+    assert options == ["Australian Grand Prix"]
 
 
 def test_filter_race_options_to_precomputed_horizon_filters_to_ready_races(patcher):
@@ -106,13 +106,13 @@ def test_filter_race_options_to_precomputed_horizon_filters_to_ready_races(patch
         pages,
         "load_precompute_horizon_index",
         lambda year, artifact_hash: {
-            "ready_races": ["Bahrain Grand Prix", "Chinese Grand Prix"],
+            "ready_races": ["Australian Grand Prix", "Chinese Grand Prix"],
             "expected_targets": [
-                "Bahrain Grand Prix",
+                "Australian Grand Prix",
                 "Chinese Grand Prix",
                 "Japanese Grand Prix",
             ],
-            "anchor_race_name": "Bahrain Grand Prix",
+            "anchor_race_name": "Australian Grand Prix",
             "anchor_session_name": "FP1",
             "boundary_signature": "sig_a",
         },
@@ -121,15 +121,15 @@ def test_filter_race_options_to_precomputed_horizon_filters_to_ready_races(patch
     filtered, metadata = pages._filter_race_options_to_precomputed_horizon(
         year=2026,
         race_options=[
-            "Bahrain Grand Prix",
+            "Australian Grand Prix",
             "Chinese Grand Prix (Sprint)",
             "Japanese Grand Prix",
         ],
     )
 
-    assert filtered == ["Bahrain Grand Prix", "Chinese Grand Prix (Sprint)"]
+    assert filtered == ["Australian Grand Prix", "Chinese Grand Prix (Sprint)"]
     assert metadata["applied"] is True
-    assert metadata["anchor_race_name"] == "Bahrain Grand Prix"
+    assert metadata["anchor_race_name"] == "Australian Grand Prix"
     assert metadata["anchor_session_name"] == "FP1"
 
 
@@ -142,7 +142,7 @@ def test_filter_race_options_to_precomputed_horizon_keeps_full_calendar_when_ind
         lambda year, artifact_hash: None,
     )
 
-    options = ["Bahrain Grand Prix", "Chinese Grand Prix (Sprint)"]
+    options = ["Australian Grand Prix", "Chinese Grand Prix (Sprint)"]
     filtered, metadata = pages._filter_race_options_to_precomputed_horizon(
         year=2026,
         race_options=options,
@@ -164,7 +164,7 @@ def test_filter_race_options_to_precomputed_horizon_marks_artifact_hash_mismatch
         lambda year, requested_horizon: [
             "Chinese Grand Prix",
             "Japanese Grand Prix",
-            "Bahrain Grand Prix",
+            "Australian Grand Prix",
         ],
     )
     patcher.setattr(pages, "load_precompute_horizon_index", lambda year, artifact_hash: None)
@@ -178,14 +178,14 @@ def test_filter_race_options_to_precomputed_horizon_marks_artifact_hash_mismatch
         race_options=[
             "Chinese Grand Prix (Sprint)",
             "Japanese Grand Prix",
-            "Bahrain Grand Prix",
+            "Australian Grand Prix",
         ],
     )
 
     assert filtered == [
         "Chinese Grand Prix (Sprint)",
         "Japanese Grand Prix",
-        "Bahrain Grand Prix",
+        "Australian Grand Prix",
     ]
     assert metadata["applied"] is False
     assert metadata["scope_applied"] is False
@@ -204,14 +204,14 @@ def test_filter_race_options_to_precomputed_horizon_limits_to_upcoming_window_wh
                 "Australian Grand Prix",
                 "Chinese Grand Prix",
                 "Japanese Grand Prix",
-                "Bahrain Grand Prix",
-                "Saudi Arabian Grand Prix",
+                "Miami Grand Prix",
+                "Canadian Grand Prix",
             ],
             "EventFormat": [
                 "conventional",
                 "sprint",
                 "conventional",
-                "conventional",
+                "sprint",
                 "conventional",
             ],
             "EventDate": [
@@ -237,22 +237,22 @@ def test_filter_race_options_to_precomputed_horizon_limits_to_upcoming_window_wh
             "Australian Grand Prix",
             "Chinese Grand Prix (Sprint)",
             "Japanese Grand Prix",
-            "Bahrain Grand Prix",
-            "Saudi Arabian Grand Prix",
+            "Miami Grand Prix (Sprint)",
+            "Canadian Grand Prix",
         ],
     )
 
     assert filtered == [
         "Chinese Grand Prix (Sprint)",
         "Japanese Grand Prix",
-        "Bahrain Grand Prix",
+        "Miami Grand Prix (Sprint)",
     ]
     assert metadata["applied"] is False
     assert metadata["scope_applied"] is True
     assert metadata["planned_races"] == [
         "Chinese Grand Prix",
         "Japanese Grand Prix",
-        "Bahrain Grand Prix",
+        "Miami Grand Prix",
     ]
 
 
@@ -270,22 +270,22 @@ def test_filter_race_options_to_precomputed_horizon_falls_back_to_last_warmed_bo
         pages,
         "load_precompute_horizon_index",
         lambda year, artifact_hash: {
-            "ready_races": ["Bahrain Grand Prix"],
-            "expected_targets": ["Bahrain Grand Prix"],
-            "anchor_race_name": "Bahrain Grand Prix",
+            "ready_races": ["Australian Grand Prix"],
+            "expected_targets": ["Australian Grand Prix"],
+            "anchor_race_name": "Australian Grand Prix",
             "anchor_session_name": "FP1",
             "boundary_signature": "sig_old",
-            "race_boundaries": {"Bahrain Grand Prix": "sig_old"},
+            "race_boundaries": {"Australian Grand Prix": "sig_old"},
         },
     )
 
-    options = ["Bahrain Grand Prix", "Chinese Grand Prix (Sprint)"]
+    options = ["Australian Grand Prix", "Chinese Grand Prix (Sprint)"]
     filtered, metadata = pages._filter_race_options_to_precomputed_horizon(
         year=2026,
         race_options=options,
     )
 
-    assert filtered == ["Bahrain Grand Prix"]
+    assert filtered == ["Australian Grand Prix"]
     assert metadata["applied"] is True
     assert metadata["fallback_boundary_active"] is True
     assert metadata["anchor_session_name"] == "FP1"
@@ -382,16 +382,16 @@ def test_prediction_action_state_keeps_selected_race_enabled_when_exact_predicti
 
 def test_cache_dir_race_matching_handles_date_prefixed_event_dirs():
     assert pages._cache_dir_matches_race(
-        "2025-04-13_Bahrain_Grand_Prix",
-        "Bahrain Grand Prix",
+        "2026-03-08_Australian_Grand_Prix",
+        "Australian Grand Prix",
     )
     assert pages._cache_dir_matches_race(
-        "BahrainGrandPrix",
-        "Bahrain Grand Prix",
+        "AustralianGrandPrix",
+        "Australian Grand Prix",
     )
     assert not pages._cache_dir_matches_race(
-        "2025-04-20_Saudi_Arabian_Grand_Prix",
-        "Bahrain Grand Prix",
+        "2026-03-15_Chinese_Grand_Prix",
+        "Australian Grand Prix",
     )
     assert pages._cache_dir_matches_race(
         "2025-11-09_Sao_Paulo_Grand_Prix",
@@ -436,9 +436,9 @@ def test_clear_fastf1_race_cache_removes_date_prefixed_race_dirs_only(patcher, t
     primary_cache = tmp_path / "fastf1_cache"
     testing_cache = tmp_path / "fastf1_cache_testing"
 
-    target_primary = primary_cache / "2025" / "2025-04-13_Bahrain_Grand_Prix"
-    target_testing = testing_cache / "2025" / "2025-04-13_Bahrain_Grand_Prix"
-    untouched_other_race = primary_cache / "2025" / "2025-04-20_Saudi_Arabian_Grand_Prix"
+    target_primary = primary_cache / "2026" / "2026-03-08_Australian_Grand_Prix"
+    target_testing = testing_cache / "2026" / "2026-03-08_Australian_Grand_Prix"
+    untouched_other_race = primary_cache / "2026" / "2026-03-15_Chinese_Grand_Prix"
 
     target_primary.mkdir(parents=True, exist_ok=True)
     target_testing.mkdir(parents=True, exist_ok=True)
@@ -450,7 +450,7 @@ def test_clear_fastf1_race_cache_removes_date_prefixed_race_dirs_only(patcher, t
 
     patcher.setattr(pages, "_FASTF1_CACHE_DIRS", (primary_cache, testing_cache))
 
-    pages._clear_fastf1_race_cache(2025, "Bahrain Grand Prix")
+    pages._clear_fastf1_race_cache(2026, "Australian Grand Prix")
 
     assert not target_primary.exists()
     assert not target_testing.exists()
@@ -552,13 +552,13 @@ def test_save_prediction_if_enabled_saves_new_session(patcher):
     class _Detector:
         def get_latest_completed_session(self, year: int, race_name: str, is_sprint: bool):
             assert year == 2026
-            assert race_name == "Bahrain Grand Prix"
+            assert race_name == "Australian Grand Prix"
             assert is_sprint is False
             return "FP3"
 
     class _Logger:
         def has_prediction_for_session(self, year: int, race_name: str, session_name: str):
-            assert (year, race_name, session_name) == (2026, "Bahrain Grand Prix", "FP3")
+            assert (year, race_name, session_name) == (2026, "Australian Grand Prix", "FP3")
             return False
 
         def save_prediction(self, **kwargs):
@@ -576,13 +576,13 @@ def test_save_prediction_if_enabled_saves_new_session(patcher):
             "race": {"finish_order": [{"driver": "VER", "team": "Red Bull Racing", "position": 1}]},
         },
         is_sprint=False,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         weather="dry",
         year=2026,
     )
 
     assert saved_payload["year"] == 2026
-    assert saved_payload["race_name"] == "Bahrain Grand Prix"
+    assert saved_payload["race_name"] == "Australian Grand Prix"
     assert saved_payload["session_name"] == "FP3"
     assert saved_payload["weather"] == "dry"
     assert "Prediction saved for accuracy tracking (checkpoint FP3)" in info_messages
@@ -594,7 +594,7 @@ def test_save_prediction_if_enabled_persists_checkpoint_summary_when_store_avail
 
     class _Detector:
         def get_latest_completed_session(self, year: int, race_name: str, is_sprint: bool):
-            assert (year, race_name, is_sprint) == (2026, "Bahrain Grand Prix", False)
+            assert (year, race_name, is_sprint) == (2026, "Australian Grand Prix", False)
             return "FP2"
 
     class _ArtifactStore:
@@ -606,7 +606,7 @@ def test_save_prediction_if_enabled_persists_checkpoint_summary_when_store_avail
             self.artifact_store = _ArtifactStore()
 
         def has_prediction_for_session(self, year: int, race_name: str, session_name: str):
-            assert (year, race_name, session_name) == (2026, "Bahrain Grand Prix", "FP2")
+            assert (year, race_name, session_name) == (2026, "Australian Grand Prix", "FP2")
             return False
 
         def save_prediction(self, **kwargs):
@@ -635,14 +635,14 @@ def test_save_prediction_if_enabled_persists_checkpoint_summary_when_store_avail
             },
         },
         is_sprint=False,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         weather="dry",
         year=2026,
     )
 
     assert len(checkpoint_saves) == 1
     assert checkpoint_saves[0]["artifact_type"] == "prediction_checkpoint"
-    assert checkpoint_saves[0]["artifact_key"] == "2026::Bahrain Grand Prix::FP2"
+    assert checkpoint_saves[0]["artifact_key"] == "2026::Australian Grand Prix::FP2"
     payload = checkpoint_saves[0]["data"]
     assert payload["metadata"]["session_name"] == "FP2"
     assert payload["qualifying"]["mean_confidence"] == 61.0
@@ -738,7 +738,7 @@ def test_save_prediction_if_enabled_handles_no_completed_sessions(patcher):
 
     class _Logger:
         def has_prediction_for_session(self, year: int, race_name: str, session_name: str):
-            assert (year, race_name, session_name) == (2026, "Bahrain Grand Prix", "PRE")
+            assert (year, race_name, session_name) == (2026, "Australian Grand Prix", "PRE")
             return False
 
         def save_prediction(self, **kwargs):
@@ -756,7 +756,7 @@ def test_save_prediction_if_enabled_handles_no_completed_sessions(patcher):
             "race": {"finish_order": [{"position": 1, "driver": "VER", "team": "Red Bull"}]},
         },
         is_sprint=False,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         weather="dry",
         year=2026,
     )
@@ -1087,7 +1087,7 @@ def test_render_prediction_accuracy_page_with_actuals(patcher):
     patcher.setattr(pages.st, "write", lambda message: writes.append(str(message)))
 
     prediction_record = {
-        "metadata": {"race_name": "Bahrain Grand Prix", "session_name": "FP3"},
+        "metadata": {"race_name": "Australian Grand Prix", "session_name": "FP3"},
         "actuals": {"qualifying": [{"driver": "VER"}], "race": [{"driver": "VER"}]},
     }
 
@@ -1115,7 +1115,7 @@ def test_render_prediction_accuracy_page_with_actuals(patcher):
 
         def calculate_all_metrics(self, _prediction):
             return {
-                "metadata": {"race_name": "Bahrain Grand Prix", "session_name": "FP3"},
+                "metadata": {"race_name": "Australian Grand Prix", "session_name": "FP3"},
                 "qualifying": {
                     "exact_accuracy": 45.0,
                     "mae": 2.1,
@@ -1137,7 +1137,7 @@ def test_render_prediction_accuracy_page_with_actuals(patcher):
 
     pages.render_prediction_accuracy_page()
 
-    assert any("Bahrain Grand Prix" in message for message in writes)
+    assert any("Australian Grand Prix" in message for message in writes)
 
 
 def test_render_prediction_accuracy_page_refreshes_actuals_only_when_requested(patcher):
@@ -1152,7 +1152,7 @@ def test_render_prediction_accuracy_page_refreshes_actuals_only_when_requested(p
         def __init__(self, year: int = 2026, *, reconcile_actuals_on_load: bool = False):
             assert year == 2026
             assert reconcile_actuals_on_load is False
-            self.all_predictions = [{"metadata": {"race_name": "Bahrain Grand Prix"}}]
+            self.all_predictions = [{"metadata": {"race_name": "Australian Grand Prix"}}]
             self.actuals_reconciled = 0
             self.snapshots_written = 0
             self.has_actuals = False
@@ -1194,7 +1194,7 @@ def test_render_live_prediction_page_passes_selected_season_to_pipeline_and_save
         if label == "Season":
             return 2027
         if label == "Grand Prix":
-            return "Bahrain Grand Prix"
+            return "Australian Grand Prix"
         if label == "Weather":
             return "dry"
         return options[index] if options else None
@@ -1214,7 +1214,7 @@ def test_render_live_prediction_page_passes_selected_season_to_pipeline_and_save
         )(),
     )
     patcher.setattr(
-        pages, "_load_race_options", lambda year=pages.DEFAULT_SEASON: ["Bahrain Grand Prix"]
+        pages, "_load_race_options", lambda year=pages.DEFAULT_SEASON: ["Australian Grand Prix"]
     )
     patcher.setattr(
         pages,
@@ -1268,7 +1268,7 @@ def test_render_live_prediction_page_uses_filtered_precompute_race_options(patch
             return 2027
         if label == "Grand Prix":
             options_seen.append(list(options))
-            return "Bahrain Grand Prix"
+            return "Australian Grand Prix"
         if label == "Weather":
             return "dry"
         return options[index] if options else None
@@ -1287,18 +1287,18 @@ def test_render_live_prediction_page_uses_filtered_precompute_race_options(patch
         )(),
     )
     patcher.setattr(
-        pages, "_load_race_options", lambda year=pages.DEFAULT_SEASON: ["Bahrain Grand Prix"]
+        pages, "_load_race_options", lambda year=pages.DEFAULT_SEASON: ["Australian Grand Prix"]
     )
     patcher.setattr(
         pages,
         "_filter_race_options_to_precomputed_horizon",
         lambda year, race_options: (
-            ["Bahrain Grand Prix"],
+            ["Australian Grand Prix"],
             {
                 "applied": True,
-                "ready_races": ["Bahrain Grand Prix"],
-                "expected_targets": ["Bahrain Grand Prix", "Chinese Grand Prix"],
-                "anchor_race_name": "Bahrain Grand Prix",
+                "ready_races": ["Australian Grand Prix"],
+                "expected_targets": ["Australian Grand Prix", "Chinese Grand Prix"],
+                "anchor_race_name": "Australian Grand Prix",
                 "anchor_session_name": "PRE",
             },
         ),
@@ -1323,7 +1323,7 @@ def test_render_live_prediction_page_uses_filtered_precompute_race_options(patch
 
     pages.render_live_prediction_page(enable_logging=False)
 
-    assert options_seen == [["Bahrain Grand Prix"]]
+    assert options_seen == [["Australian Grand Prix"]]
 
 
 def test_build_team_comparison_dataframe_uses_profile_metrics():

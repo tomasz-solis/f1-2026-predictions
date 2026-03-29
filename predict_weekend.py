@@ -207,7 +207,7 @@ def _convert_team_ranks_to_grid(team_ranks, year, race_name):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("race_name", help="e.g. 'Bahrain Grand Prix'")
+    parser.add_argument("race_name", help="e.g. 'Australian Grand Prix'")
     parser.add_argument("--year", type=int, default=datetime.now().year)
 
     parser.add_argument(

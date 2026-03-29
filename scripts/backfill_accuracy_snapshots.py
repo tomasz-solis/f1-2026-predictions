@@ -154,7 +154,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--year", type=int, default=2026, help="Season year to backfill.")
     parser.add_argument(
         "--race-name",
-        help="Optional race name filter, for example 'Bahrain Grand Prix'.",
+        help="Optional race name filter, for example 'Australian Grand Prix'.",
     )
     parser.add_argument(
         "--dry-run",

@@ -8,7 +8,7 @@ Usage:
 
 What it does:
     1. Checks and updates data (driver/track characteristics)
-    2. Runs full 2026 season simulation (24 races)
+    2. Runs a sample 2026 season simulation
     3. Outputs championship standings and race-by-race results
 
 Output:
@@ -123,9 +123,9 @@ def run_simulation_loop(year=2026):
 
     # 4. Run a short season sample calendar
     calendar = [
-        "Bahrain Grand Prix",
-        "Saudi Arabian Grand Prix",
         "Australian Grand Prix",
+        "Chinese Grand Prix",
+        "Japanese Grand Prix",
         "Miami Grand Prix",
     ]
     simulation_log = []

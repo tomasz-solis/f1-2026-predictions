@@ -31,7 +31,7 @@ def test_all_drivers_finish_no_dnf():
     ]
 
     result = predictor.predict_race(
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         qualifying_grid=qualifying_grid,
         n_simulations=50,
     )
@@ -158,7 +158,7 @@ def test_qualifying_with_missing_team_data():
     predictor = Baseline2026Predictor(seed=42)
 
     # Predict qualifying for a race
-    result = predictor.predict_qualifying(2026, race_name="Bahrain Grand Prix", n_simulations=50)
+    result = predictor.predict_qualifying(2026, race_name="Australian Grand Prix", n_simulations=50)
 
     # Should still produce results for all known teams
     grid = result["grid"]
@@ -196,7 +196,7 @@ def test_race_with_invalid_grid_positions():
     # Should either fix the grid or handle gracefully
     try:
         result = predictor.predict_race(
-            race_name="Bahrain Grand Prix",
+            race_name="Australian Grand Prix",
             qualifying_grid=malformed_grid,
             n_simulations=50,
         )
@@ -266,7 +266,7 @@ def test_minimum_simulation_count():
     predictor = Baseline2026Predictor(seed=42)
 
     # Test with n_simulations=1 (minimum)
-    result = predictor.predict_qualifying(2026, race_name="Bahrain Grand Prix", n_simulations=1)
+    result = predictor.predict_qualifying(2026, race_name="Australian Grand Prix", n_simulations=1)
 
     grid = result["grid"]
     assert len(grid) >= 20
@@ -278,7 +278,7 @@ def test_empty_or_none_fp_performance():
     predictor = Baseline2026Predictor(seed=42)
 
     # Pre-weekend prediction (no FP data available)
-    result = predictor.predict_qualifying(2026, race_name="Bahrain Grand Prix", n_simulations=50)
+    result = predictor.predict_qualifying(2026, race_name="Australian Grand Prix", n_simulations=50)
 
     # Should fall back to model-only prediction
     assert len(result["grid"]) >= 20
@@ -295,7 +295,7 @@ def test_qualifying_stage_parameter_validation():
 
     for stage in valid_stages:
         result = predictor.predict_qualifying(
-            2026, race_name="Bahrain Grand Prix", qualifying_stage=stage, n_simulations=10
+            2026, race_name="Australian Grand Prix", qualifying_stage=stage, n_simulations=10
         )
         assert result is not None, f"Stage '{stage}' should be valid"
 
@@ -306,7 +306,7 @@ def test_year_boundary_conditions():
 
     # Test with 2026 (target year)
     result_2026 = predictor.predict_qualifying(
-        2026, race_name="Bahrain Grand Prix", n_simulations=10
+        2026, race_name="Australian Grand Prix", n_simulations=10
     )
     assert len(result_2026["grid"]) >= 20
 
@@ -346,7 +346,7 @@ def test_race_distance_zero_or_negative():
 
     # Standard race should use realistic distance
     result = predictor.predict_race(
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         qualifying_grid=qualifying_grid,
         n_simulations=10,
     )
@@ -386,7 +386,7 @@ def test_duplicate_drivers_in_grid():
     # Should either deduplicate or raise validation error
     try:
         result = predictor.predict_race(
-            race_name="Bahrain Grand Prix",
+            race_name="Australian Grand Prix",
             qualifying_grid=duplicate_grid,
             n_simulations=10,
         )
@@ -404,7 +404,9 @@ def test_extremely_high_simulation_count():
     predictor = Baseline2026Predictor(seed=42)
 
     # Test with high simulation count (stress test)
-    result = predictor.predict_qualifying(2026, race_name="Bahrain Grand Prix", n_simulations=200)
+    result = predictor.predict_qualifying(
+        2026, race_name="Australian Grand Prix", n_simulations=200
+    )
 
     # Should complete and produce valid results
     assert len(result["grid"]) >= 20

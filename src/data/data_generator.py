@@ -121,7 +121,10 @@ def generate_neutral_team_characteristics(data_dir: Path) -> None:
 
 def generate_default_track_characteristics(data_dir: Path) -> None:
     """Generate track characteristics with reasonable F1 defaults."""
-    # 2026 F1 calendar (known tracks)
+    # Baseline 2026 track catalog used for circuit priors and fallback metadata.
+    # Runtime schedule resolution filters canceled 2026 Bahrain/Saudi race weekends
+    # separately, so keeping these circuit profiles does not imply they remain on
+    # the active race calendar.
     tracks = {
         "Bahrain Grand Prix": {
             "pit_stop_loss": 22.0,

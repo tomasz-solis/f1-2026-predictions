@@ -9,6 +9,19 @@ from typing import Literal
 import fastf1
 
 logger = logging.getLogger(__name__)
+_EXCLUDED_SCHEDULE_EVENT_NAMES: dict[int, frozenset[str]] = {
+    2026: frozenset({"bahrain grand prix", "saudi arabian grand prix"})
+}
+
+
+def should_skip_schedule_event(year: int, event_name: str) -> bool:
+    """Return True for non-race placeholders or canceled season entries."""
+    normalized_name = str(event_name).strip().lower()
+    if not normalized_name:
+        return True
+    if "testing" in normalized_name:
+        return True
+    return normalized_name in _EXCLUDED_SCHEDULE_EVENT_NAMES.get(int(year), frozenset())
 
 
 @lru_cache(maxsize=8)
@@ -30,7 +43,7 @@ def _load_fallback_schedule_rows(year: int) -> tuple[tuple[str, str], ...]:
 
     tracks = data.get("tracks", {})
     for race_name, track_data in tracks.items():
-        if not race_name:
+        if should_skip_schedule_event(year, race_name):
             continue
         has_sprint = bool(isinstance(track_data, dict) and track_data.get("has_sprint", False))
         rows.append((race_name, "sprint" if has_sprint else "conventional"))
@@ -50,6 +63,8 @@ def _merge_schedule_rows(
     supplemented: list[str] = []
 
     for race_name, event_format in fallback_rows:
+        if should_skip_schedule_event(year, race_name):
+            continue
         normalized_name = race_name.lower()
         if normalized_name in seen_names:
             continue
@@ -78,7 +93,7 @@ def _get_schedule_rows(year: int) -> tuple[tuple[str, str], ...]:
             for _, event in schedule.iterrows():
                 event_name = str(event.get("EventName", "")).strip()
                 event_format = str(event.get("EventFormat", "")).strip().lower()
-                if event_name:
+                if event_name and not should_skip_schedule_event(year, event_name):
                     rows.append((event_name, event_format))
     except Exception as exc:
         logger.warning(f"Could not load FastF1 schedule for {year}: {exc}")

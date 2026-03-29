@@ -21,7 +21,7 @@ def test_qualifying_simulations_converge_with_fixed_seed():
     for run in range(10):
         predictor_run = Baseline2026Predictor(seed=42 + run)
         result = predictor_run.predict_qualifying(
-            year=2026, race_name="Bahrain Grand Prix", n_simulations=50
+            year=2026, race_name="Australian Grand Prix", n_simulations=50
         )
         results.append(result["grid"])
 
@@ -48,10 +48,10 @@ def test_qualifying_simulation_deterministic_with_same_seed():
     predictor2 = Baseline2026Predictor(seed=42)
 
     result1 = predictor1.predict_qualifying(
-        year=2026, race_name="Bahrain Grand Prix", n_simulations=50
+        year=2026, race_name="Australian Grand Prix", n_simulations=50
     )
     result2 = predictor2.predict_qualifying(
-        year=2026, race_name="Bahrain Grand Prix", n_simulations=50
+        year=2026, race_name="Australian Grand Prix", n_simulations=50
     )
 
     # Grid order should be identical
@@ -72,7 +72,7 @@ def test_qualifying_position_distribution_reasonable():
     predictor = Baseline2026Predictor(seed=42)
 
     result = predictor.predict_qualifying(
-        year=2026, race_name="Bahrain Grand Prix", n_simulations=50
+        year=2026, race_name="Australian Grand Prix", n_simulations=50
     )
 
     grid = result["grid"]
@@ -106,12 +106,12 @@ def test_monte_carlo_higher_simulation_count_reduces_variance():
 
     # Run with 10 simulations
     result_10 = predictor_10.predict_qualifying(
-        year=2026, race_name="Bahrain Grand Prix", n_simulations=10
+        year=2026, race_name="Australian Grand Prix", n_simulations=10
     )
 
     # Run with 100 simulations
     result_100 = predictor_100.predict_qualifying(
-        year=2026, race_name="Bahrain Grand Prix", n_simulations=100
+        year=2026, race_name="Australian Grand Prix", n_simulations=100
     )
 
     # Extract confidence intervals
@@ -169,7 +169,7 @@ def test_race_simulations_converge_with_fixed_seed():
         predictor_run = Baseline2026Predictor(seed=100 + run)
         result = predictor_run.predict_race(
             qualifying_grid=qualifying_grid,
-            race_name="Bahrain Grand Prix",
+            race_name="Australian Grand Prix",
             n_simulations=50,
         )
         results.append(result["finish_order"])
@@ -226,7 +226,7 @@ def test_race_convergence_with_increasing_simulations():
         predictor_temp = Baseline2026Predictor(seed=42)
         result = predictor_temp.predict_race(
             qualifying_grid=qualifying_grid,
-            race_name="Bahrain Grand Prix",
+            race_name="Australian Grand Prix",
             n_simulations=n_sims,
         )
         results_by_count[n_sims] = result["finish_order"]

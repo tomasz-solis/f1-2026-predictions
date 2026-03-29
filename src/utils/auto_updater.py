@@ -15,28 +15,25 @@ import pandas as pd
 
 from src.persistence.config import should_read_db_first, should_write_to_db, should_write_to_file
 from src.persistence.runtime_state_store import RuntimeStateStore
+from src.utils.weekend import should_skip_schedule_event
 
 logger = logging.getLogger(__name__)
 _LEARNING_STATE_FILE = Path("data/learning_state.json")
 _LEARNING_STATE_NAMESPACE = "race_learning"
 
 
-def _is_competitive_race_event(event: pd.Series) -> bool:
+def _is_competitive_race_event(event: pd.Series, *, year: int) -> bool:
     """Return True only for proper race weekends (exclude testing/non-race placeholders)."""
     event_name = str(event.get("EventName", "")).strip()
-    if not event_name:
+    if should_skip_schedule_event(year, event_name):
         return False
 
-    # Guardrail 1: explicit testing labels in event name.
-    if "testing" in event_name.lower():
-        return False
-
-    # Guardrail 2: EventFormat metadata (when available).
+    # Guardrail 1: EventFormat metadata (when available).
     event_format = str(event.get("EventFormat", "")).strip().lower()
     if "testing" in event_format:
         return False
 
-    # Guardrail 3: testing events are usually round 0.
+    # Guardrail 2: testing events are usually round 0.
     round_number = event.get("RoundNumber")
     if pd.notna(round_number):
         try:
@@ -140,7 +137,7 @@ def get_completed_races(year: int = 2026) -> list[str]:
         now = datetime.now(UTC)
 
         for _, event in schedule.iterrows():
-            if not _is_competitive_race_event(event):
+            if not _is_competitive_race_event(event, year=year):
                 continue
 
             # Check if race has happened (date in the past)

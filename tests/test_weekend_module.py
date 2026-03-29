@@ -111,7 +111,7 @@ def test_get_event_format_and_all_conventional_races(patcher, tmp_path):
         "get_event_schedule",
         lambda year: pd.DataFrame(
             {
-                "EventName": ["Chinese Grand Prix", "Bahrain Grand Prix"],
+                "EventName": ["Chinese Grand Prix", "Australian Grand Prix"],
                 "EventFormat": ["sprint_shootout", "conventional"],
             }
         ),
@@ -119,8 +119,42 @@ def test_get_event_format_and_all_conventional_races(patcher, tmp_path):
 
     assert weekend.get_event_format(2026, "Chinese Grand Prix") == "sprint_shootout"
     conventional_races = weekend.get_all_conventional_races(2026)
-    assert "Bahrain Grand Prix" in conventional_races
+    assert "Australian Grand Prix" in conventional_races
     assert "Chinese Grand Prix" not in conventional_races
+
+
+def test_get_schedule_rows_excludes_cancelled_2026_april_races(patcher):
+    weekend.refresh_schedule_cache()
+    patcher.setattr(
+        weekend.fastf1,
+        "get_event_schedule",
+        lambda year: pd.DataFrame(
+            {
+                "EventName": [
+                    "Pre-Season Testing",
+                    "Australian Grand Prix",
+                    "Bahrain Grand Prix",
+                    "Saudi Arabian Grand Prix",
+                    "Chinese Grand Prix",
+                ],
+                "EventFormat": [
+                    "testing",
+                    "conventional",
+                    "conventional",
+                    "conventional",
+                    "sprint",
+                ],
+            }
+        ),
+    )
+
+    rows = weekend._get_schedule_rows(2026)
+
+    assert ("Australian Grand Prix", "conventional") in rows
+    assert ("Chinese Grand Prix", "sprint") in rows
+    assert all(event_name != "Pre-Season Testing" for event_name, _event_format in rows)
+    assert all(event_name != "Bahrain Grand Prix" for event_name, _event_format in rows)
+    assert all(event_name != "Saudi Arabian Grand Prix" for event_name, _event_format in rows)
 
 
 def test_is_sprint_weekend_raises_when_lookup_fails(patcher):

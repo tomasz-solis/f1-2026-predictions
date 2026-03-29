@@ -19,20 +19,20 @@ def test_weight_schedule_integration():
     assert len(predictor.tracks) > 0
 
     # 3. Test track suitability calculation
-    suitability = predictor.calculate_track_suitability("McLaren", "Bahrain Grand Prix")
+    suitability = predictor.calculate_track_suitability("McLaren", "Australian Grand Prix")
     assert isinstance(suitability, float)
 
     # 4. Test blended team strength
     for team in list(predictor.teams.keys())[:3]:  # Test first 3 teams
         baseline = predictor.teams[team].get("overall_performance", 0.5)
-        blended = predictor.get_blended_team_strength(team, "Bahrain Grand Prix")
+        blended = predictor.get_blended_team_strength(team, "Australian Grand Prix")
         assert isinstance(baseline, float)
         assert isinstance(blended, float)
 
     # 5. Test qualifying prediction (full integration test)
     result = predictor.predict_qualifying(
         year=2026,
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         n_simulations=10,  # Fast test
     )
     assert len(result["grid"]) >= 20

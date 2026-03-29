@@ -13,11 +13,11 @@ def predictor():
 
 
 def _quali_and_race(predictor: Baseline2026Predictor):
-    qualifying = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=500)
+    qualifying = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=500)
     race = predictor.predict_race(
         qualifying["grid"],
         weather="dry",
-        race_name="Bahrain Grand Prix",
+        race_name="Australian Grand Prix",
         n_simulations=500,
     )
     return qualifying, race

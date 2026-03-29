@@ -20,7 +20,7 @@ def test_resolve_dashboard_race_horizon_uses_next_competitive_window():
         ("Australian Grand Prix", "conventional", (now_utc - timedelta(days=4)).isoformat()),
         ("Chinese Grand Prix", "sprint", (now_utc + timedelta(days=3)).isoformat()),
         ("Japanese Grand Prix", "conventional", (now_utc + timedelta(days=10)).isoformat()),
-        ("Bahrain Grand Prix", "conventional", (now_utc + timedelta(days=17)).isoformat()),
+        ("Miami Grand Prix", "sprint", (now_utc + timedelta(days=17)).isoformat()),
     )
 
     planned_races = prediction_horizon.resolve_dashboard_race_horizon(

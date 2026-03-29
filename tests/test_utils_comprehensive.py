@@ -17,7 +17,7 @@ class TestLineupsModule:
         """Test getting lineups for 2026 races"""
         from src.utils.lineups import get_lineups
 
-        lineups = get_lineups(2026, "Bahrain Grand Prix")
+        lineups = get_lineups(2026, "Australian Grand Prix")
 
         # Should return 11 teams
         assert len(lineups) == 11
@@ -32,7 +32,7 @@ class TestLineupsModule:
         """Test all driver codes are 3-letter abbreviations"""
         from src.utils.lineups import get_lineups
 
-        lineups = get_lineups(2026, "Bahrain Grand Prix")
+        lineups = get_lineups(2026, "Australian Grand Prix")
 
         for _team, drivers in lineups.items():
             for driver in drivers:
@@ -63,7 +63,7 @@ class TestWeekendModule:
         return pd.DataFrame(
             {
                 "EventName": [
-                    "Bahrain Grand Prix",
+                    "Australian Grand Prix",
                     "Chinese Grand Prix",
                     "Miami Grand Prix",
                     "Monaco Grand Prix",
@@ -98,7 +98,7 @@ class TestWeekendModule:
             "src.utils.weekend.fastf1.get_event_schedule",
             return_value=self._mock_schedule(),
         ):
-            assert weekend.is_sprint_weekend(2026, "Bahrain Grand Prix") is False
+            assert weekend.is_sprint_weekend(2026, "Australian Grand Prix") is False
             assert weekend.is_sprint_weekend(2026, "Monaco Grand Prix") is False
 
     def test_get_all_sprint_races(self):
@@ -114,7 +114,7 @@ class TestWeekendModule:
 
         assert "Chinese Grand Prix" in sprint_races
         assert "Miami Grand Prix" in sprint_races
-        assert "Bahrain Grand Prix" not in sprint_races
+        assert "Australian Grand Prix" not in sprint_races
         assert len(sprint_races) == len(set(sprint_races))
 
     def test_get_best_qualifying_session(self):
@@ -130,7 +130,7 @@ class TestWeekendModule:
                 weekend.get_best_qualifying_session(2026, "Chinese Grand Prix")
                 == "Sprint Qualifying"
             )
-            assert weekend.get_best_qualifying_session(2026, "Bahrain Grand Prix") == "FP3"
+            assert weekend.get_best_qualifying_session(2026, "Australian Grand Prix") == "FP3"
 
     def test_invalid_race_name_handling(self):
         """Test graceful handling of invalid race names"""

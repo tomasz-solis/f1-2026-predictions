@@ -226,12 +226,12 @@ def _load_race_options_cached(year: int) -> tuple[list[str], str | None]:
 
     return (
         [
-            "Bahrain Grand Prix",
-            "Saudi Arabian Grand Prix",
             "Australian Grand Prix",
-            "Japanese Grand Prix",
             "Chinese Grand Prix",
+            "Japanese Grand Prix",
             "Miami Grand Prix",
+            "Canadian Grand Prix",
+            "Monaco Grand Prix",
         ],
         fastf1_error,
     )

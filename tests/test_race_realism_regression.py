@@ -27,11 +27,11 @@ class TestRaceRealismRegression:
         with finishing order in clean races.
         """
         # Use moderate simulation count for stable, repeatable results
-        quali = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=300)
+        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=300)
         race = predictor.predict_race(
             quali["grid"],
             weather="dry",
-            race_name="Bahrain Grand Prix",
+            race_name="Australian Grand Prix",
             n_simulations=300,
         )
 
@@ -57,11 +57,11 @@ class TestRaceRealismRegression:
         This prevents excessive position shuffling that would make races
         feel like a lottery rather than a competition.
         """
-        quali = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=300)
+        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=300)
         race = predictor.predict_race(
             quali["grid"],
             weather="dry",
-            race_name="Bahrain Grand Prix",
+            race_name="Australian Grand Prix",
             n_simulations=300,
         )
 
@@ -85,11 +85,11 @@ class TestRaceRealismRegression:
         In real F1, pole position confers a significant advantage.
         This test ensures the model respects that reality.
         """
-        quali = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=300)
+        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=300)
         race = predictor.predict_race(
             quali["grid"],
             weather="dry",
-            race_name="Bahrain Grand Prix",
+            race_name="Australian Grand Prix",
             n_simulations=300,
         )
 
@@ -109,11 +109,11 @@ class TestRaceRealismRegression:
         This ensures that front-runners don't get swamped by midfield
         in unrealistic ways.
         """
-        quali = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=300)
+        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=300)
         race = predictor.predict_race(
             quali["grid"],
             weather="dry",
-            race_name="Bahrain Grand Prix",
+            race_name="Australian Grand Prix",
             n_simulations=300,
         )
 
@@ -145,11 +145,11 @@ class TestRaceRealismRegression:
         This allows for some variance while preventing all three from having
         unrealistic tail outcomes.
         """
-        quali = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=300)
+        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=300)
         race = predictor.predict_race(
             quali["grid"],
             weather="dry",
-            race_name="Bahrain Grand Prix",
+            race_name="Australian Grand Prix",
             n_simulations=300,
         )
 
@@ -186,11 +186,11 @@ class TestRaceRealismRegression:
         a lower-placed finisher has higher podium probability than someone
         finishing ahead of them.
         """
-        quali = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=300)
+        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=300)
         race = predictor.predict_race(
             quali["grid"],
             weather="dry",
-            race_name="Bahrain Grand Prix",
+            race_name="Australian Grand Prix",
             n_simulations=300,
         )
 
@@ -256,19 +256,19 @@ class TestRaceRealismRegression:
 
         This reflects the reality that rain races are more unpredictable.
         """
-        quali = predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=200)
+        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=200)
 
         dry_race = predictor.predict_race(
             quali["grid"],
             weather="dry",
-            race_name="Bahrain Grand Prix",
+            race_name="Australian Grand Prix",
             n_simulations=200,
         )
 
         wet_race = predictor.predict_race(
             quali["grid"],
             weather="rain",
-            race_name="Bahrain Grand Prix",
+            race_name="Australian Grand Prix",
             n_simulations=200,
         )
 
