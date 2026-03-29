@@ -140,6 +140,10 @@ baseline_predictor:
     recency_exponent: 1.5
     stabilization_strength: 1.5
     saved_actual_race_weight: 0.70
+  driver_form:
+    bayesian_pace_blend_per_race: 0.20
+    bayesian_pace_blend_cap: 0.60
+    quali_pace_update_blend: 0.30
 
   # Qualifying simulation parameters
   qualifying:
@@ -148,8 +152,8 @@ baseline_predictor:
     noise_std_normal: 0.026    # Normal weekends
 
     # Score composition weights
-    team_weight: 0.66          # Car remains dominant, but less deterministic
-    skill_weight: 0.34         # Driver one-lap signal (pace+skill)
+    team_weight: 0.60          # Car remains dominant, but driver form should still matter
+    skill_weight: 0.40         # Driver one-lap signal (pace+skill)
 
     # Compress team spread before scoring.
     # 1.0 = raw team deltas, lower = closer field.
@@ -161,9 +165,11 @@ baseline_predictor:
 
     # Extra teammate divergence for setup/execution differences
     teammate_setup_std: 0.018
-    driver_offset_cap: 0.12
-    driver_signal_softness: 0.20
+    driver_offset_cap: 0.22
+    driver_signal_softness: 0.35
     weekend_form_std: 0.0
+    recent_form_scale: 0.12
+    recent_form_cap: 0.03
     model_only_team_weight_multiplier: 0.90
     model_only_skill_weight_multiplier: 1.10
     model_only_team_compression_multiplier: 0.87

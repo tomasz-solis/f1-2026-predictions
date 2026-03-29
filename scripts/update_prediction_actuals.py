@@ -149,7 +149,7 @@ def fetch_target_actual_results(
 def main() -> int:
     """Run the CLI entry point."""
     parser = argparse.ArgumentParser(description="Update a saved prediction with actual results.")
-    parser.add_argument("race_name", help="Race name (for example 'Bahrain Grand Prix')")
+    parser.add_argument("race_name", help="Race name (for example 'Australian Grand Prix')")
     parser.add_argument("session_name", help="Checkpoint session (for example 'FP1' or 'SQ')")
     parser.add_argument("--year", type=int, default=2026, help="Season year")
     args = parser.parse_args()

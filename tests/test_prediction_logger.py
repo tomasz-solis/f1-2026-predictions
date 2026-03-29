@@ -104,6 +104,33 @@ def test_save_prediction(temp_predictions_dir, sample_quali_prediction, sample_r
     assert prediction["actuals"]["race"] is None
 
 
+def test_save_prediction_always_writes_file_copy(
+    temp_predictions_dir,
+    sample_quali_prediction,
+    sample_race_prediction,
+):
+    """Prediction saves should keep a filesystem copy even when ArtifactStore succeeds."""
+    logger = PredictionLogger(predictions_dir=temp_predictions_dir)
+    save_calls: list[tuple[str, str]] = []
+    logger.artifact_store.save_artifact = (
+        lambda artifact_type, artifact_key, data, version, run_id: (
+            save_calls.append((artifact_type, artifact_key)) or {"artifact_key": artifact_key}
+        )
+    )
+
+    saved_path = logger.save_prediction(
+        year=2026,
+        race_name="Bahrain Grand Prix",
+        session_name="FP1",
+        qualifying_prediction=sample_quali_prediction,
+        race_prediction=sample_race_prediction,
+        weather="dry",
+    )
+
+    assert saved_path.exists()
+    assert save_calls == [("prediction", "2026::Bahrain Grand Prix::FP1")]
+
+
 def test_load_prediction(temp_predictions_dir, sample_quali_prediction, sample_race_prediction):
     """Test loading a saved prediction."""
     logger = PredictionLogger(predictions_dir=temp_predictions_dir)
@@ -374,6 +401,60 @@ def test_get_all_predictions(temp_predictions_dir, sample_quali_prediction, samp
     assert pred1["metadata"]["session_name"] == "FP1"
     assert pred2["metadata"]["session_name"] == "FP2"
     assert pred3["metadata"]["race_name"] == "Saudi Arabian Grand Prix"
+
+
+def test_get_all_predictions_merges_artifact_and_file_backends(
+    temp_predictions_dir,
+    sample_quali_prediction,
+    sample_race_prediction,
+):
+    """Mixed backend history should surface every unique saved checkpoint."""
+    logger = PredictionLogger(predictions_dir=temp_predictions_dir)
+
+    logger.save_prediction(
+        year=2026,
+        race_name="Bahrain Grand Prix",
+        session_name="FP1",
+        qualifying_prediction=sample_quali_prediction,
+        race_prediction=sample_race_prediction,
+        weather="dry",
+    )
+
+    logger.artifact_store.list_artifacts = lambda *_args, **_kwargs: [
+        {
+            "data": {
+                "metadata": {
+                    "year": 2026,
+                    "race_name": "Australian Grand Prix",
+                    "session_name": "FP2",
+                    "predicted_at": "2026-03-16T12:00:00+00:00",
+                    "weather": "dry",
+                },
+                "qualifying": {
+                    "predicted_grid": [{"position": 1, "driver": "NOR", "team": "McLaren"}]
+                },
+                "race": {
+                    "predicted_results": [{"position": 1, "driver": "NOR", "team": "McLaren"}]
+                },
+                "targets": {},
+                "actuals": {"qualifying": None, "race": None, "targets": {}},
+            }
+        }
+    ]
+
+    predictions = logger.get_all_predictions(2026)
+
+    assert len(predictions) == 2
+    assert {
+        (
+            prediction["metadata"]["race_name"],
+            prediction["metadata"]["session_name"],
+        )
+        for prediction in predictions
+    } == {
+        ("Australian Grand Prix", "FP2"),
+        ("Bahrain Grand Prix", "FP1"),
+    }
 
 
 def test_get_all_predictions_deduplicates_checkpoint_identity(temp_predictions_dir):

@@ -304,6 +304,94 @@ def test_update_bayesian_driver_ratings_persists_driver_characteristics_updates(
     assert "bayesian" in payload["drivers"]["LEC"]
 
 
+def test_update_bayesian_driver_ratings_refreshes_quali_pace_from_qualifying_results(patcher):
+    from src.models.bayesian import DriverPrior
+
+    race_results = pd.DataFrame(
+        {
+            "Abbreviation": ["LEC", "NOR"],
+            "Position": [1, 2],
+            "race_name": ["Bahrain Grand Prix", "Bahrain Grand Prix"],
+            "year": [2026, 2026],
+        }
+    )
+    qualifying_results = pd.DataFrame(
+        {
+            "Abbreviation": ["LEC", "NOR"],
+            "Position": [2, 8],
+            "race_name": ["Bahrain Grand Prix", "Bahrain Grand Prix"],
+            "year": [2026, 2026],
+        }
+    )
+
+    priors = {
+        "LEC": DriverPrior(
+            driver_number="16",
+            driver_code="LEC",
+            team="Ferrari",
+            team_tier="top",
+            mu=16.0,
+            sigma=2.0,
+        ),
+        "NOR": DriverPrior(
+            driver_number="4",
+            driver_code="NOR",
+            team="McLaren",
+            team_tier="top",
+            mu=15.0,
+            sigma=2.1,
+        ),
+    }
+
+    patcher.setattr("src.models.priors_factory.PriorsFactory.create_priors", lambda self: priors)
+
+    class _Store:
+        def __init__(self, data_root):
+            self.saved = []
+
+        def load_artifact(self, artifact_type, artifact_key):
+            if artifact_type == "driver_characteristics":
+                return {
+                    "version": 1,
+                    "drivers": {
+                        "LEC": {
+                            "racecraft": {"skill_score": 0.55, "overtaking_skill": 0.58},
+                            "pace": {"quali_pace": 0.20, "race_pace": 0.60},
+                            "dnf_risk": {"dnf_rate": 0.08},
+                        },
+                        "NOR": {
+                            "racecraft": {"skill_score": 0.60, "overtaking_skill": 0.61},
+                            "pace": {"quali_pace": 0.66, "race_pace": 0.64},
+                            "dnf_risk": {"dnf_rate": 0.07},
+                        },
+                    },
+                }
+            return None
+
+        def get_latest_version(self, artifact_type, artifact_key):
+            return 1
+
+        def save_artifact(self, artifact_type, artifact_key, data, version):
+            self.saved.append((artifact_type, artifact_key, data, version))
+
+    store = _Store("data")
+    patcher.setattr(updater, "ArtifactStore", lambda data_root: store)
+
+    def _config_get(key, default=None):
+        if key == "grid.size":
+            return 22
+        if key == "baseline_predictor.driver_form.quali_pace_update_blend":
+            return 0.5
+        return default
+
+    patcher.setattr(updater.config_loader, "get", _config_get)
+
+    updater.update_bayesian_driver_ratings(race_results, qualifying_results=qualifying_results)
+
+    payload = store.saved[0][2]
+    assert payload["drivers"]["LEC"]["pace"]["quali_pace"] == pytest.approx(0.576, abs=1e-3)
+
+
 def test_load_driver_characteristics_payload_prefers_year_scoped_fallback(tmp_path, patcher):
     patcher.chdir(tmp_path)
 
@@ -397,9 +485,15 @@ def test_update_from_race_skips_team_update_when_characteristics_missing(patcher
     (data_dir / "car_characteristics").mkdir(parents=True)
 
     race_results = pd.DataFrame({"Abbreviation": ["LEC"], "Position": [1]})
+    qualifying_results = pd.DataFrame({"Abbreviation": ["LEC"], "Position": [2]})
     session = SimpleNamespace(name="Race")
 
     patcher.setattr(updater, "load_race_session", lambda year, race_name: (race_results, session))
+    patcher.setattr(
+        updater,
+        "load_qualifying_session",
+        lambda year, race_name: (qualifying_results, session),
+    )
     team_update = MagicMock()
     bayesian_update = MagicMock()
     patcher.setattr(updater, "update_team_characteristics", team_update)
@@ -408,7 +502,7 @@ def test_update_from_race_skips_team_update_when_characteristics_missing(patcher
     updater.update_from_race(2026, "Bahrain Grand Prix", str(data_dir))
 
     team_update.assert_not_called()
-    bayesian_update.assert_called_once_with(race_results)
+    bayesian_update.assert_called_once_with(race_results, qualifying_results=qualifying_results)
 
 
 def test_update_from_race_reraises_load_errors(patcher):

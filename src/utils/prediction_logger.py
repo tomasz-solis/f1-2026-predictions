@@ -82,13 +82,11 @@ class PredictionLogger:
             race_name,
             session_name,
         )
-        safe_race_name = normalized_race_name.lower().replace(" ", "_").replace("'", "")
-        year_dir = self.predictions_dir / str(normalized_year)
-        year_dir.mkdir(parents=True, exist_ok=True)
-        race_dir = year_dir / safe_race_name
-        race_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"{safe_race_name}_{normalized_session_name.lower()}.json"
-        filepath = race_dir / filename
+        filepath = self._prediction_file_path(
+            normalized_year,
+            normalized_race_name,
+            normalized_session_name,
+        )
 
         normalized_targets = self._normalize_target_predictions(target_predictions)
         metadata_payload = {} if metadata is None else dict(metadata)
@@ -141,6 +139,7 @@ class PredictionLogger:
             },
         }
 
+        self._write_prediction_file(filepath, prediction_data)
         artifact_key = self._artifact_key_for_prediction(
             normalized_year,
             normalized_race_name,
@@ -154,14 +153,38 @@ class PredictionLogger:
                 version=1,
                 run_id=run_id,
             )
-            logger.info("Saved prediction via ArtifactStore (run_id=%s)", run_id)
+            logger.info("Saved prediction via ArtifactStore and file fallback (run_id=%s)", run_id)
         except Exception as exc:
-            logger.warning("ArtifactStore save failed: %s, falling back to file", exc)
-            with open(filepath, "w") as file_handle:
-                json.dump(prediction_data, file_handle, indent=2)
-            logger.info("Saved prediction to %s", filepath)
+            logger.warning(
+                "ArtifactStore save failed for prediction %s; kept file copy at %s (%s)",
+                artifact_key,
+                filepath,
+                exc,
+            )
 
         return filepath
+
+    def _prediction_file_path(
+        self,
+        year: int,
+        race_name: str,
+        session_name: str,
+    ) -> Path:
+        """Build the normalized file path for one prediction payload."""
+        safe_race_name = race_name.lower().replace(" ", "_").replace("'", "")
+        return (
+            self.predictions_dir
+            / str(year)
+            / safe_race_name
+            / f"{safe_race_name}_{session_name.lower()}.json"
+        )
+
+    @staticmethod
+    def _write_prediction_file(filepath: Path, prediction_data: dict[str, Any]) -> None:
+        """Write one prediction payload to disk with stable formatting."""
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        with open(filepath, "w") as file_handle:
+            json.dump(prediction_data, file_handle, indent=2)
 
     def load_prediction(
         self,
@@ -195,12 +218,10 @@ class PredictionLogger:
         except Exception as exc:
             logger.warning("ArtifactStore load failed: %s, trying file fallback", exc)
 
-        safe_race_name = normalized_race_name.lower().replace(" ", "_").replace("'", "")
-        filepath = (
-            self.predictions_dir
-            / str(normalized_year)
-            / safe_race_name
-            / f"{safe_race_name}_{normalized_session_name.lower()}.json"
+        filepath = self._prediction_file_path(
+            normalized_year,
+            normalized_race_name,
+            normalized_session_name,
         )
         if not filepath.exists():
             logger.warning("Prediction not found in file: %s", filepath)
@@ -297,6 +318,12 @@ class PredictionLogger:
             normalized_race_name,
             normalized_session_name,
         )
+        filepath = self._prediction_file_path(
+            normalized_year,
+            normalized_race_name,
+            normalized_session_name,
+        )
+        self._write_prediction_file(filepath, prediction)
         try:
             self.artifact_store.save_artifact(
                 artifact_type="prediction",
@@ -305,19 +332,16 @@ class PredictionLogger:
                 version=1,
                 run_id=actual_run_id,
             )
-            logger.info("Updated actuals via ArtifactStore (run_id=%s)", actual_run_id)
-        except Exception as exc:
-            logger.warning("ArtifactStore save failed: %s, falling back to file", exc)
-            safe_race_name = normalized_race_name.lower().replace(" ", "_").replace("'", "")
-            filepath = (
-                self.predictions_dir
-                / str(normalized_year)
-                / safe_race_name
-                / f"{safe_race_name}_{normalized_session_name.lower()}.json"
+            logger.info(
+                "Updated actuals via ArtifactStore and file fallback (run_id=%s)", actual_run_id
             )
-            with open(filepath, "w") as file_handle:
-                json.dump(prediction, file_handle, indent=2)
-            logger.info("Updated actuals in %s", filepath)
+        except Exception as exc:
+            logger.warning(
+                "ArtifactStore save failed while updating actuals for %s; kept file copy at %s (%s)",
+                artifact_key,
+                filepath,
+                exc,
+            )
 
         try:
             learning_summary = self.learning_system.update_from_prediction_record(prediction)
@@ -335,7 +359,7 @@ class PredictionLogger:
         return True
 
     def get_all_predictions(self, year: int) -> list[dict[str, Any]]:
-        """Load season predictions from ArtifactStore with file fallback."""
+        """Load season predictions from both storage backends and deduplicate them."""
         target_year = int(year)
         predictions: list[dict[str, Any]] = []
 
@@ -359,10 +383,8 @@ class PredictionLogger:
                 continue
             predictions.append(payload)
 
-        if predictions:
-            return self._deduplicate_predictions(predictions)
-
-        return self._deduplicate_predictions(self._load_predictions_from_files(target_year))
+        predictions.extend(self._load_predictions_from_files(target_year))
+        return self._deduplicate_predictions(predictions)
 
     def reconcile_completed_prediction_actuals(self, year: int) -> int:
         """Attach saved target actuals to completed race weekends for a season."""
@@ -488,12 +510,10 @@ class PredictionLogger:
         except Exception:
             pass
 
-        safe_race_name = normalized_race_name.lower().replace(" ", "_").replace("'", "")
-        filepath = (
-            self.predictions_dir
-            / str(normalized_year)
-            / safe_race_name
-            / f"{safe_race_name}_{normalized_session_name.lower()}.json"
+        filepath = self._prediction_file_path(
+            normalized_year,
+            normalized_race_name,
+            normalized_session_name,
         )
         return filepath.exists()
 

@@ -67,6 +67,8 @@ class BaselineQualifyingMixin:
             scale: float,
         ) -> tuple[float, bool]: ...
 
+        def _get_contextual_races_completed(self, race_name: str | None) -> int: ...
+
         def _get_testing_characteristics_for_profile(
             self,
             team: str,
@@ -417,6 +419,11 @@ class BaselineQualifyingMixin:
             get_learned_position_adjustment_fn=self._get_learned_position_adjustment,
             get_checkpoint_driver_delta_seconds_fn=self._get_checkpoint_driver_delta_seconds,
             get_driver_data_or_fallback_fn=(fallback_loader if callable(fallback_loader) else None),
+            get_contextual_races_completed_fn=getattr(
+                self,
+                "_get_contextual_races_completed",
+                None,
+            ),
         )
 
     def _run_qualifying_simulations(

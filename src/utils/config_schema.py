@@ -199,6 +199,14 @@ class CurrentSeasonFormConfig(StrictConfigModel):
     saved_actual_race_weight: float = Field(default=0.70, ge=0.0, le=1.0)
 
 
+class DriverFormConfig(StrictConfigModel):
+    """How in-season driver form feeds the prediction inputs."""
+
+    bayesian_pace_blend_per_race: float = Field(default=0.20, ge=0.0, le=1.0)
+    bayesian_pace_blend_cap: float = Field(default=0.60, ge=0.0, le=1.0)
+    quali_pace_update_blend: float = Field(default=0.30, ge=0.0, le=1.0)
+
+
 class ExperienceFloatMapConfig(StrictConfigModel):
     """Experience-tier float map used for shrinkage and caps."""
 
@@ -232,15 +240,17 @@ class BaselineQualifyingConfig(StrictConfigModel):
 
     noise_std_sprint: float = Field(default=0.030, ge=0.0)
     noise_std_normal: float = Field(default=0.026, ge=0.0)
-    team_weight: float = Field(default=0.66, ge=0.0, le=1.0)
-    skill_weight: float = Field(default=0.34, ge=0.0, le=1.0)
+    team_weight: float = Field(default=0.60, ge=0.0, le=1.0)
+    skill_weight: float = Field(default=0.40, ge=0.0, le=1.0)
     team_strength_compression: float = Field(default=0.52, ge=0.0)
     driver_quali_pace_weight: float = Field(default=0.70, ge=0.0, le=1.0)
     driver_skill_weight: float = Field(default=0.30, ge=0.0, le=1.0)
     teammate_setup_std: float = Field(default=0.018, ge=0.0)
-    driver_offset_cap: float = Field(default=0.12, ge=0.0)
-    driver_signal_softness: float = Field(default=0.20, ge=0.0)
+    driver_offset_cap: float = Field(default=0.22, ge=0.0)
+    driver_signal_softness: float = Field(default=0.35, ge=0.0)
     weekend_form_std: float = Field(default=0.0, ge=0.0)
+    recent_form_scale: float = Field(default=0.12, ge=0.0)
+    recent_form_cap: float = Field(default=0.03, ge=0.0)
     model_only_team_weight_multiplier: float = Field(default=0.90, ge=0.0)
     model_only_skill_weight_multiplier: float = Field(default=1.10, ge=0.0)
     model_only_team_compression_multiplier: float = Field(default=0.87, ge=0.0)
@@ -882,6 +892,7 @@ class BaselinePredictorSectionConfig(StrictConfigModel):
     team_strength_schedule: str = Field(default="rapid_adaptive")
     baseline_learning_rate: float = Field(default=0.3, ge=0.0, le=1.0)
     current_season_form: CurrentSeasonFormConfig = Field(default_factory=CurrentSeasonFormConfig)
+    driver_form: DriverFormConfig = Field(default_factory=DriverFormConfig)
     qualifying: BaselineQualifyingConfig = Field(default_factory=BaselineQualifyingConfig)
     compound_selection: CompoundSelectionConfig = Field(default_factory=CompoundSelectionConfig)
     race: BaselineRaceConfig = Field(default_factory=BaselineRaceConfig)

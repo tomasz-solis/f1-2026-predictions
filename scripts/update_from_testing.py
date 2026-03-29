@@ -4,13 +4,16 @@ Update Car Directionality from Testing/Practice Sessions
 Manual/explicit updater for testing and weekend practice telemetry.
 This script only runs when called directly.
 
+Testing pace is useful for car-characteristic baselines, but it is not a clean
+proxy for true team order under race-weekend conditions.
+
 Examples:
     # Preview only (default mode)
     python scripts/update_from_testing.py "Pre-Season Testing"
     # Persist changes to car_characteristics JSON
-    python scripts/update_from_testing.py "Bahrain Grand Prix" --sessions FP1 FP2 FP3 --apply
+    python scripts/update_from_testing.py "Australian Grand Prix" --sessions FP1 FP2 FP3 --apply
     # Explicit preview mode (equivalent to default)
-    python scripts/update_from_testing.py "Pre-Season Testing" "Bahrain Grand Prix" --dry-run
+    python scripts/update_from_testing.py "Pre-Season Testing" "Australian Grand Prix" --dry-run
     python scripts/update_from_testing.py "Testing 1" --session-aggregation laps_weighted
     python scripts/update_from_testing.py "Testing 1" --run-profile balanced
 """
@@ -37,7 +40,7 @@ def main() -> None:
     parser.add_argument(
         "events",
         nargs="+",
-        help="Event names to scan (e.g. 'Pre-Season Testing', 'Bahrain Grand Prix')",
+        help="Event names to scan (e.g. 'Pre-Season Testing', 'Australian Grand Prix')",
     )
     parser.add_argument("--year", type=int, default=2026, help="Season year")
     parser.add_argument(

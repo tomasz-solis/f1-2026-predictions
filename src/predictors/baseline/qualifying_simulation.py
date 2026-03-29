@@ -102,6 +102,32 @@ def _rebalance_component_weights(
     return team_weight / total_weight, skill_weight / total_weight
 
 
+def _recent_form_adjustment(
+    *,
+    driver_info: dict[str, Any],
+    driver_signal: float,
+    cfg: Any,
+) -> float:
+    """Convert Bayesian form drift into a small bounded qualifying adjustment."""
+    bayesian_skill_score = driver_info.get("bayesian_skill_score")
+    if bayesian_skill_score is None:
+        return 0.0
+    try:
+        bayesian_skill_value = float(bayesian_skill_score)
+    except (TypeError, ValueError):
+        return 0.0
+    if not np.isfinite(bayesian_skill_value):
+        return 0.0
+
+    recent_form_scale = float(cfg.get("baseline_predictor.qualifying.recent_form_scale", 0.12))
+    recent_form_cap = float(cfg.get("baseline_predictor.qualifying.recent_form_cap", 0.03))
+    if recent_form_scale <= 0 or recent_form_cap <= 0:
+        return 0.0
+
+    form_gap = bayesian_skill_value - float(driver_signal)
+    return float(np.clip(form_gap * recent_form_scale, -recent_form_cap, recent_form_cap))
+
+
 def run_qualifying_simulations(
     *,
     all_drivers: list[dict],
@@ -252,6 +278,7 @@ def run_qualifying_simulations(
             )
         )
     )
+    apply_recent_form_adjustment = not (has_testing_fallback_data and not has_practice_data)
     testing_fallback_driver_signal_shrink = float(
         cfg.get("baseline_predictor.qualifying.testing_fallback_driver_signal_shrink", 0.14)
     )
@@ -575,6 +602,14 @@ def run_qualifying_simulations(
                     team_mean=team_mean,
                     gap_cap=testing_fallback_gap_cap,
                 )
+            if apply_recent_form_adjustment:
+                recent_form_adjustment = _recent_form_adjustment(
+                    driver_info=driver_info,
+                    driver_signal=driver_signal,
+                    cfg=cfg,
+                )
+                if recent_form_adjustment:
+                    driver_signal = float(np.clip(driver_signal + recent_form_adjustment, 0.0, 1.0))
             bounded_driver_signal = 0.5 + (
                 np.tanh((driver_signal - 0.5) / driver_signal_softness) * driver_offset_cap
             )

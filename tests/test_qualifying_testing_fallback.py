@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import ExitStack, contextmanager
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
@@ -24,7 +25,15 @@ class DummyQualifyingPredictor(BaselineQualifyingMixin, BaselineDataMixin):
     def __init__(self, config_overrides: dict[str, object] | None = None):
         BaselineDataMixin.__init__(self)
         self.seed = 123
-        self.config = DummyConfig(config_overrides)
+        merged_overrides = {
+            "baseline_predictor.current_season_form.infer_from_saved_actuals": False,
+        }
+        if config_overrides:
+            merged_overrides.update(config_overrides)
+        self.config = DummyConfig(merged_overrides)
+        self.data_dir = Path("data/processed")
+        self.season_year = 2026
+        self.races_completed = 0
         self.teams = {
             "Team A": {
                 "testing_characteristics_profiles": {
@@ -137,6 +146,53 @@ def test_predict_qualifying_uses_testing_short_run_fallback():
     assert strengths["Team A"] == pytest.approx(0.55)
     assert strengths["Team B"] == pytest.approx(0.45)
     assert all("experience_total_races" in driver for driver in captured["all_drivers"])
+
+
+def test_predict_qualifying_blends_bayesian_form_into_quali_pace():
+    """Drivers with strong Bayesian form should carry that into the assembled quali pace."""
+    predictor = DummyQualifyingPredictor({"grid.size": 22})
+    predictor.races_completed = 2
+    predictor.drivers["AAA"]["pace"]["quali_pace"] = 0.30
+    predictor.drivers["AAA"]["racecraft"]["skill_score"] = 0.45
+    predictor.drivers["AAA"]["bayesian"] = {"rating_mu": 20.0}
+
+    captured: dict[str, object] = {}
+
+    def _fake_run(
+        all_drivers,
+        n_simulations,
+        is_sprint,
+        has_practice_data,
+        rng,
+        has_testing_fallback_data,
+    ):
+        _ = (n_simulations, is_sprint, has_practice_data, rng, has_testing_fallback_data)
+        captured["all_drivers"] = all_drivers
+        return {"AAA": [1], "BBB": [2]}
+
+    def _fake_aggregate(position_records, all_drivers, *, data_confidence_score=None):
+        _ = (position_records, data_confidence_score)
+        return [
+            {
+                "position": index + 1,
+                "driver": driver_info["driver"],
+                "team": driver_info["team"],
+                "median_position": index + 1,
+                "position_distribution": [index + 1],
+            }
+            for index, driver_info in enumerate(all_drivers)
+        ]
+
+    with _patched_prediction_dependencies():
+        with patch.object(predictor, "_run_qualifying_simulations", _fake_run):
+            with patch.object(predictor, "_aggregate_grid_results", _fake_aggregate):
+                predictor.predict_qualifying(2026, "Bahrain Grand Prix", n_simulations=1)
+
+    driver_map = {driver["driver"]: driver for driver in captured["all_drivers"]}
+    assert driver_map["AAA"]["raw_quali_pace"] == pytest.approx(0.30)
+    assert driver_map["AAA"]["bayesian_pace_blend_weight"] == pytest.approx(0.40)
+    assert driver_map["AAA"]["quali_pace"] > 0.50
+    assert driver_map["AAA"]["bayesian_skill_score"] == pytest.approx(19.0 / 21.0)
 
 
 def test_predict_qualifying_can_force_stored_checkpoint_profiles():
@@ -903,6 +959,55 @@ def test_run_qualifying_simulations_applies_learned_position_adjustments():
     aaa_ahead_ratio = aaa_ahead_count / 400
 
     assert aaa_ahead_ratio > 0.90
+
+
+def test_run_qualifying_simulations_applies_recent_form_adjustment():
+    """Recent Bayesian form should break ties when the baseline profile is otherwise neutral."""
+    predictor = DummyQualifyingPredictor(
+        {
+            "baseline_predictor.qualifying.noise_std_normal": 0.0,
+            "baseline_predictor.qualifying.noise_std_sprint": 0.0,
+            "baseline_predictor.qualifying.teammate_setup_std": 0.0,
+            "baseline_predictor.qualifying.team_weight": 0.0,
+            "baseline_predictor.qualifying.skill_weight": 1.0,
+            "baseline_predictor.qualifying.recent_form_scale": 0.20,
+            "baseline_predictor.qualifying.recent_form_cap": 0.03,
+        }
+    )
+
+    all_drivers = [
+        {
+            "driver": "AAA",
+            "team": "Team A",
+            "team_strength": 0.5,
+            "skill": 0.5,
+            "quali_pace": 0.5,
+            "experience_tier": "established",
+            "learned_position_adjustment": 0.0,
+            "bayesian_skill_score": 0.95,
+        },
+        {
+            "driver": "BBB",
+            "team": "Team B",
+            "team_strength": 0.5,
+            "skill": 0.5,
+            "quali_pace": 0.5,
+            "experience_tier": "established",
+            "learned_position_adjustment": 0.0,
+            "bayesian_skill_score": 0.50,
+        },
+    ]
+
+    position_records = predictor._run_qualifying_simulations(
+        all_drivers=all_drivers,
+        n_simulations=50,
+        is_sprint=False,
+        has_practice_data=False,
+        rng=np.random.default_rng(42),
+    )
+
+    assert position_records["AAA"] == [1] * 50
+    assert position_records["BBB"] == [2] * 50
 
 
 def test_testing_short_run_fallback_blends_toward_balanced_on_profile_divergence():

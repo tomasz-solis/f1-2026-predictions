@@ -68,6 +68,68 @@ def extract_experience_total_races(driver_data: dict[str, Any]) -> int | None:
     return parsed
 
 
+def resolve_bayesian_skill_score(
+    driver_data: dict[str, Any],
+    *,
+    grid_size: int,
+) -> float | None:
+    """Normalize stored Bayesian form onto the shared 0-1 driver scale."""
+    bayesian = driver_data.get("bayesian", {}) if isinstance(driver_data, dict) else {}
+    if not isinstance(bayesian, dict):
+        return None
+
+    normalized_skill = bayesian.get("normalized_skill_score")
+    normalized_skill_value: float | None = None
+    if normalized_skill is not None:
+        try:
+            normalized_skill_value = float(normalized_skill)
+        except (TypeError, ValueError):
+            normalized_skill_value = None
+    if normalized_skill_value is not None and np.isfinite(normalized_skill_value):
+        return float(np.clip(normalized_skill_value, 0.0, 1.0))
+
+    rating_mu = bayesian.get("rating_mu")
+    if rating_mu is None:
+        return None
+    try:
+        rating_mu_value = float(rating_mu)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(rating_mu_value):
+        return None
+
+    normalized = (rating_mu_value - 1.0) / max(int(grid_size) - 1, 1)
+    return float(np.clip(normalized, 0.0, 1.0))
+
+
+def blend_quali_pace_with_bayesian_form(
+    raw_quali_pace: float,
+    bayesian_skill_score: float | None,
+    *,
+    races_completed: int,
+    cfg: Any,
+) -> tuple[float, float]:
+    """Blend stale qualifying pace toward in-season Bayesian form."""
+    clipped_raw_quali_pace = float(np.clip(raw_quali_pace, 0.01, 0.99))
+    if bayesian_skill_score is None:
+        return clipped_raw_quali_pace, 0.0
+
+    blend_per_race = float(
+        cfg.get("baseline_predictor.driver_form.bayesian_pace_blend_per_race", 0.20)
+    )
+    blend_cap = float(cfg.get("baseline_predictor.driver_form.bayesian_pace_blend_cap", 0.60))
+    blend_weight = float(
+        np.clip(max(0, int(races_completed)) * blend_per_race, 0.0, max(0.0, blend_cap))
+    )
+    if blend_weight <= 0:
+        return clipped_raw_quali_pace, 0.0
+
+    blended_quali_pace = ((1.0 - blend_weight) * clipped_raw_quali_pace) + (
+        blend_weight * float(np.clip(bayesian_skill_score, 0.0, 1.0))
+    )
+    return float(np.clip(blended_quali_pace, 0.01, 0.99)), blend_weight
+
+
 def _score_profile(
     profile_metrics: dict[str, float] | None,
     metric_weights: dict[str, float],
@@ -328,6 +390,7 @@ def build_driver_list_with_strengths_core(
     get_learned_position_adjustment_fn: Callable[..., float],
     get_checkpoint_driver_delta_seconds_fn: Callable[[str, str], float | None] | None = None,
     get_driver_data_or_fallback_fn: Callable[[str, str], dict[str, Any]] | None = None,
+    get_contextual_races_completed_fn: Callable[[str | None], int] | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     """Build driver list with blended team/driver strengths and testing modifiers."""
     all_drivers: list[dict[str, Any]] = []
@@ -351,6 +414,22 @@ def build_driver_list_with_strengths_core(
     )
     default_skill = cfg.get("baseline_predictor.qualifying.default_skill", 0.5)
     default_team_strength = cfg.get("baseline_predictor.qualifying.default_team_strength", 0.5)
+    unique_driver_count = len(
+        {driver_code for team_drivers in lineups.values() for driver_code in team_drivers}
+    )
+    configured_grid_size = cfg.get("grid.size", unique_driver_count or 22)
+    try:
+        configured_grid_size_value = int(configured_grid_size)
+    except (TypeError, ValueError):
+        configured_grid_size_value = unique_driver_count or 22
+    grid_size = max(unique_driver_count or 1, configured_grid_size_value)
+    if callable(get_contextual_races_completed_fn):
+        try:
+            races_completed = max(0, int(get_contextual_races_completed_fn(race_name)))
+        except Exception:
+            races_completed = 0
+    else:
+        races_completed = 0
 
     for team in lineups:
         model_strength = get_blended_team_strength_fn(team, race_name)
@@ -400,8 +479,28 @@ def build_driver_list_with_strengths_core(
                         driver_data = {}
                 else:
                     driver_data = {}
-            skill = driver_data.get("racecraft", {}).get("skill_score", default_skill)
-            quali_pace = driver_data.get("pace", {}).get("quali_pace", 0.5)
+            try:
+                skill = float(driver_data.get("racecraft", {}).get("skill_score", default_skill))
+            except (TypeError, ValueError):
+                skill = float(default_skill)
+            skill = float(np.clip(skill, 0.01, 0.99))
+
+            try:
+                raw_quali_pace = float(driver_data.get("pace", {}).get("quali_pace", 0.5))
+            except (TypeError, ValueError):
+                raw_quali_pace = 0.5
+            raw_quali_pace = float(np.clip(raw_quali_pace, 0.01, 0.99))
+
+            bayesian_skill_score = resolve_bayesian_skill_score(
+                driver_data,
+                grid_size=grid_size,
+            )
+            quali_pace, bayesian_pace_blend_weight = blend_quali_pace_with_bayesian_form(
+                raw_quali_pace,
+                bayesian_skill_score,
+                races_completed=races_completed,
+                cfg=cfg,
+            )
             if uses_checkpoint_practice_profiles and callable(
                 get_checkpoint_driver_delta_seconds_fn
             ):
@@ -469,6 +568,9 @@ def build_driver_list_with_strengths_core(
                     "team_strength": team_strength,
                     "skill": skill,
                     "quali_pace": quali_pace,
+                    "raw_quali_pace": raw_quali_pace,
+                    "bayesian_skill_score": bayesian_skill_score,
+                    "bayesian_pace_blend_weight": bayesian_pace_blend_weight,
                     "experience_tier": experience_tier,
                     "experience_total_races": experience_total_races,
                     "learned_position_adjustment": learned_position_adjustment,

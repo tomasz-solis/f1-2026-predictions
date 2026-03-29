@@ -119,13 +119,15 @@ class TestUpdaterCore:
 
         with patch("src.systems.updater.load_race_session") as mock_load:
             mock_load.return_value = (mock_race_results, mock_session)
+            with patch("src.systems.updater.load_qualifying_session") as mock_quali:
+                mock_quali.return_value = (pd.DataFrame(), mock_session)
 
-            with patch(
-                "src.systems.updater.extract_team_performance_from_telemetry"
-            ) as mock_extract:
-                mock_extract.return_value = {"Red Bull": 0.95, "McLaren": 0.85}
+                with patch(
+                    "src.systems.updater.extract_team_performance_from_telemetry"
+                ) as mock_extract:
+                    mock_extract.return_value = {"Red Bull": 0.95, "McLaren": 0.85}
 
-                update_from_race(2026, "Bahrain Grand Prix", temp_data_dir)
+                    update_from_race(2026, "Bahrain Grand Prix", temp_data_dir)
 
         # Verify version incremented
         char_file = Path(temp_data_dir) / "car_characteristics" / "2026_car_characteristics.json"
@@ -141,13 +143,15 @@ class TestUpdaterCore:
 
         with patch("src.systems.updater.load_race_session") as mock_load:
             mock_load.return_value = (mock_race_results, mock_session)
+            with patch("src.systems.updater.load_qualifying_session") as mock_quali:
+                mock_quali.return_value = (pd.DataFrame(), mock_session)
 
-            with patch(
-                "src.systems.updater.extract_team_performance_from_telemetry"
-            ) as mock_extract:
-                mock_extract.return_value = {"Red Bull": 0.95, "McLaren": 0.82}
+                with patch(
+                    "src.systems.updater.extract_team_performance_from_telemetry"
+                ) as mock_extract:
+                    mock_extract.return_value = {"Red Bull": 0.95, "McLaren": 0.82}
 
-                update_from_race(2026, "Bahrain Grand Prix", temp_data_dir)
+                    update_from_race(2026, "Bahrain Grand Prix", temp_data_dir)
 
         # Verify performance appended
         char_file = Path(temp_data_dir) / "car_characteristics" / "2026_car_characteristics.json"
@@ -169,13 +173,15 @@ class TestUpdaterCore:
 
         with patch("src.systems.updater.load_race_session") as mock_load:
             mock_load.return_value = (mock_race_results, mock_session)
+            with patch("src.systems.updater.load_qualifying_session") as mock_quali:
+                mock_quali.return_value = (pd.DataFrame(), mock_session)
 
-            with patch(
-                "src.systems.updater.extract_team_performance_from_telemetry"
-            ) as mock_extract:
-                mock_extract.return_value = {"Red Bull": 0.95, "McLaren": 0.85}
+                with patch(
+                    "src.systems.updater.extract_team_performance_from_telemetry"
+                ) as mock_extract:
+                    mock_extract.return_value = {"Red Bull": 0.95, "McLaren": 0.85}
 
-                update_from_race(2026, "Bahrain Grand Prix", temp_data_dir)
+                    update_from_race(2026, "Bahrain Grand Prix", temp_data_dir)
 
         # Verify uncertainty reduced
         with open(char_file) as f:
@@ -197,17 +203,19 @@ class TestUpdaterCore:
 
         with patch("src.systems.updater.load_race_session") as mock_load:
             mock_load.return_value = (mock_race_results, mock_session)
+            with patch("src.systems.updater.load_qualifying_session") as mock_quali:
+                mock_quali.return_value = (pd.DataFrame(), mock_session)
 
-            with patch(
-                "src.systems.updater.extract_team_performance_from_telemetry"
-            ) as mock_extract:
-                mock_extract.side_effect = [
-                    {"Red Bull": 0.95, "McLaren": 0.60},
-                    {"Red Bull": 0.95, "McLaren": 0.50},
-                ]
+                with patch(
+                    "src.systems.updater.extract_team_performance_from_telemetry"
+                ) as mock_extract:
+                    mock_extract.side_effect = [
+                        {"Red Bull": 0.95, "McLaren": 0.60},
+                        {"Red Bull": 0.95, "McLaren": 0.50},
+                    ]
 
-                update_from_race(2026, "Bahrain Grand Prix", temp_data_dir)
-                update_from_race(2026, "Saudi Arabian Grand Prix", temp_data_dir)
+                    update_from_race(2026, "Bahrain Grand Prix", temp_data_dir)
+                    update_from_race(2026, "Saudi Arabian Grand Prix", temp_data_dir)
 
         with open(char_file) as f:
             updated_data = json.load(f)
@@ -244,14 +252,16 @@ class TestUpdaterEdgeCases:
 
         with patch("src.systems.updater.load_race_session") as mock_load:
             mock_load.return_value = (mock_results_new_team, mock_session)
+            with patch("src.systems.updater.load_qualifying_session") as mock_quali:
+                mock_quali.return_value = (pd.DataFrame(), mock_session)
 
-            with patch(
-                "src.systems.updater.extract_team_performance_from_telemetry"
-            ) as mock_extract:
-                mock_extract.return_value = {"Red Bull": 0.95, "Cadillac": 0.50}
+                with patch(
+                    "src.systems.updater.extract_team_performance_from_telemetry"
+                ) as mock_extract:
+                    mock_extract.return_value = {"Red Bull": 0.95, "Cadillac": 0.50}
 
-                # Should not crash
-                update_from_race(2026, "Bahrain Grand Prix", temp_data_dir)
+                    # Should not crash
+                    update_from_race(2026, "Bahrain Grand Prix", temp_data_dir)
 
     def test_backup_created(self, temp_data_dir, mock_race_results, mock_session):
         """Test that backup file is created before update."""
@@ -267,13 +277,15 @@ class TestUpdaterEdgeCases:
 
             with patch("src.systems.updater.load_race_session") as mock_load:
                 mock_load.return_value = (mock_race_results, mock_session)
+                with patch("src.systems.updater.load_qualifying_session") as mock_quali:
+                    mock_quali.return_value = (pd.DataFrame(), mock_session)
 
-                with patch(
-                    "src.systems.updater.extract_team_performance_from_telemetry"
-                ) as mock_extract:
-                    mock_extract.return_value = {"Red Bull": 0.95, "McLaren": 0.85}
+                    with patch(
+                        "src.systems.updater.extract_team_performance_from_telemetry"
+                    ) as mock_extract:
+                        mock_extract.return_value = {"Red Bull": 0.95, "McLaren": 0.85}
 
-                    update_from_race(2026, "Bahrain Grand Prix", temp_data_dir)
+                        update_from_race(2026, "Bahrain Grand Prix", temp_data_dir)
 
         # Check backup exists
         assert backup_file.exists(), f"Backup file should be created at {backup_file}"

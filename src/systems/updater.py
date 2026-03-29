@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 import fastf1
+import numpy as np
 import pandas as pd
 
 from src.models.bayesian import BayesianDriverRanking
@@ -139,22 +140,61 @@ def _persist_driver_characteristics_payload(
             json.dump(payload, f, indent=2)
 
 
-def load_race_session(year: int, race_name: str) -> tuple[pd.DataFrame, fastf1.core.Session]:
-    """Load race results and session from FastF1."""
-    logger.info(f"Loading {year} {race_name} results...")
+def load_competitive_session(
+    year: int,
+    race_name: str,
+    session_name: str,
+    *,
+    load_laps: bool,
+) -> tuple[pd.DataFrame, fastf1.core.Session]:
+    """Load one competitive FastF1 session and annotate the results table."""
+    logger.info("Loading %s %s %s results...", year, race_name, session_name)
 
     cache_dir = Path("data/raw/.fastf1_cache")
     cache_dir.mkdir(parents=True, exist_ok=True)
     fastf1.Cache.enable_cache(str(cache_dir))
 
-    session = fastf1.get_session(year, race_name, "R")
-    session.load(laps=True, telemetry=False, weather=False)
+    session = fastf1.get_session(year, race_name, session_name)
+    session.load(laps=load_laps, telemetry=False, weather=False)
 
-    results = session.results
+    results = session.results.copy()
     results["race_name"] = race_name
     results["year"] = year
+    results["session_name"] = str(session_name).strip().upper()
 
     return results, session
+
+
+def load_race_session(year: int, race_name: str) -> tuple[pd.DataFrame, fastf1.core.Session]:
+    """Load race results and session from FastF1."""
+    return load_competitive_session(year, race_name, "R", load_laps=True)
+
+
+def load_qualifying_session(year: int, race_name: str) -> tuple[pd.DataFrame, fastf1.core.Session]:
+    """Load qualifying results and session from FastF1."""
+    return load_competitive_session(year, race_name, "Q", load_laps=False)
+
+
+def _build_position_observations(session_results: pd.DataFrame) -> dict[str, int]:
+    """Extract clean driver-position observations from one session results table."""
+    if session_results.empty:
+        return {}
+    if "Abbreviation" not in session_results.columns or "Position" not in session_results.columns:
+        return {}
+
+    observations: dict[str, int] = {}
+    for driver, position in zip(
+        session_results["Abbreviation"].tolist(),
+        session_results["Position"].tolist(),
+        strict=False,
+    ):
+        if pd.isna(position):
+            continue
+        try:
+            observations[str(driver)] = int(position)
+        except (TypeError, ValueError):
+            continue
+    return observations
 
 
 def extract_team_performance_from_telemetry(
@@ -265,8 +305,11 @@ def update_team_characteristics(
     )
 
 
-def update_bayesian_driver_ratings(race_results: pd.DataFrame) -> None:
-    """Update Bayesian driver skill ratings from race results."""
+def update_bayesian_driver_ratings(
+    race_results: pd.DataFrame,
+    qualifying_results: pd.DataFrame | None = None,
+) -> None:
+    """Update Bayesian driver ratings plus qualifying pace from completed sessions."""
     logger.info("Updating Bayesian driver ratings...")
 
     # Create priors for drivers
@@ -279,15 +322,7 @@ def update_bayesian_driver_ratings(race_results: pd.DataFrame) -> None:
     grid_size = max(configured_grid_size, len(priors) or configured_grid_size)
 
     bayesian = BayesianDriverRanking(priors, grid_size=grid_size)
-    observations: dict[str, int] = {}
-    for driver, position in zip(
-        race_results["Abbreviation"].tolist(),
-        race_results["Position"].tolist(),
-        strict=False,
-    ):
-        if pd.notna(position):
-            observations[str(driver)] = int(position)
-
+    observations = _build_position_observations(race_results)
     if not observations:
         logger.warning("No valid race positions available for Bayesian rating update")
         return
@@ -310,7 +345,7 @@ def update_bayesian_driver_ratings(race_results: pd.DataFrame) -> None:
 
     blend_weight = float(config_loader.get("bayesian.runtime_skill_blend_weight", 0.25))
     blend_weight = float(max(0.0, min(blend_weight, 1.0)))
-    touched_drivers = 0
+    touched_skill_drivers = 0
     for driver_code, (mu, sigma) in bayesian.ratings.items():
         driver_entry = drivers_payload.get(driver_code)
         if not isinstance(driver_entry, dict):
@@ -343,17 +378,53 @@ def update_bayesian_driver_ratings(race_results: pd.DataFrame) -> None:
             "last_updated": datetime.now().isoformat(),
             "season_year": season_year,
         }
-        touched_drivers += 1
+        touched_skill_drivers += 1
 
-    if touched_drivers == 0:
+    qualifying_observations = (
+        _build_position_observations(qualifying_results)
+        if isinstance(qualifying_results, pd.DataFrame)
+        else {}
+    )
+    quali_pace_blend = float(
+        config_loader.get("baseline_predictor.driver_form.quali_pace_update_blend", 0.30)
+    )
+    quali_pace_blend = float(np.clip(quali_pace_blend, 0.0, 1.0))
+    touched_quali_pace_drivers = 0
+    for driver_code, quali_position in qualifying_observations.items():
+        driver_entry = drivers_payload.get(driver_code)
+        if not isinstance(driver_entry, dict):
+            continue
+
+        pace_payload = driver_entry.get("pace")
+        if not isinstance(pace_payload, dict):
+            pace_payload = {}
+            driver_entry["pace"] = pace_payload
+
+        try:
+            existing_quali_pace = float(pace_payload.get("quali_pace", 0.5))
+        except (TypeError, ValueError):
+            existing_quali_pace = 0.5
+        existing_quali_pace = float(np.clip(existing_quali_pace, 0.05, 0.99))
+
+        observed_quali_pace = 1.0 - ((int(quali_position) - 1) / max(grid_size - 1, 1))
+        observed_quali_pace = float(np.clip(observed_quali_pace, 0.0, 1.0))
+        updated_quali_pace = ((1.0 - quali_pace_blend) * existing_quali_pace) + (
+            quali_pace_blend * observed_quali_pace
+        )
+        pace_payload["quali_pace"] = round(float(np.clip(updated_quali_pace, 0.05, 0.99)), 3)
+        touched_quali_pace_drivers += 1
+
+    if touched_skill_drivers == 0 and touched_quali_pace_drivers == 0:
         logger.warning("Bayesian update produced no persisted driver changes")
         return
 
     _persist_driver_characteristics_payload(store, driver_payload, season_year)
     logger.info(
-        "Updated Bayesian ratings for %s drivers and persisted %s driver profile updates",
+        "Updated Bayesian ratings for %s drivers, blended skill for %s drivers, and refreshed "
+        "qualifying pace for %s drivers",
         len(observations),
-        touched_drivers,
+        touched_skill_drivers,
+        touched_quali_pace_drivers,
     )
 
 
@@ -379,6 +450,18 @@ def update_from_race(year: int, race_name: str, data_dir: str = "data/processed"
         logger.error("Make sure race has completed and data is available via FastF1")
         raise
 
+    try:
+        qualifying_results, _qualifying_session = load_qualifying_session(year, race_name)
+        logger.info("Loaded qualifying results for %s drivers", len(qualifying_results))
+    except Exception as exc:
+        logger.warning(
+            "Could not load qualifying results for %s %s; skipping quali pace refresh (%s)",
+            year,
+            race_name,
+            exc,
+        )
+        qualifying_results = None
+
     # Update team characteristics
     char_file = Path(data_dir) / "car_characteristics" / f"{year}_car_characteristics.json"
     if char_file.exists():
@@ -387,7 +470,7 @@ def update_from_race(year: int, race_name: str, data_dir: str = "data/processed"
         logger.warning(f"Team characteristics file not found: {char_file}")
 
     # Update driver ratings
-    update_bayesian_driver_ratings(race_results)
+    update_bayesian_driver_ratings(race_results, qualifying_results=qualifying_results)
 
     logger.info("\n" + "=" * 60)
     logger.info("Race update complete.")
