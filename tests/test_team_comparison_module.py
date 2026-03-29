@@ -29,10 +29,18 @@ def _stub_streamlit_team(patcher):
         "captions": [],
         "success": [],
         "expanders": [],
+        "checkboxes": [],
     }
     patcher.setattr(team_comparison.st, "subheader", lambda *_args, **_kwargs: None)
     patcher.setattr(team_comparison.st, "selectbox", lambda _label, options, **_kwargs: options[0])
     patcher.setattr(team_comparison.st, "button", lambda *_args, **_kwargs: False)
+    patcher.setattr(
+        team_comparison.st,
+        "checkbox",
+        lambda label, value=False, **_kwargs: (
+            calls["checkboxes"].append((str(label), bool(value))) or value
+        ),
+    )
     patcher.setattr(
         team_comparison.st,
         "multiselect",
@@ -1892,7 +1900,7 @@ def test_build_snapshot_history_dataframe_keeps_missing_team_snapshot_as_gap_row
 
     assert frame["Snapshot"].tolist() == ["Chinese Grand Prix Q", "Chinese Grand Prix R"]
     assert frame["Has Data"].tolist() == [True, False]
-    assert frame["Overall"].isna().tolist() == [False, True]
+    assert frame["Radar Average"].isna().tolist() == [False, True]
 
 
 def test_snapshot_label_avoids_duplicate_testing_prefix():
@@ -1981,7 +1989,7 @@ def test_build_snapshot_history_dataframe_and_summary():
 
     assert list(frame["Snapshot"]) == ["Bahrain Grand Prix FP1", "Bahrain Grand Prix FP2"]
     assert frame.iloc[0]["Top Speed"] == pytest.approx(0.1, abs=1e-4)
-    assert round(float(frame.iloc[0]["Overall"]), 3) == 0.525
+    assert round(float(frame.iloc[0]["Radar Average"]), 3) == 0.525
 
 
 def test_build_snapshot_history_dataframe_keeps_partial_overall_points():
@@ -2032,7 +2040,7 @@ def test_build_snapshot_history_dataframe_keeps_partial_overall_points():
     assert frame["Snapshot"].tolist() == ["Bahrain Grand Prix FP1", "Bahrain Grand Prix FP2"]
     assert frame["Metric Count"].tolist() == [6, 5]
     assert frame["Metric Coverage"].tolist() == [1.0, 5 / 6]
-    assert frame["Overall"].round(3).tolist() == [0.605, 0.7]
+    assert frame["Radar Average"].round(3).tolist() == [0.605, 0.7]
     assert round(float(frame.iloc[1]["Slow Corners"]), 2) == 0.70
 
 
@@ -2075,19 +2083,44 @@ def test_build_snapshot_history_dataframe_exposes_qualifying_and_race_pace_colum
 def test_development_metric_options_include_profile_specific_pace_columns_when_available():
     history_df = pd.DataFrame(
         {
-            "Overall": [0.71],
             "Overall Pace": [0.74],
+            "Radar Average": [0.71],
             "Qualifying Pace": [0.81],
             "Race Pace": [0.77],
         }
     )
 
     assert team_comparison._development_metric_options(history_df)[:4] == [
-        "Overall",
         "Overall Pace",
+        "Radar Average",
         "Qualifying Pace",
         "Race Pace",
     ]
+
+
+def test_smooth_development_history_dataframe_preserves_gaps():
+    history_df = pd.DataFrame(
+        {
+            "Snapshot": ["FP1", "FP2", "FP3"],
+            "Snapshot Order": [1, 2, 3],
+            "Snapshot Timestamp": [
+                "2027-03-01T10:00:00+00:00",
+                "2027-03-01T12:00:00+00:00",
+                "2027-03-01T14:00:00+00:00",
+            ],
+            "Team": ["McLaren", "McLaren", "McLaren"],
+            "Session": ["FP1", "FP2", "FP3"],
+            "Has Data": [True, True, False],
+            "Overall Pace": [0.30, 0.90, float("nan")],
+            "Radar Average": [0.35, 0.75, 0.55],
+        }
+    )
+
+    smoothed = team_comparison._smooth_development_history_dataframe(history_df)
+
+    assert smoothed.iloc[1]["Overall Pace"] == pytest.approx(0.60)
+    assert math.isnan(smoothed.iloc[2]["Overall Pace"])
+    assert smoothed.iloc[1]["Radar Average"] == pytest.approx((0.35 + 0.75 + 0.55) / 3)
 
 
 def test_latest_snapshot_payload_skips_sprint_only_sessions():
@@ -2315,6 +2348,13 @@ def test_render_team_comparison_section_renders_development_history(patcher, tmp
 def test_render_team_comparison_section_overall_hover_uses_real_metric_coverage(patcher, tmp_path):
     calls = _stub_streamlit_team(patcher)
     patcher.setattr(team_comparison.config_loader, "get", lambda key, default=None: str(tmp_path))
+    patcher.setattr(
+        team_comparison.st,
+        "selectbox",
+        lambda label, options, **_kwargs: (
+            "Radar Average" if label == "Development metric" else options[0]
+        ),
+    )
 
     data_path = tmp_path / "car_characteristics" / "2027_car_characteristics.json"
     data_path.parent.mkdir(parents=True, exist_ok=True)

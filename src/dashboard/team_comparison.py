@@ -88,6 +88,7 @@ _apply_profile_tire_deg_fallbacks = team_snapshot_history._apply_profile_tire_de
 _apply_profile_braking_fallbacks = team_snapshot_history._apply_profile_braking_fallbacks
 _build_snapshot_history_dataframe = team_snapshot_history._build_snapshot_history_dataframe
 _ordered_snapshot_labels = team_snapshot_history._ordered_snapshot_labels
+_smooth_development_history_dataframe = team_snapshot_history._smooth_development_history_dataframe
 _build_development_summary_table = team_snapshot_history._build_development_summary_table
 
 _build_same_event_display_metric_fallbacks = (
@@ -131,9 +132,16 @@ def _run_characteristics_season_sync(year: int, payload: dict[str, Any]) -> dict
 
 def _development_metric_options(history_df: Any) -> list[str]:
     """Return development metrics that make sense for the available history payload."""
-    options = ["Overall", "Overall Pace"]
+    columns = set(getattr(history_df, "columns", []))
+    options: list[str] = []
+    if "Overall Pace" in columns:
+        options.append("Overall Pace")
+    if "Radar Average" in columns:
+        options.append("Radar Average")
+    elif "Overall" in columns:
+        options.append("Overall")
     for label_name in ("Qualifying Pace", "Race Pace"):
-        if label_name in getattr(history_df, "columns", []):
+        if label_name in columns:
             options.append(label_name)
     options.extend(label for _, label in _TEAM_RADAR_METRICS)
     return options
@@ -272,16 +280,27 @@ def _render_development_history_section(
         return
 
     metric_options = _development_metric_options(history_df)
+    smooth_development = st.checkbox(
+        "Smooth development curves",
+        value=True,
+        help="Uses a centered three-session rolling mean per team while keeping missing sessions as gaps.",
+    )
+    if smooth_development:
+        history_df = _smooth_development_history_dataframe(history_df)
     metric_label = st.selectbox(
         "Development metric",
         options=metric_options,
         index=0,
         help=(
-            "Overall averages the radar metrics that are available in each snapshot. "
-            "Overall Pace follows the selected comparison profile. Qualifying Pace always uses "
-            "the short-run profile when snapshots store it, Race Pace uses long-run, and the "
-            "other options show one feature at a time."
+            "Overall Pace tracks actual session pace for the selected profile. "
+            "Radar Average is the mean of the six radar metrics in that snapshot. "
+            "Qualifying Pace always uses the short-run profile when snapshots store it, "
+            "Race Pace uses long-run, and the other options show one feature at a time."
         ),
+    )
+    st.caption(
+        "Overall Pace reflects actual lap-time performance for the selected profile. "
+        "Radar Average is the mean of the six radar spokes, so the two can move in different directions."
     )
 
     if metric_label not in history_df.columns:
@@ -289,7 +308,7 @@ def _render_development_history_section(
         return
 
     metric_frame_columns = ["Snapshot Order", "Snapshot", "Team", metric_label]
-    if metric_label == "Overall":
+    if metric_label in {"Radar Average", "Overall"}:
         metric_frame_columns.extend(["Metric Count", "Metric Coverage"])
     metric_frame = history_df[metric_frame_columns].copy()
     if metric_frame[metric_label].dropna().empty:
@@ -311,13 +330,13 @@ def _render_development_history_section(
             trace_color = _team_brand_color(team_name)
             customdata = None
             hovertemplate = f"{metric_label}: %{{y:.2f}}<extra>{team_name}</extra>"
-            if metric_label == "Overall":
+            if metric_label in {"Radar Average", "Overall"}:
                 coverage_frame = team_frame.reindex(
                     columns=["Metric Count", "Metric Coverage"]
                 ).fillna({"Metric Count": 0, "Metric Coverage": 0.0})
                 customdata = coverage_frame.to_numpy()
                 hovertemplate = (
-                    "Overall: %{y:.2f}<br>"
+                    "Radar Average: %{y:.2f}<br>"
                     "Coverage: %{customdata[0]:.0f}/6 metrics (%{customdata[1]:.0%})"
                     f"<extra>{team_name}</extra>"
                 )
@@ -369,9 +388,12 @@ def _render_development_history_section(
         st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
     except Exception as exc:
         st.info(f"Development chart unavailable ({exc}).")
-    if metric_label == "Overall":
+    st.caption(
+        "Each point is relative to the field in that session. Big swings can come from fuel loads, tires, and run plans, not just real development."
+    )
+    if metric_label in {"Radar Average", "Overall"}:
         st.caption(
-            "Each point is one session snapshot. Overall averages the available radar metrics, "
+            "Each point is one session snapshot. Radar Average is the mean of the available radar metrics, "
             "and the hover shows how complete each session snapshot is."
         )
     elif metric_label == "Overall Pace":

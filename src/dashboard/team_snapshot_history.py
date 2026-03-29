@@ -27,6 +27,7 @@ _PROFILE_DEVELOPMENT_PACE_LABELS = {
     "short_run": "Qualifying Pace",
     "long_run": "Race Pace",
 }
+_RADAR_AVERAGE_LABEL = "Radar Average"
 
 
 def _snapshot_label(snapshot_payload: dict[str, Any]) -> str:
@@ -576,7 +577,7 @@ def _build_snapshot_history_dataframe(
                     row[label_name] = profile_pace
             metric_count = len(metric_values)
             if metric_count:
-                row["Overall"] = float(sum(metric_values) / metric_count)
+                row[_RADAR_AVERAGE_LABEL] = float(sum(metric_values) / metric_count)
                 row["Metric Count"] = metric_count
                 row["Metric Coverage"] = float(metric_count / len(_TEAM_RADAR_METRICS))
             row["Has Data"] = bool(metric_values or overall_pace is not None)
@@ -629,6 +630,57 @@ def _ordered_snapshot_labels(history_df: pd.DataFrame) -> list[str]:
         .sort_values(["Snapshot Timestamp", "Snapshot Order", "Snapshot"])
     )
     return [str(label) for label in ordered["Snapshot"]]
+
+
+def _smooth_development_history_dataframe(
+    history_df: pd.DataFrame,
+    *,
+    window: int = 3,
+) -> pd.DataFrame:
+    """Return a per-team smoothed copy of the development-history dataframe."""
+    if history_df.empty or "Team" not in history_df.columns:
+        return history_df.copy()
+
+    smoothed = history_df.copy()
+    excluded_columns = {
+        "Snapshot",
+        "Session",
+        "Team",
+        "Has Data",
+        "Snapshot Order",
+        "Snapshot Timestamp",
+        "Metric Count",
+        "Metric Coverage",
+    }
+    metric_columns = [
+        column_name
+        for column_name in smoothed.columns
+        if column_name not in excluded_columns
+        and pd.api.types.is_numeric_dtype(smoothed[column_name])
+    ]
+    if not metric_columns:
+        return smoothed
+
+    sort_columns = [
+        column_name
+        for column_name in ("Team", "Snapshot Timestamp", "Snapshot Order", "Snapshot")
+        if column_name in smoothed.columns
+    ]
+    if sort_columns:
+        smoothed = smoothed.sort_values(sort_columns).reset_index(drop=True)
+
+    for team_name in smoothed["Team"].dropna().unique():
+        team_mask = smoothed["Team"] == team_name
+        for column_name in metric_columns:
+            original_values = smoothed.loc[team_mask, column_name]
+            rolling_mean = original_values.rolling(
+                window=window,
+                center=True,
+                min_periods=1,
+            ).mean()
+            smoothed.loc[team_mask, column_name] = rolling_mean.where(original_values.notna())
+
+    return smoothed
 
 
 def _build_development_summary_table(history_df: pd.DataFrame, metric_label: str) -> pd.DataFrame:
