@@ -3,11 +3,11 @@
   "year": 2026,
   "teams": {
     "RB": {
-      "note": "2025 P6 seed with high uncertainty for 2026 regulation reset",
-      "uncertainty": 0.243,
-      "last_updated": "2026-03-27T20:51:39.538758",
-      "races_completed": 2,
-      "overall_performance": 0.48,
+      "note": "2025 P6 seed, updated with 3 race(s) of 2026 data",
+      "uncertainty": 0.219,
+      "last_updated": "2026-03-29T17:35:56.192557",
+      "races_completed": 3,
+      "overall_performance": 0.5441,
       "directionality": {
         "max_speed": 0.0368,
         "slow_corner_speed": -0.0016,
@@ -76,52 +76,56 @@
           "run_profile": "long_run"
         }
       },
+      "current_season_performance": [
+        0.5,
+        0.7,
+        0.6
+      ],
       "compound_characteristics": {
+        "SOFT": {
+          "track_name": "Australian Grand Prix",
+          "median_lap_time": 84.232,
+          "tire_deg_slope": 0.03155632411067195,
+          "consistency": 0.9200294912784762,
+          "pace_performance": 0.8776758409785959,
+          "tire_deg_performance": 0.9303534999575845,
+          "consistency_performance": 1.0,
+          "laps_sampled": 23.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
+        },
         "HARD": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.8746484358097868,
-          "tire_deg_slope": -0.1625000000000016,
-          "tire_deg_performance": 0.871037453866772,
-          "consistency": 12.73841778338986,
-          "median_lap_time": 97.01050000000001,
-          "laps_sampled": 36.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 98.456,
+          "tire_deg_slope": -0.04623402635495655,
+          "consistency": 1.5917630360089043,
+          "pace_performance": 0.5213220727765624,
+          "tire_deg_performance": 0.29320702280889066,
+          "consistency_performance": 0.0,
+          "laps_sampled": 79.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
         },
         "MEDIUM": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.30226624643554056,
-          "tire_deg_slope": null,
-          "tire_deg_performance": null,
-          "consistency": 16.28247534499267,
-          "median_lap_time": 97.047,
-          "laps_sampled": 34.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "SOFT": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.6178894534638739,
-          "tire_deg_slope": null,
-          "tire_deg_performance": null,
-          "consistency": 16.25209141976318,
-          "median_lap_time": 100.5215,
-          "laps_sampled": 36.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 97.164,
+          "tire_deg_slope": 0.10584590409590865,
+          "consistency": 1.5434400819434844,
+          "pace_performance": 0.9879047499055054,
+          "tire_deg_performance": 0.0,
+          "consistency_performance": 0.3821594530238922,
+          "laps_sampled": 19.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
         }
-      },
-      "current_season_performance": [
-        0.5707831325301191,
-        0.5542512342292941
-      ]
+      }
     },
     "Audi": {
-      "note": "2025 P10 seed with high uncertainty for 2026 regulation reset",
-      "uncertainty": 0.243,
-      "last_updated": "2026-03-27T20:51:39.538758",
-      "races_completed": 2,
-      "overall_performance": 0.38,
+      "note": "2025 P10 seed, updated with 3 race(s) of 2026 data",
+      "uncertainty": 0.219,
+      "last_updated": "2026-03-29T17:35:56.192557",
+      "races_completed": 3,
+      "overall_performance": 0.4225,
       "directionality": {
         "max_speed": 0.0221,
         "slow_corner_speed": 0.0197,
@@ -190,52 +194,44 @@
           "run_profile": "long_run"
         }
       },
+      "current_season_performance": [
+        0.6,
+        0.19999999999999996,
+        0.4
+      ],
       "compound_characteristics": {
-        "SOFT": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.9788534204982029,
-          "tire_deg_slope": -0.06196099999998144,
-          "tire_deg_performance": 0.7335033195020308,
-          "consistency": 19.73130075257479,
-          "median_lap_time": 95.112487,
-          "laps_sampled": 58.0,
-          "sessions_used": 4.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
         "HARD": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.5942425669073035,
-          "tire_deg_slope": 0.17780000000000737,
-          "tire_deg_performance": 0.47298932345688294,
-          "consistency": 15.668511912590834,
-          "median_lap_time": 98.53838775,
-          "laps_sampled": 38.0,
-          "sessions_used": 4.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 98.775,
+          "tire_deg_slope": -0.07175517241379302,
+          "consistency": 0.8496947235052754,
+          "pace_performance": 0.4548013762902725,
+          "tire_deg_performance": 0.529052499115259,
+          "consistency_performance": 0.7440387535186592,
+          "laps_sampled": 29.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
         },
         "MEDIUM": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.5689038501998711,
-          "tire_deg_slope": null,
-          "tire_deg_performance": null,
-          "consistency": 15.809311781112552,
-          "median_lap_time": 96.108,
-          "laps_sampled": 24.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 97.116,
+          "tire_deg_slope": 0.0640105263157903,
+          "consistency": 0.7038379124610601,
+          "pace_performance": 1.0,
+          "tire_deg_performance": 0.18432044383293078,
+          "consistency_performance": 0.8258733127513577,
+          "laps_sampled": 19.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
         }
-      },
-      "current_season_performance": [
-        0.6549053356282271,
-        0.561821173889191
-      ]
+      }
     },
     "Alpine": {
-      "note": "2025 P9 seed with high uncertainty for 2026 regulation reset",
-      "uncertainty": 0.243,
-      "last_updated": "2026-03-27T20:51:39.538758",
-      "races_completed": 2,
-      "overall_performance": 0.4,
+      "note": "2025 P9 seed, updated with 3 race(s) of 2026 data",
+      "uncertainty": 0.219,
+      "last_updated": "2026-03-29T17:35:56.192557",
+      "races_completed": 3,
+      "overall_performance": 0.4568,
       "directionality": {
         "max_speed": 0.0302,
         "slow_corner_speed": -0.0026,
@@ -304,64 +300,56 @@
           "run_profile": "long_run"
         }
       },
+      "current_season_performance": [
+        0.30000000000000004,
+        0.8,
+        0.5
+      ],
       "compound_characteristics": {
         "SOFT": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.9436733176353951,
-          "tire_deg_slope": null,
-          "tire_deg_performance": null,
-          "consistency": 11.899009992432141,
-          "median_lap_time": 95.264,
-          "laps_sampled": 22.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "track_name": "Australian Grand Prix",
+          "median_lap_time": 83.912,
+          "tire_deg_slope": 0.11266666666666514,
+          "consistency": 1.3428038245071805,
+          "pace_performance": 1.0,
+          "tire_deg_performance": 0.5639363679244552,
+          "consistency_performance": 0.6278927906186322,
+          "laps_sampled": 9.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
         },
         "HARD": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 1.0,
-          "tire_deg_slope": -0.11102380952381014,
-          "tire_deg_performance": 1.0,
-          "consistency": 16.593246992819275,
-          "median_lap_time": 96.137,
-          "laps_sampled": 36.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 98.225,
+          "tire_deg_slope": -0.048223528254689854,
+          "consistency": 1.027125659610771,
+          "pace_performance": 0.5694922323011187,
+          "tire_deg_performance": 0.31159236577402616,
+          "consistency_performance": 0.5661366785867962,
+          "laps_sampled": 69.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
         },
         "MEDIUM": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.26974268347591057,
-          "tire_deg_slope": -0.103500000000001,
-          "tire_deg_performance": 0.0,
-          "consistency": 13.749649068186466,
-          "median_lap_time": 96.99586325000001,
-          "laps_sampled": 58.0,
-          "sessions_used": 4.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "TEST_UNKNOWN": {
-          "track_name": "Testing 2",
-          "median_lap_time": 98.03,
-          "tire_deg_slope": null,
-          "consistency": 7.20039805970349,
-          "pace_performance": 1.0,
-          "tire_deg_performance": null,
-          "consistency_performance": 0.7089475747302947,
-          "laps_sampled": 11.0,
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 97.595,
+          "tire_deg_slope": 0.013432947487298143,
+          "consistency": 0.7893772905883172,
+          "pace_performance": 0.8792994834320271,
+          "tire_deg_performance": 0.4071577234831958,
+          "consistency_performance": 0.7806673699761861,
+          "laps_sampled": 30.0,
           "sessions_used": 1,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "last_updated": "2026-03-29T17:35:53.462276"
         }
-      },
-      "current_season_performance": [
-        0.47988382099828064,
-        0.6229292375205695
-      ]
+      }
     },
     "Ferrari": {
-      "note": "2025 P4 seed with high uncertainty for 2026 regulation reset",
-      "uncertainty": 0.243,
-      "last_updated": "2026-03-27T20:51:39.538758",
-      "races_completed": 2,
-      "overall_performance": 0.7,
+      "note": "2025 P4 seed, updated with 3 race(s) of 2026 data",
+      "uncertainty": 0.219,
+      "last_updated": "2026-03-29T17:35:56.192557",
+      "races_completed": 3,
+      "overall_performance": 0.8214,
       "directionality": {
         "max_speed": 0.0083,
         "slow_corner_speed": 0.0178,
@@ -430,64 +418,44 @@
           "run_profile": "long_run"
         }
       },
+      "current_season_performance": [
+        0.9,
+        0.9,
+        0.8
+      ],
       "compound_characteristics": {
-        "SOFT": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.8610715572764566,
-          "tire_deg_slope": 0.02150000000000122,
-          "tire_deg_performance": 0.674550232464135,
-          "consistency": 17.51081098070119,
-          "median_lap_time": 95.99499250000001,
-          "laps_sampled": 54.0,
-          "sessions_used": 4.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
         "HARD": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.8542685301371644,
-          "tire_deg_slope": 0.7242285714285748,
-          "tire_deg_performance": 0.0,
-          "consistency": 18.494100706330585,
-          "median_lap_time": 97.246,
-          "laps_sampled": 26.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 96.74799999999999,
+          "tire_deg_slope": -0.03173822108124297,
+          "consistency": 0.708344377435964,
+          "pace_performance": 0.8774893128975125,
+          "tire_deg_performance": 0.15924869306375655,
+          "consistency_performance": 0.8857644323096227,
+          "laps_sampled": 86.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
         },
         "MEDIUM": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.7684226324478458,
-          "tire_deg_slope": null,
-          "tire_deg_performance": null,
-          "consistency": 14.705279574077423,
-          "median_lap_time": 95.494,
-          "laps_sampled": 46.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "TEST_UNKNOWN": {
-          "track_name": "Testing 2",
-          "median_lap_time": 98.255,
-          "tire_deg_slope": 0.003446428571425928,
-          "consistency": 7.388830717266506,
-          "pace_performance": 0.88549618320611,
-          "tire_deg_performance": 0.7981330379336274,
-          "consistency_performance": 0.6970837877375547,
-          "laps_sampled": 19.0,
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 98.133,
+          "tire_deg_slope": -0.12112499999999411,
+          "consistency": 0.5121870711305931,
+          "pace_performance": 0.7437318886229058,
+          "tire_deg_performance": 1.0,
+          "consistency_performance": 0.9271571560020005,
+          "laps_sampled": 16.0,
           "sessions_used": 1,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "last_updated": "2026-03-29T17:35:53.462276"
         }
-      },
-      "current_season_performance": [
-        0.9506239242685022,
-        0.9041140976412482
-      ]
+      }
     },
     "McLaren": {
-      "note": "2025 P1 seed with high uncertainty for 2026 regulation reset",
-      "uncertainty": 0.27,
-      "last_updated": "2026-03-27T20:51:39.538758",
-      "races_completed": 1,
-      "overall_performance": 0.85,
+      "note": "2025 P1 seed, updated with 3 race(s) of 2026 data",
+      "uncertainty": 0.219,
+      "last_updated": "2026-03-29T17:35:56.192557",
+      "races_completed": 3,
+      "overall_performance": 0.6632,
       "directionality": {
         "max_speed": 0.0016,
         "slow_corner_speed": 0.0435,
@@ -556,62 +524,44 @@
           "run_profile": "long_run"
         }
       },
+      "current_season_performance": [
+        0.8,
+        0.0,
+        0.9
+      ],
       "compound_characteristics": {
-        "SOFT": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.26850000000000007,
-          "tire_deg_slope": 0.15800000000000777,
-          "tire_deg_performance": 0.0,
-          "consistency": 19.1755990965709,
-          "median_lap_time": 99.17412200000001,
-          "laps_sampled": 44.0,
-          "sessions_used": 4.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+        "MEDIUM": {
+          "track_name": "Australian Grand Prix",
+          "median_lap_time": 83.3355,
+          "tire_deg_slope": -0.13157434123847203,
+          "consistency": 1.3333090293483845,
+          "pace_performance": 1.0,
+          "tire_deg_performance": 0.782964070255323,
+          "consistency_performance": 0.0,
+          "laps_sampled": 32.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:52.147275"
         },
         "HARD": {
           "track_name": "Australian Grand Prix",
-          "pace_performance": 0.8155930824008144,
-          "tire_deg_slope": 0.022390936274508687,
-          "tire_deg_performance": 0.40935893983801513,
-          "consistency": 1.8321160937180474,
-          "median_lap_time": 83.897145,
-          "laps_sampled": 50.0,
-          "sessions_used": 3.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "MEDIUM": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.5631434751558124,
-          "tire_deg_slope": 0.11288227916666485,
-          "tire_deg_performance": 0.26850000000000007,
-          "consistency": 14.803140309867782,
-          "median_lap_time": 96.15737,
-          "laps_sampled": 72.0,
-          "sessions_used": 4.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "TEST_UNKNOWN": {
-          "track_name": "Testing 2",
-          "pace_performance": 0.5024961499224181,
-          "tire_deg_slope": 0.08858052289815677,
-          "tire_deg_performance": 0.905201913382459,
-          "consistency": 3.933652411324193,
-          "median_lap_time": 99.79128,
-          "laps_sampled": 48.0,
-          "sessions_used": 3.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "median_lap_time": 83.961,
+          "tire_deg_slope": 0.022914215686274105,
+          "consistency": 0.34558500061064357,
+          "pace_performance": 0.7973550356052905,
+          "tire_deg_performance": 0.4498449888329836,
+          "consistency_performance": 0.9785402198098886,
+          "laps_sampled": 17.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:52.147275"
         }
-      },
-      "current_season_performance": [
-        0.863489672977624
-      ]
+      }
     },
     "Mercedes": {
-      "note": "2025 P2 seed with high uncertainty for 2026 regulation reset",
-      "uncertainty": 0.243,
-      "last_updated": "2026-03-27T20:51:39.538758",
-      "races_completed": 2,
-      "overall_performance": 0.75,
+      "note": "2025 P2 seed, updated with 3 race(s) of 2026 data",
+      "uncertainty": 0.219,
+      "last_updated": "2026-03-29T17:35:56.192557",
+      "races_completed": 3,
+      "overall_performance": 0.9143,
       "directionality": {
         "max_speed": 0.0003,
         "slow_corner_speed": 0.0481,
@@ -680,76 +630,44 @@
           "consistency": 0.0
         }
       },
-      "compound_characteristics": {
-        "SOFT": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.8988102614946092,
-          "tire_deg_slope": -0.09914285714284506,
-          "tire_deg_performance": 0.9184209766380735,
-          "consistency": 21.772430208484614,
-          "median_lap_time": 95.988,
-          "laps_sampled": 32.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "HARD": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 1.0,
-          "tire_deg_slope": 0.08537142857143766,
-          "tire_deg_performance": 0.627552237549282,
-          "consistency": 15.763589060336415,
-          "median_lap_time": 95.56200000000001,
-          "laps_sampled": 40.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "MEDIUM": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 1.0,
-          "tire_deg_slope": 0.09485714285714339,
-          "tire_deg_performance": 0.6172653564587428,
-          "consistency": 16.92952395621501,
-          "median_lap_time": 94.7225,
-          "laps_sampled": 48.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "TEST_UNKNOWN": {
-          "track_name": "Testing 2",
-          "median_lap_time": 96.035,
-          "tire_deg_slope": 0.40784999999999666,
-          "consistency": 1.8920292339766362,
-          "pace_performance": 1.0,
-          "tire_deg_performance": 0.0,
-          "consistency_performance": 0.0,
-          "laps_sampled": 10.0,
-          "sessions_used": 1,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "UNKNOWN": {
-          "track_name": "Testing 2",
-          "median_lap_time": 98.275,
-          "tire_deg_slope": 0.15935454545454808,
-          "consistency": 0.6421536916006686,
-          "pace_performance": null,
-          "tire_deg_performance": null,
-          "consistency_performance": null,
-          "laps_sampled": 11.0,
-          "sessions_used": 1,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        }
-      },
       "current_season_performance": [
         1.0,
+        1.0,
         1.0
-      ]
+      ],
+      "compound_characteristics": {
+        "HARD": {
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 96.16050000000001,
+          "tire_deg_slope": -0.04515961945031563,
+          "consistency": 0.8898610565700678,
+          "pace_performance": 1.0,
+          "tire_deg_performance": 0.28327823639829164,
+          "consistency_performance": 0.7037657653268918,
+          "laps_sampled": 86.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
+        },
+        "MEDIUM": {
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 97.3885,
+          "tire_deg_slope": -0.11676785714285122,
+          "consistency": 0.3743527247129384,
+          "pace_performance": 0.9313342572760503,
+          "tire_deg_performance": 0.9808030774935722,
+          "consistency_performance": 1.0,
+          "laps_sampled": 16.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
+        }
+      }
     },
     "Williams": {
-      "note": "2025 P5 seed with high uncertainty for 2026 regulation reset",
-      "uncertainty": 0.243,
-      "last_updated": "2026-03-27T20:51:39.538758",
-      "races_completed": 2,
-      "overall_performance": 0.55,
+      "note": "2025 P5 seed, updated with 3 race(s) of 2026 data",
+      "uncertainty": 0.219,
+      "last_updated": "2026-03-29T17:35:56.192557",
+      "races_completed": 3,
+      "overall_performance": 0.3406,
       "directionality": {
         "max_speed": 0.0307,
         "slow_corner_speed": 0.0069,
@@ -818,64 +736,56 @@
           "run_profile": "long_run"
         }
       },
+      "current_season_performance": [
+        0.19999999999999996,
+        0.30000000000000004,
+        0.19999999999999996
+      ],
       "compound_characteristics": {
-        "SOFT": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.0,
-          "tire_deg_slope": -0.047000000000001194,
-          "tire_deg_performance": 0.8130179907014567,
-          "consistency": 22.03095080050433,
-          "median_lap_time": 110.493,
-          "laps_sampled": 24.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
         "HARD": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.0,
-          "tire_deg_slope": 0.10985790303030833,
-          "tire_deg_performance": 0.6629753983613283,
-          "consistency": 10.197145618377697,
-          "median_lap_time": 99.88333075000001,
-          "laps_sampled": 52.0,
-          "sessions_used": 4.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 98.621,
+          "tire_deg_slope": -0.02859436026253824,
+          "consistency": 0.5944113402883681,
+          "pace_performance": 0.486914815973311,
+          "tire_deg_performance": 0.13019571282066833,
+          "consistency_performance": 1.0,
+          "laps_sampled": 42.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
         },
-        "MEDIUM": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.45184158787333184,
-          "tire_deg_slope": 0.008033333333328284,
-          "tire_deg_performance": 1.0,
-          "consistency": 15.162071816837953,
-          "median_lap_time": 96.64561825,
-          "laps_sampled": 56.0,
-          "sessions_used": 4.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "TEST_UNKNOWN": {
-          "track_name": "Testing 2",
-          "median_lap_time": 99.995,
-          "tire_deg_slope": -0.08550000000001298,
-          "consistency": 18.46062008333174,
-          "pace_performance": 0.0,
+        "SOFT": {
+          "track_name": "Australian Grand Prix",
+          "median_lap_time": 84.86850000000001,
+          "tire_deg_slope": 0.016139328063239422,
+          "consistency": 2.0561921953861746,
+          "pace_performance": 0.6343654434250743,
           "tire_deg_performance": 1.0,
           "consistency_performance": 0.0,
-          "laps_sampled": 9.0,
+          "laps_sampled": 42.0,
           "sessions_used": 1,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "last_updated": "2026-03-29T17:35:53.462276"
+        },
+        "MEDIUM": {
+          "track_name": "Australian Grand Prix",
+          "median_lap_time": 86.03,
+          "tire_deg_slope": 0.04521212121211943,
+          "consistency": 1.0037950327812235,
+          "pace_performance": 0.4319595235585525,
+          "tire_deg_performance": 0.14089359214833996,
+          "consistency_performance": 0.3455154243104047,
+          "laps_sampled": 19.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
         }
-      },
-      "current_season_performance": [
-        0.47525817555938143,
-        0.4925946242457493
-      ]
+      }
     },
     "Cadillac F1": {
-      "note": "2025 P11 seed with high uncertainty for 2026 regulation reset",
-      "uncertainty": 0.243,
-      "last_updated": "2026-03-27T20:51:39.538758",
-      "races_completed": 2,
-      "overall_performance": 0.35,
+      "note": "2025 P11 seed, updated with 3 race(s) of 2026 data",
+      "uncertainty": 0.219,
+      "last_updated": "2026-03-29T17:35:56.192557",
+      "races_completed": 3,
+      "overall_performance": 0.2121,
       "directionality": {
         "max_speed": 0.0137,
         "slow_corner_speed": -0.0204,
@@ -944,63 +854,56 @@
           "run_profile": "long_run"
         }
       },
-      "compound_characteristics": {
-        "SOFT": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.9758334366092453,
-          "tire_deg_slope": 0.3552000000000059,
-          "tire_deg_performance": 0.0,
-          "consistency": 22.16151379201275,
-          "median_lap_time": 94.745,
-          "laps_sampled": 16.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "HARD": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.5931807364458479,
-          "tire_deg_slope": -0.2937857142857158,
-          "tire_deg_performance": 1.0,
-          "consistency": 12.342410802199725,
-          "median_lap_time": 100.263,
-          "laps_sampled": 26.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "MEDIUM": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.0,
-          "tire_deg_slope": 0.23010000000000194,
-          "tire_deg_performance": 0.021091023588964863,
-          "consistency": 12.696867511145738,
-          "median_lap_time": 98.054,
-          "laps_sampled": 34.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "TEST_UNKNOWN": {
-          "track_name": "Testing 2",
-          "pace_performance": 0.0,
-          "tire_deg_slope": 0.212085274725275,
-          "tire_deg_performance": 0.493130025869109,
-          "consistency": 0.8765876728814035,
-          "median_lap_time": 102.66025,
-          "laps_sampled": 26.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        }
-      },
       "current_season_performance": [
         0.0,
-        0.21930883159627224
-      ]
+        0.4,
+        0.09999999999999998
+      ],
+      "compound_characteristics": {
+        "SOFT": {
+          "track_name": "Australian Grand Prix",
+          "median_lap_time": 86.21,
+          "tire_deg_slope": 0.19420909090909258,
+          "consistency": 1.3794568825842635,
+          "pace_performance": 0.12155963302752759,
+          "tire_deg_performance": 0.19556730069591022,
+          "consistency_performance": 0.5956323952152565,
+          "laps_sampled": 11.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
+        },
+        "HARD": {
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 99.7415,
+          "tire_deg_slope": -0.014505712665099101,
+          "consistency": 1.2528079557350185,
+          "pace_performance": 0.2532582629548542,
+          "tire_deg_performance": 0.0,
+          "consistency_performance": 0.3398551200426926,
+          "laps_sampled": 84.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
+        },
+        "MEDIUM": {
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 101.08449999999999,
+          "tire_deg_slope": -0.011267857142850998,
+          "consistency": 0.4130980866170478,
+          "pace_performance": 0.0,
+          "tire_deg_performance": 0.5159857899199062,
+          "consistency_performance": 0.9795238093684204,
+          "laps_sampled": 16.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
+        }
+      }
     },
     "Aston Martin": {
-      "note": "2025 P7 seed with high uncertainty for 2026 regulation reset",
-      "uncertainty": 0.243,
-      "last_updated": "2026-03-27T20:51:39.538758",
-      "races_completed": 2,
-      "overall_performance": 0.47,
+      "note": "2025 P7 seed, updated with 3 race(s) of 2026 data",
+      "uncertainty": 0.219,
+      "last_updated": "2026-03-29T17:35:56.192557",
+      "races_completed": 3,
+      "overall_performance": 0.2169,
       "directionality": {
         "max_speed": -0.0437,
         "slow_corner_speed": -0.0324,
@@ -1069,17 +972,35 @@
           "tire_deg_performance": 0.6251
         }
       },
+      "current_season_performance": [
+        0.09999999999999998,
+        0.09999999999999998,
+        0.0
+      ],
       "compound_characteristics": {
         "HARD": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.5319977499891829,
-          "tire_deg_slope": null,
-          "tire_deg_performance": null,
-          "consistency": 15.836729833654921,
-          "median_lap_time": 100.97,
-          "laps_sampled": 28.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 100.956,
+          "tire_deg_slope": -0.12271701465201514,
+          "consistency": 0.9071165105080842,
+          "pace_performance": 0.0,
+          "tire_deg_performance": 1.0,
+          "consistency_performance": 0.6864644923536202,
+          "laps_sampled": 33.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
+        },
+        "SOFT": {
+          "track_name": "Australian Grand Prix",
+          "median_lap_time": 86.528,
+          "tire_deg_slope": 0.2374999999999972,
+          "consistency": 1.0020721110127337,
+          "pace_performance": 0.0,
+          "tire_deg_performance": 0.0,
+          "consistency_performance": 0.9277897263854556,
+          "laps_sampled": 27.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
         },
         "MEDIUM": {
           "track_name": "Australian Grand Prix",
@@ -1091,31 +1012,16 @@
           "consistency_performance": 1.0,
           "laps_sampled": 9.0,
           "sessions_used": 1,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "SOFT": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.44409370327296993,
-          "tire_deg_slope": -0.1432499999999989,
-          "tire_deg_performance": 1.0,
-          "consistency": 14.323155682382092,
-          "median_lap_time": 98.26999999999998,
-          "laps_sampled": 38.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "last_updated": "2026-03-29T17:35:53.462276"
         }
-      },
-      "current_season_performance": [
-        0.05217297762478634,
-        0.0
-      ]
+      }
     },
     "Haas F1 Team": {
-      "note": "2025 P8 seed with high uncertainty for 2026 regulation reset",
-      "uncertainty": 0.243,
-      "last_updated": "2026-03-27T20:51:39.538758",
-      "races_completed": 2,
-      "overall_performance": 0.43,
+      "note": "2025 P8 seed, updated with 3 race(s) of 2026 data",
+      "uncertainty": 0.219,
+      "last_updated": "2026-03-29T17:35:56.192557",
+      "races_completed": 3,
+      "overall_performance": 0.4413,
       "directionality": {
         "max_speed": -0.0265,
         "slow_corner_speed": -0.023,
@@ -1184,64 +1090,56 @@
           "consistency": 0.9735
         }
       },
+      "current_season_performance": [
+        0.4,
+        0.6,
+        0.30000000000000004
+      ],
       "compound_characteristics": {
         "SOFT": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.8291919692650883,
-          "tire_deg_slope": null,
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 96.4685,
+          "tire_deg_slope": -0.03964285714285153,
+          "consistency": 0.49840115798994233,
+          "pace_performance": null,
           "tire_deg_performance": null,
-          "consistency": 11.201940288172409,
-          "median_lap_time": 97.1115,
-          "laps_sampled": 28.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "consistency_performance": null,
+          "laps_sampled": 8.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
         },
         "HARD": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.9357448833888631,
-          "tire_deg_slope": -0.059767857142852675,
-          "tire_deg_performance": 0.7701232090484229,
-          "consistency": 16.26268630634844,
-          "median_lap_time": 96.30449999999999,
-          "laps_sampled": 36.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 97.7685,
+          "tire_deg_slope": -0.04369844753325529,
+          "consistency": 0.9369554002963653,
+          "pace_performance": 0.6646856427901171,
+          "tire_deg_performance": 0.26977528531803374,
+          "consistency_performance": 0.6565463702746037,
+          "laps_sampled": 66.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
         },
         "MEDIUM": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.5613087197958881,
-          "tire_deg_slope": null,
-          "tire_deg_performance": null,
-          "consistency": 14.562831581827494,
-          "median_lap_time": 96.184,
-          "laps_sampled": 70.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "TEST_UNKNOWN": {
-          "track_name": "Testing 2",
-          "median_lap_time": 99.6695,
-          "tire_deg_slope": 0.10891666666666137,
-          "consistency": 1.5815202988123673,
-          "pace_performance": 0.49242424242424143,
-          "tire_deg_performance": 1.0,
-          "consistency_performance": 0.974698085043921,
-          "laps_sampled": 10.0,
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 98.61,
+          "tire_deg_slope": -0.11845595238095064,
+          "consistency": 2.2665680591586965,
+          "pace_performance": 0.6235353408088691,
+          "tire_deg_performance": 0.9882405736996328,
+          "consistency_performance": 0.0,
+          "laps_sampled": 23.0,
           "sessions_used": 1,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "last_updated": "2026-03-29T17:35:53.462276"
         }
-      },
-      "current_season_performance": [
-        0.5697074010327019,
-        0.6736149204607799
-      ]
+      }
     },
     "Red Bull Racing": {
-      "note": "2025 P3 seed with high uncertainty for 2026 regulation reset",
-      "uncertainty": 0.243,
-      "last_updated": "2026-03-27T20:51:39.538758",
-      "races_completed": 2,
-      "overall_performance": 0.74,
+      "note": "2025 P3 seed, updated with 3 race(s) of 2026 data",
+      "uncertainty": 0.219,
+      "last_updated": "2026-03-29T17:35:56.192557",
+      "races_completed": 3,
+      "overall_performance": 0.6727,
       "directionality": {
         "max_speed": 0.0203,
         "slow_corner_speed": -0.0204,
@@ -1310,50 +1208,42 @@
           "run_profile": "long_run"
         }
       },
+      "current_season_performance": [
+        0.7,
+        0.5,
+        0.7
+      ],
       "compound_characteristics": {
         "HARD": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.9780018331805678,
-          "tire_deg_slope": 0.43701785714285657,
-          "tire_deg_performance": 0.0,
-          "consistency": 12.899272555738438,
-          "median_lap_time": 96.161,
-          "laps_sampled": 70.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "track_name": "Chinese Grand Prix",
+          "median_lap_time": 97.925,
+          "tire_deg_slope": -0.05967857142857262,
+          "consistency": 0.6539052301365997,
+          "pace_performance": 0.6320508810343055,
+          "tire_deg_performance": 0.417450468980915,
+          "consistency_performance": 0.9403481338593902,
+          "laps_sampled": 81.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
         },
         "MEDIUM": {
-          "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.18051756785187845,
-          "tire_deg_slope": null,
-          "tire_deg_performance": null,
-          "consistency": 13.775539908151831,
-          "median_lap_time": 97.031,
-          "laps_sampled": 58.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
-        },
-        "SOFT": {
-          "track_name": "Chinese Grand Prix",
-          "pace_performance": 0.5070588235294097,
-          "tire_deg_slope": 0.10004999999999772,
-          "tire_deg_performance": null,
-          "consistency": 2.3814236512105875,
-          "median_lap_time": 97.31812,
-          "laps_sampled": 37.0,
-          "sessions_used": 3.0,
-          "last_updated": "2026-03-27T20:51:39.538758"
+          "track_name": "Australian Grand Prix",
+          "median_lap_time": 83.74,
+          "tire_deg_slope": -0.00995081453634463,
+          "consistency": 0.9058171323947793,
+          "pace_performance": 0.9147254137240437,
+          "tire_deg_performance": 0.341239772725939,
+          "consistency_performance": 0.44825119935407565,
+          "laps_sampled": 29.0,
+          "sessions_used": 1,
+          "last_updated": "2026-03-29T17:35:53.462276"
         }
-      },
-      "current_season_performance": [
-        0.8601549053356299,
-        0.6509051014810737
-      ]
+      }
     }
   },
-  "version": 62,
+  "version": 4,
   "generated_at": "2026-02-27T15:34:51.528956",
-  "last_updated": "2026-03-27T20:51:39.538758",
+  "last_updated": "2026-03-29T17:35:56.192557",
   "data_freshness": "LIVE_UPDATED",
   "directionality_source": "SESSION_EXTRACTION",
   "directionality_last_updated": "2026-03-27T20:51:39.538758",
@@ -1380,5 +1270,5 @@
       "long_run"
     ]
   },
-  "races_completed": 2
+  "races_completed": 3
 }

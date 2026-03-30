@@ -1,5 +1,5 @@
 {
-  "note": "Driver characteristics carried over from 2025. Skills persist across regulation changes; 2026 skill scores were repaired against pace features and validator expectation bands.",
+  "note": "2026 driver baseline carried over from 2025 before in-season updates",
   "years": [
     2023,
     2024,
@@ -7,780 +7,780 @@
   ],
   "method": "global_teammate_network_ranking",
   "drivers": {
-    "ALB": {
-      "name": "Driver ALB",
-      "pace": {
-        "race_pace": 0.75,
-        "quali_pace": 0.765
-      },
-      "bayesian": {
-        "rating_mu": -0.47557783925201536,
-        "rating_sigma": 1.946849648855788,
-        "normalized_skill_score": 0.0,
-        "blended_skill_score": 0.758,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.826000",
-        "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.2
-      },
-      "racecraft": {
-        "skill_score": 0.758,
-        "overtaking_skill": 0.75
-      },
-      "experience": {
-        "tier": "established",
-        "debut_year": 2019,
-        "total_races": 70,
-        "years_of_experience": 6
-      }
-    },
-    "ALO": {
-      "name": "Driver ALO",
-      "pace": {
-        "race_pace": 0.758,
-        "quali_pace": 0.748
-      },
-      "bayesian": {
-        "rating_mu": 5.230010445272375,
-        "rating_sigma": 1.7366593252010774,
-        "normalized_skill_score": 0.22263212869854604,
-        "blended_skill_score": 0.8,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825992",
-        "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.1
-      },
-      "racecraft": {
-        "skill_score": 0.8,
-        "overtaking_skill": 0.758
-      },
-      "experience": {
-        "tier": "veteran",
-        "debut_year": 2001,
-        "total_races": 70,
-        "years_of_experience": 24
-      }
-    },
-    "ANT": {
-      "name": "Driver ANT",
-      "pace": {
-        "race_pace": 0.265,
-        "quali_pace": 0.315
-      },
-      "bayesian": {
-        "rating_mu": 19.48251045970519,
-        "rating_sigma": 1.9523868371085698,
-        "normalized_skill_score": 0.9727637084055363,
-        "blended_skill_score": 0.6568343244718946,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825991",
-        "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.167
-      },
-      "racecraft": {
-        "skill_score": 0.6568343244718946,
-        "overtaking_skill": 0.265
-      },
-      "experience": {
-        "tier": "rookie",
-        "debut_year": 2025,
-        "total_races": 24,
-        "years_of_experience": 0
-      }
-    },
-    "BEA": {
-      "name": "Driver BEA",
-      "pace": {
-        "race_pace": 0.532,
-        "quali_pace": 0.585
-      },
-      "bayesian": {
-        "rating_mu": 14.277985376618677,
-        "rating_sigma": 1.7366593252010774,
-        "normalized_skill_score": 0.6988413356115093,
-        "blended_skill_score": 0.6026455107580342,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825997",
-        "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.111
-      },
-      "racecraft": {
-        "skill_score": 0.6026455107580342,
-        "overtaking_skill": 0.532
-      },
-      "experience": {
-        "tier": "rookie",
-        "debut_year": 2024,
-        "total_races": 27,
-        "years_of_experience": 1
-      }
-    },
-    "BOR": {
-      "name": "Driver BOR",
-      "pace": {
-        "race_pace": 0.628,
-        "quali_pace": 0.708
-      },
-      "bayesian": {
-        "rating_mu": 0.5292328951495135,
-        "rating_sigma": 1.9403035459365847,
-        "normalized_skill_score": 0.0,
-        "blended_skill_score": 0.4430916496841539,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.826002",
-        "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.208
-      },
-      "racecraft": {
-        "skill_score": 0.4430916496841539,
-        "overtaking_skill": 0.628
-      },
-      "experience": {
-        "tier": "rookie",
-        "debut_year": 2025,
-        "total_races": 24,
-        "years_of_experience": 0
-      }
-    },
-    "BOT": {
-      "name": "Driver BOT",
-      "pace": {
-        "race_pace": 0.546,
-        "quali_pace": 0.637
-      },
-      "bayesian": {
-        "rating_mu": 8.246002089054475,
-        "rating_sigma": 1.7366593252010774,
-        "normalized_skill_score": 0.3813685310028671,
-        "blended_skill_score": 0.36597449364627394,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.826004",
-        "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.109
-      },
-      "racecraft": {
-        "skill_score": 0.36597449364627394,
-        "overtaking_skill": 0.546
-      },
-      "experience": {
-        "tier": "veteran",
-        "debut_year": 2013,
-        "total_races": 46,
-        "years_of_experience": 12
-      }
-    },
-    "COL": {
-      "name": "Driver COL",
-      "pace": {
-        "race_pace": 0.537,
-        "quali_pace": 0.655
-      },
-      "bayesian": {
-        "rating_mu": 10.50799582189105,
-        "rating_sigma": 1.7366593252010774,
-        "normalized_skill_score": 0.5004208327311079,
-        "blended_skill_score": 0.4640367563101689,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825995",
-        "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.111
-      },
-      "racecraft": {
-        "skill_score": 0.4640367563101689,
-        "overtaking_skill": 0.537
-      },
-      "experience": {
-        "tier": "rookie",
-        "debut_year": 2024,
-        "total_races": 27,
-        "years_of_experience": 1
-      }
-    },
-    "DEV": {
-      "name": "Driver DEV",
-      "pace": {
-        "race_pace": 0.466,
-        "quali_pace": 0.416
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.2
-      },
-      "racecraft": {
-        "skill_score": 0.466,
-        "overtaking_skill": 0.466
-      },
-      "experience": {
-        "tier": "developing",
-        "debut_year": 2022,
-        "total_races": 10,
-        "years_of_experience": 3
-      }
-    },
     "DOO": {
       "name": "Driver DOO",
       "pace": {
-        "race_pace": 0.415,
-        "quali_pace": 0.465
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.286
+        "quali_pace": 0.465,
+        "race_pace": 0.415
       },
       "racecraft": {
         "skill_score": 0.415,
         "overtaking_skill": 0.415
       },
       "experience": {
-        "tier": "rookie",
+        "years_of_experience": 0,
         "debut_year": 2025,
         "total_races": 7,
-        "years_of_experience": 0
-      }
-    },
-    "GAS": {
-      "name": "Driver GAS",
-      "pace": {
-        "race_pace": 0.712,
-        "quali_pace": 0.722
-      },
-      "bayesian": {
-        "rating_mu": 13.523987465673152,
-        "rating_sigma": 1.7366593252010774,
-        "normalized_skill_score": 0.659157235035429,
-        "blended_skill_score": 0.717,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825994",
-        "season_year": 2026
+        "tier": "rookie"
       },
       "dnf_risk": {
-        "dnf_rate": 0.129
-      },
-      "racecraft": {
-        "skill_score": 0.717,
-        "overtaking_skill": 0.712
-      },
-      "experience": {
-        "tier": "established",
-        "debut_year": 2017,
-        "total_races": 70,
-        "years_of_experience": 8
-      }
-    },
-    "HAD": {
-      "name": "Driver HAD",
-      "pace": {
-        "race_pace": 0.67,
-        "quali_pace": 0.705
-      },
-      "bayesian": {
-        "rating_mu": 12.015991643782101,
-        "rating_sigma": 1.7366593252010774,
-        "normalized_skill_score": 0.5797890338832685,
-        "blended_skill_score": 0.43676692852031057,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825984",
-        "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.125
-      },
-      "racecraft": {
-        "skill_score": 0.43676692852031057,
-        "overtaking_skill": 0.67
-      },
-      "experience": {
-        "tier": "rookie",
-        "debut_year": 2025,
-        "total_races": 24,
-        "years_of_experience": 0
+        "dnf_rate": 0.0
       }
     },
     "HAM": {
       "name": "Driver HAM",
       "pace": {
-        "race_pace": 0.635,
-        "quali_pace": 0.63
-      },
-      "bayesian": {
-        "rating_mu": 17.470767104850488,
-        "rating_sigma": 1.9403035459365847,
-        "normalized_skill_score": 0.8668824792026573,
-        "blended_skill_score": 0.82,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825989",
-        "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.1
+        "quali_pace": 0.74,
+        "race_pace": 0.635
       },
       "racecraft": {
-        "skill_score": 0.82,
+        "skill_score": 0.7320596690226122,
         "overtaking_skill": 0.635
       },
       "experience": {
-        "tier": "veteran",
+        "years_of_experience": 18,
         "debut_year": 2007,
         "total_races": 70,
-        "years_of_experience": 18
-      }
-    },
-    "HUL": {
-      "name": "Driver HUL",
-      "pace": {
-        "race_pace": 0.702,
-        "quali_pace": 0.671
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
       },
       "bayesian": {
-        "rating_mu": 9.753997910945525,
-        "rating_sigma": 1.7366593252010774,
-        "normalized_skill_score": 0.46073673215502764,
-        "blended_skill_score": 0.686,
+        "rating_mu": 16.399593469047236,
+        "rating_sigma": 1.8985682597379432,
+        "normalized_skill_score": 0.733313974716535,
+        "blended_skill_score": 0.7320596690226122,
         "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.826001",
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.199091",
         "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.114
-      },
-      "racecraft": {
-        "skill_score": 0.686,
-        "overtaking_skill": 0.702
-      },
-      "experience": {
-        "tier": "veteran",
-        "debut_year": 2010,
-        "total_races": 70,
-        "years_of_experience": 15
       }
     },
-    "LAW": {
-      "name": "Driver LAW",
+    "BEA": {
+      "name": "Driver BEA",
       "pace": {
-        "race_pace": 0.622,
-        "quali_pace": 0.643
+        "quali_pace": 0.448,
+        "race_pace": 0.532
+      },
+      "racecraft": {
+        "skill_score": 0.48102534761661314,
+        "overtaking_skill": 0.532
+      },
+      "experience": {
+        "years_of_experience": 1,
+        "debut_year": 2024,
+        "total_races": 27,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
       },
       "bayesian": {
-        "rating_mu": 12.769989554727625,
-        "rating_sigma": 1.7366593252010774,
-        "normalized_skill_score": 0.6194731344593487,
-        "blended_skill_score": 0.5460900425145951,
+        "rating_mu": 2.348693083506165,
+        "rating_sigma": 1.8276959741565917,
+        "normalized_skill_score": 0.06422348016696024,
+        "blended_skill_score": 0.48102534761661314,
         "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825998",
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.200889",
         "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.171
-      },
-      "racecraft": {
-        "skill_score": 0.5460900425145951,
-        "overtaking_skill": 0.622
-      },
-      "experience": {
-        "tier": "developing",
-        "debut_year": 2022,
-        "total_races": 35,
-        "years_of_experience": 3
       }
     },
-    "LEC": {
-      "name": "Driver LEC",
+    "ANT": {
+      "name": "Driver ANT",
       "pace": {
-        "race_pace": 0.852,
-        "quali_pace": 0.707
+        "quali_pace": 0.758,
+        "race_pace": 0.265
+      },
+      "racecraft": {
+        "skill_score": 0.6716581686738642,
+        "overtaking_skill": 0.265
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 24,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
       },
       "bayesian": {
-        "rating_mu": 16.469069470496674,
-        "rating_sigma": 1.9324925009401897,
-        "normalized_skill_score": 0.8141615510787723,
-        "blended_skill_score": 0.8453665764888046,
+        "rating_mu": 21.57901030929676,
+        "rating_sigma": 1.9637627277392595,
+        "normalized_skill_score": 0.9799528718712742,
+        "blended_skill_score": 0.6716581686738642,
         "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825987",
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.199541",
         "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.1
-      },
-      "racecraft": {
-        "skill_score": 0.8453665764888046,
-        "overtaking_skill": 0.852
-      },
-      "experience": {
-        "tier": "established",
-        "debut_year": 2018,
-        "total_races": 70,
-        "years_of_experience": 7
-      }
-    },
-    "MAG": {
-      "name": "Driver MAG",
-      "pace": {
-        "race_pace": 0.516,
-        "quali_pace": 0.605
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.159
-      },
-      "racecraft": {
-        "skill_score": 0.516,
-        "overtaking_skill": 0.516
-      },
-      "experience": {
-        "tier": "veteran",
-        "debut_year": 2014,
-        "total_races": 44,
-        "years_of_experience": 11
       }
     },
     "NOR": {
       "name": "Driver NOR",
       "pace": {
-        "race_pace": 0.777,
-        "quali_pace": 0.767
-      },
-      "bayesian": {
-        "rating_mu": 1.5309305295033284,
-        "rating_sigma": 1.9324925009401897,
-        "normalized_skill_score": 0.027943712079122548,
-        "blended_skill_score": 0.78,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825985",
-        "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.057
+        "quali_pace": 0.778,
+        "race_pace": 0.777
       },
       "racecraft": {
-        "skill_score": 0.78,
+        "skill_score": 0.6561134985574598,
         "overtaking_skill": 0.777
       },
       "experience": {
-        "tier": "established",
+        "years_of_experience": 6,
         "debut_year": 2019,
         "total_races": 70,
-        "years_of_experience": 6
-      }
-    },
-    "OCO": {
-      "name": "Driver OCO",
-      "pace": {
-        "race_pace": 0.687,
-        "quali_pace": 0.647
-      },
-      "bayesian": {
-        "rating_mu": 7.4920041781089495,
-        "rating_sigma": 1.7366593252010774,
-        "normalized_skill_score": 0.3416844304267868,
-        "blended_skill_score": 0.667,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825996",
-        "season_year": 2026
+        "tier": "established"
       },
       "dnf_risk": {
-        "dnf_rate": 0.145
-      },
-      "racecraft": {
-        "skill_score": 0.667,
-        "overtaking_skill": 0.687
-      },
-      "experience": {
-        "tier": "established",
-        "debut_year": 2016,
-        "total_races": 69,
-        "years_of_experience": 9
-      }
-    },
-    "PER": {
-      "name": "Driver PER",
-      "pace": {
-        "race_pace": 0.417,
-        "quali_pace": 0.467
+        "dnf_rate": 0.0
       },
       "bayesian": {
-        "rating_mu": 6.738006267163424,
-        "rating_sigma": 1.7366593252010774,
-        "normalized_skill_score": 0.3020003298507065,
-        "blended_skill_score": 0.3437685668599429,
+        "rating_mu": 17.401517730625145,
+        "rating_sigma": 1.9311266722136642,
+        "normalized_skill_score": 0.7810246538392926,
+        "blended_skill_score": 0.6561134985574598,
         "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.826003",
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.198379",
         "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.152
-      },
-      "racecraft": {
-        "skill_score": 0.3437685668599429,
-        "overtaking_skill": 0.417
-      },
-      "experience": {
-        "tier": "veteran",
-        "debut_year": 2011,
-        "total_races": 46,
-        "years_of_experience": 14
-      }
-    },
-    "PIA": {
-      "name": "Driver PIA",
-      "pace": {
-        "race_pace": 0.589,
-        "quali_pace": 0.584
-      },
-      "bayesian": {
-        "rating_mu": 3.7220146233813236,
-        "rating_sigma": 1.7366593252010774,
-        "normalized_skill_score": 0.14326392754638545,
-        "blended_skill_score": 0.72,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825986",
-        "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.071
-      },
-      "racecraft": {
-        "skill_score": 0.72,
-        "overtaking_skill": 0.589
-      },
-      "experience": {
-        "tier": "developing",
-        "debut_year": 2023,
-        "total_races": 70,
-        "years_of_experience": 2
       }
     },
     "RIC": {
       "name": "Driver RIC",
       "pace": {
-        "race_pace": 0.569,
-        "quali_pace": 0.656
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.08
+        "quali_pace": 0.656,
+        "race_pace": 0.569
       },
       "racecraft": {
         "skill_score": 0.569,
         "overtaking_skill": 0.569
       },
       "experience": {
-        "tier": "veteran",
+        "years_of_experience": 14,
         "debut_year": 2011,
         "total_races": 25,
-        "years_of_experience": 14
-      }
-    },
-    "RUS": {
-      "name": "Driver RUS",
-      "pace": {
-        "race_pace": 0.82,
-        "quali_pace": 0.795
-      },
-      "bayesian": {
-        "rating_mu": 18.475577839252015,
-        "rating_sigma": 1.946849648855788,
-        "normalized_skill_score": 0.9197672546974744,
-        "blended_skill_score": 0.807,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825990",
-        "season_year": 2026
+        "tier": "veteran"
       },
       "dnf_risk": {
-        "dnf_rate": 0.1
+        "dnf_rate": 0.0
+      }
+    },
+    "HUL": {
+      "name": "Driver HUL",
+      "pace": {
+        "quali_pace": 0.546,
+        "race_pace": 0.702
       },
       "racecraft": {
-        "skill_score": 0.807,
-        "overtaking_skill": 0.82
+        "skill_score": 0.5171862516005541,
+        "overtaking_skill": 0.702
       },
       "experience": {
-        "tier": "established",
-        "debut_year": 2019,
+        "years_of_experience": 15,
+        "debut_year": 2010,
         "total_races": 70,
-        "years_of_experience": 6
-      }
-    },
-    "SAI": {
-      "name": "Driver SAI",
-      "pace": {
-        "race_pace": 0.648,
-        "quali_pace": 0.716
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
       },
       "bayesian": {
-        "rating_mu": 11.261993732836576,
-        "rating_sigma": 1.7366593252010774,
-        "normalized_skill_score": 0.5401049333071882,
-        "blended_skill_score": 0.72,
+        "rating_mu": 11.414931233149414,
+        "rating_sigma": 1.664383654735451,
+        "normalized_skill_score": 0.49594910634044825,
+        "blended_skill_score": 0.5171862516005541,
         "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825999",
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.201745",
         "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.13
-      },
-      "racecraft": {
-        "skill_score": 0.72,
-        "overtaking_skill": 0.648
-      },
-      "experience": {
-        "tier": "veteran",
-        "debut_year": 2015,
-        "total_races": 69,
-        "years_of_experience": 10
       }
     },
-    "SAR": {
-      "name": "Driver SAR",
+    "ZHO": {
+      "name": "Driver ZHO",
       "pace": {
-        "race_pace": 0.47,
-        "quali_pace": 0.45
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.25
+        "quali_pace": 0.714,
+        "race_pace": 0.717
       },
       "racecraft": {
-        "skill_score": 0.47,
-        "overtaking_skill": 0.47
+        "skill_score": 0.717,
+        "overtaking_skill": 0.717
       },
       "experience": {
-        "tier": "developing",
-        "debut_year": 2023,
-        "total_races": 36,
-        "years_of_experience": 2
-      }
-    },
-    "STR": {
-      "name": "Driver STR",
-      "pace": {
-        "race_pace": 0.593,
-        "quali_pace": 0.603
-      },
-      "bayesian": {
-        "rating_mu": 4.476012534326848,
-        "rating_sigma": 1.7366593252010774,
-        "normalized_skill_score": 0.18294802812246572,
-        "blended_skill_score": 0.598,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825993",
-        "season_year": 2026
+        "years_of_experience": 3,
+        "debut_year": 2022,
+        "total_races": 46,
+        "tier": "developing"
       },
       "dnf_risk": {
-        "dnf_rate": 0.13
-      },
-      "racecraft": {
-        "skill_score": 0.598,
-        "overtaking_skill": 0.593
-      },
-      "experience": {
-        "tier": "established",
-        "debut_year": 2017,
-        "total_races": 69,
-        "years_of_experience": 8
+        "dnf_rate": 0.022
       }
     },
     "TSU": {
       "name": "Driver TSU",
       "pace": {
-        "race_pace": 0.547,
-        "quali_pace": 0.522
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.1
+        "quali_pace": 0.522,
+        "race_pace": 0.547
       },
       "racecraft": {
         "skill_score": 0.547,
         "overtaking_skill": 0.547
       },
       "experience": {
-        "tier": "developing",
+        "years_of_experience": 4,
         "debut_year": 2021,
         "total_races": 70,
-        "years_of_experience": 4
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "STR": {
+      "name": "Driver STR",
+      "pace": {
+        "quali_pace": 0.305,
+        "race_pace": 0.593
+      },
+      "racecraft": {
+        "skill_score": 0.35510905870076553,
+        "overtaking_skill": 0.593
+      },
+      "experience": {
+        "years_of_experience": 8,
+        "debut_year": 2017,
+        "total_races": 69,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.014
+      },
+      "bayesian": {
+        "rating_mu": 2.60343868861658,
+        "rating_sigma": 1.904782012515317,
+        "normalized_skill_score": 0.07635422326745618,
+        "blended_skill_score": 0.35510905870076553,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.199986",
+        "season_year": 2026
+      }
+    },
+    "GAS": {
+      "name": "Driver GAS",
+      "pace": {
+        "quali_pace": 0.668,
+        "race_pace": 0.712
+      },
+      "racecraft": {
+        "skill_score": 0.6730993569072192,
+        "overtaking_skill": 0.712
+      },
+      "experience": {
+        "years_of_experience": 8,
+        "debut_year": 2017,
+        "total_races": 70,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      },
+      "bayesian": {
+        "rating_mu": 14.382833756074303,
+        "rating_sigma": 1.664383654735451,
+        "normalized_skill_score": 0.6372777979083002,
+        "blended_skill_score": 0.6730993569072192,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.200211",
+        "season_year": 2026
+      }
+    },
+    "PIA": {
+      "name": "Driver PIA",
+      "pace": {
+        "quali_pace": 0.761,
+        "race_pace": 0.589
+      },
+      "racecraft": {
+        "skill_score": 0.5299752199281886,
+        "overtaking_skill": 0.589
+      },
+      "experience": {
+        "years_of_experience": 2,
+        "debut_year": 2023,
+        "total_races": 70,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      },
+      "bayesian": {
+        "rating_mu": 20.444633595331332,
+        "rating_sigma": 1.9558078988231273,
+        "normalized_skill_score": 0.9259349331110158,
+        "blended_skill_score": 0.5299752199281886,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.198648",
+        "season_year": 2026
+      }
+    },
+    "MAG": {
+      "name": "Driver MAG",
+      "pace": {
+        "quali_pace": 0.605,
+        "race_pace": 0.516
+      },
+      "racecraft": {
+        "skill_score": 0.516,
+        "overtaking_skill": 0.516
+      },
+      "experience": {
+        "years_of_experience": 11,
+        "debut_year": 2014,
+        "total_races": 44,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.023
+      }
+    },
+    "COL": {
+      "name": "Driver COL",
+      "pace": {
+        "quali_pace": 0.467,
+        "race_pace": 0.537
+      },
+      "racecraft": {
+        "skill_score": 0.4615262221034863,
+        "overtaking_skill": 0.537
+      },
+      "experience": {
+        "years_of_experience": 1,
+        "debut_year": 2024,
+        "total_races": 27,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      },
+      "bayesian": {
+        "rating_mu": 7.502654760712698,
+        "rating_sigma": 1.8276959741565917,
+        "normalized_skill_score": 0.30965022670060466,
+        "blended_skill_score": 0.4615262221034863,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.200446",
+        "season_year": 2026
+      }
+    },
+    "BOR": {
+      "name": "Driver BOR",
+      "pace": {
+        "quali_pace": 0.573,
+        "race_pace": 0.628
+      },
+      "racecraft": {
+        "skill_score": 0.47663167244190435,
+        "overtaking_skill": 0.628
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 24,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      },
+      "bayesian": {
+        "rating_mu": 9.995203887647634,
+        "rating_sigma": 1.8276959741565917,
+        "normalized_skill_score": 0.42834304226893494,
+        "blended_skill_score": 0.47663167244190435,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.201944",
+        "season_year": 2026
+      }
+    },
+    "HAD": {
+      "name": "Driver HAD",
+      "pace": {
+        "quali_pace": 0.705,
+        "race_pace": 0.67
+      },
+      "racecraft": {
+        "skill_score": 0.5399927238636979,
+        "overtaking_skill": 0.67
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 24,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      },
+      "bayesian": {
+        "rating_mu": 10.876811753158545,
+        "rating_sigma": 1.8276959741565917,
+        "normalized_skill_score": 0.47032436919802595,
+        "blended_skill_score": 0.5399927238636979,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.198151",
+        "season_year": 2026
+      }
+    },
+    "DEV": {
+      "name": "Driver DEV",
+      "pace": {
+        "quali_pace": 0.416,
+        "race_pace": 0.466
+      },
+      "racecraft": {
+        "skill_score": 0.466,
+        "overtaking_skill": 0.466
+      },
+      "experience": {
+        "years_of_experience": 3,
+        "debut_year": 2022,
+        "total_races": 10,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      }
+    },
+    "RUS": {
+      "name": "Driver RUS",
+      "pace": {
+        "quali_pace": 0.906,
+        "race_pace": 0.82
+      },
+      "racecraft": {
+        "skill_score": 0.8630440557799944,
+        "overtaking_skill": 0.82
+      },
+      "experience": {
+        "years_of_experience": 6,
+        "debut_year": 2019,
+        "total_races": 70,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      },
+      "bayesian": {
+        "rating_mu": 18.39498203666833,
+        "rating_sigma": 1.9176503103175087,
+        "normalized_skill_score": 0.8283324779365872,
+        "blended_skill_score": 0.8630440557799944,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.199318",
+        "season_year": 2026
+      }
+    },
+    "OCO": {
+      "name": "Driver OCO",
+      "pace": {
+        "quali_pace": 0.517,
+        "race_pace": 0.687
+      },
+      "racecraft": {
+        "skill_score": 0.5585411873623234,
+        "overtaking_skill": 0.687
+      },
+      "experience": {
+        "years_of_experience": 9,
+        "debut_year": 2016,
+        "total_races": 69,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      },
+      "bayesian": {
+        "rating_mu": 11.76869039368166,
+        "rating_sigma": 1.664383654735451,
+        "normalized_skill_score": 0.5127947806515076,
+        "blended_skill_score": 0.5585411873623234,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.200668",
+        "season_year": 2026
+      }
+    },
+    "PER": {
+      "name": "Driver PER",
+      "pace": {
+        "quali_pace": 0.231,
+        "race_pace": 0.417
+      },
+      "racecraft": {
+        "skill_score": 0.3393962684988619,
+        "overtaking_skill": 0.417
+      },
+      "experience": {
+        "years_of_experience": 14,
+        "debut_year": 2011,
+        "total_races": 46,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.022
+      },
+      "bayesian": {
+        "rating_mu": 6.2993528774923755,
+        "rating_sigma": 1.664383654735451,
+        "normalized_skill_score": 0.25235013702344644,
+        "blended_skill_score": 0.3393962684988619,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.202147",
+        "season_year": 2026
+      }
+    },
+    "LEC": {
+      "name": "Driver LEC",
+      "pace": {
+        "quali_pace": 0.806,
+        "race_pace": 0.852
+      },
+      "racecraft": {
+        "skill_score": 0.8570086394220094,
+        "overtaking_skill": 0.852
+      },
+      "experience": {
+        "years_of_experience": 7,
+        "debut_year": 2018,
+        "total_races": 70,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      },
+      "bayesian": {
+        "rating_mu": 19.399785684695345,
+        "rating_sigma": 1.928922712045487,
+        "normalized_skill_score": 0.8761802706997783,
+        "blended_skill_score": 0.8570086394220094,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.198870",
+        "season_year": 2026
+      }
+    },
+    "ALB": {
+      "name": "Driver ALB",
+      "pace": {
+        "quali_pace": 0.423,
+        "race_pace": 0.75
+      },
+      "racecraft": {
+        "skill_score": 0.43095236573738177,
+        "overtaking_skill": 0.75
+      },
+      "experience": {
+        "years_of_experience": 6,
+        "debut_year": 2019,
+        "total_races": 70,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      },
+      "bayesian": {
+        "rating_mu": 4.77063768583691,
+        "rating_sigma": 1.664383654735451,
+        "normalized_skill_score": 0.17955417551604333,
+        "blended_skill_score": 0.43095236573738177,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.201548",
+        "season_year": 2026
+      }
+    },
+    "LAW": {
+      "name": "Driver LAW",
+      "pace": {
+        "quali_pace": 0.513,
+        "race_pace": 0.622
+      },
+      "racecraft": {
+        "skill_score": 0.5863456050927253,
+        "overtaking_skill": 0.622
+      },
+      "experience": {
+        "years_of_experience": 3,
+        "debut_year": 2022,
+        "total_races": 35,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      },
+      "bayesian": {
+        "rating_mu": 12.492694379604917,
+        "rating_sigma": 1.664383654735451,
+        "normalized_skill_score": 0.5472711609335674,
+        "blended_skill_score": 0.5863456050927253,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.201114",
+        "season_year": 2026
       }
     },
     "VER": {
       "name": "Driver VER",
       "pace": {
-        "race_pace": 0.99,
-        "quali_pace": 0.95
-      },
-      "bayesian": {
-        "rating_mu": 5.9840083562179,
-        "rating_sigma": 1.7366593252010774,
-        "normalized_skill_score": 0.26231622927462633,
-        "blended_skill_score": 0.97,
-        "blend_weight": 0.25,
-        "last_session": "Chinese Grand Prix",
-        "last_updated": "2026-03-16T10:27:11.825976",
-        "season_year": 2026
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.029
+        "quali_pace": 0.763,
+        "race_pace": 0.99
       },
       "racecraft": {
-        "skill_score": 0.97,
+        "skill_score": 0.7331638822508457,
         "overtaking_skill": 0.99
       },
       "experience": {
-        "tier": "veteran",
+        "years_of_experience": 10,
         "debut_year": 2015,
         "total_races": 70,
-        "years_of_experience": 10
-      }
-    },
-    "ZHO": {
-      "name": "Driver ZHO",
-      "pace": {
-        "race_pace": 0.717,
-        "quali_pace": 0.714
+        "tier": "veteran"
       },
       "dnf_risk": {
-        "dnf_rate": 0.109
+        "dnf_rate": 0.0
+      },
+      "bayesian": {
+        "rating_mu": 13.800155116357383,
+        "rating_sigma": 1.664383654735451,
+        "normalized_skill_score": 0.6095311960170182,
+        "blended_skill_score": 0.7331638822508457,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.197825",
+        "season_year": 2026
+      }
+    },
+    "SAI": {
+      "name": "Driver SAI",
+      "pace": {
+        "quali_pace": 0.487,
+        "race_pace": 0.648
       },
       "racecraft": {
-        "skill_score": 0.63,
-        "overtaking_skill": 0.717
+        "skill_score": 0.5121217859245899,
+        "overtaking_skill": 0.648
       },
       "experience": {
-        "tier": "developing",
-        "debut_year": 2022,
+        "years_of_experience": 10,
+        "debut_year": 2015,
+        "total_races": 69,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      },
+      "bayesian": {
+        "rating_mu": 8.29760939939738,
+        "rating_sigma": 1.664383654735451,
+        "normalized_skill_score": 0.3475052094951134,
+        "blended_skill_score": 0.5121217859245899,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.201336",
+        "season_year": 2026
+      }
+    },
+    "BOT": {
+      "name": "Driver BOT",
+      "pace": {
+        "quali_pace": 0.288,
+        "race_pace": 0.546
+      },
+      "racecraft": {
+        "skill_score": 0.3787257835317431,
+        "overtaking_skill": 0.546
+      },
+      "experience": {
+        "years_of_experience": 12,
+        "debut_year": 2013,
         "total_races": 46,
-        "years_of_experience": 3
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      },
+      "bayesian": {
+        "rating_mu": 5.004040440409204,
+        "rating_sigma": 1.664383654735451,
+        "normalized_skill_score": 0.1906685924004383,
+        "blended_skill_score": 0.3787257835317431,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.202349",
+        "season_year": 2026
+      }
+    },
+    "ALO": {
+      "name": "Driver ALO",
+      "pace": {
+        "quali_pace": 0.336,
+        "race_pace": 0.758
+      },
+      "racecraft": {
+        "skill_score": 0.4716710474853778,
+        "overtaking_skill": 0.758
+      },
+      "experience": {
+        "years_of_experience": 24,
+        "debut_year": 2001,
+        "total_races": 70,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.0
+      },
+      "bayesian": {
+        "rating_mu": 6.194696853306033,
+        "rating_sigma": 1.664383654735451,
+        "normalized_skill_score": 0.24736651682409683,
+        "blended_skill_score": 0.4716710474853778,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-29T17:35:56.199761",
+        "season_year": 2026
+      }
+    },
+    "SAR": {
+      "name": "Driver SAR",
+      "pace": {
+        "quali_pace": 0.45,
+        "race_pace": 0.47
+      },
+      "racecraft": {
+        "skill_score": 0.47,
+        "overtaking_skill": 0.47
+      },
+      "experience": {
+        "years_of_experience": 2,
+        "debut_year": 2023,
+        "total_races": 36,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.028
       }
     }
   },
-  "version": 5,
-  "last_updated": "2026-03-23T08:10:27+0100",
-  "extraction_date": "2026-03-06T21:40:09.212440",
+  "version": 4,
+  "last_updated": "2026-03-29T17:35:56.203126",
+  "extraction_date": "2026-02-27T15:41:17.468021",
   "carried_over_from": 2025,
   "bayesian_last_updated_year": 2026
 }
