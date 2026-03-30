@@ -7,6 +7,8 @@ import pytest
 from src.utils.backtesting import (
     aggregate_race_metrics,
     apply_config_overrides,
+    build_checked_backtest_summary,
+    build_overlap_comparison,
     parse_experiment_spec,
     rank_experiments_for_generalization,
     run_previous_race_naive_backtest,
@@ -219,6 +221,8 @@ def test_run_previous_race_naive_backtest_uses_prior_actual_results():
     assert evaluated["status"] == "ok"
     assert evaluated["predicted_from_race"] == "Australian Grand Prix"
     assert evaluated["top3_accuracy"] == pytest.approx(100.0)
+    assert evaluated["qualifying_predicted_top10"][0]["driver"] == "VER"
+    assert evaluated["race_actual_top10"][0]["driver"] == "VER"
 
 
 def test_run_previous_race_naive_backtest_resets_after_missing_actuals():
@@ -264,6 +268,120 @@ def test_run_previous_race_naive_backtest_resets_after_missing_actuals():
         "missing_previous_race_results",
     ]
     assert result["summary"]["races_evaluated"] == 0
+
+
+def test_build_overlap_comparison_uses_only_shared_successful_races():
+    model_race_results = [
+        {
+            "race_name": "Australian Grand Prix",
+            "status": "ok",
+            "qualifying_mae": 3.0,
+            "race_mae": 4.0,
+            "top3_accuracy": 60.0,
+            "winner_correct": True,
+        },
+        {
+            "race_name": "Chinese Grand Prix",
+            "status": "ok",
+            "qualifying_mae": 2.0,
+            "race_mae": 3.0,
+            "top3_accuracy": 70.0,
+            "winner_correct": False,
+        },
+        {
+            "race_name": "Japanese Grand Prix",
+            "status": "skipped",
+            "reason": "missing_actual_results",
+        },
+    ]
+    naive_race_results = [
+        {
+            "race_name": "Australian Grand Prix",
+            "status": "ok",
+            "qualifying_mae": 4.0,
+            "race_mae": 5.0,
+            "top3_accuracy": 50.0,
+            "winner_correct": False,
+        },
+        {
+            "race_name": "Japanese Grand Prix",
+            "status": "ok",
+            "qualifying_mae": 2.5,
+            "race_mae": 3.5,
+            "top3_accuracy": 55.0,
+            "winner_correct": False,
+        },
+    ]
+
+    comparison = build_overlap_comparison(
+        model_race_results=model_race_results,
+        naive_race_results=naive_race_results,
+    )
+
+    assert comparison["races_evaluated"] == 1
+    assert comparison["shared_races"] == ["Australian Grand Prix"]
+    assert comparison["model"]["race_mae_mean"] == pytest.approx(4.0)
+    assert comparison["naive"]["race_mae_mean"] == pytest.approx(5.0)
+    assert comparison["qualifying_mae_improvement"] == pytest.approx(1.0)
+    assert comparison["race_mae_improvement"] == pytest.approx(1.0)
+
+
+def test_build_checked_backtest_summary_keeps_race_level_detail():
+    baseline_report = {
+        "name": "baseline",
+        "summary": {"races_evaluated": 1, "race_mae_mean": 3.4},
+        "generalization": {"test": {"race_mae_mean": 3.8}},
+        "race_results": [
+            {
+                "race_name": "Australian Grand Prix",
+                "status": "ok",
+                "qualifying_predicted_top10": [
+                    {"driver": "VER", "position": 1, "team": "Red Bull"}
+                ],
+                "race_actual_top10": [{"driver": "NOR", "position": 1, "team": "McLaren"}],
+            }
+        ],
+    }
+    naive_report = {
+        "name": "previous_race_classification",
+        "summary": {"races_evaluated": 1, "race_mae_mean": 4.2},
+        "race_results": [
+            {
+                "race_name": "Australian Grand Prix",
+                "status": "ok",
+                "race_predicted_top10": [{"driver": "VER", "position": 1, "team": "Red Bull"}],
+                "race_actual_top10": [{"driver": "NOR", "position": 1, "team": "McLaren"}],
+            }
+        ],
+    }
+    overlap_comparison = {
+        "model": {"race_mae_mean": 3.4},
+        "naive": {"race_mae_mean": 4.2},
+        "race_mae_improvement": 0.8,
+        "races_evaluated": 1,
+        "shared_races": ["Australian Grand Prix"],
+    }
+
+    summary = build_checked_backtest_summary(
+        year=2025,
+        baseline_report=baseline_report,
+        naive_report=naive_report,
+        overlap_comparison=overlap_comparison,
+        reports_dir="reports/backtest_2025",
+    )
+
+    assert summary["season"] == 2025
+    assert summary["model"]["name"] == "baseline"
+    assert summary["model"]["race_mae_mean"] == pytest.approx(3.4)
+    assert (
+        summary["baseline_report"]["race_results"][0]["qualifying_predicted_top10"][0]["driver"]
+        == "VER"
+    )
+    assert (
+        summary["naive_previous_race_baseline"]["race_results"][0]["race_actual_top10"][0]["driver"]
+        == "NOR"
+    )
+    assert summary["overlap_comparison"]["shared_races"] == ["Australian Grand Prix"]
 
 
 def test_rank_experiments_recommends_only_generalizing_improvements():

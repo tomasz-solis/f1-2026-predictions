@@ -412,28 +412,23 @@ Outputs are written under `reports/backtest_2025/`:
 Latest checked numbers live in `data/backtesting/2025_backtest_results.json`.
 
 Using `python scripts/backtest_2025_season.py --year 2025`, the current model
-scored 11 of 24 races before FastF1 rate limits cut off later actual-result
-fetches. On those 11 races it averaged:
+scored all 24 races available in the local cache. On that full run it averaged:
 
-- qualifying MAE: `3.95` places
-- race MAE: `3.94` places
+- qualifying MAE: `4.37` places
+- race MAE: `4.83` places
 
-For a fair naive comparison, use the 10-race overlap where both the model and a
+For a fair naive comparison, use the 23-race overlap where both the model and a
 `previous race classification` baseline were available:
 
-- qualifying MAE: model `3.96`, naive `3.91`
-- race MAE: model `3.93`, naive `4.19`
-- race MAE improvement vs naive: `0.27` places better
+- qualifying MAE: model `4.33`, naive `3.94`
+- race MAE: model `4.84`, naive `4.59`
+- race MAE improvement vs naive: `-0.25` places
 
-The honest read is mixed: the model beat the naive baseline on race finishing
-order, but it was `0.05` places worse on qualifying MAE over the same shared
-window.
+The honest read is not flattering: on the full cached 2025 season, the naive
+`previous race classification` baseline beats the model on both qualifying and
+race MAE over the shared window.
 
-Illustrative example, Japanese Grand Prix (same default config, rerun
-separately because the season summary does not persist full predicted orders):
-
-- predicted top 5: `VER`, `RUS`, `NOR`, `LEC`, `HAM`
-- actual top 5: `VER`, `NOR`, `PIA`, `LEC`, `RUS`
-
-If you want a cleaner full-season benchmark, rerun after the FastF1 hourly
-limit resets or prewarm a fuller cache first.
+The checked-in summary now keeps per-race predicted and actual top-10 rows, so
+you can inspect real race-by-race misses directly in
+`reports/backtest_2025/baseline/race_results_detailed.json` or the mirrored
+`data/backtesting/2025_backtest_results.json`.

@@ -27,10 +27,13 @@ from src.utils.backtesting import (
     NestedDictConfig,
     aggregate_race_metrics,
     apply_config_overrides,
+    build_checked_backtest_summary,
+    build_overlap_comparison,
     get_races_for_year,
     load_config_dict,
     parse_experiment_spec,
     rank_experiments_for_generalization,
+    run_previous_race_naive_backtest,
     run_single_race_backtest,
     summarize_generalization,
     warm_fastf1_results_cache,
@@ -212,6 +215,15 @@ def main() -> int:
         type=str,
         default="reports/backtest_2025",
         help="Directory for summary outputs",
+    )
+    parser.add_argument(
+        "--checked-summary-path",
+        type=str,
+        default=None,
+        help=(
+            "Optional path for the checked-in summary JSON. "
+            "Defaults to data/backtesting/<year>_backtest_results.json."
+        ),
     )
     parser.add_argument(
         "--experiment",
@@ -407,6 +419,23 @@ def main() -> int:
     write_json(output_dir / "experiment_rankings.json", {"rankings": ranked})
 
     baseline = next((item for item in reports if item["name"] == "baseline"), reports[0])
+    naive_report = run_previous_race_naive_backtest(year=args.year, race_names=races)
+    overlap_comparison = build_overlap_comparison(
+        model_race_results=baseline.get("race_results", []),
+        naive_race_results=naive_report.get("race_results", []),
+    )
+    checked_summary_path = Path(args.checked_summary_path or "")
+    if not args.checked_summary_path:
+        checked_summary_path = Path("data/backtesting") / f"{args.year}_backtest_results.json"
+    checked_summary = build_checked_backtest_summary(
+        year=args.year,
+        baseline_report=baseline,
+        naive_report=naive_report,
+        overlap_comparison=overlap_comparison,
+        reports_dir=str(output_dir),
+    )
+    write_json(checked_summary_path, checked_summary)
+
     baseline_test_mae = baseline.get("generalization", {}).get("test", {}).get("race_mae_mean")
     _emit_markdown_recommendations(
         output_path=output_dir / "recommendations.md",

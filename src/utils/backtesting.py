@@ -393,11 +393,15 @@ def run_previous_race_naive_backtest(
                     "predicted_from_race": previous_race_name,
                     "qualifying_mae": qualifying_metrics["mae"],
                     "qualifying_exact_accuracy": qualifying_metrics["exact_accuracy"],
+                    "qualifying_predicted_top10": _top_n_entries(previous_qualifying_actual),
+                    "qualifying_actual_top10": _top_n_entries(qualifying_actual),
                     "race_mae": race_metrics["mae"],
                     "race_exact_accuracy": race_metrics["exact_accuracy"],
                     "race_within_3": race_metrics["within_3"],
                     "top3_accuracy": race_metrics["top3_accuracy"],
                     "winner_correct": race_metrics["winner_correct"],
+                    "race_predicted_top10": _top_n_entries(previous_race_actual),
+                    "race_actual_top10": _top_n_entries(race_actual),
                 }
             )
 
@@ -451,6 +455,75 @@ def aggregate_race_metrics(race_results: list[dict[str, Any]]) -> dict[str, Any]
         }
     )
     return summary
+
+
+def build_overlap_comparison(
+    *,
+    model_race_results: list[dict[str, Any]],
+    naive_race_results: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Compare model and naive summaries on the races both could score."""
+    model_by_race = {
+        str(row.get("race_name")): row
+        for row in model_race_results
+        if row.get("status") == "ok" and row.get("race_name")
+    }
+    naive_by_race = {
+        str(row.get("race_name")): row
+        for row in naive_race_results
+        if row.get("status") == "ok" and row.get("race_name")
+    }
+    shared_races = [race_name for race_name in model_by_race if race_name in naive_by_race]
+    model_overlap = [model_by_race[race_name] for race_name in shared_races]
+    naive_overlap = [naive_by_race[race_name] for race_name in shared_races]
+    model_summary = aggregate_race_metrics(model_overlap)
+    naive_summary = aggregate_race_metrics(naive_overlap)
+
+    def _improvement(metric_key: str) -> float | None:
+        model_metric = model_summary.get(metric_key)
+        naive_metric = naive_summary.get(metric_key)
+        if model_metric is None or naive_metric is None:
+            return None
+        return float(naive_metric) - float(model_metric)
+
+    return {
+        "model": model_summary,
+        "naive": naive_summary,
+        "qualifying_mae_improvement": _improvement("qualifying_mae_mean"),
+        "race_mae_improvement": _improvement("race_mae_mean"),
+        "races_evaluated": len(shared_races),
+        "shared_races": shared_races,
+    }
+
+
+def build_checked_backtest_summary(
+    *,
+    year: int,
+    baseline_report: dict[str, Any],
+    naive_report: dict[str, Any],
+    overlap_comparison: dict[str, Any],
+    reports_dir: str,
+) -> dict[str, Any]:
+    """Build the checked-in season summary with both aggregate and race-level detail."""
+    baseline_summary = dict(baseline_report.get("summary", {}))
+    model_summary = {
+        "name": str(baseline_report.get("name", "baseline")),
+        **baseline_summary,
+    }
+
+    return {
+        "season": int(year),
+        "reports_dir": reports_dir,
+        "model": model_summary,
+        "baseline_report": dict(baseline_report),
+        "naive_previous_race_baseline": dict(naive_report),
+        "overlap_comparison": dict(overlap_comparison),
+        "notes": [
+            "baseline_report mirrors the baseline summary written under reports/backtest_2025/.",
+            "Per-race rows keep predicted and actual top-10 classifications for qualifying and race results.",
+            "Overlap comparison only scores races where both the model and naive baseline produced valid metrics.",
+        ],
+    }
 
 
 def split_train_test_results(
