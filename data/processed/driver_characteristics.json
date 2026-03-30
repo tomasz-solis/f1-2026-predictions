@@ -1,121 +1,50 @@
 {
-  "extraction_date": "2026-02-27T15:41:17.468021",
+  "extraction_date": "2026-03-30T09:06:23.904531+00:00",
   "years": [
     2023,
     2024,
     2025
   ],
   "method": "global_teammate_network_ranking",
+  "last_updated": "2026-03-30T09:06:23.904531+00:00",
+  "bayesian_last_updated_year": 2026,
   "drivers": {
-    "DOO": {
-      "name": "Driver DOO",
+    "PIA": {
+      "name": "Oscar Piastri",
       "pace": {
-        "quali_pace": 0.465,
-        "race_pace": 0.415
+        "quali_pace": 0.584,
+        "race_pace": 0.539
       },
       "racecraft": {
-        "skill_score": 0.415,
-        "overtaking_skill": 0.415
+        "skill_score": 0.589,
+        "overtaking_skill": 0.659
       },
       "experience": {
-        "years_of_experience": 0,
-        "debut_year": 2025,
-        "total_races": 7,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      }
-    },
-    "HAM": {
-      "name": "Driver HAM",
-      "pace": {
-        "quali_pace": 0.63,
-        "race_pace": 0.635
-      },
-      "racecraft": {
-        "skill_score": 0.635,
-        "overtaking_skill": 0.635
-      },
-      "experience": {
-        "years_of_experience": 18,
-        "debut_year": 2007,
+        "years_of_experience": 2,
+        "debut_year": 2023,
         "total_races": 70,
-        "tier": "veteran"
+        "tier": "developing"
       },
       "dnf_risk": {
-        "dnf_rate": 0.0
-      }
-    },
-    "BEA": {
-      "name": "Driver BEA",
-      "pace": {
-        "quali_pace": 0.585,
-        "race_pace": 0.532
+        "dnf_rate": 0.071
       },
-      "racecraft": {
-        "skill_score": 0.532,
-        "overtaking_skill": 0.532
-      },
-      "experience": {
-        "years_of_experience": 1,
-        "debut_year": 2024,
-        "total_races": 27,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      }
-    },
-    "ANT": {
-      "name": "Driver ANT",
-      "pace": {
-        "quali_pace": 0.315,
-        "race_pace": 0.265
-      },
-      "racecraft": {
-        "skill_score": 0.265,
-        "overtaking_skill": 0.265
-      },
-      "experience": {
-        "years_of_experience": 0,
-        "debut_year": 2025,
-        "total_races": 24,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      }
-    },
-    "NOR": {
-      "name": "Driver NOR",
-      "pace": {
-        "quali_pace": 0.767,
-        "race_pace": 0.777
-      },
-      "racecraft": {
-        "skill_score": 0.777,
-        "overtaking_skill": 0.777
-      },
-      "experience": {
-        "years_of_experience": 6,
-        "debut_year": 2019,
-        "total_races": 70,
-        "tier": "established"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
+      "bayesian": {
+        "rating_mu": 13.369,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.589,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
       }
     },
     "RIC": {
-      "name": "Driver RIC",
+      "name": "Daniel Ricciardo",
       "pace": {
         "quali_pace": 0.656,
-        "race_pace": 0.569
+        "race_pace": 0.611
       },
       "racecraft": {
         "skill_score": 0.569,
-        "overtaking_skill": 0.569
+        "overtaking_skill": 0.593
       },
       "experience": {
         "years_of_experience": 14,
@@ -124,58 +53,79 @@
         "tier": "veteran"
       },
       "dnf_risk": {
-        "dnf_rate": 0.0
+        "dnf_rate": 0.08
+      },
+      "bayesian": {
+        "rating_mu": 12.949,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.569,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
       }
     },
-    "HUL": {
-      "name": "Driver HUL",
+    "DOO": {
+      "name": "Jack Doohan",
       "pace": {
-        "quali_pace": 0.671,
-        "race_pace": 0.702
+        "quali_pace": 0.465,
+        "race_pace": 0.365
       },
       "racecraft": {
-        "skill_score": 0.702,
-        "overtaking_skill": 0.702
+        "skill_score": 0.415,
+        "overtaking_skill": 0.54
       },
       "experience": {
-        "years_of_experience": 15,
-        "debut_year": 2010,
-        "total_races": 70,
-        "tier": "veteran"
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 7,
+        "tier": "rookie"
       },
       "dnf_risk": {
-        "dnf_rate": 0.0
+        "dnf_rate": 0.286
+      },
+      "bayesian": {
+        "rating_mu": 9.715,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.415,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
       }
     },
-    "ZHO": {
-      "name": "Driver ZHO",
+    "LAW": {
+      "name": "Liam Lawson",
       "pace": {
-        "quali_pace": 0.714,
-        "race_pace": 0.717
+        "quali_pace": 0.643,
+        "race_pace": 0.598
       },
       "racecraft": {
-        "skill_score": 0.717,
-        "overtaking_skill": 0.717
+        "skill_score": 0.622,
+        "overtaking_skill": 0.679
       },
       "experience": {
-        "years_of_experience": 3,
-        "debut_year": 2022,
-        "total_races": 46,
+        "years_of_experience": 2,
+        "debut_year": 2023,
+        "total_races": 35,
         "tier": "developing"
       },
       "dnf_risk": {
-        "dnf_rate": 0.022
+        "dnf_rate": 0.171
+      },
+      "bayesian": {
+        "rating_mu": 14.062,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.622,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
       }
     },
     "TSU": {
-      "name": "Driver TSU",
+      "name": "Yuki Tsunoda",
       "pace": {
         "quali_pace": 0.522,
-        "race_pace": 0.547
+        "race_pace": 0.497
       },
       "racecraft": {
         "skill_score": 0.547,
-        "overtaking_skill": 0.547
+        "overtaking_skill": 0.597
       },
       "experience": {
         "years_of_experience": 4,
@@ -184,198 +134,25 @@
         "tier": "developing"
       },
       "dnf_risk": {
-        "dnf_rate": 0.0
-      }
-    },
-    "STR": {
-      "name": "Driver STR",
-      "pace": {
-        "quali_pace": 0.603,
-        "race_pace": 0.593
+        "dnf_rate": 0.1
       },
-      "racecraft": {
-        "skill_score": 0.593,
-        "overtaking_skill": 0.593
-      },
-      "experience": {
-        "years_of_experience": 8,
-        "debut_year": 2017,
-        "total_races": 69,
-        "tier": "established"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.014
-      }
-    },
-    "GAS": {
-      "name": "Driver GAS",
-      "pace": {
-        "quali_pace": 0.722,
-        "race_pace": 0.712
-      },
-      "racecraft": {
-        "skill_score": 0.712,
-        "overtaking_skill": 0.712
-      },
-      "experience": {
-        "years_of_experience": 8,
-        "debut_year": 2017,
-        "total_races": 70,
-        "tier": "established"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      }
-    },
-    "PIA": {
-      "name": "Driver PIA",
-      "pace": {
-        "quali_pace": 0.584,
-        "race_pace": 0.589
-      },
-      "racecraft": {
-        "skill_score": 0.589,
-        "overtaking_skill": 0.589
-      },
-      "experience": {
-        "years_of_experience": 2,
-        "debut_year": 2023,
-        "total_races": 70,
-        "tier": "developing"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      }
-    },
-    "MAG": {
-      "name": "Driver MAG",
-      "pace": {
-        "quali_pace": 0.605,
-        "race_pace": 0.516
-      },
-      "racecraft": {
-        "skill_score": 0.516,
-        "overtaking_skill": 0.516
-      },
-      "experience": {
-        "years_of_experience": 11,
-        "debut_year": 2014,
-        "total_races": 44,
-        "tier": "veteran"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.023
-      }
-    },
-    "COL": {
-      "name": "Driver COL",
-      "pace": {
-        "quali_pace": 0.655,
-        "race_pace": 0.537
-      },
-      "racecraft": {
-        "skill_score": 0.537,
-        "overtaking_skill": 0.537
-      },
-      "experience": {
-        "years_of_experience": 1,
-        "debut_year": 2024,
-        "total_races": 27,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      }
-    },
-    "BOR": {
-      "name": "Driver BOR",
-      "pace": {
-        "quali_pace": 0.708,
-        "race_pace": 0.628
-      },
-      "racecraft": {
-        "skill_score": 0.628,
-        "overtaking_skill": 0.628
-      },
-      "experience": {
-        "years_of_experience": 0,
-        "debut_year": 2025,
-        "total_races": 24,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      }
-    },
-    "HAD": {
-      "name": "Driver HAD",
-      "pace": {
-        "quali_pace": 0.705,
-        "race_pace": 0.67
-      },
-      "racecraft": {
-        "skill_score": 0.67,
-        "overtaking_skill": 0.67
-      },
-      "experience": {
-        "years_of_experience": 0,
-        "debut_year": 2025,
-        "total_races": 24,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      }
-    },
-    "DEV": {
-      "name": "Driver DEV",
-      "pace": {
-        "quali_pace": 0.416,
-        "race_pace": 0.466
-      },
-      "racecraft": {
-        "skill_score": 0.466,
-        "overtaking_skill": 0.466
-      },
-      "experience": {
-        "years_of_experience": 3,
-        "debut_year": 2022,
-        "total_races": 10,
-        "tier": "developing"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      }
-    },
-    "RUS": {
-      "name": "Driver RUS",
-      "pace": {
-        "quali_pace": 0.795,
-        "race_pace": 0.82
-      },
-      "racecraft": {
-        "skill_score": 0.82,
-        "overtaking_skill": 0.82
-      },
-      "experience": {
-        "years_of_experience": 6,
-        "debut_year": 2019,
-        "total_races": 70,
-        "tier": "established"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
+      "bayesian": {
+        "rating_mu": 12.487,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.547,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
       }
     },
     "OCO": {
-      "name": "Driver OCO",
+      "name": "Esteban Ocon",
       "pace": {
         "quali_pace": 0.647,
-        "race_pace": 0.687
+        "race_pace": 0.692
       },
       "racecraft": {
         "skill_score": 0.687,
-        "overtaking_skill": 0.687
+        "overtaking_skill": 0.64
       },
       "experience": {
         "years_of_experience": 9,
@@ -384,58 +161,25 @@
         "tier": "established"
       },
       "dnf_risk": {
-        "dnf_rate": 0.0
+        "dnf_rate": 0.145
+      },
+      "bayesian": {
+        "rating_mu": 15.427,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.687,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
       }
     },
-    "PER": {
-      "name": "Driver PER",
+    "NOR": {
+      "name": "Lando Norris",
       "pace": {
-        "quali_pace": 0.467,
-        "race_pace": 0.417
+        "quali_pace": 0.767,
+        "race_pace": 0.812
       },
       "racecraft": {
-        "skill_score": 0.417,
-        "overtaking_skill": 0.417
-      },
-      "experience": {
-        "years_of_experience": 14,
-        "debut_year": 2011,
-        "total_races": 46,
-        "tier": "veteran"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.022
-      }
-    },
-    "LEC": {
-      "name": "Driver LEC",
-      "pace": {
-        "quali_pace": 0.707,
-        "race_pace": 0.852
-      },
-      "racecraft": {
-        "skill_score": 0.852,
-        "overtaking_skill": 0.852
-      },
-      "experience": {
-        "years_of_experience": 7,
-        "debut_year": 2018,
-        "total_races": 70,
-        "tier": "established"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.0
-      }
-    },
-    "ALB": {
-      "name": "Driver ALB",
-      "pace": {
-        "quali_pace": 0.765,
-        "race_pace": 0.75
-      },
-      "racecraft": {
-        "skill_score": 0.75,
-        "overtaking_skill": 0.75
+        "skill_score": 0.777,
+        "overtaking_skill": 0.714
       },
       "experience": {
         "years_of_experience": 6,
@@ -444,118 +188,241 @@
         "tier": "established"
       },
       "dnf_risk": {
-        "dnf_rate": 0.0
+        "dnf_rate": 0.057
+      },
+      "bayesian": {
+        "rating_mu": 17.317,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.777,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
       }
     },
-    "LAW": {
-      "name": "Driver LAW",
+    "BOR": {
+      "name": "Gabriel Bortoleto",
       "pace": {
-        "quali_pace": 0.643,
-        "race_pace": 0.622
+        "quali_pace": 0.755,
+        "race_pace": 0.725
       },
       "racecraft": {
-        "skill_score": 0.622,
-        "overtaking_skill": 0.622
+        "skill_score": 0.675,
+        "overtaking_skill": 0.68
       },
       "experience": {
-        "years_of_experience": 3,
-        "debut_year": 2022,
-        "total_races": 35,
-        "tier": "developing"
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 24,
+        "tier": "rookie"
       },
       "dnf_risk": {
-        "dnf_rate": 0.0
+        "dnf_rate": 0.208
+      },
+      "bayesian": {
+        "rating_mu": 15.175,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.675,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
       }
     },
-    "VER": {
-      "name": "Driver VER",
+    "HAD": {
+      "name": "Isack Hadjar",
       "pace": {
-        "quali_pace": 0.95,
-        "race_pace": 0.99
+        "quali_pace": 0.752,
+        "race_pace": 0.767
       },
       "racecraft": {
-        "skill_score": 0.99,
-        "overtaking_skill": 0.99
+        "skill_score": 0.717,
+        "overtaking_skill": 0.677
       },
       "experience": {
-        "years_of_experience": 10,
-        "debut_year": 2015,
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 24,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.125
+      },
+      "bayesian": {
+        "rating_mu": 16.057,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.717,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "ALB": {
+      "name": "Alexander Albon",
+      "pace": {
+        "quali_pace": 0.765,
+        "race_pace": 0.8
+      },
+      "racecraft": {
+        "skill_score": 0.75,
+        "overtaking_skill": 0.69
+      },
+      "experience": {
+        "years_of_experience": 6,
+        "debut_year": 2019,
         "total_races": 70,
-        "tier": "veteran"
+        "tier": "established"
       },
       "dnf_risk": {
-        "dnf_rate": 0.0
+        "dnf_rate": 0.2
+      },
+      "bayesian": {
+        "rating_mu": 16.75,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.75,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
       }
     },
-    "SAI": {
-      "name": "Driver SAI",
+    "BEA": {
+      "name": "Oliver Bearman",
       "pace": {
-        "quali_pace": 0.716,
-        "race_pace": 0.648
+        "quali_pace": 0.623,
+        "race_pace": 0.548
       },
       "racecraft": {
-        "skill_score": 0.648,
-        "overtaking_skill": 0.648
+        "skill_score": 0.571,
+        "overtaking_skill": 0.657
       },
       "experience": {
-        "years_of_experience": 10,
-        "debut_year": 2015,
-        "total_races": 69,
-        "tier": "veteran"
+        "years_of_experience": 1,
+        "debut_year": 2024,
+        "total_races": 27,
+        "tier": "rookie"
       },
       "dnf_risk": {
-        "dnf_rate": 0.0
+        "dnf_rate": 0.111
+      },
+      "bayesian": {
+        "rating_mu": 12.991,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.571,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
       }
     },
-    "BOT": {
-      "name": "Driver BOT",
+    "PER": {
+      "name": "Sergio Perez",
       "pace": {
-        "quali_pace": 0.637,
-        "race_pace": 0.546
+        "quali_pace": 0.467,
+        "race_pace": 0.367
       },
       "racecraft": {
-        "skill_score": 0.546,
-        "overtaking_skill": 0.546
+        "skill_score": 0.417,
+        "overtaking_skill": 0.542
       },
       "experience": {
-        "years_of_experience": 12,
-        "debut_year": 2013,
+        "years_of_experience": 14,
+        "debut_year": 2011,
         "total_races": 46,
         "tier": "veteran"
       },
       "dnf_risk": {
-        "dnf_rate": 0.0
+        "dnf_rate": 0.152
+      },
+      "bayesian": {
+        "rating_mu": 9.757,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.417,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
       }
     },
-    "ALO": {
-      "name": "Driver ALO",
+    "GAS": {
+      "name": "Pierre Gasly",
       "pace": {
-        "quali_pace": 0.748,
-        "race_pace": 0.758
+        "quali_pace": 0.722,
+        "race_pace": 0.762
       },
       "racecraft": {
-        "skill_score": 0.758,
-        "overtaking_skill": 0.758
+        "skill_score": 0.712,
+        "overtaking_skill": 0.647
       },
       "experience": {
-        "years_of_experience": 24,
-        "debut_year": 2001,
+        "years_of_experience": 8,
+        "debut_year": 2017,
         "total_races": 70,
-        "tier": "veteran"
+        "tier": "established"
       },
       "dnf_risk": {
-        "dnf_rate": 0.0
+        "dnf_rate": 0.129
+      },
+      "bayesian": {
+        "rating_mu": 15.952,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.712,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "ZHO": {
+      "name": "Guanyu Zhou",
+      "pace": {
+        "quali_pace": 0.714,
+        "race_pace": 0.767
+      },
+      "racecraft": {
+        "skill_score": 0.717,
+        "overtaking_skill": 0.639
+      },
+      "experience": {
+        "years_of_experience": 3,
+        "debut_year": 2022,
+        "total_races": 46,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.109
+      },
+      "bayesian": {
+        "rating_mu": 16.057,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.717,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "COL": {
+      "name": "Franco Colapinto",
+      "pace": {
+        "quali_pace": 0.698,
+        "race_pace": 0.631
+      },
+      "racecraft": {
+        "skill_score": 0.581,
+        "overtaking_skill": 0.623
+      },
+      "experience": {
+        "years_of_experience": 1,
+        "debut_year": 2024,
+        "total_races": 27,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.111
+      },
+      "bayesian": {
+        "rating_mu": 13.201,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.581,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
       }
     },
     "SAR": {
-      "name": "Driver SAR",
+      "name": "Logan Sargeant",
       "pace": {
         "quali_pace": 0.45,
-        "race_pace": 0.47
+        "race_pace": 0.42
       },
       "racecraft": {
         "skill_score": 0.47,
-        "overtaking_skill": 0.47
+        "overtaking_skill": 0.525
       },
       "experience": {
         "years_of_experience": 2,
@@ -564,7 +431,366 @@
         "tier": "developing"
       },
       "dnf_risk": {
-        "dnf_rate": 0.028
+        "dnf_rate": 0.25
+      },
+      "bayesian": {
+        "rating_mu": 10.87,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.47,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "BOT": {
+      "name": "Valtteri Bottas",
+      "pace": {
+        "quali_pace": 0.637,
+        "race_pace": 0.584
+      },
+      "racecraft": {
+        "skill_score": 0.546,
+        "overtaking_skill": 0.579
+      },
+      "experience": {
+        "years_of_experience": 12,
+        "debut_year": 2013,
+        "total_races": 46,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.109
+      },
+      "bayesian": {
+        "rating_mu": 12.466,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.546,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "VER": {
+      "name": "Max Verstappen",
+      "pace": {
+        "quali_pace": 0.95,
+        "race_pace": 0.99
+      },
+      "racecraft": {
+        "skill_score": 0.99,
+        "overtaking_skill": 0.893
+      },
+      "experience": {
+        "years_of_experience": 10,
+        "debut_year": 2015,
+        "total_races": 70,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.03
+      },
+      "bayesian": {
+        "rating_mu": 21.79,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.99,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "ANT": {
+      "name": "Kimi Antonelli",
+      "pace": {
+        "quali_pace": 0.509,
+        "race_pace": 0.409
+      },
+      "racecraft": {
+        "skill_score": 0.459,
+        "overtaking_skill": 0.584
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 24,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.167
+      },
+      "bayesian": {
+        "rating_mu": 10.639,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.459,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "LEC": {
+      "name": "Charles Leclerc",
+      "pace": {
+        "quali_pace": 0.707,
+        "race_pace": 0.802
+      },
+      "racecraft": {
+        "skill_score": 0.852,
+        "overtaking_skill": 0.782
+      },
+      "experience": {
+        "years_of_experience": 7,
+        "debut_year": 2018,
+        "total_races": 70,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.1
+      },
+      "bayesian": {
+        "rating_mu": 18.892,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.852,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "MAG": {
+      "name": "Kevin Magnussen",
+      "pace": {
+        "quali_pace": 0.605,
+        "race_pace": 0.508
+      },
+      "racecraft": {
+        "skill_score": 0.516,
+        "overtaking_skill": 0.618
+      },
+      "experience": {
+        "years_of_experience": 11,
+        "debut_year": 2014,
+        "total_races": 44,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.159
+      },
+      "bayesian": {
+        "rating_mu": 11.836,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.516,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "HAM": {
+      "name": "Lewis Hamilton",
+      "pace": {
+        "quali_pace": 0.63,
+        "race_pace": 0.585
+      },
+      "racecraft": {
+        "skill_score": 0.635,
+        "overtaking_skill": 0.705
+      },
+      "experience": {
+        "years_of_experience": 18,
+        "debut_year": 2007,
+        "total_races": 70,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.1
+      },
+      "bayesian": {
+        "rating_mu": 14.335,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.635,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "DEV": {
+      "name": "Nyck de Vries",
+      "pace": {
+        "quali_pace": 0.416,
+        "race_pace": 0.416
+      },
+      "racecraft": {
+        "skill_score": 0.466,
+        "overtaking_skill": 0.491
+      },
+      "experience": {
+        "years_of_experience": 3,
+        "debut_year": 2022,
+        "total_races": 10,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.2
+      },
+      "bayesian": {
+        "rating_mu": 10.786,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.466,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "SAI": {
+      "name": "Carlos Sainz",
+      "pace": {
+        "quali_pace": 0.716,
+        "race_pace": 0.656
+      },
+      "racecraft": {
+        "skill_score": 0.648,
+        "overtaking_skill": 0.703
+      },
+      "experience": {
+        "years_of_experience": 10,
+        "debut_year": 2015,
+        "total_races": 69,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.13
+      },
+      "bayesian": {
+        "rating_mu": 14.608,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.648,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "RUS": {
+      "name": "George Russell",
+      "pace": {
+        "quali_pace": 0.795,
+        "race_pace": 0.87
+      },
+      "racecraft": {
+        "skill_score": 0.82,
+        "overtaking_skill": 0.72
+      },
+      "experience": {
+        "years_of_experience": 6,
+        "debut_year": 2019,
+        "total_races": 70,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.1
+      },
+      "bayesian": {
+        "rating_mu": 18.22,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.82,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "ALO": {
+      "name": "Fernando Alonso",
+      "pace": {
+        "quali_pace": 0.748,
+        "race_pace": 0.808
+      },
+      "racecraft": {
+        "skill_score": 0.758,
+        "overtaking_skill": 0.673
+      },
+      "experience": {
+        "years_of_experience": 24,
+        "debut_year": 2001,
+        "total_races": 70,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.1
+      },
+      "bayesian": {
+        "rating_mu": 16.918,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.758,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "STR": {
+      "name": "Lance Stroll",
+      "pace": {
+        "quali_pace": 0.603,
+        "race_pace": 0.543
+      },
+      "racecraft": {
+        "skill_score": 0.593,
+        "overtaking_skill": 0.678
+      },
+      "experience": {
+        "years_of_experience": 8,
+        "debut_year": 2017,
+        "total_races": 69,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.13
+      },
+      "bayesian": {
+        "rating_mu": 13.453,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.593,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "HUL": {
+      "name": "Nico Hulkenberg",
+      "pace": {
+        "quali_pace": 0.671,
+        "race_pace": 0.746
+      },
+      "racecraft": {
+        "skill_score": 0.702,
+        "overtaking_skill": 0.604
+      },
+      "experience": {
+        "years_of_experience": 15,
+        "debut_year": 2010,
+        "total_races": 70,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.114
+      },
+      "bayesian": {
+        "rating_mu": 15.742,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.702,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "LIN": {
+      "name": "Arvid Lindblad",
+      "pace": {
+        "quali_pace": 0.515,
+        "race_pace": 0.542
+      },
+      "racecraft": {
+        "skill_score": 0.542,
+        "overtaking_skill": 0.542
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2026,
+        "total_races": 0,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.03
+      },
+      "prior_source": "team_based_prior",
+      "bayesian": {
+        "rating_mu": 12.382,
+        "rating_sigma": 2.5,
+        "normalized_skill_score": 0.542,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
       }
     }
   }
