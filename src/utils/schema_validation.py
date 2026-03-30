@@ -95,6 +95,8 @@ _DRIVER_BAYESIAN_SCHEMA = {
         "normalized_skill_score": _UNIT_INTERVAL_NUMBER,
         "blended_skill_score": _UNIT_INTERVAL_NUMBER,
         "blend_weight": _UNIT_INTERVAL_NUMBER,
+        "sessions_observed": {"type": "integer", "minimum": 0},
+        "seeded_from": {"type": "string"},
         "last_session": {"type": "string"},
         "last_updated": _STRING_OR_NULL,
         "season_year": _YEAR_VALUE,
@@ -115,6 +117,7 @@ _DRIVER_ENTRY_SCHEMA = {
         "dnf_risk": _DRIVER_DNF_SCHEMA,
         "tire_management": _TIRE_MANAGEMENT_SCHEMA,
         "bayesian": _DRIVER_BAYESIAN_SCHEMA,
+        "prior_source": {"type": "string"},
     },
     "additionalProperties": False,
 }

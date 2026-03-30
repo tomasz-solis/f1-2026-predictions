@@ -61,6 +61,40 @@ _FASTF1_POLICY = FastF1ResiliencePolicy(
     circuit_breaker_cooldown_seconds=60.0,
 )
 _RACE_NAME_CACHE: dict[int, list[str]] = {}
+_DNF_RATE_FLOOR = 0.03
+_DEFAULT_BAYESIAN_SIGMA = 2.5
+
+DRIVER_FULL_NAMES = {
+    "VER": "Max Verstappen",
+    "NOR": "Lando Norris",
+    "LEC": "Charles Leclerc",
+    "RUS": "George Russell",
+    "HAM": "Lewis Hamilton",
+    "PIA": "Oscar Piastri",
+    "SAI": "Carlos Sainz",
+    "ALO": "Fernando Alonso",
+    "GAS": "Pierre Gasly",
+    "OCO": "Esteban Ocon",
+    "STR": "Lance Stroll",
+    "ALB": "Alexander Albon",
+    "HUL": "Nico Hulkenberg",
+    "TSU": "Yuki Tsunoda",
+    "RIC": "Daniel Ricciardo",
+    "BEA": "Oliver Bearman",
+    "ANT": "Kimi Antonelli",
+    "PER": "Sergio Perez",
+    "LAW": "Liam Lawson",
+    "BOT": "Valtteri Bottas",
+    "ZHO": "Guanyu Zhou",
+    "MAG": "Kevin Magnussen",
+    "HAD": "Isack Hadjar",
+    "BOR": "Gabriel Bortoleto",
+    "COL": "Franco Colapinto",
+    "DOO": "Jack Doohan",
+    "SAR": "Logan Sargeant",
+    "DEV": "Nyck de Vries",
+    "LIN": "Arvid Lindblad",
+}
 
 
 def _fastf1_call(operation_name: str, fn, *, labels: dict | None = None):
@@ -99,6 +133,97 @@ def _read_cgroup_memory_limit_mb() -> int | None:
             continue
         return max(1, int(limit_bytes / (1024 * 1024)))
     return None
+
+
+def _apply_rookie_penalty(base_rating: float, experience_data: dict) -> float:
+    """Apply a lighter rookie penalty once the sample size becomes meaningful."""
+    adjusted_rating = float(base_rating)
+    if experience_data.get("tier") != "rookie":
+        return adjusted_rating
+
+    total_races = int(experience_data.get("total_races", 0) or 0)
+    if total_races >= 20:
+        return adjusted_rating * 0.96
+    if total_races >= 10:
+        return adjusted_rating * 0.93
+    return adjusted_rating * 0.90
+
+
+def _load_current_lineups(lineup_file: Path) -> dict[str, list[str]]:
+    """Load current lineup mapping from disk when available."""
+    if not lineup_file.exists():
+        return {}
+
+    try:
+        with open(lineup_file) as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("Could not read %s: %s", lineup_file, exc)
+        return {}
+
+    current_lineups = payload.get("current_lineups", {})
+    if not isinstance(current_lineups, dict):
+        return {}
+
+    normalized: dict[str, list[str]] = {}
+    for team_name, raw_drivers in current_lineups.items():
+        if not isinstance(raw_drivers, list):
+            continue
+        normalized[str(team_name)] = [
+            str(driver).strip().upper() for driver in raw_drivers if driver
+        ]
+    return normalized
+
+
+def _resolve_bayesian_seed_grid_size(
+    final_ratings: dict[str, dict],
+    current_lineups: dict[str, list[str]],
+) -> int:
+    """Pick a seed grid size that matches the active season, not the archive size."""
+    lineup_grid_size = len({driver for drivers in current_lineups.values() for driver in drivers})
+    if lineup_grid_size >= 2:
+        return lineup_grid_size
+    return max(2, min(len(final_ratings), 22))
+
+
+def _seed_initial_bayesian_state(
+    final_ratings: dict[str, dict],
+    *,
+    grid_size: int,
+) -> None:
+    """Seed Bayesian state so file-only loads still expose an in-season prior."""
+    for _driver_code, entry in final_ratings.items():
+        skill = float(entry["racecraft"]["skill_score"])
+        rating_mu = 1.0 + (skill * max(grid_size - 1, 1))
+        entry["bayesian"] = {
+            "rating_mu": round(rating_mu, 3),
+            "rating_sigma": _DEFAULT_BAYESIAN_SIGMA,
+            "normalized_skill_score": round(skill, 3),
+            "sessions_observed": 0,
+            "seeded_from": "extraction_prior",
+        }
+
+
+def _absolute_finish_floor(
+    *,
+    driver_code: str,
+    absolute_finish_baselines: dict[str, float],
+    experience_data: dict,
+) -> float | None:
+    """Return a conservative floor for rookies with enough real race mileage.
+
+    The teammate network can underrate a rookie paired with an elite benchmark.
+    Once we have close to a full season of starts, field results are strong
+    enough to stop the rating from collapsing to the absolute backmarker floor.
+    """
+    if experience_data.get("tier") != "rookie":
+        return None
+    if int(experience_data.get("total_races", 0) or 0) < 20:
+        return None
+    baseline = absolute_finish_baselines.get(driver_code)
+    if baseline is None:
+        return None
+    return float(np.clip(baseline * 0.75, 0.35, 0.65))
 
 
 def _is_render_web_instance() -> bool:
@@ -600,7 +725,7 @@ def calculate_experience_and_consistency(
             tier = "rookie"
 
         # DNF rate (all non-finish outcomes)
-        dnf_rate = stats["dnf_count"] / total_races
+        dnf_rate = max(stats["dnf_count"] / total_races, _DNF_RATE_FLOOR)
 
         output[driver] = {
             "years_of_experience": years_of_experience,
@@ -612,6 +737,36 @@ def calculate_experience_and_consistency(
 
     logger.info(f"Processed experience for {len(output)} drivers")
     return output
+
+
+def calculate_absolute_finish_baselines(
+    years: list[int],
+    race_summaries: list[dict],
+) -> dict[str, float]:
+    """Translate median race finish into a cautious field-relative pace floor."""
+    finish_positions_by_driver: dict[str, list[int]] = defaultdict(list)
+    valid_years = set(years)
+
+    for summary in race_summaries:
+        year = int(summary.get("year", 0))
+        if year not in valid_years:
+            continue
+        for row in summary.get("rows", []):
+            driver = str(row.get("driver", "")).strip().upper()
+            position = row.get("position")
+            if not driver or not isinstance(position, int):
+                continue
+            finish_positions_by_driver[driver].append(int(position))
+
+    baselines: dict[str, float] = {}
+    for driver_code, positions in finish_positions_by_driver.items():
+        if len(positions) < 10:
+            continue
+        median_finish = float(np.median(positions))
+        field_percentile = 1.0 - ((median_finish - 1.0) / 19.0)
+        baselines[driver_code] = float(np.clip(0.35 + (field_percentile * 0.50), 0.35, 0.85))
+
+    return baselines
 
 
 def calculate_championship_overperformance(
@@ -781,6 +936,8 @@ def main():
         pace_ratings,
         race_summaries,
     )
+    absolute_finish_baselines = calculate_absolute_finish_baselines(years, race_summaries)
+    current_lineups = _load_current_lineups(Path("data/current_lineups.json"))
 
     # Step 6: Combine into final ratings
     final_ratings = {}
@@ -794,22 +951,34 @@ def main():
         championship_bonus = championship_bonuses.get(driver, 0.0)
         exp_data = experience_data[driver]
 
-        # Apply rookie penalty (10% reduction for first 2 seasons)
-        if exp_data["tier"] == "rookie":
-            base_rating *= 0.90
+        base_rating = _apply_rookie_penalty(base_rating, exp_data)
+        finish_floor = _absolute_finish_floor(
+            driver_code=driver,
+            absolute_finish_baselines=absolute_finish_baselines,
+            experience_data=exp_data,
+        )
+        if finish_floor is not None:
+            base_rating = max(base_rating, finish_floor)
 
-        # Final skill score (base + racecraft + championship overdelivery)
-        skill_score = np.clip(base_rating + racecraft_bonus + championship_bonus, 0.10, 0.99)
+        # Separate dimensions so downstream simulation can distinguish pace,
+        # general race execution, and passing skill.
+        race_pace_score = np.clip(base_rating + championship_bonus, 0.10, 0.99)
+        general_skill = np.clip(base_rating + racecraft_bonus + championship_bonus, 0.10, 0.99)
+        overtaking_score = np.clip(
+            base_rating + (racecraft_bonus * 1.5),
+            0.10,
+            0.99,
+        )
 
         final_ratings[driver] = {
-            "name": f"Driver {driver}",
+            "name": DRIVER_FULL_NAMES.get(driver, driver),
             "pace": {
                 "quali_pace": round(base_rating, 3),
-                "race_pace": round(skill_score, 3),
+                "race_pace": round(race_pace_score, 3),
             },
             "racecraft": {
-                "skill_score": round(skill_score, 3),
-                "overtaking_skill": round(skill_score, 3),
+                "skill_score": round(general_skill, 3),
+                "overtaking_skill": round(overtaking_score, 3),
             },
             "experience": {
                 "years_of_experience": exp_data["years_of_experience"],
@@ -822,11 +991,64 @@ def main():
             },
         }
 
+    # Step 7: Fill missing lineup drivers from current lineups with team-based priors.
+    for team_name, team_drivers in current_lineups.items():
+        for driver_code in team_drivers:
+            if driver_code in final_ratings:
+                continue
+
+            teammate_ratings = [
+                final_ratings[teammate]["racecraft"]["skill_score"]
+                for teammate in team_drivers
+                if teammate in final_ratings and teammate != driver_code
+            ]
+            if teammate_ratings:
+                prior_rating = float(np.clip(np.mean(teammate_ratings) - 0.08, 0.10, 0.90))
+            else:
+                prior_rating = 0.40
+
+            logger.info(
+                "  %s: no race data, using team-based prior (%s, base=%.3f)",
+                driver_code,
+                team_name,
+                prior_rating,
+            )
+            final_ratings[driver_code] = {
+                "name": DRIVER_FULL_NAMES.get(driver_code, driver_code),
+                "pace": {
+                    "quali_pace": round(prior_rating * 0.95, 3),
+                    "race_pace": round(prior_rating, 3),
+                },
+                "racecraft": {
+                    "skill_score": round(prior_rating, 3),
+                    "overtaking_skill": round(prior_rating, 3),
+                },
+                "experience": {
+                    "years_of_experience": 0,
+                    "debut_year": 2026,
+                    "total_races": 0,
+                    "tier": "rookie",
+                },
+                "dnf_risk": {
+                    "dnf_rate": round(_DNF_RATE_FLOOR, 3),
+                },
+                "prior_source": "team_based_prior",
+            }
+
+    # Step 8: Seed initial Bayesian state so file-based fallbacks can use it.
+    _seed_initial_bayesian_state(
+        final_ratings,
+        grid_size=_resolve_bayesian_seed_grid_size(final_ratings, current_lineups),
+    )
+
     # Save
+    extraction_timestamp = pd.Timestamp.now(tz="UTC").isoformat()
     output = {
-        "extraction_date": pd.Timestamp.now().isoformat(),
+        "extraction_date": extraction_timestamp,
         "years": years,
         "method": "global_teammate_network_ranking",
+        "last_updated": extraction_timestamp,
+        "bayesian_last_updated_year": pd.Timestamp.now(tz="UTC").year,
         "drivers": final_ratings,
     }
 

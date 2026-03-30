@@ -309,8 +309,10 @@ def test_update_bayesian_driver_ratings_skips_when_no_valid_positions(patcher):
     bayesian_cls.return_value.update.assert_not_called()
 
 
-def test_update_bayesian_driver_ratings_persists_driver_characteristics_updates(patcher):
+def test_update_bayesian_driver_ratings_persists_driver_characteristics_updates(patcher, tmp_path):
     from src.models.bayesian import DriverPrior
+
+    patcher.chdir(tmp_path)
 
     race_results = pd.DataFrame(
         {
@@ -387,8 +389,81 @@ def test_update_bayesian_driver_ratings_persists_driver_characteristics_updates(
     assert "bayesian" in payload["drivers"]["LEC"]
 
 
-def test_update_bayesian_driver_ratings_refreshes_quali_pace_from_qualifying_results(patcher):
+def test_update_bayesian_driver_ratings_also_writes_year_scoped_fallback_on_store_success(
+    patcher, tmp_path
+):
+    """A successful store write should still refresh the file fallback used locally."""
     from src.models.bayesian import DriverPrior
+
+    patcher.chdir(tmp_path)
+
+    race_results = pd.DataFrame(
+        {
+            "Abbreviation": ["LEC", "NOR"],
+            "Position": [1, 2],
+            "race_name": ["Bahrain Grand Prix", "Bahrain Grand Prix"],
+            "year": [2027, 2027],
+        }
+    )
+
+    priors = {
+        "LEC": DriverPrior(
+            driver_number="16",
+            driver_code="LEC",
+            team="Ferrari",
+            team_tier="top",
+            mu=16.0,
+            sigma=2.0,
+        ),
+        "NOR": DriverPrior(
+            driver_number="4",
+            driver_code="NOR",
+            team="McLaren",
+            team_tier="top",
+            mu=15.0,
+            sigma=2.1,
+        ),
+    }
+    patcher.setattr("src.models.priors_factory.PriorsFactory.create_priors", lambda self: priors)
+    patcher.setattr(updater.config_loader, "get", lambda key, default=None: default)
+
+    class _Store:
+        def __init__(self, data_root):
+            self.saved = []
+
+        def load_artifact(self, artifact_type, artifact_key):
+            if artifact_type == "driver_characteristics":
+                return {
+                    "version": 1,
+                    "drivers": {
+                        "LEC": {"racecraft": {"skill_score": 0.55}, "pace": {"quali_pace": 0.60}},
+                        "NOR": {"racecraft": {"skill_score": 0.60}, "pace": {"quali_pace": 0.58}},
+                    },
+                }
+            return None
+
+        def get_latest_version(self, artifact_type, artifact_key):
+            return 1
+
+        def save_artifact(self, artifact_type, artifact_key, data, version):
+            self.saved.append((artifact_type, artifact_key, data, version))
+
+    patcher.setattr(updater, "ArtifactStore", _Store)
+
+    updater.update_bayesian_driver_ratings(race_results)
+
+    fallback_file = Path("data/processed/driver_characteristics/2027_driver_characteristics.json")
+    assert fallback_file.exists()
+    persisted = json.loads(fallback_file.read_text())
+    assert "bayesian" in persisted["drivers"]["LEC"]
+
+
+def test_update_bayesian_driver_ratings_refreshes_quali_pace_from_qualifying_results(
+    patcher, tmp_path
+):
+    from src.models.bayesian import DriverPrior
+
+    patcher.chdir(tmp_path)
 
     race_results = pd.DataFrame(
         {

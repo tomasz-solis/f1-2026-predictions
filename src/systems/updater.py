@@ -120,6 +120,13 @@ def _persist_driver_characteristics_payload(
     payload["last_updated"] = datetime.now().isoformat()
     payload["bayesian_last_updated_year"] = year
 
+    def _write_fallback_file() -> None:
+        """Persist the same payload to the season-scoped JSON fallback."""
+        import json
+
+        with open(fallback_file, "w") as f:
+            json.dump(payload, f, indent=2)
+
     try:
         store.save_artifact(
             artifact_type="driver_characteristics",
@@ -127,6 +134,7 @@ def _persist_driver_characteristics_payload(
             data=payload,
             version=new_version,
         )
+        _write_fallback_file()
     except Exception as exc:
         logger.warning(
             "ArtifactStore save failed for driver characteristics: %s. "
@@ -134,10 +142,7 @@ def _persist_driver_characteristics_payload(
             exc,
             fallback_file,
         )
-        import json
-
-        with open(fallback_file, "w") as f:
-            json.dump(payload, f, indent=2)
+        _write_fallback_file()
 
 
 def load_competitive_session(
