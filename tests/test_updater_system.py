@@ -394,6 +394,40 @@ class TestUpdaterEdgeCases:
         assert "Red Bull Racing" in perf
         assert "Ferrari" in perf
 
+    def test_extract_team_performance_uses_rank_based_normalization(self):
+        """Telemetry normalization should space teams by rank instead of raw time spread."""
+        from src.systems.updater import extract_team_performance_from_telemetry
+
+        rows = []
+        lap_templates = {
+            "Mercedes": [88.0, 88.1, 88.0, 88.2, 88.0, 88.1, 88.2],
+            "Ferrari": [90.0, 90.1, 90.0, 90.1, 90.0, 90.2, 90.1],
+            "Aston Martin": [95.0, 95.1, 95.0, 95.2, 95.0, 95.1, 95.2],
+        }
+        for team, lap_times in lap_templates.items():
+            for lap_number, lap_time in enumerate(lap_times, start=2):
+                rows.append(
+                    {
+                        "Team": team,
+                        "LapTime": pd.Timedelta(seconds=lap_time),
+                        "PitOutTime": pd.NaT,
+                        "PitInTime": pd.NaT,
+                        "LapNumber": lap_number,
+                    }
+                )
+
+        session = MagicMock()
+        session.laps = pd.DataFrame(rows)
+
+        perf = extract_team_performance_from_telemetry(
+            session=session,
+            team_names=["Mercedes", "Ferrari", "Aston Martin"],
+        )
+
+        assert perf["Mercedes"] == pytest.approx(1.0)
+        assert perf["Ferrari"] == pytest.approx(0.5)
+        assert perf["Aston Martin"] == pytest.approx(0.0)
+
     def test_update_bayesian_driver_ratings_uses_observation_mapping(self):
         """Bayesian updater should receive a full observations mapping, not per-driver scalars."""
         from src.systems.updater import update_bayesian_driver_ratings

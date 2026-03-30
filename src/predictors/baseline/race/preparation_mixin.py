@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from src.persistence.artifact_store import ArtifactStore
+from src.predictors.baseline.qualifying_preparation import resolve_bayesian_skill_score
 from src.types.prediction_types import DriverRaceInfo, QualifyingGridEntry
 from src.utils import config_loader
 from src.utils.schema_validation import validate_track_characteristics
@@ -86,14 +87,13 @@ class BaselineRacePreparationMixin:
         if experience_tier not in {"established", "veteran", "sunset"}:
             return float(base_skill)
 
-        try:
-            normalized_skill = float(
-                driver_data.get("bayesian", {}).get("normalized_skill_score", base_skill)
-            )
-        except (TypeError, ValueError):
-            normalized_skill = float(base_skill)
-
-        if not (normalized_skill >= 0.0):
+        cfg = getattr(self, "config", config_loader)
+        configured_grid_size = int(cfg.get("grid.size", len(self.drivers) or 22))
+        normalized_skill = resolve_bayesian_skill_score(
+            driver_data,
+            grid_size=max(configured_grid_size, len(self.drivers) or 0, 2),
+        )
+        if normalized_skill is None:
             normalized_skill = float(base_skill)
 
         portable_skill = max(float(base_skill), (float(base_skill) + normalized_skill) / 2.0)
@@ -266,6 +266,7 @@ class BaselineRacePreparationMixin:
             qualifying_grid=qualifying_grid,
             race_name=race_name,
             race_compound=race_compound,
+            races_completed=int(getattr(self, "races_completed", 0)),
             teams=self.teams,
             config=getattr(self, "config", config_loader),
             get_compound_adjusted_team_strength_fn=self.get_compound_adjusted_team_strength,
@@ -286,6 +287,7 @@ class BaselineRacePreparationMixin:
         driver_info_map, profile_count = prepare_driver_info_with_compounds_core(
             qualifying_grid=qualifying_grid,
             race_name=race_name,
+            races_completed=int(getattr(self, "races_completed", 0)),
             teams=self.teams,
             config=getattr(self, "config", config_loader),
             get_blended_team_strength_fn=self.get_blended_team_strength,

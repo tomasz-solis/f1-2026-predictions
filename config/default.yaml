@@ -157,7 +157,7 @@ baseline_predictor:
 
     # Compress team spread before scoring.
     # 1.0 = raw team deltas, lower = closer field.
-    team_strength_compression: 0.52
+    team_strength_compression: 0.44
 
     # Driver signal composition for qualifying
     driver_quali_pace_weight: 0.70

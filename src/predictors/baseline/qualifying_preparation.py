@@ -73,20 +73,14 @@ def resolve_bayesian_skill_score(
     *,
     grid_size: int,
 ) -> float | None:
-    """Normalize stored Bayesian form onto the shared 0-1 driver scale."""
+    """Normalize stored Bayesian form onto the shared 0-1 driver scale.
+
+    Always recompute from ``rating_mu`` and the current grid size so persisted
+    cache fields do not leak stale normalization from an older season layout.
+    """
     bayesian = driver_data.get("bayesian", {}) if isinstance(driver_data, dict) else {}
     if not isinstance(bayesian, dict):
         return None
-
-    normalized_skill = bayesian.get("normalized_skill_score")
-    normalized_skill_value: float | None = None
-    if normalized_skill is not None:
-        try:
-            normalized_skill_value = float(normalized_skill)
-        except (TypeError, ValueError):
-            normalized_skill_value = None
-    if normalized_skill_value is not None and np.isfinite(normalized_skill_value):
-        return float(np.clip(normalized_skill_value, 0.0, 1.0))
 
     rating_mu = bayesian.get("rating_mu")
     if rating_mu is None:

@@ -212,11 +212,16 @@ def extract_team_performance_from_telemetry(
     """
     race_pace = {}
 
-    if not hasattr(session, "laps") or session.laps is None or session.laps.empty:
+    try:
+        laps = session.laps
+    except Exception as exc:
+        logger.warning("Could not access lap data: %s", exc)
+        return {}
+
+    if laps is None or laps.empty:
         logger.warning("No lap data available")
         return {}
 
-    laps = session.laps
     known_teams = set(team_names)
     if "Team" not in laps.columns:
         logger.warning("Lap data does not include Team column")
@@ -268,20 +273,31 @@ def extract_team_performance_from_telemetry(
         race_pace[team] = median_time
         logger.debug(f"  {team}: Median lap time {median_time:.3f}s ({len(clean_times)} laps)")
 
-    # Convert lap times to 0-1 performance scale
+    # Convert lap times to rank-based 0-1 performance scale.
+    # Rank-based scoring is more stable than min-max because a single outlier
+    # cannot stretch the whole field and flatten the midfield signal.
     if race_pace:
-        fastest_time = min(race_pace.values())
-        slowest_time = max(race_pace.values())
-
-        if fastest_time < slowest_time:
-            for team in race_pace:
-                # Invert: faster time = higher score
-                performance = 1.0 - (race_pace[team] - fastest_time) / (slowest_time - fastest_time)
-                race_pace[team] = performance
-        else:
-            # All teams same pace
+        ranked_items = sorted(race_pace.items(), key=lambda item: item[1])
+        team_count = len(ranked_items)
+        if team_count < 2:
             for team in race_pace:
                 race_pace[team] = 0.5
+        else:
+            grouped_items: list[tuple[float, list[str]]] = []
+            for team, lap_time in ranked_items:
+                lap_time_value = float(lap_time)
+                if grouped_items and np.isclose(lap_time_value, grouped_items[-1][0]):
+                    grouped_items[-1][1].append(team)
+                else:
+                    grouped_items.append((lap_time_value, [team]))
+
+            rank_cursor = 0
+            for _lap_time, tied_teams in grouped_items:
+                average_rank = rank_cursor + ((len(tied_teams) - 1) / 2.0)
+                normalized_score = float(1.0 - (average_rank / (team_count - 1)))
+                for team in tied_teams:
+                    race_pace[team] = normalized_score
+                rank_cursor += len(tied_teams)
 
     return race_pace
 

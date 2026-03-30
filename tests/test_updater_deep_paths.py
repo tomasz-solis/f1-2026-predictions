@@ -78,6 +78,17 @@ def test_extract_team_performance_missing_laps_or_team_column():
     )
 
 
+def test_extract_team_performance_handles_unloaded_lap_property():
+    class _SessionWithBrokenLaps:
+        @property
+        def laps(self):
+            raise RuntimeError("laps not loaded")
+
+    assert (
+        updater.extract_team_performance_from_telemetry(_SessionWithBrokenLaps(), ["Ferrari"]) == {}
+    )
+
+
 def test_extract_team_performance_equal_pace_and_missing_team(patcher):
     rows = []
     for team in ("Ferrari", "McLaren"):
@@ -161,6 +172,78 @@ def test_update_team_characteristics_position_fallback_and_file_save(patcher, tm
     assert saved["version"] == 2
     assert saved["data_freshness"] == "LIVE_UPDATED"
     assert Path(str(characteristics_file) + ".backup").exists()
+
+
+def test_update_team_characteristics_uses_full_position_fallback_for_partial_telemetry(
+    patcher, tmp_path
+):
+    characteristics_file = (
+        tmp_path / "processed" / "car_characteristics" / "2026_car_characteristics.json"
+    )
+    payload = {
+        "year": 2026,
+        "version": 1,
+        "races_completed": 0,
+        "teams": {
+            "Ferrari": {
+                "overall_performance": 0.8,
+                "directionality": {
+                    "max_speed": 0.0,
+                    "slow_corner_speed": 0.0,
+                    "medium_corner_speed": 0.0,
+                    "high_corner_speed": 0.0,
+                },
+                "uncertainty": 0.3,
+            },
+            "McLaren": {
+                "overall_performance": 0.82,
+                "directionality": {
+                    "max_speed": 0.0,
+                    "slow_corner_speed": 0.0,
+                    "medium_corner_speed": 0.0,
+                    "high_corner_speed": 0.0,
+                },
+                "uncertainty": 0.3,
+            },
+        },
+    }
+    characteristics_file.parent.mkdir(parents=True, exist_ok=True)
+    characteristics_file.write_text(json.dumps(payload))
+
+    class Store:
+        def __init__(self, data_root):
+            self.data_root = data_root
+
+        def load_artifact(self, artifact_type, artifact_key):
+            return None
+
+        def save_artifact(self, artifact_type, artifact_key, data, version):
+            raise RuntimeError("db save failed")
+
+    patcher.setattr(updater, "ArtifactStore", Store)
+    patcher.setattr(
+        updater,
+        "extract_team_performance_from_telemetry",
+        lambda session, team_names: {"Ferrari": 1.0},
+    )
+    patcher.setattr(updater, "map_team_to_characteristics", lambda raw, known_teams: str(raw))
+
+    race_results = pd.DataFrame(
+        {
+            "TeamName": ["Ferrari", "McLaren"],
+            "Position": [1, 2],
+        }
+    )
+    session = SimpleNamespace(event=None, name="Race Session", laps=pd.DataFrame())
+
+    updater.update_team_characteristics(race_results, session, characteristics_file)
+
+    saved = json.loads(characteristics_file.read_text())
+    ferrari = saved["teams"]["Ferrari"]
+    mclaren = saved["teams"]["McLaren"]
+    assert ferrari["current_season_performance"] == [1.0]
+    assert mclaren["current_season_performance"] == [0.0]
+    assert saved["races_completed"] == 1
 
 
 def test_update_team_characteristics_handles_compound_extraction_failure(patcher, tmp_path):

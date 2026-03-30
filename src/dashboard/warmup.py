@@ -23,6 +23,11 @@ from src.dashboard.precomputed_predictions import (
     save_precomputed_base_features,
     save_precomputed_prediction,
 )
+from src.dashboard.prediction_checkpointing import (
+    prediction_payload_for_session,
+    prediction_sections_for_session,
+    prediction_targets_for_checkpoint,
+)
 from src.dashboard.prediction_flow import (
     _derive_race_input_confidence,
     _predict_race_with_optional_confidence,
@@ -40,6 +45,8 @@ from src.dashboard.update_flow import (
 )
 from src.persistence.config import should_read_db_first, should_write_to_db
 from src.persistence.runtime_state_store import RuntimeStateStore
+from src.utils.accuracy_targets import legacy_target_keys_for_prediction, weekend_format_name
+from src.utils.prediction_logger import PredictionLogger
 from src.utils.race_input_confidence import cap_predicted_main_race_input_confidence
 from src.utils.session_detector import SessionDetector
 from src.utils.weekend import is_sprint_weekend
@@ -459,6 +466,67 @@ def _can_verify_db_writes() -> bool:
     return should_write_to_db() and should_read_db_first()
 
 
+def _save_warmup_prediction_to_logger(
+    *,
+    year: int,
+    race_name: str,
+    checkpoint_session: str,
+    weather: str,
+    is_sprint: bool,
+    prediction_results: dict[str, Any],
+) -> None:
+    """Mirror one warmup payload into the prediction logger for accuracy scoring."""
+    logger_inst = PredictionLogger()
+    if logger_inst.has_prediction_for_session(year, race_name, checkpoint_session):
+        return
+
+    target_predictions = prediction_targets_for_checkpoint(
+        prediction_results=prediction_results,
+        is_sprint=is_sprint,
+        session_name=checkpoint_session,
+    )
+    if not target_predictions:
+        return
+
+    qualifying_prediction, race_prediction, fp_blend_info = prediction_payload_for_session(
+        prediction_results=prediction_results,
+        is_sprint=is_sprint,
+        session_name=checkpoint_session,
+    )
+    qualifying_section, race_section = prediction_sections_for_session(
+        prediction_results=prediction_results,
+        is_sprint=is_sprint,
+        session_name=checkpoint_session,
+    )
+    qualifying_target, race_target = legacy_target_keys_for_prediction(
+        checkpoint_session,
+        is_sprint=is_sprint,
+    )
+
+    logger_inst.save_prediction(
+        year=year,
+        race_name=race_name,
+        session_name=checkpoint_session,
+        qualifying_prediction=qualifying_prediction,
+        race_prediction=race_prediction,
+        weather=weather,
+        fp_blend_info=fp_blend_info,
+        target_predictions=target_predictions,
+        metadata={
+            "source": "warmup_precompute",
+            "weekend_format": weekend_format_name(is_sprint),
+            "top_level_qualifying_target": qualifying_target,
+            "top_level_race_target": race_target,
+            "top_level_qualifying_eligible_at_save": qualifying_target in target_predictions,
+            "top_level_race_eligible_at_save": race_target in target_predictions,
+            "top_level_qualifying_result_mode": qualifying_section.get("result_mode", "PREDICTED"),
+            "top_level_race_result_mode": race_section.get("result_mode", "PREDICTED"),
+            "top_level_qualifying_grid_source": qualifying_section.get("grid_source", "PREDICTED"),
+            "top_level_race_grid_source": race_section.get("grid_source", "PREDICTED"),
+        },
+    )
+
+
 def _verify_runtime_state_record(namespace: str, state_key: str) -> bool:
     """Verify that a runtime-state record exists immediately after write."""
     try:
@@ -728,58 +796,77 @@ def run_warmup_precompute_cycle(
                 if persisted_prediction is not None:
                     summary.predictions_reused += 1
                     race_weather_coverage.setdefault(target_race, set()).add(target_weather)
-                    continue
+                    prediction_results = persisted_prediction
+                else:
+                    if dry_run:
+                        summary.predictions_generated += 1
+                        race_weather_coverage.setdefault(target_race, set()).add(target_weather)
+                        continue
 
-                if dry_run:
-                    summary.predictions_generated += 1
-                    race_weather_coverage.setdefault(target_race, set()).add(target_weather)
-                    continue
-
-                try:
-                    prediction_results = compute_weather_predictions(
-                        base_features,
-                        target_weather,
-                        predictor=_resolve_target_predictor(),
-                        year=int(year),
-                        target_race=target_race,
-                    )
-                    save_precomputed_prediction(
-                        year=int(year),
-                        race_name=target_race,
-                        weather=target_weather,
-                        artifact_hash=artifact_hash,
-                        boundary_signature=target_boundary_signature,
-                        is_sprint=target_is_sprint,
-                        prediction_results=prediction_results,
-                        metadata={
-                            "source_race_name": targets.anchor_race_name,
-                            "boundary_session_name": target_checkpoint,
-                            "computed_from_base_features": True,
-                        },
-                        max_file_entries=max_file_entries,
-                    )
-                    if db_verification_enabled:
-                        prediction_state_key = build_precomputed_prediction_key(
+                    try:
+                        prediction_results = compute_weather_predictions(
+                            base_features,
+                            target_weather,
+                            predictor=_resolve_target_predictor(),
+                            year=int(year),
+                            target_race=target_race,
+                        )
+                        save_precomputed_prediction(
                             year=int(year),
                             race_name=target_race,
                             weather=target_weather,
                             artifact_hash=artifact_hash,
                             boundary_signature=target_boundary_signature,
+                            is_sprint=target_is_sprint,
+                            prediction_results=prediction_results,
+                            metadata={
+                                "source_race_name": targets.anchor_race_name,
+                                "boundary_session_name": target_checkpoint,
+                                "computed_from_base_features": True,
+                            },
+                            max_file_entries=max_file_entries,
                         )
-                        verified = _verify_runtime_state_record(
-                            _STATE_NAMESPACE_PRECOMPUTED_PREDICTIONS,
-                            prediction_state_key,
-                        )
-                        if not verified:
-                            summary.db_verification_warnings.append(
-                                f"Prediction write could not be verified in DB for {target_race} [{target_weather}]."
+                        if db_verification_enabled:
+                            prediction_state_key = build_precomputed_prediction_key(
+                                year=int(year),
+                                race_name=target_race,
+                                weather=target_weather,
+                                artifact_hash=artifact_hash,
+                                boundary_signature=target_boundary_signature,
                             )
-                    summary.predictions_generated += 1
-                    race_weather_coverage.setdefault(target_race, set()).add(target_weather)
+                            verified = _verify_runtime_state_record(
+                                _STATE_NAMESPACE_PRECOMPUTED_PREDICTIONS,
+                                prediction_state_key,
+                            )
+                            if not verified:
+                                summary.db_verification_warnings.append(
+                                    f"Prediction write could not be verified in DB for {target_race} [{target_weather}]."
+                                )
+                        summary.predictions_generated += 1
+                        race_weather_coverage.setdefault(target_race, set()).add(target_weather)
+                    except Exception as exc:
+                        error_message = f"{target_race} [{target_weather}]: {exc}"
+                        summary.errors.append(error_message)
+                        logger.warning("Warmup weather precompute failed: %s", error_message)
+                        continue
+
+                try:
+                    _save_warmup_prediction_to_logger(
+                        year=int(year),
+                        race_name=target_race,
+                        checkpoint_session=target_checkpoint,
+                        weather=target_weather,
+                        is_sprint=target_is_sprint,
+                        prediction_results=prediction_results,
+                    )
                 except Exception as exc:
-                    error_message = f"{target_race} [{target_weather}]: {exc}"
-                    summary.errors.append(error_message)
-                    logger.warning("Warmup weather precompute failed: %s", error_message)
+                    logger.warning(
+                        "Could not save warmup prediction to PredictionLogger for %s %s %s: %s",
+                        int(year),
+                        target_race,
+                        target_checkpoint,
+                        exc,
+                    )
 
         expected_weather = set(weather_scenarios)
         summary.ready_races = [

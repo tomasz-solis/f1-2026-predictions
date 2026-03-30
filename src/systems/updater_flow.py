@@ -280,13 +280,23 @@ def update_team_characteristics_core(
 
     team_names = list(char_data["teams"].keys())
     race_pace = extract_team_performance_from_telemetry_fn(session, team_names)
-    if not race_pace:
-        race_pace = _build_position_fallback_race_pace(
+    if not race_pace or len(race_pace) < len(team_names):
+        fallback_race_pace = _build_position_fallback_race_pace(
             race_results=race_results,
             team_names=team_names,
             map_team_to_characteristics_fn=map_team_to_characteristics_fn,
             logger=logger,
         )
+        if not race_pace:
+            race_pace = fallback_race_pace
+        elif len(fallback_race_pace) >= len(race_pace):
+            logger.warning(
+                "Incomplete telemetry coverage (%s/%s teams); using position fallback for a "
+                "consistent full-field ranking",
+                len(race_pace),
+                len(team_names),
+            )
+            race_pace = fallback_race_pace
 
     now_iso = datetime.now().isoformat()
     _apply_team_performance_updates(
@@ -322,7 +332,14 @@ def update_team_characteristics_core(
 
     char_data["last_updated"] = now_iso
     char_data["data_freshness"] = "LIVE_UPDATED"
-    char_data["races_completed"] = char_data.get("races_completed", 0) + 1
+    char_data["races_completed"] = max(
+        (
+            len(team_data.get("current_season_performance", []))
+            for team_data in char_data.get("teams", {}).values()
+            if isinstance(team_data, dict)
+        ),
+        default=int(char_data.get("races_completed", 0)),
+    )
 
     _save_characteristics_payload(
         store=store,

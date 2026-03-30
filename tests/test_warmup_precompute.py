@@ -734,6 +734,124 @@ def test_run_warmup_precompute_cycle_reports_db_verification_warning_on_missing_
     assert result.db_verification_warnings
 
 
+def test_run_warmup_precompute_cycle_backfills_prediction_logger_from_reused_prediction(patcher):
+    """Warmup should mirror reused precomputed payloads into PredictionLogger once."""
+    fixed_now = datetime(2026, 3, 5, 12, 0, tzinfo=UTC)
+    saved_predictions: list[dict[str, object]] = []
+    seen_sessions: set[tuple[int, str, str]] = set()
+
+    class _Logger:
+        def has_prediction_for_session(self, year: int, race_name: str, session_name: str) -> bool:
+            return (int(year), str(race_name), str(session_name).strip().upper()) in seen_sessions
+
+        def save_prediction(self, **kwargs):
+            session_key = (
+                int(kwargs["year"]),
+                str(kwargs["race_name"]),
+                str(kwargs["session_name"]).strip().upper(),
+            )
+            seen_sessions.add(session_key)
+            saved_predictions.append(dict(kwargs))
+
+    patcher.setattr(warmup, "PredictionLogger", _Logger)
+    patcher.setattr(warmup, "should_write_to_db", lambda: False)
+    patcher.setattr(warmup, "_refresh_anchor_practice_characteristics", lambda **kwargs: {})
+    patcher.setattr(
+        warmup,
+        "get_prediction_precompute_config",
+        lambda: {
+            "enabled": True,
+            "horizon_races": 3,
+            "weather_scenarios": ["dry"],
+            "max_file_entries": 2048,
+        },
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_warmup_targets",
+        lambda year, now_utc, horizon_races: warmup.WarmupTargets(
+            anchor_race_name="Bahrain Grand Prix",
+            anchor_is_sprint=False,
+            target_races=("Bahrain Grand Prix",),
+        ),
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_checkpoint_context",
+        lambda year, race_name, is_sprint, now_utc, session_detector: warmup.CheckpointContext(
+            checkpoint="FP1",
+            expected_checkpoint="FP1",
+            latest_ready_checkpoint="FP1",
+            checkpoint_ready=True,
+            reason="ready",
+            boundary_signature="boundary_sig",
+        ),
+    )
+    patcher.setattr(warmup, "get_artifact_versions", lambda year=2026: {"k": (1, "ts")})
+    patcher.setattr(warmup, "compute_artifact_hash", lambda artifact_versions: "artifact_hash")
+    patcher.setattr(warmup, "_load_predictor", lambda artifact_versions, year: object())
+    patcher.setattr(warmup, "is_sprint_weekend", lambda year, race_name: False)
+    patcher.setattr(
+        warmup,
+        "load_precomputed_base_features",
+        lambda **kwargs: {
+            "is_sprint": False,
+            "qualifying": {"grid": []},
+            "qualifying_grid_for_race": [],
+            "race_input_confidence": 0.7,
+            "timing": {"qualifying": 0.1},
+        },
+    )
+    patcher.setattr(
+        warmup,
+        "load_precomputed_prediction",
+        lambda **kwargs: {
+            "qualifying": {
+                "grid": [
+                    {"position": 1, "driver": "RUS", "team": "Mercedes"},
+                    {"position": 2, "driver": "LEC", "team": "Ferrari"},
+                ],
+                "result_mode": "PREDICTED",
+                "grid_source": "PREDICTED",
+            },
+            "race": {
+                "finish_order": [
+                    {"position": 1, "driver": "RUS", "team": "Mercedes"},
+                    {"position": 2, "driver": "LEC", "team": "Ferrari"},
+                ],
+                "result_mode": "PREDICTED",
+                "grid_source": "PREDICTED",
+            },
+        },
+    )
+    patcher.setattr(
+        warmup,
+        "compute_base_features",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("compute_base_features should not run when base features are cached")
+        ),
+    )
+    patcher.setattr(
+        warmup,
+        "compute_weather_predictions",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("compute_weather_predictions should not run when prediction is cached")
+        ),
+    )
+    patcher.setattr(warmup, "save_precomputed_base_features", lambda **kwargs: None)
+    patcher.setattr(warmup, "save_precomputed_prediction", lambda **kwargs: None)
+    patcher.setattr(warmup, "save_precompute_horizon_index", lambda **kwargs: None)
+
+    result = warmup.run_warmup_precompute_cycle(2026, now_utc=fixed_now)
+
+    assert result.status == "success"
+    assert result.predictions_reused == 1
+    assert len(saved_predictions) == 1
+    assert saved_predictions[0]["session_name"] == "FP1"
+    assert saved_predictions[0]["metadata"]["source"] == "warmup_precompute"
+    assert saved_predictions[0]["target_predictions"]
+
+
 def test_run_warmup_precompute_cycle_returns_locked_when_another_worker_holds_lock(patcher):
     """Warmup should skip compute work when a DB-backed lock is held by another worker."""
     fixed_now = datetime(2026, 3, 5, 12, 0, tzinfo=UTC)

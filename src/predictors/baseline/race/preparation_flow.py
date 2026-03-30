@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 
+from src.predictors.baseline.qualifying_preparation import resolve_bayesian_skill_score
 from src.types.prediction_types import DriverRaceInfo, QualifyingGridEntry
 from src.utils import config_loader
 from src.utils.team_mapping import map_team_to_characteristics
@@ -312,6 +313,35 @@ def _compute_driver_dnf_probability(
     return max(floor, min(adjusted_dnf, dnf_rate_final_cap))
 
 
+def _blend_race_skill_with_bayesian_form(
+    driver_data: dict[str, Any],
+    *,
+    base_skill: float,
+    races_completed: int,
+    grid_size: int,
+    config: Any | None,
+) -> float:
+    """Blend base race skill toward in-season Bayesian form as evidence accumulates."""
+    clipped_base_skill = float(np.clip(base_skill, 0.0, 1.0))
+    cfg = config or config_loader
+    bayesian_skill = resolve_bayesian_skill_score(driver_data, grid_size=max(int(grid_size), 2))
+    if bayesian_skill is None:
+        return clipped_base_skill
+
+    blend_per_race = float(
+        cfg.get("baseline_predictor.driver_form.bayesian_pace_blend_per_race", 0.20)
+    )
+    blend_cap = float(cfg.get("baseline_predictor.driver_form.bayesian_pace_blend_cap", 0.60))
+    blend_weight = float(
+        np.clip(max(0, int(races_completed)) * blend_per_race, 0.0, max(0.0, blend_cap))
+    )
+    if blend_weight <= 0.0:
+        return clipped_base_skill
+
+    blended_skill = ((1.0 - blend_weight) * clipped_base_skill) + (blend_weight * bayesian_skill)
+    return float(np.clip(blended_skill, 0.0, 1.0))
+
+
 def _load_preparation_config(
     config: Any | None,
 ) -> tuple[float, float, float, float, dict, dict, float]:
@@ -370,6 +400,7 @@ def prepare_driver_info_core(
     race_name: str | None,
     race_compound: str,
     *,
+    races_completed: int,
     teams: dict[str, dict],
     config: Any | None,
     get_compound_adjusted_team_strength_fn: Callable[[str, str, str], float],
@@ -387,6 +418,9 @@ def prepare_driver_info_core(
         defensive_skill_weights,
         team_uncertainty_dnf_multiplier,
     ) = _load_preparation_config(config)
+    cfg = config or config_loader
+    configured_grid_size = int(cfg.get("grid.size", len(qualifying_grid) or 22))
+    effective_grid_size = max(configured_grid_size, len(qualifying_grid) or 0, 2)
 
     driver_info_map: dict[str, DriverRaceInfo] = {}
     teams_with_long_profile: set[str] = set()
@@ -416,6 +450,13 @@ def prepare_driver_info_core(
         race_advantage, skill, overtaking_skill, defensive_skill = _resolve_racecraft_metrics(
             driver_data=driver_data,
             defensive_skill_weights=defensive_skill_weights,
+        )
+        skill = _blend_race_skill_with_bayesian_form(
+            driver_data,
+            base_skill=skill,
+            races_completed=races_completed,
+            grid_size=effective_grid_size,
+            config=cfg,
         )
 
         team_uncertainty = team_payload.get("uncertainty", 0.30)
@@ -448,6 +489,7 @@ def prepare_driver_info_with_compounds_core(
     qualifying_grid: list[QualifyingGridEntry],
     race_name: str | None,
     *,
+    races_completed: int,
     teams: dict[str, dict],
     config: Any | None,
     get_blended_team_strength_fn: Callable[[str, str], float],
@@ -467,6 +509,8 @@ def prepare_driver_info_with_compounds_core(
         team_uncertainty_dnf_multiplier,
     ) = _load_preparation_config(config)
     cfg = config or config_loader
+    configured_grid_size = int(cfg.get("grid.size", len(qualifying_grid) or 22))
+    effective_grid_size = max(configured_grid_size, len(qualifying_grid) or 0, 2)
     default_tire_deg_slope = _coerce_tire_deg_slope(
         cfg.get("baseline_predictor.race.tire_physics.default_deg_slope", 0.15),
         default=0.15,
@@ -518,6 +562,13 @@ def prepare_driver_info_with_compounds_core(
         race_advantage, skill, overtaking_skill, defensive_skill = _resolve_racecraft_metrics(
             driver_data=driver_data,
             defensive_skill_weights=defensive_skill_weights,
+        )
+        skill = _blend_race_skill_with_bayesian_form(
+            driver_data,
+            base_skill=skill,
+            races_completed=races_completed,
+            grid_size=effective_grid_size,
+            config=cfg,
         )
         team_uncertainty = team_payload.get("uncertainty", 0.30)
         dnf_probability = _compute_driver_dnf_probability(

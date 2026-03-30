@@ -213,6 +213,48 @@ def test_prepare_driver_info_with_compounds_defaults_missing_tire_deg_slope():
     assert info["tire_deg_by_compound"]["SOFT"] == pytest.approx(0.12)
 
 
+def test_prepare_driver_info_with_compounds_blends_race_skill_with_bayesian_form():
+    prep = DummyPreparation()
+    prep.races_completed = 2
+    prep.blended_strength = 0.7
+    prep.profile_modifier = (0.0, False)
+    prep.config = DummyConfig(
+        {
+            "grid.size": 22,
+            "baseline_predictor.race.tire_physics.default_deg_slope": 0.12,
+            "baseline_predictor.race.dnf_rate_historical_cap": 0.20,
+            "baseline_predictor.race.dnf_rate_final_cap": 0.35,
+            "baseline_predictor.driver_form.bayesian_pace_blend_per_race": 0.20,
+            "baseline_predictor.driver_form.bayesian_pace_blend_cap": 0.60,
+        }
+    )
+    prep.teams = {"Mercedes": {"uncertainty": 0.2}}
+    prep.drivers = {
+        "ANT": {
+            "pace": {"quali_pace": 0.45, "race_pace": 0.48},
+            "racecraft": {"skill_score": 0.30, "overtaking_skill": 0.55},
+            "dnf_risk": {"dnf_rate": 0.12},
+            "experience": {"tier": "rookie"},
+            "bayesian": {
+                "rating_mu": 20.0,
+                "normalized_skill_score": 0.99,
+            },
+        }
+    }
+
+    with patch(
+        "src.data.compound_performance.get_compound_performance_modifier",
+        lambda team_compound_chars, compound: 0.0,
+    ):
+        info_map, _ = prep._prepare_driver_info_with_compounds(
+            qualifying_grid=[{"driver": "ANT", "team": "Mercedes", "position": 2}],
+            race_name="Bahrain Grand Prix",
+        )
+
+    expected_skill = (0.60 * 0.30) + (0.40 * (19.0 / 21.0))
+    assert info_map["ANT"]["skill"] == pytest.approx(expected_skill)
+
+
 def test_prepare_driver_info_resolves_team_alias_for_uncertainty():
     prep = DummyPreparation()
     prep.compound_strength = 0.6
@@ -242,6 +284,24 @@ def test_prepare_driver_info_resolves_team_alias_for_uncertainty():
 
     assert info_map["HUL"]["team_strength"] == pytest.approx(0.6)
     assert info_map["HUL"]["dnf_probability"] == pytest.approx(0.22)
+
+
+def test_build_portable_skill_signal_recomputes_bayesian_normalization():
+    prep = DummyPreparation()
+    prep.config = DummyConfig({"grid.size": 22})
+    prep.drivers = {
+        "HAM": {
+            "experience": {"tier": "veteran"},
+            "bayesian": {
+                "rating_mu": 11.0,
+                "normalized_skill_score": 0.95,
+            },
+        }
+    }
+
+    portable_skill = prep._build_portable_skill_signal("HAM", base_skill=0.40)
+
+    assert portable_skill == pytest.approx((0.40 + (10.0 / 21.0)) / 2.0)
 
 
 def test_prepare_driver_info_with_compounds_resolves_team_alias_for_compound_data():
