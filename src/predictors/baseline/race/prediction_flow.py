@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -25,6 +27,29 @@ from .weather_context import (
     resolve_race_environment_context,
     weather_bucket_mismatch_score,
 )
+
+
+@dataclass(frozen=True)
+class RaceSimulationDeps:
+    """Bundle race-simulation callables into one readable dependency object."""
+
+    load_race_params: Callable[[], dict[str, Any]]
+    prepare_driver_info_with_compounds: Callable[
+        [list[QualifyingGridEntry], str | None],
+        tuple[dict[str, Any], int],
+    ]
+    get_learned_position_adjustment: Callable[..., float]
+    enforce_non_increasing: Callable[[list[float]], list[float]]
+    load_track_specific_params: Callable[..., dict[str, Any]]
+    get_tire_stress_score: Callable[..., float]
+    get_available_compounds: Callable[..., list[str]]
+    resolve_track_temperature_c: Callable[..., float | None] | None
+    resolve_track_temperature_profile: Callable[..., dict[str, Any] | None] | None
+    resolve_non_competitive_weather_features: Callable[..., dict[str, Any] | None] | None
+    resolve_race_distance_laps: Callable[..., int]
+    generate_pit_strategy: Callable[..., PitStrategy]
+    simulate_race_lap_by_lap: Callable[..., dict[str, Any]]
+    aggregate_simulation_results: Callable[[list[dict[str, Any]]], dict[str, Any]]
 
 
 def _coerce_optional_float(value: Any) -> float | None:
@@ -137,30 +162,17 @@ def predict_race_core(
     year: int,
     cfg: Any,
     base_seed: int,
-    load_race_params: Any,
-    prepare_driver_info_with_compounds: Any,
-    get_learned_position_adjustment: Any,
-    enforce_non_increasing: Any,
-    load_track_specific_params: Any,
-    get_tire_stress_score: Any,
-    get_available_compounds: Any,
-    resolve_track_temperature_c: Any | None,
-    resolve_track_temperature_profile: Any | None,
-    resolve_non_competitive_weather_features: Any | None,
-    resolve_race_distance_laps: Any,
-    generate_pit_strategy: Any,
-    simulate_race_lap_by_lap: Any,
-    aggregate_simulation_results: Any,
+    deps: RaceSimulationDeps,
 ) -> dict[str, Any]:
     """Run the full race prediction flow with injectable dependencies."""
     _ = race_compound
 
     try:
-        track_params = load_track_specific_params(race_name, year=year)
+        track_params = deps.load_track_specific_params(race_name, year=year)
     except TypeError:
         # Backward compatibility for patched/legacy callables without year kwargs.
-        track_params = load_track_specific_params(race_name)
-    base_params = load_race_params()
+        track_params = deps.load_track_specific_params(race_name)
+    base_params = deps.load_race_params()
 
     race_params = {**base_params, **track_params}
     race_params["track_name"] = race_name
@@ -217,7 +229,7 @@ def predict_race_core(
         ),
     }
 
-    driver_info_map, teams_with_long_profile = prepare_driver_info_with_compounds(
+    driver_info_map, teams_with_long_profile = deps.prepare_driver_info_with_compounds(
         validated_grid, race_name
     )
     grid_uncertainty_profile = _prepare_grid_uncertainty_profile(
@@ -229,18 +241,18 @@ def predict_race_core(
         driver: [] for driver in driver_info_map.keys()
     }
 
-    race_distance = resolve_race_distance_laps(
+    race_distance = deps.resolve_race_distance_laps(
         year=year,
         race_name=race_name,
         is_sprint=is_sprint,
     )
 
     try:
-        tire_stress_score = get_tire_stress_score(race_name, year=year)
+        tire_stress_score = deps.get_tire_stress_score(race_name, year=year)
     except TypeError:
         # Backward compatibility for patched/legacy callables without year kwargs.
-        tire_stress_score = get_tire_stress_score(race_name)
-    available_compounds = get_available_compounds(race_name, weather=weather)
+        tire_stress_score = deps.get_tire_stress_score(race_name)
+    available_compounds = deps.get_available_compounds(race_name, weather=weather)
     enforce_two_compound_rule = weather in {"dry", "mixed"}
 
     base_chaos_dry = float(race_params.get("base_chaos_dry", 0.35))
@@ -281,9 +293,9 @@ def predict_race_core(
             race_name=race_name,
             is_sprint=is_sprint,
             cfg=cfg,
-            resolve_track_temperature_c=resolve_track_temperature_c,
-            resolve_track_temperature_profile=resolve_track_temperature_profile,
-            resolve_non_competitive_weather_features=resolve_non_competitive_weather_features,
+            resolve_track_temperature_c=deps.resolve_track_temperature_c,
+            resolve_track_temperature_profile=deps.resolve_track_temperature_profile,
+            resolve_non_competitive_weather_features=deps.resolve_non_competitive_weather_features,
         )
     )
 
@@ -340,7 +352,7 @@ def predict_race_core(
                 }
             else:
                 driver_info = simulation_driver_info_map.get(driver, {})
-                strategies[driver] = generate_pit_strategy(
+                strategies[driver] = deps.generate_pit_strategy(
                     race_distance=race_distance,
                     tire_stress_score=tire_stress_score,
                     available_compounds=available_compounds,
@@ -351,7 +363,7 @@ def predict_race_core(
                     strategy_signal=driver_info.get("race_advantage", 0.0),
                 )
 
-        sim_result = simulate_race_lap_by_lap(
+        sim_result = deps.simulate_race_lap_by_lap(
             driver_info_map=simulation_driver_info_map,
             strategies=strategies,
             race_params=race_params,
@@ -362,7 +374,7 @@ def predict_race_core(
 
         simulation_results.append(sim_result)
 
-    aggregated = aggregate_simulation_results(simulation_results)
+    aggregated = deps.aggregate_simulation_results(simulation_results)
 
     finish_order = build_finish_order(
         aggregated=aggregated,
@@ -375,8 +387,8 @@ def predict_race_core(
         cfg=cfg,
         race_params=race_params,
         weather_feature_modifiers=weather_feature_modifiers,
-        get_learned_position_adjustment=get_learned_position_adjustment,
-        enforce_non_increasing=enforce_non_increasing,
+        get_learned_position_adjustment=deps.get_learned_position_adjustment,
+        enforce_non_increasing=deps.enforce_non_increasing,
         base_seed=base_seed,
     )
 

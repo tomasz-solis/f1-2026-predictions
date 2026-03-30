@@ -108,7 +108,7 @@ def _save_event_boundary_state(state: dict) -> None:
     tmp_path.replace(_EVENT_BOUNDARY_STATE_FILE)
 
 
-def _build_event_boundary_snapshot(
+def build_event_boundary_snapshot(
     year: int,
     race_name: str,
     is_sprint: bool,
@@ -188,7 +188,7 @@ def _build_event_boundary_snapshot(
     }
 
 
-def _boundary_signature(snapshot: dict) -> str:
+def boundary_signature(snapshot: dict) -> str:
     """Build deterministic signature for boundary-sensitive cache keys."""
     payload = {
         "weekend_type": snapshot.get("weekend_type", "conventional"),
@@ -217,7 +217,7 @@ def detect_event_boundary_refresh_if_needed(
     Returns:
         dict with `refresh_needed`, `reason`, `new_sessions`, and latest-boundary details.
     """
-    snapshot = _build_event_boundary_snapshot(
+    snapshot = build_event_boundary_snapshot(
         year=year,
         race_name=race_name,
         is_sprint=is_sprint,
@@ -310,7 +310,7 @@ def detect_event_boundary_refresh_if_needed(
         "refresh_needed": refresh_needed,
         "reason": reason,
         "new_sessions": new_sessions,
-        "boundary_signature": _boundary_signature(snapshot),
+        "boundary_signature": boundary_signature(snapshot),
         "latest_elapsed_session": current_latest,
         "previous_latest_elapsed_session": previous_latest,
     }

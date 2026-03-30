@@ -39,9 +39,9 @@ from src.dashboard.prediction_flow import (
     fetch_grid_if_available,
 )
 from src.dashboard.update_flow import (
-    _boundary_signature,
-    _build_event_boundary_snapshot,
     auto_update_practice_characteristics_if_needed,
+    boundary_signature,
+    build_event_boundary_snapshot,
 )
 from src.persistence.config import should_read_db_first, should_write_to_db
 from src.persistence.runtime_state_store import RuntimeStateStore
@@ -268,7 +268,7 @@ def _resolve_checkpoint_context(
     session_detector: SessionDetector,
 ) -> CheckpointContext:
     """Resolve expected and ready checkpoint labels using schedule and session readiness."""
-    snapshot = _build_event_boundary_snapshot(
+    snapshot = build_event_boundary_snapshot(
         year=year,
         race_name=race_name,
         is_sprint=is_sprint,
@@ -276,7 +276,7 @@ def _resolve_checkpoint_context(
         now_utc=now_utc,
     )
     has_schedule_data = bool(snapshot.get("has_schedule_data"))
-    boundary_signature = _boundary_signature(snapshot) if has_schedule_data else ""
+    current_boundary_signature = boundary_signature(snapshot) if has_schedule_data else ""
 
     expected_checkpoint = "PRE"
     for checkpoint, session_name in _checkpoint_sessions(is_sprint):
@@ -294,7 +294,7 @@ def _resolve_checkpoint_context(
             latest_ready_checkpoint=latest_ready,
             checkpoint_ready=False,
             reason="schedule_unavailable",
-            boundary_signature=boundary_signature,
+            boundary_signature=current_boundary_signature,
         )
 
     session_completion_raw = snapshot.get("session_completion", {})
@@ -306,7 +306,7 @@ def _resolve_checkpoint_context(
             latest_ready_checkpoint=latest_ready,
             checkpoint_ready=True,
             reason="ready",
-            boundary_signature=boundary_signature,
+            boundary_signature=current_boundary_signature,
         )
 
     for checkpoint, session_name in _checkpoint_sessions(is_sprint):
@@ -318,7 +318,7 @@ def _resolve_checkpoint_context(
                 latest_ready_checkpoint=latest_ready,
                 checkpoint_ready=False,
                 reason=f"{session_name}_not_ready",
-                boundary_signature=boundary_signature,
+                boundary_signature=current_boundary_signature,
             )
         latest_ready = checkpoint
         if checkpoint == expected_checkpoint:
@@ -331,7 +331,7 @@ def _resolve_checkpoint_context(
         latest_ready_checkpoint=latest_ready,
         checkpoint_ready=is_ready,
         reason="ready" if is_ready else "checkpoint_not_ready",
-        boundary_signature=boundary_signature,
+        boundary_signature=current_boundary_signature,
     )
 
 

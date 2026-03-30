@@ -12,6 +12,8 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
+from src.utils.normalization import rank_normalize
+
 logger = logging.getLogger(__name__)
 
 # Standard F1 tire compounds
@@ -205,6 +207,11 @@ def normalize_compound_metrics_across_teams(
 ) -> dict[str, dict[str, dict[str, float | str | None]]]:
     """Normalize compound metrics to 0-1 scale (track-specific, avoids cross-track comparison)."""
     normalized_output: dict[str, dict[str, dict[str, float | str | None]]] = {}
+    performance_metric_map = {
+        "median_lap_time": "pace_performance",
+        "tire_deg_slope": "tire_deg_performance",
+        "consistency": "consistency_performance",
+    }
 
     # Collect all values per compound+metric for normalization (within same track)
     compound_metric_values: dict[str, dict[str, list[tuple[str, float]]]] = defaultdict(
@@ -225,81 +232,35 @@ def normalize_compound_metrics_across_teams(
                                 (team_name, float(value))
                             )
 
+    compound_metric_scores: dict[str, dict[str, dict[str, float]]] = defaultdict(dict)
+    for compound_name, metric_groups in compound_metric_values.items():
+        for metric_name, entries in metric_groups.items():
+            value_map = {team_name: value for team_name, value in entries}
+            compound_metric_scores[compound_name][metric_name] = rank_normalize(
+                value_map,
+                higher_is_better=False,
+            )
+
     # Normalize each compound+metric independently (within track)
     for team_name, compounds in all_team_compound_metrics.items():
         normalized_output[team_name] = {}
 
         for compound, metrics in compounds.items():
             normalized_metrics = metrics.copy()
+            for metric_name, output_name in performance_metric_map.items():
+                metric_value = _as_numeric_metric(metrics.get(metric_name))
+                if metric_value is None:
+                    normalized_metrics[output_name] = None
+                    continue
 
-            # Normalize median_lap_time (lower is better)
-            median_lap_time = _as_numeric_metric(metrics.get("median_lap_time"))
-            if median_lap_time is not None:
-                all_values = [
-                    v
-                    for _, v in compound_metric_values[compound].get("median_lap_time", [])
-                    if v is not None
-                ]
-                if len(all_values) > 1:
-                    best = min(all_values)
-                    worst = max(all_values)
-                    if worst > best:
-                        normalized = 1.0 - ((median_lap_time - best) / (worst - best))
-                        normalized_metrics["pace_performance"] = float(
-                            np.clip(normalized, 0.0, 1.0)
-                        )
-                    else:
-                        normalized_metrics["pace_performance"] = 0.5
-                else:
-                    normalized_metrics["pace_performance"] = None
-            else:
-                normalized_metrics["pace_performance"] = None
-
-            # Normalize tire_deg_slope (lower is better - less degradation)
-            tire_deg_slope = _as_numeric_metric(metrics.get("tire_deg_slope"))
-            if tire_deg_slope is not None:
-                all_values = [
-                    v
-                    for _, v in compound_metric_values[compound].get("tire_deg_slope", [])
-                    if v is not None
-                ]
-                if len(all_values) > 1:
-                    best = min(all_values)
-                    worst = max(all_values)
-                    if worst > best:
-                        normalized = 1.0 - ((tire_deg_slope - best) / (worst - best))
-                        normalized_metrics["tire_deg_performance"] = float(
-                            np.clip(normalized, 0.0, 1.0)
-                        )
-                    else:
-                        normalized_metrics["tire_deg_performance"] = 0.5
-                else:
-                    normalized_metrics["tire_deg_performance"] = None
-            else:
-                normalized_metrics["tire_deg_performance"] = None
-
-            # Normalize consistency (lower is better - more consistent)
-            consistency = _as_numeric_metric(metrics.get("consistency"))
-            if consistency is not None:
-                all_values = [
-                    v
-                    for _, v in compound_metric_values[compound].get("consistency", [])
-                    if v is not None
-                ]
-                if len(all_values) > 1:
-                    best = min(all_values)
-                    worst = max(all_values)
-                    if worst > best:
-                        normalized = 1.0 - ((consistency - best) / (worst - best))
-                        normalized_metrics["consistency_performance"] = float(
-                            np.clip(normalized, 0.0, 1.0)
-                        )
-                    else:
-                        normalized_metrics["consistency_performance"] = 0.5
-                else:
-                    normalized_metrics["consistency_performance"] = None
-            else:
-                normalized_metrics["consistency_performance"] = None
+                normalized_metrics[output_name] = (
+                    compound_metric_scores.get(compound, {})
+                    .get(
+                        metric_name,
+                        {},
+                    )
+                    .get(team_name)
+                )
 
             normalized_output[team_name][compound] = normalized_metrics
 

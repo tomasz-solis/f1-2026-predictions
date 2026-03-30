@@ -17,7 +17,7 @@ from src.dashboard.precomputed_predictions import (
     load_precompute_horizon_index,
     load_precomputed_prediction,
 )
-from src.dashboard.update_flow import _boundary_signature, _build_event_boundary_snapshot
+from src.dashboard.update_flow import boundary_signature, build_event_boundary_snapshot
 from src.utils.operational_observability import (
     drain_recent_alerts,
     snapshot_counters,
@@ -329,8 +329,8 @@ def _resolve_race_boundary_context(
         year=year,
         race_name=race_name,
         is_sprint=is_sprint,
-        build_event_boundary_snapshot_fn=_build_event_boundary_snapshot,
-        boundary_signature_fn=_boundary_signature,
+        build_event_boundary_snapshot_fn=build_event_boundary_snapshot,
+        boundary_signature_fn=boundary_signature,
         session_detector=session_detector,
     )
 

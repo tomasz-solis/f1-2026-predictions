@@ -42,7 +42,7 @@ def test_load_race_options_uses_fallback_when_schedule_fails(patcher):
     )
     patcher.setattr(
         pages,
-        "_get_schedule_rows",
+        "get_schedule_rows",
         lambda _year: (("Australian Grand Prix", "conventional"), ("Chinese Grand Prix", "sprint")),
     )
     patcher.setattr(pages.st, "warning", lambda message: warnings.append(str(message)))
@@ -63,7 +63,7 @@ def test_load_race_options_warns_when_fastf1_and_fallback_unavailable(patcher):
         "get_event_schedule",
         lambda _year: (_ for _ in ()).throw(RuntimeError("offline")),
     )
-    patcher.setattr(pages, "_get_schedule_rows", lambda _year: tuple())
+    patcher.setattr(pages, "get_schedule_rows", lambda _year: tuple())
     patcher.setattr(pages.st, "warning", lambda message: warnings.append(str(message)))
 
     options = pages._load_race_options()

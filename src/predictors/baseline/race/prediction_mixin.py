@@ -24,7 +24,7 @@ from src.utils.lap_by_lap_simulator import (
 )
 from src.utils.validation_helpers import validate_enum, validate_positive_int
 
-from .prediction_flow import predict_race_core
+from .prediction_flow import RaceSimulationDeps, predict_race_core
 
 logger = logging.getLogger("src.predictors.baseline_2026")
 
@@ -159,18 +159,20 @@ class BaselineRacePredictionMixin:
             else int(getattr(self, "season_year", getattr(self, "year", 2026))),
             cfg=cfg,
             base_seed=int(getattr(self, "seed", 42)),
-            load_race_params=self._load_race_params,
-            prepare_driver_info_with_compounds=self._prepare_driver_info_with_compounds,
-            get_learned_position_adjustment=self._get_learned_position_adjustment,
-            enforce_non_increasing=self._enforce_non_increasing,
-            load_track_specific_params=load_track_specific_params,
-            get_tire_stress_score=get_tire_stress_score,
-            get_available_compounds=get_available_compounds,
-            resolve_track_temperature_c=resolve_track_temperature_c,
-            resolve_track_temperature_profile=resolve_track_temperature_profile,
-            resolve_non_competitive_weather_features=resolve_non_competitive_weather_features,
-            resolve_race_distance_laps=resolve_race_distance_laps,
-            generate_pit_strategy=generate_pit_strategy,
-            simulate_race_lap_by_lap=simulate_race_lap_by_lap,
-            aggregate_simulation_results=aggregate_simulation_results,
+            deps=RaceSimulationDeps(
+                load_race_params=self._load_race_params,
+                prepare_driver_info_with_compounds=self._prepare_driver_info_with_compounds,
+                get_learned_position_adjustment=self._get_learned_position_adjustment,
+                enforce_non_increasing=self._enforce_non_increasing,
+                load_track_specific_params=load_track_specific_params,
+                get_tire_stress_score=get_tire_stress_score,
+                get_available_compounds=get_available_compounds,
+                resolve_track_temperature_c=resolve_track_temperature_c,
+                resolve_track_temperature_profile=resolve_track_temperature_profile,
+                resolve_non_competitive_weather_features=resolve_non_competitive_weather_features,
+                resolve_race_distance_laps=resolve_race_distance_laps,
+                generate_pit_strategy=generate_pit_strategy,
+                simulate_race_lap_by_lap=simulate_race_lap_by_lap,
+                aggregate_simulation_results=aggregate_simulation_results,
+            ),
         )

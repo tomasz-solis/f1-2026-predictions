@@ -1,6 +1,6 @@
 """Extract and normalize team performance relative to the field."""
 
-import numpy as np
+from src.utils.normalization import rank_normalize
 
 
 def _normalize_metric_range(
@@ -8,26 +8,8 @@ def _normalize_metric_range(
     *,
     higher_is_better: bool,
 ) -> dict[str, float]:
-    """Normalize one metric so the session leader lands at 1.0."""
-    if not metric_values:
-        return {}
-
-    best_value = max(metric_values.values()) if higher_is_better else min(metric_values.values())
-    worst_value = min(metric_values.values()) if higher_is_better else max(metric_values.values())
-
-    if np.isclose(best_value, worst_value):
-        return {team_name: 0.5 for team_name in metric_values}
-
-    normalized_scores: dict[str, float] = {}
-    value_range = worst_value - best_value
-    for team_name, value in metric_values.items():
-        if higher_is_better:
-            score = (value - worst_value) / (best_value - worst_value)
-        else:
-            score = 1.0 - ((value - best_value) / value_range)
-        normalized_scores[team_name] = float(np.clip(score, 0.0, 1.0))
-
-    return normalized_scores
+    """Normalize one metric with an outlier-resistant rank scale."""
+    return rank_normalize(metric_values, higher_is_better=higher_is_better)
 
 
 def extract_all_teams_performance(

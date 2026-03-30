@@ -255,6 +255,96 @@ def test_normalize_compound_metrics_across_teams():
     assert normalized["Mercedes"]["SOFT"]["tire_deg_performance"] == pytest.approx(0.0)
 
 
+def test_normalize_compound_metrics_uses_rank_scale_for_outliers():
+    """One slow outlier should not flatten the midfield compound scores."""
+    all_metrics = {
+        "Team A": {
+            "SOFT": {
+                "median_lap_time": 90.0,
+                "tire_deg_slope": 0.11,
+                "consistency": 0.45,
+                "track_name": "Bahrain",
+                "laps_count": 10.0,
+            }
+        },
+        "Team B": {
+            "SOFT": {
+                "median_lap_time": 90.8,
+                "tire_deg_slope": 0.12,
+                "consistency": 0.48,
+                "track_name": "Bahrain",
+                "laps_count": 10.0,
+            }
+        },
+        "Team C": {
+            "SOFT": {
+                "median_lap_time": 91.0,
+                "tire_deg_slope": 0.14,
+                "consistency": 0.50,
+                "track_name": "Bahrain",
+                "laps_count": 10.0,
+            }
+        },
+        "Team D": {
+            "SOFT": {
+                "median_lap_time": 97.0,
+                "tire_deg_slope": 0.40,
+                "consistency": 1.20,
+                "track_name": "Bahrain",
+                "laps_count": 10.0,
+            }
+        },
+    }
+
+    normalized = normalize_compound_metrics_across_teams(all_metrics, "Bahrain")
+
+    assert normalized["Team A"]["SOFT"]["pace_performance"] == pytest.approx(1.0)
+    assert normalized["Team D"]["SOFT"]["pace_performance"] == pytest.approx(0.0)
+    assert normalized["Team B"]["SOFT"]["pace_performance"] > 0.5
+    assert normalized["Team C"]["SOFT"]["pace_performance"] > 0.3
+
+
+def test_normalize_compound_metrics_handles_ties():
+    """Teams with identical compound values should land on the same score."""
+    all_metrics = {
+        "Team A": {
+            "SOFT": {
+                "median_lap_time": 90.0,
+                "tire_deg_slope": 0.10,
+                "consistency": 0.50,
+                "track_name": "Bahrain",
+                "laps_count": 10.0,
+            }
+        },
+        "Team B": {
+            "SOFT": {
+                "median_lap_time": 90.0,
+                "tire_deg_slope": 0.10,
+                "consistency": 0.50,
+                "track_name": "Bahrain",
+                "laps_count": 10.0,
+            }
+        },
+        "Team C": {
+            "SOFT": {
+                "median_lap_time": 91.5,
+                "tire_deg_slope": 0.20,
+                "consistency": 0.80,
+                "track_name": "Bahrain",
+                "laps_count": 10.0,
+            }
+        },
+    }
+
+    normalized = normalize_compound_metrics_across_teams(all_metrics, "Bahrain")
+
+    assert (
+        normalized["Team A"]["SOFT"]["pace_performance"]
+        == normalized["Team B"]["SOFT"]["pace_performance"]
+    )
+    assert normalized["Team C"]["SOFT"]["pace_performance"] == pytest.approx(0.0)
+
+
 def test_normalize_compound_metrics_different_tracks():
     """Test that different tracks are not normalized together."""
     all_metrics = {

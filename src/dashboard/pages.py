@@ -10,7 +10,7 @@ from typing import Any
 import fastf1
 import streamlit as st
 
-from src.utils.weekend import _get_schedule_rows, is_sprint_weekend
+from src.utils.weekend import get_schedule_rows, is_sprint_weekend
 
 from . import prediction_horizon as _prediction_horizon
 from . import prediction_messages as _prediction_messages
@@ -52,10 +52,10 @@ from .rendering import (
     render_prediction_hero_deck,
 )
 from .update_flow import (
-    _boundary_signature,
-    _build_event_boundary_snapshot,
     auto_update_if_needed,
     auto_update_practice_characteristics_if_needed,
+    boundary_signature,
+    build_event_boundary_snapshot,
     detect_event_boundary_refresh_if_needed,
 )
 
@@ -214,7 +214,7 @@ def _load_race_options_cached(year: int) -> tuple[list[str], str | None]:
     except Exception as exc:
         fastf1_error = str(exc)
 
-    fallback_rows = list(_get_schedule_rows(year))
+    fallback_rows = list(get_schedule_rows(year))
     fallback_options = _options_from_schedule_rows(fallback_rows)
     if fallback_options:
         logger.warning(
@@ -288,7 +288,7 @@ def _load_schedule_event_rows_cached(year: int) -> tuple[tuple[str, str, str], .
     return _prediction_horizon.load_schedule_event_rows(
         year,
         get_event_schedule_fn=fastf1.get_event_schedule,
-        fallback_schedule_rows_fn=_get_schedule_rows,
+        fallback_schedule_rows_fn=get_schedule_rows,
         logger=logger,
     )
 
@@ -310,8 +310,8 @@ def _current_anchor_boundary_signature(year: int, anchor_race_name: str) -> str 
         year,
         anchor_race_name,
         is_sprint_weekend_fn=is_sprint_weekend,
-        build_event_boundary_snapshot_fn=_build_event_boundary_snapshot,
-        boundary_signature_fn=_boundary_signature,
+        build_event_boundary_snapshot_fn=build_event_boundary_snapshot,
+        boundary_signature_fn=boundary_signature,
         session_detector_factory=SessionDetector,
         logger=logger,
     )

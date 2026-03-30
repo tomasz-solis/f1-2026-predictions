@@ -1,6 +1,6 @@
 """Regression tests for performance extractor normalization."""
 
-from src.extractors.performance import extract_all_teams_performance
+from src.extractors.performance import _normalize_metric_range, extract_all_teams_performance
 
 
 def test_extract_all_teams_performance_uses_team_keys():
@@ -79,3 +79,26 @@ def test_extract_all_teams_performance_uses_braking_profile_when_available():
     assert normalized["Team B"]["braking_performance"] == 0.0
     assert normalized["Team A"]["slow_corner_performance"] == 0.0
     assert normalized["Team B"]["slow_corner_performance"] == 1.0
+
+
+def test_rank_based_normalization_resists_outlier():
+    """A single outlier should not compress the midfield into one bucket."""
+    values = {"TeamA": 80.0, "TeamB": 85.0, "TeamC": 86.0, "TeamD": 120.0}
+
+    result = _normalize_metric_range(values, higher_is_better=False)
+
+    assert result["TeamA"] == 1.0
+    assert result["TeamD"] == 0.0
+    assert result["TeamB"] > 0.5
+    assert result["TeamC"] > 0.3
+
+
+def test_rank_based_normalization_handles_ties():
+    """Tied teams should share the same averaged rank."""
+    values = {"X": 10.0, "Y": 10.0, "Z": 20.0}
+
+    result = _normalize_metric_range(values, higher_is_better=True)
+
+    assert result["X"] == result["Y"]
+    assert result["Z"] == 1.0
+    assert 0.0 < result["X"] < 0.5
