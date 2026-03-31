@@ -16,6 +16,7 @@ def pytest_addoption(parser):
     """Register repo-local pytest options used by regression tests."""
     parser.addoption(
         "--update-golden",
+        "--update-golden-files",
         action="store_true",
         default=False,
         help="Refresh golden regression fixtures instead of asserting current output.",

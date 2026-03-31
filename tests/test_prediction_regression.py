@@ -117,6 +117,94 @@ def _race_payload() -> dict[str, Any]:
     }
 
 
+def _sprint_qualifying_payload() -> dict[str, Any]:
+    """Build the fixed-seed sprint qualifying payload used for regression checks."""
+    predictor = _build_test_predictor()
+    result = predictor.predict_qualifying(
+        2026,
+        "Chinese Grand Prix",
+        n_simulations=40,
+        qualifying_stage="sprint",
+    )
+    return {
+        "seed": 42,
+        "year": 2026,
+        "race_name": "Chinese Grand Prix",
+        "n_simulations": 40,
+        "qualifying_stage": "sprint",
+        "grid": [_normalize_row(row) for row in result["grid"]],
+    }
+
+
+def _sprint_race_payload() -> dict[str, Any]:
+    """Build the fixed-seed sprint race payload used for regression checks."""
+    predictor = _build_test_predictor()
+    sprint_qualifying = predictor.predict_qualifying(
+        2026,
+        "Chinese Grand Prix",
+        n_simulations=40,
+        qualifying_stage="sprint",
+    )
+    result = predictor.predict_sprint_race(
+        sprint_qualifying["grid"],
+        weather="dry",
+        race_name="Chinese Grand Prix",
+        n_simulations=40,
+    )
+    return {
+        "seed": 42,
+        "year": 2026,
+        "race_name": "Chinese Grand Prix",
+        "weather": "dry",
+        "n_simulations": 40,
+        "finish_order": [_normalize_row(row) for row in result["finish_order"]],
+    }
+
+
+def _china_main_qualifying_payload() -> dict[str, Any]:
+    """Build the fixed-seed main qualifying payload for a sprint weekend."""
+    predictor = _build_test_predictor()
+    result = predictor.predict_qualifying(
+        2026,
+        "Chinese Grand Prix",
+        n_simulations=40,
+        qualifying_stage="main",
+    )
+    return {
+        "seed": 42,
+        "year": 2026,
+        "race_name": "Chinese Grand Prix",
+        "n_simulations": 40,
+        "qualifying_stage": "main",
+        "grid": [_normalize_row(row) for row in result["grid"]],
+    }
+
+
+def _china_main_race_payload() -> dict[str, Any]:
+    """Build the fixed-seed main race payload for a sprint weekend."""
+    predictor = _build_test_predictor()
+    main_qualifying = predictor.predict_qualifying(
+        2026,
+        "Chinese Grand Prix",
+        n_simulations=40,
+        qualifying_stage="main",
+    )
+    result = predictor.predict_race(
+        main_qualifying["grid"],
+        weather="dry",
+        race_name="Chinese Grand Prix",
+        n_simulations=40,
+    )
+    return {
+        "seed": 42,
+        "year": 2026,
+        "race_name": "Chinese Grand Prix",
+        "weather": "dry",
+        "n_simulations": 40,
+        "finish_order": [_normalize_row(row) for row in result["finish_order"]],
+    }
+
+
 def _assert_matches_or_update(
     *,
     golden_path: Path,
@@ -165,6 +253,58 @@ def test_race_regression(update_golden_files):
     payload = _race_payload()
     _assert_matches_or_update(
         golden_path=GOLDEN_DIR / "golden_race_australia.json",
+        payload=payload,
+        update_golden_files=update_golden_files,
+        row_key="finish_order",
+        max_position_delta=5,
+        mean_position_delta=2.5,
+    )
+
+
+def test_sprint_qualifying_regression(update_golden_files):
+    """Fixed-seed China sprint qualifying output should stay stable."""
+    payload = _sprint_qualifying_payload()
+    _assert_matches_or_update(
+        golden_path=GOLDEN_DIR / "golden_sprint_qualifying_china.json",
+        payload=payload,
+        update_golden_files=update_golden_files,
+        row_key="grid",
+        max_position_delta=5,
+        mean_position_delta=2.0,
+    )
+
+
+def test_sprint_race_regression(update_golden_files):
+    """Fixed-seed China sprint race output should stay stable."""
+    payload = _sprint_race_payload()
+    _assert_matches_or_update(
+        golden_path=GOLDEN_DIR / "golden_sprint_race_china.json",
+        payload=payload,
+        update_golden_files=update_golden_files,
+        row_key="finish_order",
+        max_position_delta=5,
+        mean_position_delta=2.5,
+    )
+
+
+def test_china_main_qualifying_regression(update_golden_files):
+    """Fixed-seed China main qualifying output should stay stable."""
+    payload = _china_main_qualifying_payload()
+    _assert_matches_or_update(
+        golden_path=GOLDEN_DIR / "golden_qualifying_china.json",
+        payload=payload,
+        update_golden_files=update_golden_files,
+        row_key="grid",
+        max_position_delta=5,
+        mean_position_delta=2.0,
+    )
+
+
+def test_china_main_race_regression(update_golden_files):
+    """Fixed-seed China main race output should stay stable."""
+    payload = _china_main_race_payload()
+    _assert_matches_or_update(
+        golden_path=GOLDEN_DIR / "golden_race_china.json",
         payload=payload,
         update_golden_files=update_golden_files,
         row_key="finish_order",
