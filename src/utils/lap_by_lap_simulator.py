@@ -49,7 +49,7 @@ _OVERTAKE_INTERNAL = {
 }
 
 
-def _expand_overtake_cfg(compact: dict) -> dict:
+def _expand_overtake_cfg(compact: dict[str, Any]) -> dict[str, Any]:
     """Expand 5 user-facing overtake params into the full internal set.
 
     The 5 exposed params and their defaults:
@@ -109,7 +109,7 @@ def _calculate_safety_car_lap_probability(
 def simulate_race_lap_by_lap(
     driver_info_map: dict[str, dict[str, Any]],
     strategies: dict[str, PitStrategy],
-    race_params: dict,
+    race_params: dict[str, Any],
     race_distance: int,
     weather: str,
     rng: np.random.Generator,
@@ -375,7 +375,7 @@ def simulate_race_lap_by_lap(
     return _generate_race_result(driver_states, strategies)
 
 
-def _resolve_base_chaos_std(race_params: dict, weather: str) -> float:
+def _resolve_base_chaos_std(race_params: dict[str, Any], weather: str) -> float:
     """Resolve weather-specific chaos with explicit handling for mixed conditions."""
     base_chaos_cfg = race_params.get("base_chaos", {})
     dry_std = float(base_chaos_cfg.get("dry", 0.35))
@@ -396,10 +396,10 @@ def _resolve_base_chaos_std(race_params: dict, weather: str) -> float:
 
 def _get_traffic_overtake_effect(
     driver: str,
-    driver_states: dict[str, dict],
-    driver_info_map: dict[str, dict],
+    driver_states: dict[str, dict[str, Any]],
+    driver_info_map: dict[str, dict[str, Any]],
     driver_ahead_map: dict[str, str],
-    race_params: dict,
+    race_params: dict[str, Any],
     rng: np.random.Generator,
 ) -> float:
     """Return lap-time delta from traffic and overtake attempts.
@@ -510,7 +510,7 @@ def _get_traffic_overtake_effect(
 
 
 def _get_overtake_zone_adjustments(
-    target_position: int, overtake_cfg: dict
+    target_position: int, overtake_cfg: dict[str, Any]
 ) -> tuple[float, float, float]:
     """Scale overtake threshold/probability/benefit by target's position zone.
 
@@ -541,7 +541,11 @@ def _get_overtake_zone_adjustments(
     )
 
 
-def _get_lap1_chaos(position: int, race_params: dict, rng: np.random.Generator) -> float:
+def _get_lap1_chaos(
+    position: int,
+    race_params: dict[str, Any],
+    rng: np.random.Generator,
+) -> float:
     """Calculate lap 1 chaos based on grid position and track-specific risk."""
     lap1_config = race_params.get("lap1_chaos", {})
 
@@ -562,9 +566,9 @@ def _get_lap1_chaos(position: int, race_params: dict, rng: np.random.Generator) 
 
 
 def _apply_pit_stop(
-    state: dict,
+    state: dict[str, Any],
     strategy: PitStrategy,
-    race_params: dict,
+    race_params: dict[str, Any],
     rng: np.random.Generator,
 ) -> None:
     """Apply pit stop time loss and compound change to driver state."""
@@ -599,7 +603,7 @@ def _apply_pit_stop(
         )
 
 
-def _update_positions_from_times(driver_states: dict[str, dict]) -> None:
+def _update_positions_from_times(driver_states: dict[str, dict[str, Any]]) -> None:
     """Update positions based on cumulative race time.
 
     Drivers with lower cumulative time get better positions.
@@ -633,7 +637,7 @@ def _update_positions_from_times(driver_states: dict[str, dict]) -> None:
 
 
 def _generate_race_result(
-    driver_states: dict[str, dict],
+    driver_states: dict[str, dict[str, Any]],
     strategies: dict[str, PitStrategy],
 ) -> RaceSimulationResult:
     """Generate final race result dict from driver states."""
@@ -652,7 +656,7 @@ def _generate_race_result(
 
 def aggregate_simulation_results(
     simulation_results: list[RaceSimulationResult],
-) -> dict:
+) -> dict[str, Any]:
     """Aggregate results from multiple simulations.
 
     Returns dict with:

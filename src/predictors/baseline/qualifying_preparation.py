@@ -128,6 +128,7 @@ def _score_profile(
     profile_metrics: dict[str, float] | None,
     metric_weights: dict[str, float],
 ) -> float | None:
+    """Collapse one testing profile into a normalized weighted score."""
     if not profile_metrics:
         return None
 

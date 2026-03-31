@@ -389,7 +389,7 @@ class BaselineQualifyingMixin:
         is_sprint: bool,
         fp_blend_weight: float,
         prediction_year: int | None = None,
-    ) -> tuple[list[dict], int]:
+    ) -> tuple[list[dict[str, Any]], int]:
         """Build driver list with blended team/driver strengths and testing modifiers."""
         _ = is_sprint
         cfg = getattr(self, "config", config_loader)

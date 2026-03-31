@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 
-from src.types.prediction_types import PitStrategy, QualifyingGridEntry
+from src.types.prediction_types import PitStrategy, QualifyingGridEntry, RaceSimulationResult
 
 from .grid_uncertainty import (
     coerce_grid_position_metric,
@@ -48,8 +48,8 @@ class RaceSimulationDeps:
     resolve_non_competitive_weather_features: Callable[..., dict[str, Any] | None] | None
     resolve_race_distance_laps: Callable[..., int]
     generate_pit_strategy: Callable[..., PitStrategy]
-    simulate_race_lap_by_lap: Callable[..., dict[str, Any]]
-    aggregate_simulation_results: Callable[[list[dict[str, Any]]], dict[str, Any]]
+    simulate_race_lap_by_lap: Callable[..., RaceSimulationResult]
+    aggregate_simulation_results: Callable[[list[RaceSimulationResult]], dict[str, Any]]
 
 
 def _coerce_optional_float(value: Any) -> float | None:
