@@ -72,6 +72,8 @@ class PriorsFactory:
         from src.utils.lineups import load_current_lineups
 
         lineups = load_current_lineups()
+        if lineups is None:
+            raise ValueError("Current lineups could not be loaded")
 
         driver_to_team = {}
         for team, drivers in lineups.items():

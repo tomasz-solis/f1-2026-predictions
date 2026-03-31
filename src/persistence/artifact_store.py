@@ -58,7 +58,7 @@ class ArtifactStore:
         """
         start_time = time.time()
         file_success = db_success = False
-        last_error = None
+        last_error: Exception | None = None
 
         # Determine version
         if version is None:

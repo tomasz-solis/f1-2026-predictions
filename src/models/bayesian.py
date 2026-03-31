@@ -168,10 +168,10 @@ class BayesianDriverRanking:
         }
         team_ratings: dict[str, list[float]] = {}
         for driver_code, observed_rating in observed_ratings.items():
-            team_name = driver_to_team.get(driver_code)
-            if team_name is None:
+            driver_team = driver_to_team.get(driver_code)
+            if driver_team is None:
                 continue
-            team_ratings.setdefault(team_name, []).append(observed_rating)
+            team_ratings.setdefault(driver_team, []).append(observed_rating)
 
         team_means = {
             team_name: float(np.mean(ratings))
@@ -192,10 +192,10 @@ class BayesianDriverRanking:
 
         for driver_code, _finish_pos in observations.items():
             raw_rating = observed_ratings[driver_code]
-            team_name = driver_to_team.get(driver_code)
+            driver_team = driver_to_team.get(driver_code)
             adjusted_rating = raw_rating
-            if team_name is not None and team_name in team_means:
-                adjusted_rating = raw_rating - team_means[team_name] + field_mean
+            if driver_team is not None and driver_team in team_means:
+                adjusted_rating = raw_rating - team_means[driver_team] + field_mean
 
             adjusted_ratings[driver_code] = adjusted_rating
             adjusted_positions[driver_code] = self._rating_to_position(adjusted_rating)
