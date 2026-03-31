@@ -9,8 +9,26 @@ import numpy as np
 
 
 @dataclass(frozen=True)
+class RegularizationConfig:
+    """Extra teammate controls for a qualifying run."""
+
+    driver_signal_shrink: float
+    experience_shrink: dict[str, float]
+    teammate_gap_cap_by_tier: dict[str, float]
+    teammate_gap_cap_max_races_by_tier: dict[str, float]
+    teammate_gap_cap_min_scale: float
+    teammate_anchor_scale: float
+    teammate_anchor_cap: float
+    anchor_experience_multiplier: dict[str, float]
+    negative_delta_threshold: float
+    negative_delta_shrink_scale: float
+    negative_delta_shrink_cap: float
+    max_total_shrink: float
+
+
+@dataclass(frozen=True)
 class QualiSimConfig:
-    """Resolved qualifying simulation parameters after context-specific adjustments."""
+    """Resolved settings for one qualifying run."""
 
     noise_std: float
     team_weight: float
@@ -26,33 +44,9 @@ class QualiSimConfig:
     recent_form_scale: float
     recent_form_cap: float
 
-    apply_model_only_teammate_regularization: bool
-    apply_testing_fallback_teammate_guard: bool
+    apply_regularization: bool
     apply_recent_form_adjustment: bool
-
-    model_only_driver_signal_shrink: float
-    model_only_experience_shrink: dict[str, float]
-    model_only_teammate_gap_cap_by_tier: dict[str, float]
-    model_only_teammate_gap_cap_max_races_by_tier: dict[str, float]
-    model_only_teammate_gap_cap_min_scale: float
-    model_only_teammate_anchor_scale: float
-    model_only_teammate_anchor_cap: float
-    model_only_anchor_experience_multiplier: dict[str, float]
-    model_only_negative_delta_threshold: float
-    model_only_negative_delta_shrink_scale: float
-    model_only_negative_delta_shrink_cap: float
-
-    testing_fallback_driver_signal_shrink: float
-    testing_fallback_experience_shrink: dict[str, float]
-    testing_fallback_anchor_experience_multiplier: dict[str, float]
-    testing_fallback_teammate_anchor_scale: float
-    testing_fallback_teammate_anchor_cap: float
-    testing_fallback_teammate_gap_cap_by_tier: dict[str, float]
-    testing_fallback_teammate_gap_cap_max_races_by_tier: dict[str, float]
-    testing_fallback_teammate_gap_cap_min_scale: float
-    testing_fallback_negative_delta_threshold: float
-    testing_fallback_negative_delta_shrink_scale: float
-    testing_fallback_negative_delta_shrink_cap: float
+    regularization: RegularizationConfig | None
 
 
 def _normalize_experience_tier(raw_tier: object) -> str:
@@ -143,7 +137,7 @@ def _rebalance_component_weights(
     fallback_team_weight: float,
     fallback_skill_weight: float,
 ) -> tuple[float, float]:
-    """Normalize team and driver weights after context-specific multipliers."""
+    """Renormalize team and driver weights after multipliers."""
     total_weight = team_weight + skill_weight
     if total_weight <= 0:
         return fallback_team_weight, fallback_skill_weight
@@ -175,6 +169,155 @@ def _recent_form_adjustment(
     return float(np.clip(form_gap * recent_form_scale, -recent_form_cap, recent_form_cap))
 
 
+def _compute_regularized_driver_signal(
+    *,
+    driver_info: dict[str, Any],
+    raw_driver_signal: float,
+    team_driver_signal_means: dict[str, float],
+    sim_cfg: QualiSimConfig,
+) -> tuple[float, float | None]:
+    """Apply the active teammate-regularization regime to a driver signal."""
+    regularization = sim_cfg.regularization
+    driver_signal = raw_driver_signal
+    gap_cap: float | None = None
+    team_name = str(driver_info["team"])
+    team_mean = team_driver_signal_means.get(team_name, driver_signal)
+
+    if sim_cfg.apply_regularization and regularization is not None:
+        gap_cap = _resolve_teammate_gap_cap(
+            driver_info=driver_info,
+            cap_by_tier=regularization.teammate_gap_cap_by_tier,
+            max_races_by_tier=regularization.teammate_gap_cap_max_races_by_tier,
+            min_scale=regularization.teammate_gap_cap_min_scale,
+        )
+        driver_signal = _clip_driver_signal_by_team_gap(
+            driver_signal=driver_signal,
+            team_mean=team_mean,
+            gap_cap=gap_cap,
+        )
+
+        if regularization.driver_signal_shrink > 0:
+            experience_tier = _normalize_experience_tier(
+                driver_info.get("experience_tier", "unknown")
+            )
+            extra_shrink = regularization.experience_shrink.get(
+                experience_tier,
+                regularization.experience_shrink.get("unknown", 0.0),
+            )
+            delta_from_team = driver_signal - team_mean
+            extra_negative_delta_shrink = 0.0
+            if delta_from_team < -regularization.negative_delta_threshold:
+                extra_negative_delta_shrink = min(
+                    max(
+                        0.0,
+                        ((-delta_from_team) - regularization.negative_delta_threshold)
+                        * regularization.negative_delta_shrink_scale,
+                    ),
+                    max(0.0, regularization.negative_delta_shrink_cap),
+                )
+            total_shrink = float(
+                np.clip(
+                    regularization.driver_signal_shrink
+                    + float(extra_shrink)
+                    + float(extra_negative_delta_shrink),
+                    0.0,
+                    regularization.max_total_shrink,
+                )
+            )
+            driver_signal = team_mean + ((driver_signal - team_mean) * (1.0 - total_shrink))
+
+        driver_signal = _clip_driver_signal_by_team_gap(
+            driver_signal=driver_signal,
+            team_mean=team_mean,
+            gap_cap=gap_cap,
+        )
+
+    if sim_cfg.apply_recent_form_adjustment:
+        adjustment = _recent_form_adjustment(
+            driver_info=driver_info,
+            driver_signal=driver_signal,
+            recent_form_scale=sim_cfg.recent_form_scale,
+            recent_form_cap=sim_cfg.recent_form_cap,
+        )
+        if adjustment:
+            driver_signal = float(np.clip(driver_signal + adjustment, 0.0, 1.0))
+
+    return driver_signal, gap_cap
+
+
+def _compute_teammate_anchor_adjustment(
+    *,
+    driver_info: dict[str, Any],
+    raw_driver_signal: float,
+    team_driver_signal_means: dict[str, float],
+    gap_cap: float | None,
+    sim_cfg: QualiSimConfig,
+) -> float:
+    """Compute the active teammate-aware anchor adjustment for one driver."""
+    regularization = sim_cfg.regularization
+    if not sim_cfg.apply_regularization or regularization is None:
+        return 0.0
+    if regularization.teammate_anchor_scale <= 0:
+        return 0.0
+
+    team_name = str(driver_info["team"])
+    team_mean_raw = team_driver_signal_means.get(team_name, raw_driver_signal)
+    teammate_delta = raw_driver_signal - team_mean_raw
+    if gap_cap is not None:
+        teammate_delta = float(np.clip(teammate_delta, -gap_cap, gap_cap))
+
+    anchor = np.clip(
+        teammate_delta * regularization.teammate_anchor_scale,
+        -regularization.teammate_anchor_cap,
+        regularization.teammate_anchor_cap,
+    )
+    tier_mult = _fallback_experience_multiplier(
+        regularization.anchor_experience_multiplier,
+        str(driver_info.get("experience_tier", "unknown")),
+        default=1.0,
+    )
+    return float(anchor * max(0.0, tier_mult))
+
+
+def _score_single_driver_in_simulation(
+    *,
+    driver_info: dict[str, Any],
+    raw_driver_signal: float,
+    regularized_signal: float,
+    gap_cap: float | None,
+    team_driver_signal_means: dict[str, float],
+    sim_cfg: QualiSimConfig,
+    weekend_form_offset: float,
+    rng: np.random.Generator,
+) -> float:
+    """Combine team, driver, form, and noise into one simulation score."""
+    compressed_team = 0.5 + (
+        (float(driver_info["team_strength"]) - 0.5) * sim_cfg.team_strength_compression
+    )
+    compressed_team = float(np.clip(compressed_team, 0.0, 1.0))
+
+    bounded_driver = 0.5 + (
+        np.tanh((regularized_signal - 0.5) / sim_cfg.driver_signal_softness)
+        * sim_cfg.driver_offset_cap
+    )
+
+    score = (compressed_team * sim_cfg.team_weight) + (bounded_driver * sim_cfg.skill_weight)
+    score += float(driver_info.get("learned_position_adjustment", 0.0)) * (
+        sim_cfg.effective_learning_scale
+    )
+    score += weekend_form_offset
+    score += _compute_teammate_anchor_adjustment(
+        driver_info=driver_info,
+        raw_driver_signal=raw_driver_signal,
+        team_driver_signal_means=team_driver_signal_means,
+        gap_cap=gap_cap,
+        sim_cfg=sim_cfg,
+    )
+    score += float(rng.normal(0, sim_cfg.teammate_setup_std))
+    score += float(rng.normal(0, sim_cfg.noise_std))
+    return float(score)
+
+
 def _build_quali_sim_config(
     *,
     cfg: Any,
@@ -182,7 +325,7 @@ def _build_quali_sim_config(
     has_practice_data: bool,
     has_testing_fallback_data: bool,
 ) -> QualiSimConfig:
-    """Read qualifying simulation settings and apply context-specific adjustments."""
+    """Build the qualifying simulation config."""
     use_model_only_profile = not has_practice_data
     apply_model_only_teammate_regularization = use_model_only_profile and (
         not has_testing_fallback_data
@@ -237,156 +380,7 @@ def _build_quali_sim_config(
     recent_form_scale = float(cfg.get("baseline_predictor.qualifying.recent_form_scale", 0.12))
     recent_form_cap = float(cfg.get("baseline_predictor.qualifying.recent_form_cap", 0.03))
 
-    model_only_driver_signal_shrink = float(
-        cfg.get("baseline_predictor.qualifying.model_only_driver_signal_shrink", 0.35)
-    )
-    model_only_driver_signal_shrink = float(np.clip(model_only_driver_signal_shrink, 0.0, 1.0))
-    model_only_experience_shrink = _normalized_tier_mapping(
-        cfg.get(
-            "baseline_predictor.qualifying.model_only_experience_shrink",
-            {
-                "rookie": 0.45,
-                "second_year": 0.30,
-                "developing": 0.20,
-                "sunset": 0.05,
-                "unknown": 0.30,
-            },
-        )
-    )
-    model_only_teammate_anchor_scale = float(
-        cfg.get("baseline_predictor.qualifying.model_only_teammate_anchor_scale", 0.12)
-    )
-    model_only_teammate_anchor_cap = float(
-        cfg.get("baseline_predictor.qualifying.model_only_teammate_anchor_cap", 0.04)
-    )
-    model_only_anchor_experience_multiplier = _normalized_tier_mapping(
-        cfg.get(
-            "baseline_predictor.qualifying.model_only_teammate_anchor_experience_multiplier",
-            {
-                "rookie": 0.30,
-                "second_year": 0.45,
-                "developing": 0.55,
-                "sunset": 1.00,
-                "unknown": 0.45,
-            },
-        )
-    )
-    model_only_teammate_gap_cap_by_tier = _normalized_tier_mapping(
-        cfg.get(
-            "baseline_predictor.qualifying.model_only_teammate_gap_cap_by_experience",
-            {
-                "rookie": 0.16,
-                "second_year": 0.12,
-                "developing": 0.10,
-                "unknown": 0.12,
-            },
-        )
-    )
-    model_only_teammate_gap_cap_max_races_by_tier = _normalized_tier_mapping(
-        cfg.get(
-            "baseline_predictor.qualifying.model_only_teammate_gap_cap_max_races_by_experience",
-            {
-                "rookie": 40,
-                "second_year": 55,
-                "developing": 55,
-                "unknown": 45,
-            },
-        )
-    )
-    model_only_teammate_gap_cap_min_scale = float(
-        cfg.get("baseline_predictor.qualifying.model_only_teammate_gap_cap_min_scale", 0.35)
-    )
-    model_only_teammate_gap_cap_min_scale = float(
-        np.clip(model_only_teammate_gap_cap_min_scale, 0.0, 1.0)
-    )
-    model_only_negative_delta_threshold = float(
-        cfg.get("baseline_predictor.qualifying.model_only_negative_delta_threshold", 0.08)
-    )
-    model_only_negative_delta_shrink_scale = float(
-        cfg.get("baseline_predictor.qualifying.model_only_negative_delta_shrink_scale", 1.0)
-    )
-    model_only_negative_delta_shrink_cap = float(
-        cfg.get("baseline_predictor.qualifying.model_only_negative_delta_shrink_cap", 0.25)
-    )
-
-    testing_fallback_driver_signal_shrink = float(
-        cfg.get("baseline_predictor.qualifying.testing_fallback_driver_signal_shrink", 0.14)
-    )
-    testing_fallback_driver_signal_shrink = float(
-        np.clip(testing_fallback_driver_signal_shrink, 0.0, 1.0)
-    )
-    testing_fallback_experience_shrink = _normalized_tier_mapping(
-        cfg.get(
-            "baseline_predictor.qualifying.testing_fallback_experience_shrink",
-            {
-                "rookie": 0.22,
-                "second_year": 0.14,
-                "developing": 0.09,
-                "sunset": 0.03,
-                "unknown": 0.14,
-            },
-        )
-    )
-    testing_fallback_anchor_experience_multiplier = _normalized_tier_mapping(
-        cfg.get(
-            "baseline_predictor.qualifying.testing_fallback_teammate_anchor_experience_multiplier",
-            {
-                "rookie": 0.55,
-                "second_year": 0.70,
-                "developing": 0.80,
-                "sunset": 1.00,
-                "unknown": 0.70,
-            },
-        )
-    )
-    testing_fallback_teammate_anchor_scale = float(
-        cfg.get("baseline_predictor.qualifying.testing_fallback_teammate_anchor_scale", 0.07)
-    )
-    testing_fallback_teammate_anchor_cap = float(
-        cfg.get("baseline_predictor.qualifying.testing_fallback_teammate_anchor_cap", 0.025)
-    )
-    testing_fallback_teammate_gap_cap_by_tier = _normalized_tier_mapping(
-        cfg.get(
-            "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_by_experience",
-            {
-                "rookie": 0.22,
-                "second_year": 0.18,
-                "developing": 0.14,
-                "unknown": 0.18,
-            },
-        )
-    )
-    testing_fallback_teammate_gap_cap_max_races_by_tier = _normalized_tier_mapping(
-        cfg.get(
-            "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_max_races_by_experience",
-            {
-                "rookie": 40,
-                "second_year": 55,
-                "developing": 55,
-                "unknown": 45,
-            },
-        )
-    )
-    testing_fallback_teammate_gap_cap_min_scale = float(
-        cfg.get("baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_min_scale", 0.30)
-    )
-    testing_fallback_teammate_gap_cap_min_scale = float(
-        np.clip(testing_fallback_teammate_gap_cap_min_scale, 0.0, 1.0)
-    )
-    testing_fallback_negative_delta_threshold = float(
-        cfg.get("baseline_predictor.qualifying.testing_fallback_negative_delta_threshold", 0.12)
-    )
-    testing_fallback_negative_delta_shrink_scale = float(
-        cfg.get("baseline_predictor.qualifying.testing_fallback_negative_delta_shrink_scale", 0.7)
-    )
-    testing_fallback_negative_delta_shrink_cap = float(
-        cfg.get("baseline_predictor.qualifying.testing_fallback_negative_delta_shrink_cap", 0.12)
-    )
-
     if has_practice_data:
-        # Practice-backed qualifying runs should not collapse into a pure team ladder.
-        # Once we have real weekend pace input, widen driver dispersion enough for the
-        # whole field to mix naturally instead of pairing teammates in blocks.
         team_weight *= float(
             cfg.get(
                 "baseline_predictor.qualifying.practice_data_team_weight_multiplier",
@@ -461,9 +455,6 @@ def _build_quali_sim_config(
         )
 
     if has_testing_fallback_data and not has_practice_data:
-        # Testing fallback has team-level signal but weaker direct driver calibration.
-        # Do not over-dampen variance here, or the pre-weekend grid turns into a
-        # near-pure team ladder.
         team_weight *= float(
             cfg.get("baseline_predictor.qualifying.testing_fallback_team_weight_multiplier", 0.92)
         )
@@ -509,6 +500,200 @@ def _build_quali_sim_config(
         )
         weekend_form_std = max(float(weekend_form_std), weekend_form_floor)
 
+    regularization: RegularizationConfig | None = None
+    if apply_model_only_teammate_regularization:
+        regularization = RegularizationConfig(
+            driver_signal_shrink=float(
+                np.clip(
+                    float(
+                        cfg.get(
+                            "baseline_predictor.qualifying.model_only_driver_signal_shrink",
+                            0.35,
+                        )
+                    ),
+                    0.0,
+                    1.0,
+                )
+            ),
+            experience_shrink=_normalized_tier_mapping(
+                cfg.get(
+                    "baseline_predictor.qualifying.model_only_experience_shrink",
+                    {
+                        "rookie": 0.45,
+                        "second_year": 0.30,
+                        "developing": 0.20,
+                        "sunset": 0.05,
+                        "unknown": 0.30,
+                    },
+                )
+            ),
+            teammate_gap_cap_by_tier=_normalized_tier_mapping(
+                cfg.get(
+                    "baseline_predictor.qualifying.model_only_teammate_gap_cap_by_experience",
+                    {
+                        "rookie": 0.16,
+                        "second_year": 0.12,
+                        "developing": 0.10,
+                        "unknown": 0.12,
+                    },
+                )
+            ),
+            teammate_gap_cap_max_races_by_tier=_normalized_tier_mapping(
+                cfg.get(
+                    "baseline_predictor.qualifying.model_only_teammate_gap_cap_max_races_by_experience",
+                    {
+                        "rookie": 40,
+                        "second_year": 55,
+                        "developing": 55,
+                        "unknown": 45,
+                    },
+                )
+            ),
+            teammate_gap_cap_min_scale=float(
+                np.clip(
+                    float(
+                        cfg.get(
+                            "baseline_predictor.qualifying.model_only_teammate_gap_cap_min_scale",
+                            0.35,
+                        )
+                    ),
+                    0.0,
+                    1.0,
+                )
+            ),
+            teammate_anchor_scale=float(
+                cfg.get("baseline_predictor.qualifying.model_only_teammate_anchor_scale", 0.12)
+            ),
+            teammate_anchor_cap=float(
+                cfg.get("baseline_predictor.qualifying.model_only_teammate_anchor_cap", 0.04)
+            ),
+            anchor_experience_multiplier=_normalized_tier_mapping(
+                cfg.get(
+                    "baseline_predictor.qualifying.model_only_teammate_anchor_experience_multiplier",
+                    {
+                        "rookie": 0.30,
+                        "second_year": 0.45,
+                        "developing": 0.55,
+                        "sunset": 1.00,
+                        "unknown": 0.45,
+                    },
+                )
+            ),
+            negative_delta_threshold=float(
+                cfg.get("baseline_predictor.qualifying.model_only_negative_delta_threshold", 0.08)
+            ),
+            negative_delta_shrink_scale=float(
+                cfg.get(
+                    "baseline_predictor.qualifying.model_only_negative_delta_shrink_scale",
+                    1.0,
+                )
+            ),
+            negative_delta_shrink_cap=float(
+                cfg.get("baseline_predictor.qualifying.model_only_negative_delta_shrink_cap", 0.25)
+            ),
+            max_total_shrink=0.95,
+        )
+    elif apply_testing_fallback_teammate_guard:
+        regularization = RegularizationConfig(
+            driver_signal_shrink=float(
+                np.clip(
+                    float(
+                        cfg.get(
+                            "baseline_predictor.qualifying.testing_fallback_driver_signal_shrink",
+                            0.14,
+                        )
+                    ),
+                    0.0,
+                    1.0,
+                )
+            ),
+            experience_shrink=_normalized_tier_mapping(
+                cfg.get(
+                    "baseline_predictor.qualifying.testing_fallback_experience_shrink",
+                    {
+                        "rookie": 0.22,
+                        "second_year": 0.14,
+                        "developing": 0.09,
+                        "sunset": 0.03,
+                        "unknown": 0.14,
+                    },
+                )
+            ),
+            teammate_gap_cap_by_tier=_normalized_tier_mapping(
+                cfg.get(
+                    "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_by_experience",
+                    {
+                        "rookie": 0.22,
+                        "second_year": 0.18,
+                        "developing": 0.14,
+                        "unknown": 0.18,
+                    },
+                )
+            ),
+            teammate_gap_cap_max_races_by_tier=_normalized_tier_mapping(
+                cfg.get(
+                    "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_max_races_by_experience",
+                    {
+                        "rookie": 40,
+                        "second_year": 55,
+                        "developing": 55,
+                        "unknown": 45,
+                    },
+                )
+            ),
+            teammate_gap_cap_min_scale=float(
+                np.clip(
+                    float(
+                        cfg.get(
+                            "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_min_scale",
+                            0.30,
+                        )
+                    ),
+                    0.0,
+                    1.0,
+                )
+            ),
+            teammate_anchor_scale=float(
+                cfg.get(
+                    "baseline_predictor.qualifying.testing_fallback_teammate_anchor_scale", 0.07
+                )
+            ),
+            teammate_anchor_cap=float(
+                cfg.get("baseline_predictor.qualifying.testing_fallback_teammate_anchor_cap", 0.025)
+            ),
+            anchor_experience_multiplier=_normalized_tier_mapping(
+                cfg.get(
+                    "baseline_predictor.qualifying.testing_fallback_teammate_anchor_experience_multiplier",
+                    {
+                        "rookie": 0.55,
+                        "second_year": 0.70,
+                        "developing": 0.80,
+                        "sunset": 1.00,
+                        "unknown": 0.70,
+                    },
+                )
+            ),
+            negative_delta_threshold=float(
+                cfg.get(
+                    "baseline_predictor.qualifying.testing_fallback_negative_delta_threshold",
+                    0.12,
+                )
+            ),
+            negative_delta_shrink_scale=float(
+                cfg.get(
+                    "baseline_predictor.qualifying.testing_fallback_negative_delta_shrink_scale",
+                    0.7,
+                )
+            ),
+            negative_delta_shrink_cap=float(
+                cfg.get(
+                    "baseline_predictor.qualifying.testing_fallback_negative_delta_shrink_cap",
+                    0.12,
+                )
+            ),
+            max_total_shrink=0.90,
+        )
+
     return QualiSimConfig(
         noise_std=float(noise_std),
         team_weight=float(team_weight),
@@ -523,39 +708,9 @@ def _build_quali_sim_config(
         teammate_setup_std=float(teammate_setup_std),
         recent_form_scale=float(recent_form_scale),
         recent_form_cap=float(recent_form_cap),
-        apply_model_only_teammate_regularization=apply_model_only_teammate_regularization,
-        apply_testing_fallback_teammate_guard=apply_testing_fallback_teammate_guard,
+        apply_regularization=regularization is not None,
         apply_recent_form_adjustment=apply_recent_form_adjustment,
-        model_only_driver_signal_shrink=model_only_driver_signal_shrink,
-        model_only_experience_shrink=model_only_experience_shrink,
-        model_only_teammate_gap_cap_by_tier=model_only_teammate_gap_cap_by_tier,
-        model_only_teammate_gap_cap_max_races_by_tier=model_only_teammate_gap_cap_max_races_by_tier,
-        model_only_teammate_gap_cap_min_scale=model_only_teammate_gap_cap_min_scale,
-        model_only_teammate_anchor_scale=float(model_only_teammate_anchor_scale),
-        model_only_teammate_anchor_cap=float(model_only_teammate_anchor_cap),
-        model_only_anchor_experience_multiplier=model_only_anchor_experience_multiplier,
-        model_only_negative_delta_threshold=float(model_only_negative_delta_threshold),
-        model_only_negative_delta_shrink_scale=float(model_only_negative_delta_shrink_scale),
-        model_only_negative_delta_shrink_cap=float(model_only_negative_delta_shrink_cap),
-        testing_fallback_driver_signal_shrink=testing_fallback_driver_signal_shrink,
-        testing_fallback_experience_shrink=testing_fallback_experience_shrink,
-        testing_fallback_anchor_experience_multiplier=testing_fallback_anchor_experience_multiplier,
-        testing_fallback_teammate_anchor_scale=float(testing_fallback_teammate_anchor_scale),
-        testing_fallback_teammate_anchor_cap=float(testing_fallback_teammate_anchor_cap),
-        testing_fallback_teammate_gap_cap_by_tier=testing_fallback_teammate_gap_cap_by_tier,
-        testing_fallback_teammate_gap_cap_max_races_by_tier=(
-            testing_fallback_teammate_gap_cap_max_races_by_tier
-        ),
-        testing_fallback_teammate_gap_cap_min_scale=float(
-            testing_fallback_teammate_gap_cap_min_scale
-        ),
-        testing_fallback_negative_delta_threshold=float(testing_fallback_negative_delta_threshold),
-        testing_fallback_negative_delta_shrink_scale=float(
-            testing_fallback_negative_delta_shrink_scale
-        ),
-        testing_fallback_negative_delta_shrink_cap=float(
-            testing_fallback_negative_delta_shrink_cap
-        ),
+        regularization=regularization,
     )
 
 
@@ -570,12 +725,10 @@ def run_qualifying_simulations(
     logger: Any,
     has_testing_fallback_data: bool = False,
 ) -> dict[str, list[int]]:
-    """Run Monte Carlo qualifying simulations and return position records.
+    """Run Monte Carlo qualifying simulations and return position histories.
 
-    Testing fallback data provides team-level signal even when weekend practice
-    laps are unavailable. In that case, avoid the strict model-only teammate
-    regularization stack and inject a real weekend-form spread so early-season
-    fallback runs do not collapse into rigid team blocks.
+    When we only have testing data, keep enough driver variance that the grid
+    does not turn into pure team order.
     """
     _ = logger
     sim_cfg = _build_quali_sim_config(
@@ -617,206 +770,26 @@ def run_qualifying_simulations(
     for _ in range(n_simulations):
         driver_scores: list[dict[str, Any]] = []
         for driver_info in all_drivers:
-            compressed_team_strength = 0.5 + (
-                (float(driver_info["team_strength"]) - 0.5) * sim_cfg.team_strength_compression
-            )
-            compressed_team_strength = float(np.clip(compressed_team_strength, 0.0, 1.0))
-
             raw_driver_signal = (
                 (float(driver_info["quali_pace"]) * sim_cfg.driver_quali_pace_weight)
                 + (float(driver_info["skill"]) * sim_cfg.driver_skill_weight)
             ) / driver_weight_sum
-            driver_signal = raw_driver_signal
-            model_only_gap_cap = None
-            testing_fallback_gap_cap = None
-            if sim_cfg.apply_model_only_teammate_regularization:
-                model_only_gap_cap = _resolve_teammate_gap_cap(
-                    driver_info=driver_info,
-                    cap_by_tier=sim_cfg.model_only_teammate_gap_cap_by_tier,
-                    max_races_by_tier=sim_cfg.model_only_teammate_gap_cap_max_races_by_tier,
-                    min_scale=sim_cfg.model_only_teammate_gap_cap_min_scale,
-                )
-                team_mean_for_cap = team_driver_signal_means.get(
-                    str(driver_info["team"]),
-                    driver_signal,
-                )
-                driver_signal = _clip_driver_signal_by_team_gap(
-                    driver_signal=driver_signal,
-                    team_mean=team_mean_for_cap,
-                    gap_cap=model_only_gap_cap,
-                )
-            elif sim_cfg.apply_testing_fallback_teammate_guard:
-                testing_fallback_gap_cap = _resolve_teammate_gap_cap(
-                    driver_info=driver_info,
-                    cap_by_tier=sim_cfg.testing_fallback_teammate_gap_cap_by_tier,
-                    max_races_by_tier=sim_cfg.testing_fallback_teammate_gap_cap_max_races_by_tier,
-                    min_scale=sim_cfg.testing_fallback_teammate_gap_cap_min_scale,
-                )
-                team_mean_for_cap = team_driver_signal_means.get(
-                    str(driver_info["team"]),
-                    driver_signal,
-                )
-                driver_signal = _clip_driver_signal_by_team_gap(
-                    driver_signal=driver_signal,
-                    team_mean=team_mean_for_cap,
-                    gap_cap=testing_fallback_gap_cap,
-                )
-            if (
-                sim_cfg.apply_model_only_teammate_regularization
-                and sim_cfg.model_only_driver_signal_shrink > 0
-            ):
-                team_mean = team_driver_signal_means.get(str(driver_info["team"]), driver_signal)
-                experience_tier = _normalize_experience_tier(
-                    driver_info.get("experience_tier", "unknown")
-                )
-                extra_shrink = sim_cfg.model_only_experience_shrink.get(
-                    experience_tier,
-                    sim_cfg.model_only_experience_shrink.get("unknown", 0.0),
-                )
-                delta_from_team = driver_signal - team_mean
-                extra_negative_delta_shrink = 0.0
-                if delta_from_team < -sim_cfg.model_only_negative_delta_threshold:
-                    extra_negative_delta_shrink = min(
-                        max(
-                            0.0,
-                            ((-delta_from_team) - sim_cfg.model_only_negative_delta_threshold)
-                            * sim_cfg.model_only_negative_delta_shrink_scale,
-                        ),
-                        max(0.0, sim_cfg.model_only_negative_delta_shrink_cap),
-                    )
-                total_shrink = float(
-                    np.clip(
-                        sim_cfg.model_only_driver_signal_shrink
-                        + float(extra_shrink)
-                        + float(extra_negative_delta_shrink),
-                        0.0,
-                        0.95,
-                    )
-                )
-                driver_signal = team_mean + ((driver_signal - team_mean) * (1.0 - total_shrink))
-            elif (
-                sim_cfg.apply_testing_fallback_teammate_guard
-                and sim_cfg.testing_fallback_driver_signal_shrink > 0
-            ):
-                team_mean = team_driver_signal_means.get(str(driver_info["team"]), driver_signal)
-                experience_tier = _normalize_experience_tier(
-                    driver_info.get("experience_tier", "unknown")
-                )
-                extra_shrink = sim_cfg.testing_fallback_experience_shrink.get(
-                    experience_tier,
-                    sim_cfg.testing_fallback_experience_shrink.get("unknown", 0.0),
-                )
-                delta_from_team = driver_signal - team_mean
-                extra_negative_delta_shrink = 0.0
-                if delta_from_team < -sim_cfg.testing_fallback_negative_delta_threshold:
-                    extra_negative_delta_shrink = min(
-                        max(
-                            0.0,
-                            ((-delta_from_team) - sim_cfg.testing_fallback_negative_delta_threshold)
-                            * sim_cfg.testing_fallback_negative_delta_shrink_scale,
-                        ),
-                        max(0.0, sim_cfg.testing_fallback_negative_delta_shrink_cap),
-                    )
-                total_shrink = float(
-                    np.clip(
-                        sim_cfg.testing_fallback_driver_signal_shrink
-                        + float(extra_shrink)
-                        + float(extra_negative_delta_shrink),
-                        0.0,
-                        0.90,
-                    )
-                )
-                driver_signal = team_mean + ((driver_signal - team_mean) * (1.0 - total_shrink))
-            if sim_cfg.apply_model_only_teammate_regularization:
-                team_mean = team_driver_signal_means.get(str(driver_info["team"]), driver_signal)
-                driver_signal = _clip_driver_signal_by_team_gap(
-                    driver_signal=driver_signal,
-                    team_mean=team_mean,
-                    gap_cap=model_only_gap_cap,
-                )
-            elif sim_cfg.apply_testing_fallback_teammate_guard:
-                team_mean = team_driver_signal_means.get(str(driver_info["team"]), driver_signal)
-                driver_signal = _clip_driver_signal_by_team_gap(
-                    driver_signal=driver_signal,
-                    team_mean=team_mean,
-                    gap_cap=testing_fallback_gap_cap,
-                )
-            if sim_cfg.apply_recent_form_adjustment:
-                recent_form_adjustment = _recent_form_adjustment(
-                    driver_info=driver_info,
-                    driver_signal=driver_signal,
-                    recent_form_scale=sim_cfg.recent_form_scale,
-                    recent_form_cap=sim_cfg.recent_form_cap,
-                )
-                if recent_form_adjustment:
-                    driver_signal = float(np.clip(driver_signal + recent_form_adjustment, 0.0, 1.0))
-            bounded_driver_signal = 0.5 + (
-                np.tanh((driver_signal - 0.5) / sim_cfg.driver_signal_softness)
-                * sim_cfg.driver_offset_cap
+            regularized_signal, gap_cap = _compute_regularized_driver_signal(
+                driver_info=driver_info,
+                raw_driver_signal=raw_driver_signal,
+                team_driver_signal_means=team_driver_signal_means,
+                sim_cfg=sim_cfg,
             )
-
-            score = (compressed_team_strength * sim_cfg.team_weight) + (
-                bounded_driver_signal * sim_cfg.skill_weight
+            score = _score_single_driver_in_simulation(
+                driver_info=driver_info,
+                raw_driver_signal=raw_driver_signal,
+                regularized_signal=regularized_signal,
+                gap_cap=gap_cap,
+                team_driver_signal_means=team_driver_signal_means,
+                sim_cfg=sim_cfg,
+                weekend_form_offset=weekend_form.get(str(driver_info["driver"]), 0.0),
+                rng=rng,
             )
-            learned_position_adjustment = float(driver_info.get("learned_position_adjustment", 0.0))
-            score += learned_position_adjustment * sim_cfg.effective_learning_scale
-            score += weekend_form.get(str(driver_info["driver"]), 0.0)
-            if (
-                sim_cfg.apply_model_only_teammate_regularization
-                and sim_cfg.model_only_teammate_anchor_scale > 0
-            ):
-                team_mean_raw = team_driver_signal_means.get(
-                    str(driver_info["team"]),
-                    raw_driver_signal,
-                )
-                teammate_delta = raw_driver_signal - team_mean_raw
-                if model_only_gap_cap is not None:
-                    teammate_delta = float(
-                        np.clip(teammate_delta, -model_only_gap_cap, model_only_gap_cap)
-                    )
-                anchor_adjustment = np.clip(
-                    teammate_delta * sim_cfg.model_only_teammate_anchor_scale,
-                    -sim_cfg.model_only_teammate_anchor_cap,
-                    sim_cfg.model_only_teammate_anchor_cap,
-                )
-                anchor_tier_multiplier = _fallback_experience_multiplier(
-                    sim_cfg.model_only_anchor_experience_multiplier,
-                    str(driver_info.get("experience_tier", "unknown")),
-                    default=1.0,
-                )
-                anchor_adjustment *= max(0.0, anchor_tier_multiplier)
-                score += anchor_adjustment
-            elif (
-                sim_cfg.apply_testing_fallback_teammate_guard
-                and sim_cfg.testing_fallback_teammate_anchor_scale > 0
-            ):
-                team_mean_raw = team_driver_signal_means.get(
-                    str(driver_info["team"]),
-                    raw_driver_signal,
-                )
-                teammate_delta = raw_driver_signal - team_mean_raw
-                if testing_fallback_gap_cap is not None:
-                    teammate_delta = float(
-                        np.clip(
-                            teammate_delta,
-                            -testing_fallback_gap_cap,
-                            testing_fallback_gap_cap,
-                        )
-                    )
-                anchor_adjustment = np.clip(
-                    teammate_delta * sim_cfg.testing_fallback_teammate_anchor_scale,
-                    -sim_cfg.testing_fallback_teammate_anchor_cap,
-                    sim_cfg.testing_fallback_teammate_anchor_cap,
-                )
-                anchor_tier_multiplier = _fallback_experience_multiplier(
-                    sim_cfg.testing_fallback_anchor_experience_multiplier,
-                    str(driver_info.get("experience_tier", "unknown")),
-                    default=1.0,
-                )
-                anchor_adjustment *= max(0.0, anchor_tier_multiplier)
-                score += anchor_adjustment
-            score += float(rng.normal(0, sim_cfg.teammate_setup_std))
-            score += float(rng.normal(0, sim_cfg.noise_std))
 
             driver_scores.append(
                 {

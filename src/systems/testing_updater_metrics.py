@@ -252,7 +252,7 @@ def _count_team_selected_laps(
     """Count selected laps per team for a specific run-profile strategy."""
     try:
         laps = session.laps
-    except Exception:
+    except (AttributeError, RuntimeError, TypeError, ValueError):
         return {}
 
     if laps is None or laps.empty or "Team" not in laps.columns:
@@ -405,20 +405,32 @@ def _normalize_tire_deg_scores(
 
 
 def _normalize_lower_better(metric_values: dict[str, float]) -> dict[str, float]:
-    """Normalize a lower-is-better metric into 0-1 scale."""
+    """Normalize a lower-is-better metric into 0-1 scale using rank-based scoring."""
     if not metric_values:
         return {}
 
-    best = min(metric_values.values())
-    worst = max(metric_values.values())
-    if worst <= best:
+    if len(metric_values) < 2:
         return {team: 0.5 for team in metric_values}
 
-    normalized = {}
-    for team, value in metric_values.items():
-        score = 1.0 - ((value - best) / (worst - best))
-        normalized[team] = float(np.clip(score, 0.0, 1.0))
+    ranked_items = sorted(metric_values.items(), key=lambda item: item[1])
+    team_count = len(ranked_items)
 
+    grouped: list[tuple[float, list[str]]] = []
+    for team, value in ranked_items:
+        metric_value = float(value)
+        if grouped and np.isclose(metric_value, grouped[-1][0]):
+            grouped[-1][1].append(team)
+        else:
+            grouped.append((metric_value, [team]))
+
+    normalized: dict[str, float] = {}
+    rank_cursor = 0
+    for _value, tied_teams in grouped:
+        average_rank = rank_cursor + ((len(tied_teams) - 1) / 2.0)
+        score = float(1.0 - (average_rank / (team_count - 1)))
+        for team in tied_teams:
+            normalized[team] = float(np.clip(score, 0.0, 1.0))
+        rank_cursor += len(tied_teams)
     return normalized
 
 
@@ -550,7 +562,7 @@ def _extract_braking_capability(valid_laps: pd.DataFrame) -> float | None:
         if callable(get_telemetry):
             try:
                 telemetry = get_telemetry()
-            except Exception:
+            except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
                 telemetry = None
 
         if telemetry is None:
@@ -558,7 +570,7 @@ def _extract_braking_capability(valid_laps: pd.DataFrame) -> float | None:
             if callable(get_car_data):
                 try:
                     telemetry = get_car_data()
-                except Exception:
+                except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
                     telemetry = None
 
         if not isinstance(telemetry, pd.DataFrame):
@@ -648,7 +660,7 @@ def _collect_session_metrics(
 
     try:
         laps = session.laps
-    except Exception as exc:
+    except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
         logger.debug(f"Session laps unavailable for {session_key}: {exc}")
         if diagnostics is not None:
             diagnostics.append(f"{session_key}: laps unavailable ({type(exc).__name__})")
@@ -788,7 +800,7 @@ def _count_team_valid_laps(
     """Count valid timed laps per canonical team for session weighting."""
     try:
         laps = session.laps
-    except Exception:
+    except (AttributeError, RuntimeError, TypeError, ValueError):
         return {}
 
     if laps is None or laps.empty or "Team" not in laps.columns:
