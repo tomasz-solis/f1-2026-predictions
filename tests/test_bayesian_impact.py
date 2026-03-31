@@ -82,3 +82,42 @@ def test_bayesian_skill_score_resolves_from_seeded_state() -> None:
         f"Only {resolved_count}/{len(drivers)} drivers resolved Bayesian score from "
         "committed seeded state."
     )
+
+
+def test_bayesian_ratings_reflect_driver_form_not_just_car() -> None:
+    """Teammate-relative updates should elevate the stronger driver signal across teams."""
+    from src.models.bayesian import BayesianDriverRanking, DriverPrior
+
+    priors = {
+        "FAST_A": DriverPrior("1", "FAST_A", "TopTeam", "top", mu=16.0, sigma=2.0),
+        "FAST_B": DriverPrior("2", "FAST_B", "TopTeam", "top", mu=14.0, sigma=2.0),
+        "SLOW_A": DriverPrior("3", "SLOW_A", "BackTeam", "backmarker", mu=8.0, sigma=2.0),
+        "SLOW_B": DriverPrior("4", "SLOW_B", "BackTeam", "backmarker", mu=6.0, sigma=2.0),
+    }
+    lineups = {
+        "TopTeam": ["FAST_A", "FAST_B"],
+        "BackTeam": ["SLOW_A", "SLOW_B"],
+    }
+
+    ranker = BayesianDriverRanking(priors, grid_size=22)
+
+    for race_num in range(5):
+        ranker.update_teammate_relative(
+            observations={
+                "FAST_A": 1,
+                "FAST_B": 6,
+                "SLOW_A": 12,
+                "SLOW_B": 17,
+            },
+            session_name=f"race_{race_num}",
+            lineups=lineups,
+            confidence=1.0,
+        )
+
+    slow_a_mu = ranker.ratings["SLOW_A"][0]
+    fast_b_mu = ranker.ratings["FAST_B"][0]
+
+    assert slow_a_mu > fast_b_mu, (
+        f"SLOW_A (mu={slow_a_mu:.2f}) should rate higher than FAST_B (mu={fast_b_mu:.2f}) "
+        "because SLOW_A consistently dominates their teammate while FAST_B underperforms."
+    )

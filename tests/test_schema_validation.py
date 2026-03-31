@@ -152,6 +152,20 @@ class TestDriverCharacteristicsSchema:
         with pytest.raises(ValueError, match="expected season 2026"):
             validate_driver_characteristics(data, expected_year=2026)
 
+    def test_valid_driver_bayesian_payload_without_normalized_skill_score(self):
+        """Allow newer Bayesian payloads that omit the cached normalized score."""
+        data = _driver_payload()
+        data["drivers"]["VER"]["bayesian"] = {
+            "rating_mu": 18.5,
+            "rating_sigma": 1.6,
+            "blended_skill_score": 0.84,
+            "blend_weight": 0.25,
+            "last_session": "Japanese Grand Prix",
+            "season_year": 2026,
+        }
+
+        validate_driver_characteristics(data, expected_year=2026)
+
 
 class TestTeamCharacteristicsSchema:
     """Test team characteristics schema validation."""

@@ -15,12 +15,12 @@ logging.getLogger("fastf1").setLevel(logging.CRITICAL)
 logger = logging.getLogger(__name__)
 
 
-def get_lineups_from_session(year, race_name, session_type="Q"):
-    """
-    Extract actual lineups from a specific race session.
-
-    Handles reserve drivers, mid-season swaps, and injuries automatically.
-    """
+def get_lineups_from_session(
+    year: int,
+    race_name: str,
+    session_type: str = "Q",
+) -> dict[str, list[str]] | None:
+    """Extract actual race-weekend lineups from a loaded FastF1 session."""
     try:
         session = ff1.get_session(year, race_name, session_type)
         session.load(laps=False, telemetry=False, weather=False)
@@ -42,7 +42,15 @@ def get_lineups_from_session(year, race_name, session_type="Q"):
 
         return lineups
 
-    except Exception as e:
+    except (
+        AttributeError,
+        ConnectionError,
+        FileNotFoundError,
+        KeyError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as e:
         logger.warning(
             f"Failed to extract lineups from {race_name} ({year}) {session_type} session: {e}. Lineups from this session will be unavailable."
         )
@@ -50,28 +58,42 @@ def get_lineups_from_session(year, race_name, session_type="Q"):
         return None
 
 
-def load_current_lineups(config_path="data/current_lineups.json"):
-    """
-    Load current team lineups from config file for future predictions or fallback.
-    """
+def load_current_lineups(
+    config_path: str = "data/current_lineups.json",
+) -> dict[str, list[str]] | None:
+    """Load the current lineup config used for future events and fallbacks."""
     config_file = Path(config_path)
 
     if not config_file.exists():
         return None
 
-    with open(config_file) as f:
-        data = json.load(f)
+    try:
+        with open(config_file) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError, TypeError) as exc:
+        logger.warning("Could not load lineup config %s: %s", config_file, exc)
+        return None
 
-    return data.get("current_lineups", {})
+    if not isinstance(data, dict):
+        return None
+
+    current_lineups = data.get("current_lineups", {})
+    if not isinstance(current_lineups, dict):
+        return None
+
+    return {
+        str(team_name): [str(driver_code) for driver_code in drivers]
+        for team_name, drivers in current_lineups.items()
+        if isinstance(drivers, list)
+    }
 
 
-def get_lineups(year, race_name=None, config_path="data/current_lineups.json"):
-    """
-    Get team lineups for a race.
-
-    Extracts from session data for 2024-2025, uses config for 2026+.
-    Handles reserve drivers and mid-season changes automatically.
-    """
+def get_lineups(
+    year: int,
+    race_name: str | None = None,
+    config_path: str = "data/current_lineups.json",
+) -> dict[str, list[str]]:
+    """Return the best available lineup mapping for one season or event."""
     # For historical seasons with specific race, extract from data
     if year <= 2025 and race_name:
         session_lineups = get_lineups_from_session(year, race_name, "Q")
@@ -94,10 +116,11 @@ def get_lineups(year, race_name=None, config_path="data/current_lineups.json"):
     )
 
 
-def save_current_lineups(lineups, config_path="../data/current_lineups.json"):
-    """
-    Save current lineups to config file when drivers change.
-    """
+def save_current_lineups(
+    lineups: dict[str, list[str]],
+    config_path: str = "../data/current_lineups.json",
+) -> None:
+    """Persist the current lineup mapping to the shared config file."""
     from datetime import datetime
 
     output = {"last_updated": datetime.now().isoformat(), "current_lineups": lineups}
@@ -111,14 +134,15 @@ def save_current_lineups(lineups, config_path="../data/current_lineups.json"):
     logger.info(f"Saved lineups to {config_file}")
 
 
-def extract_lineups_for_season(year, output_path=None):
-    """
-    Extract lineups for all races in a season for reference or debugging.
-    """
+def extract_lineups_for_season(
+    year: int,
+    output_path: str | None = None,
+) -> dict[str, dict[str, list[str]]]:
+    """Extract lineups for every non-testing event in a season."""
     import fastf1 as ff1
 
     schedule = ff1.get_event_schedule(year)
-    all_lineups = {}
+    all_lineups: dict[str, dict[str, list[str]]] = {}
 
     logger.info(f"Extracting lineups for {year} season...")
 

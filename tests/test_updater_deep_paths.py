@@ -309,6 +309,63 @@ def test_update_bayesian_driver_ratings_skips_when_no_valid_positions(patcher):
     bayesian_cls.return_value.update.assert_not_called()
 
 
+def test_update_bayesian_driver_ratings_prefers_teammate_relative_updates(patcher, tmp_path):
+    patcher.chdir(tmp_path)
+
+    race_results = pd.DataFrame(
+        {
+            "Abbreviation": ["LEC", "HAM"],
+            "Position": [1, 4],
+            "race_name": ["Bahrain Grand Prix", "Bahrain Grand Prix"],
+            "year": [2026, 2026],
+        }
+    )
+
+    bayesian_cls = MagicMock()
+    patcher.setattr(updater, "BayesianDriverRanking", bayesian_cls)
+    patcher.setattr(
+        "src.models.priors_factory.PriorsFactory.create_priors",
+        lambda self: {"LEC": object(), "HAM": object()},
+    )
+    patcher.setattr(
+        "src.utils.lineups.load_current_lineups",
+        lambda config_path="data/current_lineups.json": {"Ferrari": ["LEC", "HAM"]},
+    )
+
+    class _Store:
+        def __init__(self, data_root):
+            self.saved = []
+
+        def load_artifact(self, artifact_type, artifact_key):
+            if artifact_type == "driver_characteristics":
+                return {
+                    "version": 1,
+                    "drivers": {
+                        "LEC": {"racecraft": {"skill_score": 0.55}},
+                        "HAM": {"racecraft": {"skill_score": 0.50}},
+                    },
+                }
+            return None
+
+        def get_latest_version(self, artifact_type, artifact_key):
+            return 1
+
+        def save_artifact(self, artifact_type, artifact_key, data, version):
+            self.saved.append((artifact_type, artifact_key, data, version))
+
+    patcher.setattr(updater, "ArtifactStore", _Store)
+    patcher.setattr(updater.config_loader, "get", lambda key, default=None: default)
+    bayesian_cls.return_value.ratings = {"LEC": (17.0, 1.8), "HAM": (15.0, 1.9)}
+
+    updater.update_bayesian_driver_ratings(race_results)
+
+    bayesian_cls.return_value.update_teammate_relative.assert_called_once()
+    assert bayesian_cls.return_value.update_teammate_relative.call_args.kwargs["confidence"] == (
+        pytest.approx(0.35)
+    )
+    bayesian_cls.return_value.update.assert_not_called()
+
+
 def test_update_bayesian_driver_ratings_persists_driver_characteristics_updates(patcher, tmp_path):
     from src.models.bayesian import DriverPrior
 
@@ -387,6 +444,123 @@ def test_update_bayesian_driver_ratings_persists_driver_characteristics_updates(
     assert payload["version"] >= 2
     assert payload["drivers"]["LEC"]["racecraft"]["skill_score"] != 0.55
     assert "bayesian" in payload["drivers"]["LEC"]
+
+
+def test_update_bayesian_driver_ratings_reuses_saved_posteriors_and_cleans_stale_fields(
+    patcher, tmp_path
+):
+    """Persisted Bayesian state should carry forward, and deprecated fields should be stripped."""
+    from src.models.bayesian import DriverPrior
+
+    patcher.chdir(tmp_path)
+
+    race_results = pd.DataFrame(
+        {
+            "Abbreviation": ["LEC", "HAM"],
+            "Position": [1, 4],
+            "race_name": ["Bahrain Grand Prix", "Bahrain Grand Prix"],
+            "year": [2026, 2026],
+        }
+    )
+
+    priors = {
+        "LEC": DriverPrior(
+            driver_number="16",
+            driver_code="LEC",
+            team="Ferrari",
+            team_tier="top",
+            mu=5.0,
+            sigma=3.0,
+        ),
+        "HAM": DriverPrior(
+            driver_number="44",
+            driver_code="HAM",
+            team="Ferrari",
+            team_tier="top",
+            mu=4.0,
+            sigma=3.1,
+        ),
+    }
+    patcher.setattr("src.models.priors_factory.PriorsFactory.create_priors", lambda self: priors)
+    patcher.setattr(
+        "src.utils.lineups.load_current_lineups",
+        lambda config_path="data/current_lineups.json": {"Ferrari": ["LEC", "HAM"]},
+    )
+
+    seen_initial_ratings: dict[str, tuple[float, float]] = {}
+
+    class _Bayesian:
+        def __init__(self, seeded_priors, grid_size=22):
+            self.ratings = {
+                driver_code: (prior.mu, prior.sigma) for driver_code, prior in seeded_priors.items()
+            }
+
+        def update_teammate_relative(self, observations, session_name, lineups, confidence=1.0):
+            seen_initial_ratings.update(self.ratings)
+            self.ratings["LEC"] = (18.4, 1.05)
+            self.ratings["HAM"] = (14.2, 1.25)
+
+        def update(self, observations, session_name, confidence=1.0):
+            pytest.fail("Expected teammate-relative Bayesian updates for paired teammates")
+
+    class _Store:
+        def __init__(self, data_root):
+            self.saved = []
+
+        def load_artifact(self, artifact_type, artifact_key):
+            if artifact_type == "driver_characteristics":
+                return {
+                    "version": 1,
+                    "drivers": {
+                        "LEC": {
+                            "racecraft": {"skill_score": 0.55},
+                            "pace": {"quali_pace": 0.62},
+                            "bayesian": {
+                                "rating_mu": 17.8,
+                                "rating_sigma": 1.1,
+                                "normalized_skill_score": 0.81,
+                            },
+                        },
+                        "HAM": {
+                            "racecraft": {"skill_score": 0.52},
+                            "pace": {"quali_pace": 0.60},
+                            "bayesian": {
+                                "rating_mu": 13.5,
+                                "rating_sigma": 1.4,
+                                "normalized_skill_score": 0.60,
+                            },
+                        },
+                        "RIC": {
+                            "bayesian": {
+                                "rating_mu": 12.0,
+                                "rating_sigma": 2.5,
+                                "normalized_skill_score": 0.52,
+                            }
+                        },
+                    },
+                }
+            return None
+
+        def get_latest_version(self, artifact_type, artifact_key):
+            return 1
+
+        def save_artifact(self, artifact_type, artifact_key, data, version):
+            self.saved.append((artifact_type, artifact_key, data, version))
+
+    store = _Store("data")
+    patcher.setattr(updater, "BayesianDriverRanking", _Bayesian)
+    patcher.setattr(updater, "ArtifactStore", lambda data_root: store)
+    patcher.setattr(updater.config_loader, "get", lambda key, default=None: default)
+
+    updater.update_bayesian_driver_ratings(race_results)
+
+    assert seen_initial_ratings["LEC"] == (17.8, 1.1)
+    assert seen_initial_ratings["HAM"] == (13.5, 1.4)
+    assert len(store.saved) == 1
+    payload = store.saved[0][2]
+    assert "normalized_skill_score" not in payload["drivers"]["LEC"]["bayesian"]
+    assert "normalized_skill_score" not in payload["drivers"]["HAM"]["bayesian"]
+    assert "normalized_skill_score" not in payload["drivers"]["RIC"]["bayesian"]
 
 
 def test_update_bayesian_driver_ratings_also_writes_year_scoped_fallback_on_store_success(

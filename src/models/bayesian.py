@@ -1,9 +1,4 @@
-"""Bayesian driver ranking with volatility-adjusted priors.
-
-Uses a conjugate Normal-Normal update. The volatility parameter inflates
-uncertainty when observations deviate from priors, which helps with
-regulation changes and mid-season form shifts.
-"""
+"""Bayesian driver ratings."""
 
 from dataclasses import dataclass
 
@@ -17,7 +12,7 @@ MIN_SIGMA = 0.05
 
 @dataclass
 class DriverPrior:
-    """Configuration for a driver's initial belief state."""
+    """Initial rating state for one driver."""
 
     driver_number: str
     driver_code: str
@@ -29,7 +24,7 @@ class DriverPrior:
 
 @dataclass
 class UpdateRecord:
-    """Audit trail for a single Bayesian update."""
+    """One saved rating update."""
 
     driver_number: str
     session_name: str
@@ -42,24 +37,22 @@ class UpdateRecord:
 
 
 class BayesianDriverRanking:
-    """Track driver ratings with a volatility-aware Bayesian update."""
+    """Track driver ratings across sessions."""
 
     def __init__(self, priors: dict[str, DriverPrior], grid_size: int = 22):
-        """Initialize Bayesian state for one championship field size."""
+        """Initialize ratings for the current grid."""
         self.priors = priors
         self.grid_size = max(int(grid_size), 2)
-        # State: {driver_number: (mu, sigma)}
         self.ratings: dict[str, tuple[float, float]] = {
             d: (p.mu, p.sigma) for d, p in priors.items()
         }
         self.history: list[UpdateRecord] = []
 
     def get_current_ratings(self) -> pd.DataFrame:
-        """Return current ratings as a DataFrame for analysis."""
+        """Return the current ratings table."""
         data = []
         for d_num, (mu, sigma) in self.ratings.items():
             prior = self.priors[d_num]
-            # Convert latent rating to expected position on the active grid size.
             expected_pos = np.clip((self.grid_size + 1) - mu, 1, self.grid_size)
 
             data.append(
@@ -83,73 +76,188 @@ class BayesianDriverRanking:
 
         return pd.DataFrame(data).sort_values("rating_mu", ascending=False)
 
+    @staticmethod
+    def _load_update_hyperparameters() -> tuple[float, float, float, float]:
+        """Read update settings from config."""
+        try:
+            base_volatility = float(get("bayesian.base_volatility", 0.1))
+            shock_threshold = float(get("bayesian.shock_threshold", 2.0))
+            shock_multiplier = float(get("bayesian.shock_multiplier", 0.5))
+            base_obs_noise = float(get("bayesian.base_observation_noise", 2.0))
+        except (FileNotFoundError, KeyError, TypeError, ValueError):
+            base_volatility = 0.1
+            shock_threshold = 2.0
+            shock_multiplier = 0.5
+            base_obs_noise = 2.0
+
+        return base_volatility, shock_threshold, shock_multiplier, base_obs_noise
+
+    def _position_to_rating(self, finish_pos: int | float) -> float:
+        """Map a finishing position to the rating scale."""
+        return float(self.grid_size + 1) - float(finish_pos)
+
+    def _rating_to_position(self, observed_rating: float) -> int:
+        """Map a rating back to a finishing position."""
+        projected_position = round(float(self.grid_size + 1) - float(observed_rating))
+        return int(np.clip(projected_position, 1, self.grid_size))
+
+    def _apply_rating_updates(
+        self,
+        *,
+        observed_ratings: dict[str, float],
+        session_name: str,
+        confidence: float,
+        observed_positions: dict[str, int] | None = None,
+    ) -> None:
+        """Apply one update pass from observed ratings."""
+        (
+            base_volatility,
+            shock_threshold,
+            shock_multiplier,
+            base_obs_noise,
+        ) = self._load_update_hyperparameters()
+        for driver_number, observed_rating in observed_ratings.items():
+            observed_pos = (
+                observed_positions[driver_number]
+                if observed_positions is not None and driver_number in observed_positions
+                else self._rating_to_position(observed_rating)
+            )
+            self._update_single_driver_rating(
+                driver_number=driver_number,
+                observed_rating=observed_rating,
+                observed_pos=observed_pos,
+                session_name=session_name,
+                confidence=confidence,
+                base_volatility=base_volatility,
+                shock_threshold=shock_threshold,
+                shock_multiplier=shock_multiplier,
+                base_obs_noise=base_obs_noise,
+            )
+
     def update(
         self, observations: dict[str, int], session_name: str, confidence: float = 1.0
     ) -> None:
-        """Update driver ratings based on observed race results with specified confidence."""
-        try:
-            BASE_VOLATILITY = get("bayesian.base_volatility", 0.1)
-            SHOCK_THRESHOLD = get("bayesian.shock_threshold", 2.0)
-            SHOCK_MULTIPLIER = get("bayesian.shock_multiplier", 0.5)
-            BASE_OBS_NOISE = get("bayesian.base_observation_noise", 2.0)
-        except (FileNotFoundError, KeyError):
-            BASE_VOLATILITY = 0.1
-            SHOCK_THRESHOLD = 2.0
-            SHOCK_MULTIPLIER = 0.5
-            BASE_OBS_NOISE = 2.0
+        """Update ratings from finishing positions."""
+        observed_ratings = {
+            driver_code: self._position_to_rating(finish_pos)
+            for driver_code, finish_pos in observations.items()
+        }
+        self._apply_rating_updates(
+            observed_ratings=observed_ratings,
+            session_name=session_name,
+            confidence=confidence,
+            observed_positions=observations,
+        )
 
-        for d_num, finish_pos in observations.items():
-            if d_num not in self.ratings:
+    def update_teammate_relative(
+        self,
+        observations: dict[str, int],
+        session_name: str,
+        lineups: dict[str, list[str]],
+        confidence: float = 1.0,
+    ) -> None:
+        """Update ratings from teammate-relative results."""
+        driver_to_team: dict[str, str] = {}
+        for team_name, drivers in lineups.items():
+            for driver_code in drivers:
+                driver_to_team[str(driver_code)] = str(team_name)
+
+        observed_ratings = {
+            driver_code: self._position_to_rating(finish_pos)
+            for driver_code, finish_pos in observations.items()
+        }
+        team_ratings: dict[str, list[float]] = {}
+        for driver_code, observed_rating in observed_ratings.items():
+            team_name = driver_to_team.get(driver_code)
+            if team_name is None:
                 continue
+            team_ratings.setdefault(team_name, []).append(observed_rating)
 
-            prior_mu, prior_sigma = self.ratings[d_num]
+        team_means = {
+            team_name: float(np.mean(ratings))
+            for team_name, ratings in team_ratings.items()
+            if len(ratings) >= 2
+        }
+        if not team_means:
+            self.update(observations=observations, session_name=session_name, confidence=confidence)
+            return
 
-            # Process noise: widen the prior for inter-race development.
-            prior_sigma = np.sqrt(prior_sigma**2 + BASE_VOLATILITY**2)
+        field_mean = (
+            float(np.mean(list(observed_ratings.values())))
+            if observed_ratings
+            else float(self.grid_size + 1) / 2.0
+        )
+        adjusted_ratings: dict[str, float] = {}
+        adjusted_positions: dict[str, int] = {}
 
-            # Convert finishing position into the latent rating scale.
-            observed_rating = float(self.grid_size + 1) - finish_pos
+        for driver_code, _finish_pos in observations.items():
+            raw_rating = observed_ratings[driver_code]
+            team_name = driver_to_team.get(driver_code)
+            adjusted_rating = raw_rating
+            if team_name is not None and team_name in team_means:
+                adjusted_rating = raw_rating - team_means[team_name] + field_mean
 
-            innovation = abs(observed_rating - prior_mu)
+            adjusted_ratings[driver_code] = adjusted_rating
+            adjusted_positions[driver_code] = self._rating_to_position(adjusted_rating)
 
-            # Inflate uncertainty for outlier results.
-            shock = 0.0
-            if innovation > (SHOCK_THRESHOLD * prior_sigma):
-                shock = SHOCK_MULTIPLIER * (innovation / prior_sigma)
+        self._apply_rating_updates(
+            observed_ratings=adjusted_ratings,
+            session_name=session_name,
+            confidence=confidence,
+            observed_positions=adjusted_positions,
+        )
 
-            # Effective observation noise (High confidence = Low noise)
-            obs_noise = BASE_OBS_NOISE / (confidence + 1e-6)
-
-            # Inflate prior uncertainty if shocked
-            effective_prior_sigma = prior_sigma * (1.0 + shock)
-
-            # Conjugate normal-normal update.
-            prior_prec = 1.0 / (effective_prior_sigma**2)
-            obs_prec = 1.0 / (obs_noise**2)
-
-            posterior_sigma_sq = 1.0 / (prior_prec + obs_prec)
-            posterior_mu = (prior_mu * prior_prec + observed_rating * obs_prec) * posterior_sigma_sq
-            posterior_sigma = np.sqrt(posterior_sigma_sq)
-            posterior_sigma = max(posterior_sigma, MIN_SIGMA)
-
-            self.ratings[d_num] = (posterior_mu, posterior_sigma)
-
-            self.history.append(
-                UpdateRecord(
-                    driver_number=d_num,
-                    session_name=session_name,
-                    observed_pos=finish_pos,
-                    prior_mu=prior_mu,
-                    prior_sigma=prior_sigma,
-                    posterior_mu=posterior_mu,
-                    posterior_sigma=posterior_sigma,
-                    shock_factor=shock,
-                )
-            )
-
-    # Alias for backward compatibility with older scripts/notebooks
     update_from_session = update
+    update_from_session_teammate_relative = update_teammate_relative
 
     def get_history_df(self) -> pd.DataFrame:
         """Export update history for visualization."""
         return pd.DataFrame([vars(r) for r in self.history])
+
+    def _update_single_driver_rating(
+        self,
+        *,
+        driver_number: str,
+        observed_rating: float,
+        observed_pos: int,
+        session_name: str,
+        confidence: float,
+        base_volatility: float,
+        shock_threshold: float,
+        shock_multiplier: float,
+        base_obs_noise: float,
+    ) -> None:
+        """Apply one conjugate Normal-Normal update for a single driver."""
+        if driver_number not in self.ratings:
+            return
+
+        prior_mu, prior_sigma = self.ratings[driver_number]
+        prior_sigma = np.sqrt(prior_sigma**2 + base_volatility**2)
+        innovation = abs(observed_rating - prior_mu)
+        shock = 0.0
+        if innovation > (shock_threshold * prior_sigma):
+            shock = shock_multiplier * (innovation / prior_sigma)
+        obs_noise = base_obs_noise / (confidence + 1e-6)
+        effective_prior_sigma = prior_sigma * (1.0 + shock)
+        prior_prec = 1.0 / (effective_prior_sigma**2)
+        obs_prec = 1.0 / (obs_noise**2)
+
+        posterior_sigma_sq = 1.0 / (prior_prec + obs_prec)
+        posterior_mu = (prior_mu * prior_prec + observed_rating * obs_prec) * posterior_sigma_sq
+        posterior_sigma = np.sqrt(posterior_sigma_sq)
+        posterior_sigma = max(posterior_sigma, MIN_SIGMA)
+
+        self.ratings[driver_number] = (posterior_mu, posterior_sigma)
+
+        self.history.append(
+            UpdateRecord(
+                driver_number=driver_number,
+                session_name=session_name,
+                observed_pos=observed_pos,
+                prior_mu=prior_mu,
+                prior_sigma=prior_sigma,
+                posterior_mu=posterior_mu,
+                posterior_sigma=posterior_sigma,
+                shock_factor=shock,
+            )
+        )

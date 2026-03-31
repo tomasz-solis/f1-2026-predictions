@@ -7,61 +7,320 @@
   ],
   "method": "global_teammate_network_ranking",
   "drivers": {
-    "PIA": {
-      "name": "Oscar Piastri",
+    "MAG": {
+      "name": "Kevin Magnussen",
       "pace": {
-        "quali_pace": 0.761,
-        "race_pace": 0.539
+        "quali_pace": 0.605,
+        "race_pace": 0.508
       },
       "racecraft": {
-        "skill_score": 0.5299752199281886,
-        "overtaking_skill": 0.659
+        "skill_score": 0.516,
+        "overtaking_skill": 0.618
+      },
+      "experience": {
+        "years_of_experience": 11,
+        "debut_year": 2014,
+        "total_races": 44,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.159
+      },
+      "bayesian": {
+        "rating_mu": 11.836,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
+      }
+    },
+    "GAS": {
+      "name": "Pierre Gasly",
+      "pace": {
+        "quali_pace": 0.668,
+        "race_pace": 0.762
+      },
+      "racecraft": {
+        "skill_score": 0.6962491552742488,
+        "overtaking_skill": 0.647
+      },
+      "experience": {
+        "years_of_experience": 8,
+        "debut_year": 2017,
+        "total_races": 70,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.129
+      },
+      "bayesian": {
+        "rating_mu": 15.360855229861938,
+        "rating_sigma": 1.9969171465722282,
+        "blended_skill_score": 0.6962491552742488,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-31T14:36:06.372112",
+        "season_year": 2026
+      }
+    },
+    "HUL": {
+      "name": "Nico Hulkenberg",
+      "pace": {
+        "quali_pace": 0.546,
+        "race_pace": 0.746
+      },
+      "racecraft": {
+        "skill_score": 0.5749795963223289,
+        "overtaking_skill": 0.604
+      },
+      "experience": {
+        "years_of_experience": 15,
+        "debut_year": 2010,
+        "total_races": 70,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.114
+      },
+      "bayesian": {
+        "rating_mu": 11.992628291089453,
+        "rating_sigma": 3.043931511685079,
+        "blended_skill_score": 0.5749795963223289,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-31T14:36:06.372121",
+        "season_year": 2026
+      }
+    },
+    "NOR": {
+      "name": "Lando Norris",
+      "pace": {
+        "quali_pace": 0.778,
+        "race_pace": 0.812
+      },
+      "racecraft": {
+        "skill_score": 0.701032034064949,
+        "overtaking_skill": 0.714
+      },
+      "experience": {
+        "years_of_experience": 6,
+        "debut_year": 2019,
+        "total_races": 70,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.057
+      },
+      "bayesian": {
+        "rating_mu": 12.937384008693035,
+        "rating_sigma": 3.2830025549760165,
+        "blended_skill_score": 0.701032034064949,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-31T14:36:06.372103",
+        "season_year": 2026
+      }
+    },
+    "ALO": {
+      "name": "Fernando Alonso",
+      "pace": {
+        "quali_pace": 0.336,
+        "race_pace": 0.808
+      },
+      "racecraft": {
+        "skill_score": 0.6649223784714041,
+        "overtaking_skill": 0.673
+      },
+      "experience": {
+        "years_of_experience": 24,
+        "debut_year": 2001,
+        "total_races": 70,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.1
+      },
+      "bayesian": {
+        "rating_mu": 13.314659567098841,
+        "rating_sigma": 2.8253048263015925,
+        "blended_skill_score": 0.6649223784714041,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-31T14:36:06.372110",
+        "season_year": 2026
+      }
+    },
+    "ALB": {
+      "name": "Alexander Albon",
+      "pace": {
+        "quali_pace": 0.423,
+        "race_pace": 0.8
+      },
+      "racecraft": {
+        "skill_score": 0.5820759620512451,
+        "overtaking_skill": 0.69
+      },
+      "experience": {
+        "years_of_experience": 6,
+        "debut_year": 2019,
+        "total_races": 70,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.2
+      },
+      "bayesian": {
+        "rating_mu": 8.90907646331793,
+        "rating_sigma": 3.5947902133914735,
+        "blended_skill_score": 0.5820759620512451,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-31T14:36:06.372120",
+        "season_year": 2026
+      }
+    },
+    "STR": {
+      "name": "Lance Stroll",
+      "pace": {
+        "quali_pace": 0.305,
+        "race_pace": 0.543
+      },
+      "racecraft": {
+        "skill_score": 0.5759149222173401,
+        "overtaking_skill": 0.678
+      },
+      "experience": {
+        "years_of_experience": 8,
+        "debut_year": 2017,
+        "total_races": 69,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.13
+      },
+      "bayesian": {
+        "rating_mu": 12.555680896304239,
+        "rating_sigma": 1.9969171465722282,
+        "blended_skill_score": 0.5759149222173401,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-31T14:36:06.372111",
+        "season_year": 2026
+      }
+    },
+    "LAW": {
+      "name": "Liam Lawson",
+      "pace": {
+        "quali_pace": 0.513,
+        "race_pace": 0.598
+      },
+      "racecraft": {
+        "skill_score": 0.5788978170710601,
+        "overtaking_skill": 0.679
       },
       "experience": {
         "years_of_experience": 2,
         "debut_year": 2023,
-        "total_races": 70,
+        "total_races": 35,
         "tier": "developing"
       },
       "dnf_risk": {
-        "dnf_rate": 0.071
+        "dnf_rate": 0.171
       },
       "bayesian": {
-        "rating_mu": 20.444633595331332,
-        "rating_sigma": 1.9558078988231273,
-        "normalized_skill_score": 0.9259349331110158,
-        "blended_skill_score": 0.5299752199281886,
+        "rating_mu": 12.853516789709374,
+        "rating_sigma": 2.760763420883569,
+        "blended_skill_score": 0.5788978170710601,
         "blend_weight": 0.25,
         "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872704",
+        "last_updated": "2026-03-31T14:36:06.372117",
         "season_year": 2026
       }
     },
-    "RIC": {
-      "name": "Daniel Ricciardo",
+    "HAD": {
+      "name": "Isack Hadjar",
       "pace": {
-        "quali_pace": 0.656,
-        "race_pace": 0.611
+        "quali_pace": 0.721,
+        "race_pace": 0.767
       },
       "racecraft": {
-        "skill_score": 0.569,
-        "overtaking_skill": 0.593
+        "skill_score": 0.5569637958380573,
+        "overtaking_skill": 0.677
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 24,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.125
+      },
+      "bayesian": {
+        "rating_mu": 10.68615028718376,
+        "rating_sigma": 3.065955948727046,
+        "blended_skill_score": 0.5569637958380573,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-31T14:36:06.372102",
+        "season_year": 2026
+      }
+    },
+    "PER": {
+      "name": "Sergio Perez",
+      "pace": {
+        "quali_pace": 0.231,
+        "race_pace": 0.367
+      },
+      "racecraft": {
+        "skill_score": 0.43518720669548416,
+        "overtaking_skill": 0.542
       },
       "experience": {
         "years_of_experience": 14,
         "debut_year": 2011,
-        "total_races": 25,
+        "total_races": 46,
         "tier": "veteran"
       },
       "dnf_risk": {
-        "dnf_rate": 0.08
+        "dnf_rate": 0.152
       },
       "bayesian": {
-        "rating_mu": 12.949,
-        "rating_sigma": 2.5,
-        "normalized_skill_score": 0.569,
-        "sessions_observed": 0,
-        "seeded_from": "extraction_prior"
+        "rating_mu": 10.576945447525349,
+        "rating_sigma": 1.9969171465722282,
+        "blended_skill_score": 0.43518720669548416,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-31T14:36:06.372123",
+        "season_year": 2026
+      }
+    },
+    "LEC": {
+      "name": "Charles Leclerc",
+      "pace": {
+        "quali_pace": 0.806,
+        "race_pace": 0.802
+      },
+      "racecraft": {
+        "skill_score": 0.7200828622159063,
+        "overtaking_skill": 0.782
+      },
+      "experience": {
+        "years_of_experience": 7,
+        "debut_year": 2018,
+        "total_races": 70,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.1
+      },
+      "bayesian": {
+        "rating_mu": 13.620852326745807,
+        "rating_sigma": 2.8864330622146745,
+        "blended_skill_score": 0.7200828622159063,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-31T14:36:06.372106",
+        "season_year": 2026
       }
     },
     "DOO": {
@@ -86,38 +345,36 @@
       "bayesian": {
         "rating_mu": 9.715,
         "rating_sigma": 2.5,
-        "normalized_skill_score": 0.415,
         "sessions_observed": 0,
         "seeded_from": "extraction_prior"
       }
     },
-    "LAW": {
-      "name": "Liam Lawson",
+    "COL": {
+      "name": "Franco Colapinto",
       "pace": {
-        "quali_pace": 0.513,
-        "race_pace": 0.598
+        "quali_pace": 0.482,
+        "race_pace": 0.631
       },
       "racecraft": {
-        "skill_score": 0.5863456050927253,
-        "overtaking_skill": 0.679
+        "skill_score": 0.5306537117034562,
+        "overtaking_skill": 0.623
       },
       "experience": {
-        "years_of_experience": 2,
-        "debut_year": 2023,
-        "total_races": 35,
-        "tier": "developing"
+        "years_of_experience": 1,
+        "debut_year": 2024,
+        "total_races": 27,
+        "tier": "rookie"
       },
       "dnf_risk": {
-        "dnf_rate": 0.171
+        "dnf_rate": 0.111
       },
       "bayesian": {
-        "rating_mu": 12.492694379604917,
-        "rating_sigma": 1.664383654735451,
-        "normalized_skill_score": 0.5472711609335674,
-        "blended_skill_score": 0.5863456050927253,
+        "rating_mu": 10.07666660260072,
+        "rating_sigma": 3.6384309881947,
+        "blended_skill_score": 0.5306537117034562,
         "blend_weight": 0.25,
         "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872715",
+        "last_updated": "2026-03-31T14:36:06.372113",
         "season_year": 2026
       }
     },
@@ -143,50 +400,19 @@
       "bayesian": {
         "rating_mu": 12.487,
         "rating_sigma": 2.5,
-        "normalized_skill_score": 0.547,
         "sessions_observed": 0,
         "seeded_from": "extraction_prior"
       }
     },
-    "OCO": {
-      "name": "Esteban Ocon",
+    "RUS": {
+      "name": "George Russell",
       "pace": {
-        "quali_pace": 0.517,
-        "race_pace": 0.692
+        "quali_pace": 0.906,
+        "race_pace": 0.87
       },
       "racecraft": {
-        "skill_score": 0.5585411873623234,
-        "overtaking_skill": 0.64
-      },
-      "experience": {
-        "years_of_experience": 9,
-        "debut_year": 2016,
-        "total_races": 69,
-        "tier": "established"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.145
-      },
-      "bayesian": {
-        "rating_mu": 11.76869039368166,
-        "rating_sigma": 1.664383654735451,
-        "normalized_skill_score": 0.5127947806515076,
-        "blended_skill_score": 0.5585411873623234,
-        "blend_weight": 0.25,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872713",
-        "season_year": 2026
-      }
-    },
-    "NOR": {
-      "name": "Lando Norris",
-      "pace": {
-        "quali_pace": 0.778,
-        "race_pace": 0.812
-      },
-      "racecraft": {
-        "skill_score": 0.6561134985574598,
-        "overtaking_skill": 0.714
+        "skill_score": 0.6961360597226322,
+        "overtaking_skill": 0.72
       },
       "experience": {
         "years_of_experience": 6,
@@ -195,253 +421,15 @@
         "tier": "established"
       },
       "dnf_risk": {
-        "dnf_rate": 0.057
+        "dnf_rate": 0.1
       },
       "bayesian": {
-        "rating_mu": 17.401517730625145,
-        "rating_sigma": 1.9311266722136642,
-        "normalized_skill_score": 0.7810246538392926,
-        "blended_skill_score": 0.6561134985574598,
+        "rating_mu": 12.85295145144444,
+        "rating_sigma": 2.8455307672556853,
+        "blended_skill_score": 0.6961360597226322,
         "blend_weight": 0.25,
         "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872703",
-        "season_year": 2026
-      }
-    },
-    "BOR": {
-      "name": "Gabriel Bortoleto",
-      "pace": {
-        "quali_pace": 0.589,
-        "race_pace": 0.725
-      },
-      "racecraft": {
-        "skill_score": 0.497089056288255,
-        "overtaking_skill": 0.68
-      },
-      "experience": {
-        "years_of_experience": 0,
-        "debut_year": 2025,
-        "total_races": 24,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.208
-      },
-      "bayesian": {
-        "rating_mu": 10.01300694029177,
-        "rating_sigma": 1.8276959741565917,
-        "normalized_skill_score": 0.4291908066805605,
-        "blended_skill_score": 0.497089056288255,
-        "blend_weight": 0.25,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872720",
-        "season_year": 2026
-      }
-    },
-    "HAD": {
-      "name": "Isack Hadjar",
-      "pace": {
-        "quali_pace": 0.721,
-        "race_pace": 0.767
-      },
-      "racecraft": {
-        "skill_score": 0.5604501077100484,
-        "overtaking_skill": 0.677
-      },
-      "experience": {
-        "years_of_experience": 0,
-        "debut_year": 2025,
-        "total_races": 24,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.125
-      },
-      "bayesian": {
-        "rating_mu": 10.894614805802684,
-        "rating_sigma": 1.8276959741565917,
-        "normalized_skill_score": 0.4711721336096516,
-        "blended_skill_score": 0.5604501077100484,
-        "blend_weight": 0.25,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872702",
-        "season_year": 2026
-      }
-    },
-    "ALB": {
-      "name": "Alexander Albon",
-      "pace": {
-        "quali_pace": 0.423,
-        "race_pace": 0.8
-      },
-      "racecraft": {
-        "skill_score": 0.43095236573738177,
-        "overtaking_skill": 0.69
-      },
-      "experience": {
-        "years_of_experience": 6,
-        "debut_year": 2019,
-        "total_races": 70,
-        "tier": "established"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.2
-      },
-      "bayesian": {
-        "rating_mu": 4.77063768583691,
-        "rating_sigma": 1.664383654735451,
-        "normalized_skill_score": 0.17955417551604333,
-        "blended_skill_score": 0.43095236573738177,
-        "blend_weight": 0.25,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872718",
-        "season_year": 2026
-      }
-    },
-    "BEA": {
-      "name": "Oliver Bearman",
-      "pace": {
-        "quali_pace": 0.461,
-        "race_pace": 0.548
-      },
-      "racecraft": {
-        "skill_score": 0.48836524388789576,
-        "overtaking_skill": 0.657
-      },
-      "experience": {
-        "years_of_experience": 1,
-        "debut_year": 2024,
-        "total_races": 27,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.111
-      },
-      "bayesian": {
-        "rating_mu": 2.3550806333855427,
-        "rating_sigma": 1.8276959741565917,
-        "normalized_skill_score": 0.06452764920883537,
-        "blended_skill_score": 0.48836524388789576,
-        "blend_weight": 0.25,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872714",
-        "season_year": 2026
-      }
-    },
-    "PER": {
-      "name": "Sergio Perez",
-      "pace": {
-        "quali_pace": 0.231,
-        "race_pace": 0.367
-      },
-      "racecraft": {
-        "skill_score": 0.3393962684988619,
-        "overtaking_skill": 0.542
-      },
-      "experience": {
-        "years_of_experience": 14,
-        "debut_year": 2011,
-        "total_races": 46,
-        "tier": "veteran"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.152
-      },
-      "bayesian": {
-        "rating_mu": 6.2993528774923755,
-        "rating_sigma": 1.664383654735451,
-        "normalized_skill_score": 0.25235013702344644,
-        "blended_skill_score": 0.3393962684988619,
-        "blend_weight": 0.25,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872721",
-        "season_year": 2026
-      }
-    },
-    "GAS": {
-      "name": "Pierre Gasly",
-      "pace": {
-        "quali_pace": 0.668,
-        "race_pace": 0.762
-      },
-      "racecraft": {
-        "skill_score": 0.6730993569072192,
-        "overtaking_skill": 0.647
-      },
-      "experience": {
-        "years_of_experience": 8,
-        "debut_year": 2017,
-        "total_races": 70,
-        "tier": "established"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.129
-      },
-      "bayesian": {
-        "rating_mu": 14.382833756074303,
-        "rating_sigma": 1.664383654735451,
-        "normalized_skill_score": 0.6372777979083002,
-        "blended_skill_score": 0.6730993569072192,
-        "blend_weight": 0.25,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872711",
-        "season_year": 2026
-      }
-    },
-    "ZHO": {
-      "name": "Guanyu Zhou",
-      "pace": {
-        "quali_pace": 0.714,
-        "race_pace": 0.767
-      },
-      "racecraft": {
-        "skill_score": 0.717,
-        "overtaking_skill": 0.639
-      },
-      "experience": {
-        "years_of_experience": 3,
-        "debut_year": 2022,
-        "total_races": 46,
-        "tier": "developing"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.109
-      },
-      "bayesian": {
-        "rating_mu": 16.057,
-        "rating_sigma": 2.5,
-        "normalized_skill_score": 0.717,
-        "sessions_observed": 0,
-        "seeded_from": "extraction_prior"
-      }
-    },
-    "COL": {
-      "name": "Franco Colapinto",
-      "pace": {
-        "quali_pace": 0.482,
-        "race_pace": 0.631
-      },
-      "racecraft": {
-        "skill_score": 0.4806778154915592,
-        "overtaking_skill": 0.623
-      },
-      "experience": {
-        "years_of_experience": 1,
-        "debut_year": 2024,
-        "total_races": 27,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.111
-      },
-      "bayesian": {
-        "rating_mu": 7.519321448294444,
-        "rating_sigma": 1.8276959741565917,
-        "normalized_skill_score": 0.3104438784902116,
-        "blended_skill_score": 0.4806778154915592,
-        "blend_weight": 0.25,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872712",
+        "last_updated": "2026-03-31T14:36:06.372108",
         "season_year": 2026
       }
     },
@@ -467,38 +455,65 @@
       "bayesian": {
         "rating_mu": 10.87,
         "rating_sigma": 2.5,
-        "normalized_skill_score": 0.47,
         "sessions_observed": 0,
         "seeded_from": "extraction_prior"
       }
     },
-    "BOT": {
-      "name": "Valtteri Bottas",
+    "BOR": {
+      "name": "Gabriel Bortoleto",
       "pace": {
-        "quali_pace": 0.288,
-        "race_pace": 0.584
+        "quali_pace": 0.589,
+        "race_pace": 0.725
       },
       "racecraft": {
-        "skill_score": 0.3787257835317431,
-        "overtaking_skill": 0.579
+        "skill_score": 0.5763878850899541,
+        "overtaking_skill": 0.68
       },
       "experience": {
-        "years_of_experience": 12,
-        "debut_year": 2013,
-        "total_races": 46,
-        "tier": "veteran"
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 24,
+        "tier": "rookie"
       },
       "dnf_risk": {
-        "dnf_rate": 0.109
+        "dnf_rate": 0.208
       },
       "bayesian": {
-        "rating_mu": 5.004040440409204,
-        "rating_sigma": 1.664383654735451,
-        "normalized_skill_score": 0.1906685924004383,
-        "blended_skill_score": 0.3787257835317431,
+        "rating_mu": 10.336838644345576,
+        "rating_sigma": 3.4819694436418476,
+        "blended_skill_score": 0.5763878850899541,
         "blend_weight": 0.25,
         "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872722",
+        "last_updated": "2026-03-31T14:36:06.372122",
+        "season_year": 2026
+      }
+    },
+    "PIA": {
+      "name": "Oscar Piastri",
+      "pace": {
+        "quali_pace": 0.761,
+        "race_pace": 0.539
+      },
+      "racecraft": {
+        "skill_score": 0.47024847135705733,
+        "overtaking_skill": 0.659
+      },
+      "experience": {
+        "years_of_experience": 2,
+        "debut_year": 2023,
+        "total_races": 70,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.071
+      },
+      "bayesian": {
+        "rating_mu": 10.13753266196339,
+        "rating_sigma": 3.016874063538579,
+        "blended_skill_score": 0.47024847135705733,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-31T14:36:06.372104",
         "season_year": 2026
       }
     },
@@ -506,10 +521,10 @@
       "name": "Max Verstappen",
       "pace": {
         "quali_pace": 0.763,
-        "race_pace": 0.99
+        "race_pace": 0.975
       },
       "racecraft": {
-        "skill_score": 0.7331638822508457,
+        "skill_score": 0.7661707266203823,
         "overtaking_skill": 0.893
       },
       "experience": {
@@ -522,101 +537,42 @@
         "dnf_rate": 0.03
       },
       "bayesian": {
-        "rating_mu": 13.800155116357383,
-        "rating_sigma": 1.664383654735451,
-        "normalized_skill_score": 0.6095311960170182,
-        "blended_skill_score": 0.7331638822508457,
+        "rating_mu": 12.246178494439018,
+        "rating_sigma": 3.6834456585096054,
+        "blended_skill_score": 0.7661707266203823,
         "blend_weight": 0.25,
         "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872696",
+        "last_updated": "2026-03-31T14:36:06.372097",
         "season_year": 2026
       }
     },
-    "ANT": {
-      "name": "Kimi Antonelli",
+    "SAI": {
+      "name": "Carlos Sainz",
       "pace": {
-        "quali_pace": 0.824,
-        "race_pace": 0.409
+        "quali_pace": 0.487,
+        "race_pace": 0.656
       },
       "racecraft": {
-        "skill_score": 0.7534522885747439,
-        "overtaking_skill": 0.584
+        "skill_score": 0.6389045307231077,
+        "overtaking_skill": 0.703
       },
       "experience": {
-        "years_of_experience": 0,
-        "debut_year": 2025,
-        "total_races": 24,
-        "tier": "rookie"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.167
-      },
-      "bayesian": {
-        "rating_mu": 21.57771700078383,
-        "rating_sigma": 1.9622319266493538,
-        "normalized_skill_score": 0.979891285751611,
-        "blended_skill_score": 0.7534522885747439,
-        "blend_weight": 0.25,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872709",
-        "season_year": 2026
-      }
-    },
-    "LEC": {
-      "name": "Charles Leclerc",
-      "pace": {
-        "quali_pace": 0.806,
-        "race_pace": 0.802
-      },
-      "racecraft": {
-        "skill_score": 0.8570086394220094,
-        "overtaking_skill": 0.782
-      },
-      "experience": {
-        "years_of_experience": 7,
-        "debut_year": 2018,
-        "total_races": 70,
-        "tier": "established"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.1
-      },
-      "bayesian": {
-        "rating_mu": 19.399785684695345,
-        "rating_sigma": 1.928922712045487,
-        "normalized_skill_score": 0.8761802706997783,
-        "blended_skill_score": 0.8570086394220094,
-        "blend_weight": 0.25,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872706",
-        "season_year": 2026
-      }
-    },
-    "MAG": {
-      "name": "Kevin Magnussen",
-      "pace": {
-        "quali_pace": 0.605,
-        "race_pace": 0.508
-      },
-      "racecraft": {
-        "skill_score": 0.516,
-        "overtaking_skill": 0.618
-      },
-      "experience": {
-        "years_of_experience": 11,
-        "debut_year": 2014,
-        "total_races": 44,
+        "years_of_experience": 10,
+        "debut_year": 2015,
+        "total_races": 69,
         "tier": "veteran"
       },
       "dnf_risk": {
-        "dnf_rate": 0.159
+        "dnf_rate": 0.13
       },
       "bayesian": {
-        "rating_mu": 11.836,
-        "rating_sigma": 2.5,
-        "normalized_skill_score": 0.516,
-        "sessions_observed": 0,
-        "seeded_from": "extraction_prior"
+        "rating_mu": 14.386640856731635,
+        "rating_sigma": 1.9969171465722282,
+        "blended_skill_score": 0.6389045307231077,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-31T14:36:06.372119",
+        "season_year": 2026
       }
     },
     "HAM": {
@@ -626,7 +582,7 @@
         "race_pace": 0.585
       },
       "racecraft": {
-        "skill_score": 0.7320596690226122,
+        "skill_score": 0.6098696880211565,
         "overtaking_skill": 0.705
       },
       "experience": {
@@ -639,14 +595,97 @@
         "dnf_rate": 0.1
       },
       "bayesian": {
-        "rating_mu": 16.399593469047236,
-        "rating_sigma": 1.8985682597379432,
-        "normalized_skill_score": 0.733313974716535,
-        "blended_skill_score": 0.7320596690226122,
+        "rating_mu": 13.1154525393079,
+        "rating_sigma": 1.9969171465722282,
+        "blended_skill_score": 0.6098696880211565,
         "blend_weight": 0.25,
         "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872707",
+        "last_updated": "2026-03-31T14:36:06.372107",
         "season_year": 2026
+      }
+    },
+    "BEA": {
+      "name": "Oliver Bearman",
+      "pace": {
+        "quali_pace": 0.461,
+        "race_pace": 0.548
+      },
+      "racecraft": {
+        "skill_score": 0.5309639977370276,
+        "overtaking_skill": 0.657
+      },
+      "experience": {
+        "years_of_experience": 1,
+        "debut_year": 2024,
+        "total_races": 27,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.111
+      },
+      "bayesian": {
+        "rating_mu": 9.215777318212027,
+        "rating_sigma": 4.176955760248711,
+        "blended_skill_score": 0.5309639977370276,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-31T14:36:06.372116",
+        "season_year": 2026
+      }
+    },
+    "ANT": {
+      "name": "Kimi Antonelli",
+      "pace": {
+        "quali_pace": 0.824,
+        "race_pace": 0.409
+      },
+      "racecraft": {
+        "skill_score": 0.4674517454132888,
+        "overtaking_skill": 0.584
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 24,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.167
+      },
+      "bayesian": {
+        "rating_mu": 11.137083049274194,
+        "rating_sigma": 1.9969171465722282,
+        "blended_skill_score": 0.4674517454132888,
+        "blend_weight": 0.25,
+        "last_session": "Japanese Grand Prix",
+        "last_updated": "2026-03-31T14:36:06.372109",
+        "season_year": 2026
+      }
+    },
+    "ZHO": {
+      "name": "Guanyu Zhou",
+      "pace": {
+        "quali_pace": 0.714,
+        "race_pace": 0.767
+      },
+      "racecraft": {
+        "skill_score": 0.717,
+        "overtaking_skill": 0.639
+      },
+      "experience": {
+        "years_of_experience": 3,
+        "debut_year": 2022,
+        "total_races": 46,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.109
+      },
+      "bayesian": {
+        "rating_mu": 16.057,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
       }
     },
     "DEV": {
@@ -671,158 +710,91 @@
       "bayesian": {
         "rating_mu": 10.786,
         "rating_sigma": 2.5,
-        "normalized_skill_score": 0.466,
         "sessions_observed": 0,
         "seeded_from": "extraction_prior"
       }
     },
-    "SAI": {
-      "name": "Carlos Sainz",
+    "RIC": {
+      "name": "Daniel Ricciardo",
       "pace": {
-        "quali_pace": 0.487,
-        "race_pace": 0.656
+        "quali_pace": 0.656,
+        "race_pace": 0.611
       },
       "racecraft": {
-        "skill_score": 0.5121217859245899,
-        "overtaking_skill": 0.703
+        "skill_score": 0.569,
+        "overtaking_skill": 0.593
       },
       "experience": {
-        "years_of_experience": 10,
-        "debut_year": 2015,
-        "total_races": 69,
+        "years_of_experience": 14,
+        "debut_year": 2011,
+        "total_races": 25,
         "tier": "veteran"
       },
       "dnf_risk": {
-        "dnf_rate": 0.13
+        "dnf_rate": 0.08
       },
       "bayesian": {
-        "rating_mu": 8.29760939939738,
-        "rating_sigma": 1.664383654735451,
-        "normalized_skill_score": 0.3475052094951134,
-        "blended_skill_score": 0.5121217859245899,
-        "blend_weight": 0.25,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872717",
-        "season_year": 2026
+        "rating_mu": 12.949,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior"
       }
     },
-    "RUS": {
-      "name": "George Russell",
+    "OCO": {
+      "name": "Esteban Ocon",
       "pace": {
-        "quali_pace": 0.906,
-        "race_pace": 0.87
+        "quali_pace": 0.517,
+        "race_pace": 0.692
       },
       "racecraft": {
-        "skill_score": 0.8630440557799944,
-        "overtaking_skill": 0.72
+        "skill_score": 0.6170788056286562,
+        "overtaking_skill": 0.64
       },
       "experience": {
-        "years_of_experience": 6,
-        "debut_year": 2019,
-        "total_races": 70,
-        "tier": "established"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.1
-      },
-      "bayesian": {
-        "rating_mu": 18.39498203666833,
-        "rating_sigma": 1.9176503103175087,
-        "normalized_skill_score": 0.8283324779365872,
-        "blended_skill_score": 0.8630440557799944,
-        "blend_weight": 0.25,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872708",
-        "season_year": 2026
-      }
-    },
-    "ALO": {
-      "name": "Fernando Alonso",
-      "pace": {
-        "quali_pace": 0.336,
-        "race_pace": 0.808
-      },
-      "racecraft": {
-        "skill_score": 0.4716710474853778,
-        "overtaking_skill": 0.673
-      },
-      "experience": {
-        "years_of_experience": 24,
-        "debut_year": 2001,
-        "total_races": 70,
-        "tier": "veteran"
-      },
-      "dnf_risk": {
-        "dnf_rate": 0.1
-      },
-      "bayesian": {
-        "rating_mu": 6.194696853306033,
-        "rating_sigma": 1.664383654735451,
-        "normalized_skill_score": 0.24736651682409683,
-        "blended_skill_score": 0.4716710474853778,
-        "blend_weight": 0.25,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872710",
-        "season_year": 2026
-      }
-    },
-    "STR": {
-      "name": "Lance Stroll",
-      "pace": {
-        "quali_pace": 0.305,
-        "race_pace": 0.543
-      },
-      "racecraft": {
-        "skill_score": 0.35510905870076553,
-        "overtaking_skill": 0.678
-      },
-      "experience": {
-        "years_of_experience": 8,
-        "debut_year": 2017,
+        "years_of_experience": 9,
+        "debut_year": 2016,
         "total_races": 69,
         "tier": "established"
       },
       "dnf_risk": {
-        "dnf_rate": 0.13
+        "dnf_rate": 0.145
       },
       "bayesian": {
-        "rating_mu": 2.60343868861658,
-        "rating_sigma": 1.904782012515317,
-        "normalized_skill_score": 0.07635422326745618,
-        "blended_skill_score": 0.35510905870076553,
+        "rating_mu": 14.627510928937918,
+        "rating_sigma": 4.32246474295881,
+        "blended_skill_score": 0.6170788056286562,
         "blend_weight": 0.25,
         "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872710",
+        "last_updated": "2026-03-31T14:36:06.372114",
         "season_year": 2026
       }
     },
-    "HUL": {
-      "name": "Nico Hulkenberg",
+    "BOT": {
+      "name": "Valtteri Bottas",
       "pace": {
-        "quali_pace": 0.546,
-        "race_pace": 0.746
+        "quali_pace": 0.288,
+        "race_pace": 0.584
       },
       "racecraft": {
-        "skill_score": 0.5171862516005541,
-        "overtaking_skill": 0.604
+        "skill_score": 0.5339557413365683,
+        "overtaking_skill": 0.579
       },
       "experience": {
-        "years_of_experience": 15,
-        "debut_year": 2010,
-        "total_races": 70,
+        "years_of_experience": 12,
+        "debut_year": 2013,
+        "total_races": 46,
         "tier": "veteran"
       },
       "dnf_risk": {
-        "dnf_rate": 0.114
+        "dnf_rate": 0.109
       },
       "bayesian": {
-        "rating_mu": 11.414931233149414,
-        "rating_sigma": 1.664383654735451,
-        "normalized_skill_score": 0.49594910634044825,
-        "blended_skill_score": 0.5171862516005541,
+        "rating_mu": 11.930126360428453,
+        "rating_sigma": 1.9969171465722282,
+        "blended_skill_score": 0.5339557413365683,
         "blend_weight": 0.25,
         "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872719",
+        "last_updated": "2026-03-31T14:36:06.372124",
         "season_year": 2026
       }
     },
@@ -833,7 +805,7 @@
         "race_pace": 0.542
       },
       "racecraft": {
-        "skill_score": 0.49682640681770146,
+        "skill_score": 0.5340726957895193,
         "overtaking_skill": 0.542
       },
       "experience": {
@@ -847,20 +819,19 @@
       },
       "prior_source": "team_based_prior",
       "bayesian": {
-        "rating_mu": 8.974186894843037,
-        "rating_sigma": 1.8276959741565917,
-        "normalized_skill_score": 0.37972318546871603,
-        "blended_skill_score": 0.49682640681770146,
+        "rating_mu": 11.753652928708544,
+        "rating_sigma": 1.9969171465722282,
+        "blended_skill_score": 0.5340726957895193,
         "blend_weight": 0.25,
         "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-03-30T11:16:17.872716",
+        "last_updated": "2026-03-31T14:36:06.372118",
         "season_year": 2026
       }
     }
   },
   "version": 4,
-  "last_updated": "2026-03-30T11:16:17.873052",
-  "extraction_date": "2026-03-30T09:06:23.904531+00:00",
+  "last_updated": "2026-03-31T14:36:06.372444",
+  "extraction_date": "2026-03-30T12:44:57.846556+00:00",
   "carried_over_from": 2025,
   "bayesian_last_updated_year": 2026
 }

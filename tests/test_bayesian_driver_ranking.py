@@ -237,3 +237,80 @@ class TestBayesianDriverRanking:
         ranker.update_from_session({"1": 1}, "race", confidence=1.0)
 
         assert len(ranker.history) == 1
+
+    def test_teammate_relative_update_separates_driver_from_car(self, sample_priors):
+        """Teammate-relative updates should reward the larger intra-team outperformance."""
+        priors = sample_priors.copy()
+        priors["11"] = DriverPrior(
+            driver_number="11",
+            driver_code="PER",
+            team="Red Bull Racing",
+            team_tier="top",
+            mu=14.0,
+            sigma=2.2,
+        )
+        priors["81"] = DriverPrior(
+            driver_number="81",
+            driver_code="PIA",
+            team="McLaren",
+            team_tier="top",
+            mu=16.5,
+            sigma=2.2,
+        )
+        ranker = BayesianDriverRanking(priors, grid_size=22)
+
+        lineups = {
+            "Red Bull Racing": ["1", "11"],
+            "McLaren": ["4", "81"],
+        }
+        observations = {"1": 1, "11": 5, "4": 2, "81": 3}
+        initial_ver_mu = ranker.ratings["1"][0]
+        initial_nor_mu = ranker.ratings["4"][0]
+
+        ranker.update_teammate_relative(
+            observations=observations,
+            session_name="test_race",
+            lineups=lineups,
+            confidence=1.0,
+        )
+
+        ver_shift = ranker.ratings["1"][0] - initial_ver_mu
+        nor_shift = ranker.ratings["4"][0] - initial_nor_mu
+
+        assert ver_shift > nor_shift, (
+            f"VER shift ({ver_shift:.3f}) should exceed NOR shift ({nor_shift:.3f}) "
+            "because VER beat his teammate by a larger margin."
+        )
+
+    def test_teammate_relative_update_does_not_punish_slow_car_driver(self, sample_priors):
+        """A driver beating their teammate in a slow car should keep a viable rating signal."""
+        priors = sample_priors.copy()
+        priors["99"] = DriverPrior(
+            driver_number="99",
+            driver_code="TST",
+            team="Backmarker",
+            team_tier="backmarker",
+            mu=8.0,
+            sigma=2.5,
+        )
+        ranker = BayesianDriverRanking(priors, grid_size=22)
+
+        lineups = {
+            "Red Bull Racing": ["1", "44"],
+            "Backmarker": ["77", "99"],
+        }
+        initial_bot_mu = ranker.ratings["77"][0]
+        observations = {"1": 1, "44": 3, "77": 18, "99": 20}
+
+        ranker.update_teammate_relative(
+            observations=observations,
+            session_name="test_race",
+            lineups=lineups,
+            confidence=1.0,
+        )
+
+        bot_shift = ranker.ratings["77"][0] - initial_bot_mu
+        assert bot_shift > -0.5, (
+            f"BOT should not be heavily penalized for P18 when teammate was P20 "
+            f"(shift was {bot_shift:.3f})."
+        )

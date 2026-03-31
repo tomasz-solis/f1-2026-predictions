@@ -442,9 +442,10 @@ class TestUpdaterEdgeCases:
 
         with patch("src.models.priors_factory.PriorsFactory.create_priors", return_value={}) as _:
             with patch("src.systems.updater.BayesianDriverRanking") as mock_bayesian_cls:
-                mock_bayesian = mock_bayesian_cls.return_value
+                with patch("src.utils.lineups.load_current_lineups", return_value=None):
+                    mock_bayesian = mock_bayesian_cls.return_value
 
-                update_bayesian_driver_ratings(race_results)
+                    update_bayesian_driver_ratings(race_results)
 
         mock_bayesian.update.assert_called_once()
         kwargs = mock_bayesian.update.call_args.kwargs

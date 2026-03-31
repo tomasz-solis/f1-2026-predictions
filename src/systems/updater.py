@@ -1,15 +1,9 @@
-"""
-Race Data Updater System
-
-Adaptive learning after each race:
-- Updates team performance from telemetry
-- Updates Bayesian driver ratings
-- Reduces uncertainty as season progresses
-"""
+"""Update team and driver characteristics after a completed race."""
 
 import logging
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import fastf1
 import numpy as np
@@ -32,12 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 def _driver_characteristics_fallback_paths(year: int) -> tuple[Path, ...]:
-    """
-    Return fallback file paths for driver characteristics in priority order.
-
-    First preference is season-scoped fallback to avoid cross-year contamination.
-    Legacy unscoped path is read-only compatibility.
-    """
+    """Return the season-scoped driver file first, then the legacy fallback path."""
     processed_root = Path("data/processed")
     return (
         processed_root / "driver_characteristics" / f"{year}_driver_characteristics.json",
@@ -46,7 +35,7 @@ def _driver_characteristics_fallback_paths(year: int) -> tuple[Path, ...]:
 
 
 def _coerce_season_year(race_results: pd.DataFrame, default_year: int = 2026) -> int:
-    """Resolve season year from race results payload with safe fallback."""
+    """Read the season year from race results."""
     if "year" not in race_results.columns or race_results.empty:
         return default_year
     raw_year = race_results["year"].iloc[0]
@@ -60,7 +49,7 @@ def _load_driver_characteristics_payload(
     store: ArtifactStore,
     year: int,
 ) -> dict | None:
-    """Load driver characteristics from artifact store with file fallback."""
+    """Load driver characteristics from the store or JSON file."""
     artifact_key = f"{year}::driver_characteristics"
     payload = store.load_artifact(
         artifact_type="driver_characteristics",
@@ -83,7 +72,7 @@ def _load_driver_characteristics_payload(
                 year,
             )
             return fallback_payload
-        except Exception as exc:
+        except (OSError, ValueError, TypeError) as exc:
             logger.warning(
                 "Could not read driver characteristics fallback %s: %s",
                 fallback_file,
@@ -98,7 +87,7 @@ def _persist_driver_characteristics_payload(
     payload: dict,
     year: int,
 ) -> None:
-    """Persist updated driver characteristics payload with artifact-store fallback."""
+    """Save driver characteristics to the store and JSON file."""
     artifact_key = f"{year}::driver_characteristics"
     fallback_file = _driver_characteristics_fallback_paths(year)[0]
     fallback_file.parent.mkdir(parents=True, exist_ok=True)
@@ -112,7 +101,7 @@ def _persist_driver_characteristics_payload(
     latest_store_version = 0
     try:
         latest_store_version = int(store.get_latest_version("driver_characteristics", artifact_key))
-    except Exception:
+    except (AttributeError, RuntimeError, TypeError, ValueError, OSError):
         latest_store_version = 0
     new_version = max(current_version, latest_store_version) + 1
 
@@ -135,7 +124,7 @@ def _persist_driver_characteristics_payload(
             version=new_version,
         )
         _write_fallback_file()
-    except Exception as exc:
+    except (RuntimeError, OSError, TypeError, ValueError) as exc:
         logger.warning(
             "ArtifactStore save failed for driver characteristics: %s. "
             "Falling back to season-scoped file %s.",
@@ -143,6 +132,63 @@ def _persist_driver_characteristics_payload(
             fallback_file,
         )
         _write_fallback_file()
+
+
+def _read_saved_bayesian_state(
+    bayesian_payload: Any,
+) -> tuple[float, float] | None:
+    """Return a saved `(mu, sigma)` pair when it is valid."""
+    if not isinstance(bayesian_payload, dict):
+        return None
+
+    try:
+        rating_mu = float(bayesian_payload["rating_mu"])
+        rating_sigma = float(bayesian_payload["rating_sigma"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+    if not np.isfinite(rating_mu) or not np.isfinite(rating_sigma) or rating_sigma <= 0.0:
+        return None
+
+    return float(rating_mu), float(rating_sigma)
+
+
+def _restore_bayesian_state(
+    bayesian: BayesianDriverRanking,
+    drivers_payload: dict[str, Any],
+) -> int:
+    """Restore saved in-season ratings."""
+    seeded_drivers = 0
+    for driver_code, driver_entry in drivers_payload.items():
+        if driver_code not in bayesian.ratings or not isinstance(driver_entry, dict):
+            continue
+
+        persisted_state = _read_saved_bayesian_state(driver_entry.get("bayesian"))
+        if persisted_state is None:
+            continue
+
+        bayesian.ratings[driver_code] = persisted_state
+        seeded_drivers += 1
+
+    return seeded_drivers
+
+
+def _remove_legacy_bayesian_fields(drivers_payload: dict[str, Any]) -> int:
+    """Drop old Bayesian fields we no longer save."""
+    stripped_fields = 0
+    for driver_entry in drivers_payload.values():
+        if not isinstance(driver_entry, dict):
+            continue
+
+        bayesian_payload = driver_entry.get("bayesian")
+        if not isinstance(bayesian_payload, dict):
+            continue
+
+        if "normalized_skill_score" in bayesian_payload:
+            bayesian_payload.pop("normalized_skill_score", None)
+            stripped_fields += 1
+
+    return stripped_fields
 
 
 def load_competitive_session(
@@ -219,7 +265,7 @@ def extract_team_performance_from_telemetry(
 
     try:
         laps = session.laps
-    except Exception as exc:
+    except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
         logger.warning("Could not access lap data: %s", exc)
         return {}
 
@@ -244,7 +290,6 @@ def extract_team_performance_from_telemetry(
             logger.warning(f"  No laps found for {team}")
             continue
 
-        # Filter valid racing laps
         mask = team_laps["LapTime"].notna()
         if "PitOutTime" in team_laps.columns:
             mask &= team_laps["PitOutTime"].isna()
@@ -260,10 +305,8 @@ def extract_team_performance_from_telemetry(
             logger.warning(f"  {team}: Only {len(valid_laps)} valid laps, skipping")
             continue
 
-        # Get lap times in seconds
         lap_times_seconds = valid_laps["LapTime"].dt.total_seconds()
 
-        # Remove outliers (>3 std devs)
         mean_time = lap_times_seconds.mean()
         std_time = lap_times_seconds.std()
         clean_times = lap_times_seconds[
@@ -278,9 +321,6 @@ def extract_team_performance_from_telemetry(
         race_pace[team] = median_time
         logger.debug(f"  {team}: Median lap time {median_time:.3f}s ({len(clean_times)} laps)")
 
-    # Convert lap times to rank-based 0-1 performance scale.
-    # Rank-based scoring is more stable than min-max because a single outlier
-    # cannot stretch the whole field and flatten the midfield signal.
     if race_pace:
         ranked_items = sorted(race_pace.items(), key=lambda item: item[1])
         team_count = len(ranked_items)
@@ -333,7 +373,6 @@ def update_bayesian_driver_ratings(
     """Update Bayesian driver ratings plus qualifying pace from completed sessions."""
     logger.info("Updating Bayesian driver ratings...")
 
-    # Create priors for drivers
     from src.models.priors_factory import PriorsFactory
 
     season_year = _coerce_season_year(race_results)
@@ -343,21 +382,38 @@ def update_bayesian_driver_ratings(
     grid_size = max(configured_grid_size, len(priors) or configured_grid_size)
 
     bayesian = BayesianDriverRanking(priors, grid_size=grid_size)
+    store = ArtifactStore(data_root="data")
+    driver_payload = _load_driver_characteristics_payload(store, season_year)
+    drivers_payload = driver_payload.get("drivers") if isinstance(driver_payload, dict) else None
+    if isinstance(drivers_payload, dict):
+        _remove_legacy_bayesian_fields(drivers_payload)
+        _restore_bayesian_state(bayesian, drivers_payload)
+
     observations = _build_position_observations(race_results)
     if not observations:
         logger.warning("No valid race positions available for Bayesian rating update")
         return
 
     session_name = str(race_results.get("race_name", pd.Series(["Race"])).iloc[0])
-    bayesian.update(observations=observations, session_name=session_name, confidence=1.0)
+    teammate_confidence = float(config_loader.get("bayesian.teammate_relative_confidence", 0.35))
+    teammate_confidence = float(np.clip(teammate_confidence, 0.05, 1.0))
+    from src.utils.lineups import load_current_lineups
 
-    store = ArtifactStore(data_root="data")
-    driver_payload = _load_driver_characteristics_payload(store, season_year)
+    lineups = load_current_lineups()
+    if lineups:
+        bayesian.update_teammate_relative(
+            observations=observations,
+            session_name=session_name,
+            lineups=lineups,
+            confidence=teammate_confidence,
+        )
+    else:
+        bayesian.update(observations=observations, session_name=session_name, confidence=1.0)
+
     if not isinstance(driver_payload, dict):
         logger.warning("Could not load driver characteristics payload to persist Bayesian updates")
         return
 
-    drivers_payload = driver_payload.get("drivers")
     if not isinstance(drivers_payload, dict):
         logger.warning(
             "Driver characteristics payload missing 'drivers'; skipping Bayesian persistence"
@@ -392,7 +448,6 @@ def update_bayesian_driver_ratings(
         driver_entry["bayesian"] = {
             "rating_mu": float(mu),
             "rating_sigma": float(sigma),
-            "normalized_skill_score": bayesian_skill,
             "blended_skill_score": blended_skill,
             "blend_weight": blend_weight,
             "last_session": session_name,
@@ -466,7 +521,7 @@ def update_from_race(year: int, race_name: str, data_dir: str = "data/processed"
     try:
         race_results, session = load_race_session(year, race_name)
         logger.info(f"Loaded results for {len(race_results)} drivers\n")
-    except Exception as e:
+    except (AttributeError, FileNotFoundError, OSError, RuntimeError, TypeError, ValueError) as e:
         logger.error(f"Failed to load race results: {e}")
         logger.error("Make sure race has completed and data is available via FastF1")
         raise
@@ -474,7 +529,7 @@ def update_from_race(year: int, race_name: str, data_dir: str = "data/processed"
     try:
         qualifying_results, _qualifying_session = load_qualifying_session(year, race_name)
         logger.info("Loaded qualifying results for %s drivers", len(qualifying_results))
-    except Exception as exc:
+    except (AttributeError, FileNotFoundError, OSError, RuntimeError, TypeError, ValueError) as exc:
         logger.warning(
             "Could not load qualifying results for %s %s; skipping quali pace refresh (%s)",
             year,
@@ -483,14 +538,12 @@ def update_from_race(year: int, race_name: str, data_dir: str = "data/processed"
         )
         qualifying_results = None
 
-    # Update team characteristics
     char_file = Path(data_dir) / "car_characteristics" / f"{year}_car_characteristics.json"
     if char_file.exists():
         update_team_characteristics(race_results, session, char_file)
     else:
         logger.warning(f"Team characteristics file not found: {char_file}")
 
-    # Update driver ratings
     update_bayesian_driver_ratings(race_results, qualifying_results=qualifying_results)
 
     logger.info("\n" + "=" * 60)
