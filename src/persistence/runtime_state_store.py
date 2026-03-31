@@ -6,6 +6,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
+from postgrest.exceptions import APIError
 from postgrest.types import CountMethod
 
 from .config import get_storage_mode, should_read_db_first, should_write_to_db
@@ -45,7 +46,7 @@ class RuntimeStateStore:
                 if key and isinstance(payload, dict):
                     loaded[key] = payload
             return loaded
-        except Exception as exc:
+        except (APIError, AttributeError, RuntimeError, TypeError, ValueError) as exc:
             if self.db_writes_enabled:
                 raise RuntimeError(
                     f"Supabase runtime state read failed for namespace={namespace}: {exc}"
@@ -67,7 +68,7 @@ class RuntimeStateStore:
             )
             raw_count = getattr(result, "count", 0)
             return int(raw_count or 0)
-        except Exception as exc:
+        except (APIError, AttributeError, RuntimeError, TypeError, ValueError) as exc:
             if self.db_writes_enabled:
                 raise RuntimeError(
                     f"Supabase runtime state count failed for namespace={namespace}: {exc}"
@@ -99,7 +100,7 @@ class RuntimeStateStore:
                 if key:
                     keys.append(key)
             return keys
-        except Exception as exc:
+        except (APIError, AttributeError, RuntimeError, TypeError, ValueError) as exc:
             if self.db_writes_enabled:
                 raise RuntimeError(
                     f"Supabase runtime state oldest-key read failed for namespace={namespace}: {exc}"
@@ -126,7 +127,7 @@ class RuntimeStateStore:
                 return None
             payload = rows[0].get("state")
             return payload if isinstance(payload, dict) else None
-        except Exception as exc:
+        except (APIError, AttributeError, RuntimeError, TypeError, ValueError) as exc:
             if self.db_writes_enabled:
                 raise RuntimeError(
                     f"Supabase runtime state read failed for {namespace}:{state_key}: {exc}"
@@ -198,7 +199,7 @@ class RuntimeStateStore:
                 )
             ).execute()
             return True
-        except Exception as exc:
+        except (APIError, AttributeError, RuntimeError, TypeError, ValueError) as exc:
             error_text = str(exc).lower()
             if "duplicate" in error_text or "unique" in error_text or "conflict" in error_text:
                 return False

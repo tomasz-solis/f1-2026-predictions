@@ -277,6 +277,11 @@ def test_metric_helpers_and_payload_extraction():
     assert tu._median_timedelta_seconds(pd.Series([], dtype=object)) is None
     assert tu._median_lap_seconds(pd.DataFrame()) is None
     assert tu._normalize_lower_better({"A": 1.0, "B": 1.0}) == {"A": 0.5, "B": 0.5}
+    assert tu._normalize_lower_better({"A": 90.0, "B": 91.0, "C": 120.0}) == {
+        "A": 1.0,
+        "B": 0.5,
+        "C": 0.0,
+    }
 
     laps = pd.DataFrame(
         {

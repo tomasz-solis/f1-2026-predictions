@@ -7,6 +7,8 @@ Keeps extraction logic consistent across all metrics.
 
 import logging
 import warnings
+from collections import defaultdict
+from typing import Any
 
 import fastf1 as ff1
 import pandas as pd
@@ -18,7 +20,11 @@ warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
 
 
-def extract_race_data(year, race_name):
+RaceResult = dict[str, Any]
+SeasonRaceData = dict[str, list[RaceResult]]
+
+
+def extract_race_data(year: int, race_name: str) -> dict[str, RaceResult] | None:
     """Extract race data from FastF1.
 
     Returns dict with quali/race/gain/DNF/team/status per driver.
@@ -86,10 +92,8 @@ def extract_race_data(year, race_name):
         return None
 
 
-def extract_season(year, verbose=True):
+def extract_season(year: int, verbose: bool = True) -> SeasonRaceData:
     """Extract all races from a season. Returns {driver: [race_data, ...]}."""
-    from collections import defaultdict
-
     schedule = ff1.get_event_schedule(year)
     races = [
         event["EventName"]
@@ -123,21 +127,21 @@ def extract_season(year, verbose=True):
     return driver_data
 
 
-def count_total_dnfs(driver_races):
+def count_total_dnfs(driver_races: list[RaceResult]) -> int:
     """Count total DNF races for a driver. Returns int."""
     return sum(1 for race in driver_races if race.get("dnf", race.get("dn", False)))
 
 
-def get_valid_races(driver_races):
+def get_valid_races(driver_races: list[RaceResult]) -> list[RaceResult]:
     """Filter to races with valid qualifying data. Returns races with has_quali=True."""
     return [race for race in driver_races if race.get("has_quali", True)]
 
 
-def get_dnf_races(driver_races):
+def get_dnf_races(driver_races: list[RaceResult]) -> list[RaceResult]:
     """Get all DNF races. Returns races where dnf=True."""
     return [race for race in driver_races if race.get("dnf", race.get("dn", False))]
 
 
-def get_clean_races(driver_races):
+def get_clean_races(driver_races: list[RaceResult]) -> list[RaceResult]:
     """Get finished races (not DNF). Returns races where dnf=False."""
     return [race for race in driver_races if not race.get("dnf", race.get("dn", False))]

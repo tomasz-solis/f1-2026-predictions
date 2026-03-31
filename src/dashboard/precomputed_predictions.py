@@ -24,10 +24,18 @@ _STATE_NAMESPACE_PRECOMPUTE_HORIZON_INDEX = "prediction_precompute_horizon_index
 _DEFAULT_MAX_FILE_ENTRIES = 2048
 _DEFAULT_PRECOMPUTE_HORIZON_RACES = 3
 _DEFAULT_WEATHER_SCENARIOS = ("dry", "mixed", "rain")
+_STATE_ERRORS = (
+    AttributeError,
+    KeyError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 def _resolve_max_entries(max_file_entries: int | None) -> int:
-    """Resolve max-entries configuration with safe lower bound."""
+    """Clamp the configured entry limit."""
     if max_file_entries is None:
         return _DEFAULT_MAX_FILE_ENTRIES
     try:
@@ -37,7 +45,7 @@ def _resolve_max_entries(max_file_entries: int | None) -> int:
 
 
 def _resolve_simulation_count(value: Any, *, default: int) -> int:
-    """Resolve a configured dashboard simulation count with a safe lower bound."""
+    """Clamp the configured simulation count."""
     try:
         return max(10, int(value))
     except (TypeError, ValueError):
@@ -116,18 +124,7 @@ def _prune_db_namespace_entries(
 
 
 def get_prediction_precompute_config() -> dict[str, Any]:
-    """
-    Read precompute behavior from config with safe defaults.
-
-    Returns:
-        dict with:
-            enabled: bool
-            horizon_races: int
-            weather_scenarios: list[str]
-            max_file_entries: int
-            qualifying_n_simulations: int
-            race_n_simulations: int
-    """
+    """Read precompute settings from config."""
     enabled = bool(config_loader.get("dashboard.prediction_precompute.enabled", True))
     raw_horizon_races = config_loader.get(
         "dashboard.prediction_precompute.horizon_races",
@@ -177,7 +174,7 @@ def get_prediction_precompute_config() -> dict[str, Any]:
 
 
 def compute_artifact_hash(artifact_versions: dict[str, tuple[int, str]]) -> str:
-    """Build a stable hash from artifact versions for precompute cache keys."""
+    """Hash artifact versions for cache keys."""
     normalized = {
         str(key): [int(value[0]), str(value[1])]
         for key, value in sorted(artifact_versions.items())
@@ -195,7 +192,7 @@ def build_precomputed_prediction_key(
     artifact_hash: str,
     boundary_signature: str,
 ) -> str:
-    """Build deterministic key for precomputed prediction storage."""
+    """Build the cache key for a precomputed prediction."""
     payload = {
         "year": int(year),
         "race_name": str(race_name),
@@ -216,7 +213,7 @@ def load_precomputed_prediction(
     artifact_hash: str,
     boundary_signature: str,
 ) -> dict[str, Any] | None:
-    """Load precomputed prediction payload from DB/file backends."""
+    """Load a cached prediction."""
     state_key = build_precomputed_prediction_key(
         year=year,
         race_name=race_name,
@@ -232,7 +229,7 @@ def load_precomputed_prediction(
             validated = _extract_prediction_results(db_payload)
             if validated is not None:
                 return validated
-        except Exception as exc:
+        except _STATE_ERRORS as exc:
             logger.warning("Could not load precomputed prediction from DB: %s", exc)
 
     file_state = _load_file_state()
@@ -290,7 +287,7 @@ def save_precomputed_prediction(
                 max_entries=max_entries,
                 store=runtime_store,
             )
-        except Exception as exc:
+        except _STATE_ERRORS as exc:
             logger.warning("Could not save precomputed prediction to DB: %s", exc)
             if _is_db_only_mode():
                 raise RuntimeError(
@@ -312,7 +309,7 @@ def save_precomputed_prediction(
         file_state["entries"] = entries
         file_state["updated_at"] = now_iso
         _write_file_state(file_state)
-    except Exception as exc:
+    except _STATE_ERRORS as exc:
         logger.warning("Could not save precomputed prediction to file cache: %s", exc)
 
 
@@ -324,7 +321,7 @@ def build_precomputed_base_features_key(
     artifact_hash: str,
     boundary_signature: str,
 ) -> str:
-    """Build deterministic key for precomputed base-feature storage."""
+    """Build the cache key for base features."""
     payload = {
         "year": int(year),
         "race_name": str(race_name).strip(),
@@ -345,7 +342,7 @@ def load_precomputed_base_features(
     artifact_hash: str,
     boundary_signature: str,
 ) -> dict[str, Any] | None:
-    """Load precomputed base-feature payload from DB/file backends."""
+    """Load cached base features."""
     state_key = build_precomputed_base_features_key(
         year=year,
         race_name=race_name,
@@ -361,7 +358,7 @@ def load_precomputed_base_features(
             validated = _extract_base_features(db_payload)
             if validated is not None:
                 return validated
-        except Exception as exc:
+        except _STATE_ERRORS as exc:
             logger.warning("Could not load precomputed base features from DB: %s", exc)
 
     file_state = _load_base_features_file_state()
@@ -419,7 +416,7 @@ def save_precomputed_base_features(
                 max_entries=max_entries,
                 store=runtime_store,
             )
-        except Exception as exc:
+        except _STATE_ERRORS as exc:
             logger.warning("Could not save precomputed base features to DB: %s", exc)
             if _is_db_only_mode():
                 raise RuntimeError(
@@ -441,7 +438,7 @@ def save_precomputed_base_features(
         file_state["entries"] = entries
         file_state["updated_at"] = now_iso
         _write_base_features_file_state(file_state)
-    except Exception as exc:
+    except _STATE_ERRORS as exc:
         logger.warning("Could not save precomputed base features to file cache: %s", exc)
 
 
@@ -497,7 +494,7 @@ def list_precomputed_race_names(
     boundary_signature: str | None = None,
 ) -> list[str]:
     """
-    List race names that already have persisted precomputed prediction payloads.
+    List race names that already have cached predictions.
 
     Args:
         year: Season year used in prediction keys.
@@ -542,7 +539,7 @@ def list_precomputed_race_names(
             )
             if isinstance(db_entries, dict):
                 _collect(db_entries)
-        except Exception as exc:
+        except _STATE_ERRORS as exc:
             logger.warning("Could not list precomputed predictions from DB: %s", exc)
 
     if should_write_to_file():
@@ -555,12 +552,7 @@ def list_precomputed_race_names(
 
 
 def load_precompute_horizon_index(*, year: int, artifact_hash: str) -> dict[str, Any] | None:
-    """
-    Load persisted precompute horizon index for a season/artifact state.
-
-    The horizon index tracks the currently warm race window so the UI can hide
-    races that are not yet precomputed for instant load behavior.
-    """
+    """Load the saved warmup horizon for one season and artifact state."""
     state_key = f"{int(year)}::{str(artifact_hash).strip()}"
 
     if should_read_db_first():
@@ -570,7 +562,7 @@ def load_precompute_horizon_index(*, year: int, artifact_hash: str) -> dict[str,
             )
             if isinstance(payload, dict):
                 return payload
-        except Exception as exc:
+        except _STATE_ERRORS as exc:
             logger.warning("Could not load precompute horizon index from DB: %s", exc)
 
     file_state = _load_horizon_index_state()
@@ -586,7 +578,7 @@ def has_precompute_horizon_for_year(
     year: int,
     exclude_artifact_hash: str | None = None,
 ) -> bool:
-    """Return True when any persisted horizon metadata exists for the season."""
+    """Return True when the season has any saved horizon metadata."""
     year_prefix = f"{int(year)}::"
     excluded_key = ""
     if exclude_artifact_hash is not None:
@@ -612,7 +604,7 @@ def has_precompute_horizon_for_year(
             )
             if _matches(db_entries):
                 return True
-        except Exception as exc:
+        except _STATE_ERRORS as exc:
             logger.warning("Could not inspect precompute horizon index in DB: %s", exc)
 
     file_state = _load_horizon_index_state()
@@ -632,20 +624,7 @@ def save_precompute_horizon_index(
     weather_scenarios: list[str],
     race_boundaries: dict[str, str] | None = None,
 ) -> None:
-    """
-    Persist precompute horizon metadata for dropdown filtering and observability.
-
-    Args:
-        year: Season year.
-        artifact_hash: Active artifact hash used for precompute keys.
-        boundary_signature: Boundary signature that produced this horizon.
-        anchor_race_name: Race selected when horizon generation started.
-        anchor_session_name: Checkpoint label (`PRE`, `FP1`, `SQ`, ...).
-        expected_targets: Intended horizon races (for example 3 races).
-        ready_races: Subset with full weather coverage precomputed.
-        weather_scenarios: Weather scenarios expected for each ready race.
-        race_boundaries: Optional per-race boundary signature mapping for diagnostics.
-    """
+    """Save the current warmup horizon."""
     state_key = f"{int(year)}::{str(artifact_hash).strip()}"
     now_iso = datetime.now(UTC).isoformat()
     payload = {
@@ -674,7 +653,7 @@ def save_precompute_horizon_index(
                 state_key,
                 payload,
             )
-        except Exception as exc:
+        except _STATE_ERRORS as exc:
             logger.warning("Could not save precompute horizon index to DB: %s", exc)
             if _is_db_only_mode():
                 raise RuntimeError(
@@ -693,12 +672,12 @@ def save_precompute_horizon_index(
         state["entries"] = entries
         state["updated_at"] = now_iso
         _write_horizon_index_state(state)
-    except Exception as exc:
+    except _STATE_ERRORS as exc:
         logger.warning("Could not save precompute horizon index to file: %s", exc)
 
 
 def _load_file_state() -> dict[str, Any]:
-    """Load file-backed precompute state, returning empty state on corruption."""
+    """Load prediction cache state from disk."""
     if not _PRECOMPUTED_PREDICTIONS_FILE.exists():
         return {"entries": {}}
 
@@ -716,7 +695,7 @@ def _load_file_state() -> dict[str, Any]:
 
 
 def _write_file_state(state: dict[str, Any]) -> None:
-    """Persist file-backed precompute state atomically."""
+    """Write prediction cache state to disk."""
     _PRECOMPUTED_PREDICTIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = _PRECOMPUTED_PREDICTIONS_FILE.with_suffix(".tmp")
     with open(tmp_path, "w") as handle:
@@ -725,7 +704,7 @@ def _write_file_state(state: dict[str, Any]) -> None:
 
 
 def _load_horizon_index_state() -> dict[str, Any]:
-    """Load file-backed horizon-index state, returning empty state on corruption."""
+    """Load horizon index state from disk."""
     if not _PRECOMPUTE_HORIZON_INDEX_FILE.exists():
         return {"entries": {}}
 
@@ -743,7 +722,7 @@ def _load_horizon_index_state() -> dict[str, Any]:
 
 
 def _load_base_features_file_state() -> dict[str, Any]:
-    """Load file-backed base-feature state, returning empty state on corruption."""
+    """Load base-feature cache state from disk."""
     if not _PRECOMPUTED_BASE_FEATURES_FILE.exists():
         return {"entries": {}}
 

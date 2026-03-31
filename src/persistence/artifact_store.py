@@ -16,6 +16,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
+from postgrest.exceptions import APIError
+
 from .config import (
     get_storage_mode,
     should_read_db_first,
@@ -64,7 +66,7 @@ class ArtifactStore:
             try:
                 latest_version = self.get_latest_version(artifact_type, artifact_key)
                 version = latest_version + 1
-            except Exception:
+            except (APIError, AttributeError, OSError, RuntimeError, TypeError, ValueError):
                 version = 1  # First version
 
         # Prepare run_id (convert to UUID if needed)
@@ -81,7 +83,7 @@ class ArtifactStore:
                 self._write_file(artifact_type, artifact_key, data)
                 file_success = True
                 logger.debug(f"File write successful: {artifact_type}::{artifact_key} v{version}")
-            except Exception as e:
+            except (OSError, RuntimeError, TypeError, ValueError) as e:
                 last_error = e
                 logger.error(f"File write failed: {e}")
 
@@ -96,7 +98,7 @@ class ArtifactStore:
                 )
                 # Return DB result (includes id, timestamps)
                 return result
-            except Exception as e:
+            except (APIError, AttributeError, RuntimeError, TypeError, ValueError) as e:
                 last_error = e
                 logger.error(f"DB write failed: {e}")
 
@@ -135,7 +137,7 @@ class ArtifactStore:
                         f"DB read successful: {artifact_type}::{artifact_key} ({elapsed:.3f}s)"
                     )
                     return result
-            except Exception as e:
+            except (APIError, AttributeError, RuntimeError, TypeError, ValueError) as e:
                 logger.warning(f"DB read failed, trying file fallback: {e}")
 
         # Try file (either as primary or fallback)
@@ -147,7 +149,7 @@ class ArtifactStore:
                     f"File read successful: {artifact_type}::{artifact_key} ({elapsed:.3f}s)"
                 )
                 return result
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as e:
             logger.error(f"File read failed: {e}")
 
         return None
@@ -165,7 +167,7 @@ class ArtifactStore:
                 db_rows = self._list_db(artifact_type, key_prefix, limit)
                 if db_rows or self.storage_mode == "db_only":
                     return db_rows
-            except Exception as e:
+            except (APIError, AttributeError, RuntimeError, TypeError, ValueError) as e:
                 logger.warning(f"DB list failed: {e}")
 
         # Fallback to file listing (less efficient)
@@ -188,7 +190,7 @@ class ArtifactStore:
                 if result.data:
                     row = cast(list[dict[str, Any]], result.data)[0]
                     return int(row.get("version", 0))
-            except Exception as e:
+            except (APIError, AttributeError, RuntimeError, TypeError, ValueError) as e:
                 logger.warning(f"DB version check failed: {e}")
 
         # Fallback: check file (version stored in data if available)
@@ -196,7 +198,7 @@ class ArtifactStore:
             data = self._read_file(artifact_type, artifact_key)
             if data and "version" in data:
                 return data["version"]
-        except Exception:
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
             pass
 
         return 0
@@ -303,7 +305,7 @@ class ArtifactStore:
 
             try:
                 data = json.loads(file_path.read_text())
-            except Exception as exc:
+            except (OSError, json.JSONDecodeError, TypeError) as exc:
                 logger.warning(f"Skipping unreadable artifact file {file_path}: {exc}")
                 continue
 

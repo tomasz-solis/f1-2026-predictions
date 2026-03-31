@@ -114,7 +114,7 @@ def _refresh_partial_qualifying_results(
 
     try:
         missing_positions = bool(results["Position"].isna().any())
-    except Exception:
+    except (AttributeError, KeyError, TypeError, ValueError):
         return results
 
     if not missing_positions:
@@ -126,7 +126,7 @@ def _refresh_partial_qualifying_results(
 
     try:
         recompute_results(force=True)
-    except Exception as exc:
+    except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
         logger.warning(
             "Could not recompute partial qualifying positions for %s %s: %s",
             race_name,
@@ -201,7 +201,7 @@ def fetch_actual_session_results(
                         "position": position,
                     }
                 )
-            except Exception as e:
+            except (AttributeError, KeyError, TypeError, ValueError) as e:
                 logger.error(
                     "Malformed FastF1 results for %s %s at row %s: %s",
                     race_name,
@@ -248,7 +248,15 @@ def fetch_actual_session_results(
         )
         return grid
 
-    except Exception as e:
+    except (
+        AttributeError,
+        ConnectionError,
+        FileNotFoundError,
+        KeyError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as e:
         logger.error(f"Failed to fetch {session_name} results for {race_name}: {e}")
         record_counter(
             "fastf1_results_fetch_failure_total",

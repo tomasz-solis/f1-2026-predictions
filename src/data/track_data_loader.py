@@ -98,6 +98,16 @@ _SESSION_TEMPERATURE_BLEND_WEIGHTS = {
     "FP2": 0.65,
     "FP1": 0.60,
 }
+_TRACK_ERRORS = (
+    AttributeError,
+    DataNotLoadedError,
+    KeyError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+_COERCE_ERRORS = (AttributeError, TypeError, ValueError)
 
 
 def _coerce_float(value: object) -> float | None:
@@ -192,7 +202,7 @@ def _coerce_utc_datetime(value: object) -> datetime | None:
     if hasattr(value, "to_pydatetime"):
         try:
             value = value.to_pydatetime()
-        except Exception:
+        except _COERCE_ERRORS:
             return None
 
     if not isinstance(value, datetime):
@@ -224,7 +234,7 @@ def _session_status_completed(session: object) -> bool | None:
 
     try:
         cleaned = status_values.dropna().astype(str)
-    except Exception:
+    except _COERCE_ERRORS:
         return None
     if cleaned.empty:
         return None
@@ -259,7 +269,7 @@ def _weather_metric_median(weather_data: object, metric_token: str) -> float | N
 
     try:
         values = df[selected_column].dropna().astype(float)
-    except Exception:
+    except _COERCE_ERRORS:
         return None
     if values.empty:
         return None
@@ -312,7 +322,7 @@ def _session_scheduled_end_passed(event: object, session_name: str, now_utc: dat
 
     try:
         raw_start = get_session_date(session_name)
-    except Exception:
+    except _TRACK_ERRORS:
         return True
 
     session_start = _coerce_utc_datetime(raw_start)
@@ -353,7 +363,7 @@ def _load_session_temperature_signal(
     """Load session temperature signal with provenance metadata."""
     try:
         session = fastf1.get_session(year, race_name, session_name)
-    except Exception as exc:
+    except _TRACK_ERRORS as exc:
         logger.debug(
             "Could not create FastF1 session for %s %s %s while resolving track temperature: %s",
             year,
@@ -368,7 +378,7 @@ def _load_session_temperature_signal(
 
     try:
         session.load(laps=False, telemetry=False, weather=True, messages=False)
-    except Exception as exc:
+    except _TRACK_ERRORS as exc:
         logger.debug(
             "Could not load FastF1 weather for %s %s %s: %s",
             year,
@@ -464,7 +474,7 @@ def _load_session_weather_features(
     """Load weather summary features from a specific FastF1 session."""
     try:
         session = fastf1.get_session(year, race_name, session_name)
-    except Exception as exc:
+    except _TRACK_ERRORS as exc:
         logger.debug(
             "Could not create FastF1 session for %s %s %s while resolving weather features: %s",
             year,
@@ -479,7 +489,7 @@ def _load_session_weather_features(
 
     try:
         session.load(laps=False, telemetry=False, weather=True, messages=False)
-    except Exception as exc:
+    except _TRACK_ERRORS as exc:
         logger.debug(
             "Could not load FastF1 weather for %s %s %s while resolving weather features: %s",
             year,
@@ -730,7 +740,7 @@ def load_track_specific_params(race_name: str | None = None, year: int = 2026) -
                 f"Failed to parse track characteristics JSON at {track_chars_path}. "
                 "Using config defaults."
             )
-        except Exception as e:
+        except _TRACK_ERRORS as e:
             logger.error(
                 f"Unexpected error loading track characteristics: {e}. Using config defaults."
             )
@@ -782,7 +792,7 @@ def get_tire_stress_score(race_name: str | None = None, year: int = 2026) -> flo
         else:
             logger.warning(f"Tire stress data not found for {race_name}. Using default (3.0).")
 
-    except Exception as e:
+    except _TRACK_ERRORS as e:
         logger.error(f"Error loading Pirelli data: {e}. Using default stress (3.0).")
 
     # Fallback to config default
@@ -831,7 +841,7 @@ def resolve_track_temperature_profile(
 
     try:
         event = fastf1.get_event(year, race_name)
-    except Exception as exc:
+    except _TRACK_ERRORS as exc:
         logger.info(
             "Could not load FastF1 event while resolving track temperature for %s %s: %s. "
             "Using fallback %.1fC.",
@@ -939,7 +949,7 @@ def resolve_track_temperature_c(
         if value is not None:
             return value
         return _default_track_temperature_c(weather)
-    except Exception:
+    except _TRACK_ERRORS:
         return _default_track_temperature_c(weather)
 
 
@@ -972,7 +982,7 @@ def resolve_non_competitive_weather_features(
 
     try:
         event = fastf1.get_event(year, race_name)
-    except Exception as exc:
+    except _TRACK_ERRORS as exc:
         logger.info(
             "Could not load FastF1 event while resolving non-competitive weather features "
             "for %s %s: %s.",
@@ -1041,7 +1051,7 @@ def resolve_race_distance_laps(year: int, race_name: str | None, is_sprint: bool
         total_laps = getattr(session, "total_laps", None)
         if total_laps:
             return max(1, int(total_laps))
-    except Exception as exc:
+    except _TRACK_ERRORS as exc:
         logger.warning(
             f"Could not resolve race distance for {race_name} ({year}, {session_name}): {exc}. "
             f"Using fallback {default_distance} laps."

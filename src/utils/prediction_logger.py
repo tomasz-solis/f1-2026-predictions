@@ -154,7 +154,7 @@ class PredictionLogger:
                 run_id=run_id,
             )
             logger.info("Saved prediction via ArtifactStore and file fallback (run_id=%s)", run_id)
-        except Exception as exc:
+        except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
             logger.warning(
                 "ArtifactStore save failed for prediction %s; kept file copy at %s (%s)",
                 artifact_key,
@@ -215,7 +215,7 @@ class PredictionLogger:
                 if self._validate_prediction_schema(data):
                     return data
                 logger.error("Invalid prediction schema from DB for %s", artifact_key)
-        except Exception as exc:
+        except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
             logger.warning("ArtifactStore load failed: %s, trying file fallback", exc)
 
         filepath = self._prediction_file_path(
@@ -237,7 +237,7 @@ class PredictionLogger:
         except json.JSONDecodeError as exc:
             logger.error("Corrupted JSON file %s: %s", filepath, exc)
             return None
-        except Exception as exc:
+        except (OSError, TypeError, ValueError) as exc:
             logger.error("Failed to load prediction from %s: %s", filepath, exc)
             return None
 
@@ -335,7 +335,7 @@ class PredictionLogger:
             logger.info(
                 "Updated actuals via ArtifactStore and file fallback (run_id=%s)", actual_run_id
             )
-        except Exception as exc:
+        except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
             logger.warning(
                 "ArtifactStore save failed while updating actuals for %s; kept file copy at %s (%s)",
                 artifact_key,
@@ -353,7 +353,7 @@ class PredictionLogger:
                     learning_summary["driver_updates"],
                     learning_summary["pair_updates"],
                 )
-        except Exception as exc:
+        except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
             logger.warning("Could not update adaptive calibration from actuals: %s", exc)
 
         return True
@@ -365,7 +365,7 @@ class PredictionLogger:
 
         try:
             artifact_rows = self.artifact_store.list_artifacts("prediction", limit=4096)
-        except Exception as exc:
+        except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
             logger.warning("Could not list prediction artifacts for %s: %s", year, exc)
             artifact_rows = []
 
@@ -421,7 +421,7 @@ class PredictionLogger:
             if race_name not in sprint_cache:
                 try:
                     sprint_cache[race_name] = bool(is_sprint_weekend(target_year, race_name))
-                except Exception as exc:
+                except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
                     logger.warning(
                         "Could not determine weekend type while reconciling actuals for %s %s: %s",
                         target_year,
@@ -507,7 +507,7 @@ class PredictionLogger:
             )
             if data:
                 return True
-        except Exception:
+        except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
             pass
 
         filepath = self._prediction_file_path(
@@ -531,7 +531,7 @@ class PredictionLogger:
                 try:
                     with open(prediction_file) as file_handle:
                         payload = json.load(file_handle)
-                except Exception as exc:
+                except (OSError, json.JSONDecodeError, TypeError) as exc:
                     logger.warning("Could not read prediction file %s: %s", prediction_file, exc)
                     continue
                 if self._validate_prediction_schema(payload):

@@ -43,7 +43,7 @@ def atomic_json_write(file_path: Path, data: dict[str, Any], create_backup: bool
         shutil.move(temp_path, file_path)
         logger.debug(f"Atomically wrote: {file_path}")
 
-    except Exception as e:
+    except (OSError, RuntimeError, TypeError, ValueError) as e:
         # Clean up temp file if it still exists
         try:
             Path(temp_path).unlink()
@@ -65,6 +65,6 @@ def restore_from_backup(file_path: Path) -> bool:
         shutil.copy2(backup_path, file_path)
         logger.info(f"Restored from backup: {file_path}")
         return True
-    except Exception as e:
+    except OSError as e:
         logger.error(f"Failed to restore from backup: {e}")
         return False

@@ -34,6 +34,15 @@ _PRACTICE_CAPTURE_SESSION_ORDER = {
     "Q": 6,
     "R": 7,
 }
+_UPDATE_ERRORS = (
+    AttributeError,
+    KeyError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +60,7 @@ def _coerce_utc_datetime(value) -> datetime | None:
     if hasattr(candidate, "to_pydatetime"):
         try:
             candidate = candidate.to_pydatetime()
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             return None
 
     if not isinstance(candidate, datetime):
@@ -124,7 +133,7 @@ def build_event_boundary_snapshot(
 
     try:
         event = fastf1.get_event(year, race_name)
-    except Exception as exc:
+    except _UPDATE_ERRORS as exc:
         logger.debug(f"Could not load FastF1 event for boundary refresh check: {exc}")
         return {
             "weekend_type": "sprint" if is_sprint else "conventional",
@@ -143,7 +152,7 @@ def build_event_boundary_snapshot(
     for session_name in sessions:
         try:
             raw_session_date = event.get_session_date(session_name)
-        except Exception:
+        except _UPDATE_ERRORS:
             raw_session_date = None
 
         session_date = _coerce_utc_datetime(raw_session_date)
@@ -161,7 +170,7 @@ def build_event_boundary_snapshot(
                 session_is_completed = bool(
                     detector.is_session_completed(year, race_name, session_name)
                 )
-        except Exception as exc:
+        except _UPDATE_ERRORS as exc:
             logger.debug(
                 "Could not determine completion state for %s %s %s: %s",
                 year,
@@ -290,7 +299,7 @@ def detect_event_boundary_refresh_if_needed(
     }
     try:
         _save_event_boundary_state(state)
-    except Exception as exc:
+    except _UPDATE_ERRORS as exc:
         logger.warning(f"Could not persist event-boundary refresh state: {exc}")
         record_counter(
             "event_boundary_state_persist_failure_total",
@@ -455,7 +464,7 @@ def _iter_candidate_practice_events(
 
     try:
         schedule = fastf1.get_event_schedule(year)
-    except Exception as exc:
+    except _UPDATE_ERRORS as exc:
         logger.debug("Could not load schedule for backlog practice updates: %s", exc)
         return [(focus_race_name, focus_is_sprint)]
 
@@ -692,7 +701,7 @@ def auto_update_practice_characteristics_if_needed(
             if should_write_to_db() and lock_acquired:
                 try:
                     state_store.release_lock(lock_key, lock_owner)
-                except Exception as exc:
+                except _UPDATE_ERRORS as exc:
                     logger.warning("Could not release practice backlog lock %s: %s", lock_key, exc)
         if event_had_update:
             all_updated_events.append(event_name)

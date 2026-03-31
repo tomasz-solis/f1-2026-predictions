@@ -7,6 +7,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+_LOOKUP_ERRORS = (
+    AttributeError,
+    KeyError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def parse_refresh_timestamp(value: Any) -> datetime | None:
     """Parse a persisted refresh timestamp into UTC when possible."""
@@ -39,7 +48,7 @@ def latest_dashboard_refresh_timestamp(
 
     try:
         artifact_versions = get_artifact_versions_fn(year=year)
-    except Exception as exc:
+    except _LOOKUP_ERRORS as exc:
         logger.warning("Could not load artifact versions for refresh stamp: %s", exc)
         artifact_versions = {}
 
@@ -52,7 +61,7 @@ def latest_dashboard_refresh_timestamp(
 
     try:
         artifact_hash = compute_artifact_hash_fn(artifact_versions)
-    except Exception as exc:
+    except _LOOKUP_ERRORS as exc:
         logger.warning("Could not compute artifact hash for refresh stamp: %s", exc)
 
     if artifact_hash:
@@ -61,7 +70,7 @@ def latest_dashboard_refresh_timestamp(
                 year=year,
                 artifact_hash=artifact_hash,
             )
-        except Exception as exc:
+        except _LOOKUP_ERRORS as exc:
             logger.warning("Could not load horizon index for refresh stamp: %s", exc)
             horizon_index = None
         if isinstance(horizon_index, dict):
@@ -86,7 +95,7 @@ def dashboard_refresh_label(
     latest_dashboard_refresh_timestamp_fn: Any,
     fallback_label: str,
 ) -> str:
-    """Format the latest dashboard refresh stamp for the hero card."""
+    """Format the dashboard refresh label."""
     latest_refresh = latest_dashboard_refresh_timestamp_fn(year)
     if latest_refresh is None:
         return fallback_label
@@ -100,7 +109,7 @@ def load_schedule_event_rows(
     fallback_schedule_rows_fn: Any,
     logger: logging.Logger,
 ) -> tuple[tuple[str, str, str], ...]:
-    """Load schedule rows with serialized event dates for horizon filtering."""
+    """Load schedule rows with ISO-formatted event dates."""
     rows: list[tuple[str, str, str]] = []
 
     try:
@@ -115,7 +124,7 @@ def load_schedule_event_rows(
                 if hasattr(event_date, "to_pydatetime"):
                     try:
                         event_date = event_date.to_pydatetime()
-                    except Exception:
+                    except (AttributeError, TypeError, ValueError):
                         event_date = None
                 if isinstance(event_date, datetime):
                     if event_date.tzinfo is None:
@@ -126,7 +135,7 @@ def load_schedule_event_rows(
                 else:
                     event_date_iso = ""
                 rows.append((event_name, event_format, event_date_iso))
-    except Exception as exc:
+    except _LOOKUP_ERRORS as exc:
         logger.warning("Could not load dated schedule rows for %s: %s", year, exc)
 
     if rows:
@@ -207,7 +216,7 @@ def current_anchor_boundary_signature(
     """Return the live boundary signature for the anchor race, if available."""
     try:
         is_sprint = bool(is_sprint_weekend_fn(year, anchor_race_name))
-    except Exception as exc:
+    except _LOOKUP_ERRORS as exc:
         logger.warning(
             "Could not determine weekend type for anchor boundary validation (%s %s): %s",
             year,
@@ -224,7 +233,7 @@ def current_anchor_boundary_signature(
             session_detector=session_detector_factory(),
             now_utc=now_utc or datetime.now(UTC),
         )
-    except Exception as exc:
+    except _LOOKUP_ERRORS as exc:
         logger.warning(
             "Could not build anchor boundary snapshot for dropdown filtering (%s %s): %s",
             year,
@@ -253,7 +262,7 @@ def selected_race_persisted_prediction_available(
     try:
         artifact_versions = get_artifact_versions_fn(year=year)
         artifact_hash = compute_artifact_hash_fn(artifact_versions)
-    except Exception as exc:
+    except _LOOKUP_ERRORS as exc:
         logger.warning(
             "Could not compute artifact hash while checking selected-race availability: %s",
             exc,
@@ -272,7 +281,7 @@ def selected_race_persisted_prediction_available(
             artifact_hash=artifact_hash,
             boundary_signature=current_boundary_signature,
         )
-    except Exception as exc:
+    except _LOOKUP_ERRORS as exc:
         logger.warning(
             "Could not load persisted selected-race prediction for %s %s [%s]: %s",
             year,
@@ -387,7 +396,7 @@ def filter_race_options_to_precomputed_horizon(
     try:
         artifact_versions = get_artifact_versions_fn(year=year)
         artifact_hash = compute_artifact_hash_fn(artifact_versions)
-    except Exception as exc:
+    except _LOOKUP_ERRORS as exc:
         logger.warning("Could not compute artifact hash for dropdown filtering: %s", exc)
         return scoped_race_options, scope_metadata
 

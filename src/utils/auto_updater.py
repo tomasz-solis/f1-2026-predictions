@@ -72,7 +72,7 @@ def _load_learning_state(year: int) -> dict:
             if should_write_to_db():
                 # In write-capable DB modes, treat missing DB state as empty season state.
                 return _default_learning_state(year)
-        except Exception as exc:
+        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
             logger.warning(
                 "Could not load race-learning state from DB for season %s: %s",
                 year,
@@ -178,7 +178,16 @@ def get_completed_races(year: int = 2026) -> list[str]:
 
         return completed
 
-    except Exception as e:
+    except (
+        AttributeError,
+        ConnectionError,
+        FileNotFoundError,
+        KeyError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as e:
         logger.warning(f"Could not check for completed races: {e}")
         return []
 

@@ -2,6 +2,7 @@
 
 import logging
 
+from postgrest.exceptions import APIError
 from supabase import Client, create_client
 
 from .config import get_supabase_key, get_supabase_url, is_db_enabled
@@ -29,7 +30,7 @@ def get_supabase_client() -> Client:
         try:
             _supabase_client = create_client(supabase_url, supabase_key)
             logger.info(f"Supabase client initialized: {supabase_url}")
-        except Exception as e:
+        except (APIError, OSError, RuntimeError, TypeError, ValueError) as e:
             logger.error(f"Failed to initialize Supabase client: {e}")
             raise RuntimeError(f"Failed to connect to Supabase: {e}") from e
 
@@ -42,7 +43,7 @@ def check_connection() -> str:
         client = get_supabase_client()
         result = client.table("artifacts").select("id").limit(1).execute()
         return f"Supabase connection healthy ({len(result.data)} row(s) accessible)"
-    except Exception as e:
+    except (APIError, AttributeError, OSError, RuntimeError, TypeError, ValueError) as e:
         raise RuntimeError(f"Supabase connection failed: {e}") from e
 
 

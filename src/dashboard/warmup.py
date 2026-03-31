@@ -65,11 +65,20 @@ _WARMUP_LOCK_TTL_SECONDS = 5400
 _DEFAULT_HORIZON_RACES = 3
 _DEFAULT_WEATHER_SCENARIOS = ("dry", "mixed", "rain")
 _VALID_WEATHER_SCENARIOS = frozenset(_DEFAULT_WEATHER_SCENARIOS)
+_WARMUP_ERRORS = (
+    AttributeError,
+    KeyError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 @dataclass(frozen=True)
 class WarmupTargets:
-    """Anchor race and horizon races selected for a warmup cycle."""
+    """Anchor race plus the races we want to warm."""
 
     anchor_race_name: str
     anchor_is_sprint: bool
@@ -78,7 +87,7 @@ class WarmupTargets:
 
 @dataclass(frozen=True)
 class CheckpointContext:
-    """Checkpoint readiness state derived from schedule plus data validation."""
+    """Checkpoint state for the current warmup run."""
 
     checkpoint: str
     expected_checkpoint: str
@@ -90,7 +99,7 @@ class CheckpointContext:
 
 @dataclass
 class WarmupSummary:
-    """Structured summary returned by one warmup precompute cycle."""
+    """Summary for one warmup run."""
 
     year: int
     status: str
@@ -152,7 +161,7 @@ def _coerce_utc_datetime(value: Any) -> datetime | None:
     if hasattr(candidate, "to_pydatetime"):
         try:
             candidate = candidate.to_pydatetime()
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             return None
 
     if not isinstance(candidate, datetime):
@@ -212,7 +221,7 @@ def _resolve_warmup_targets(
     """Find anchor race (next upcoming) and horizon races from the current schedule."""
     try:
         schedule = fastf1.get_event_schedule(year)
-    except Exception as exc:
+    except _WARMUP_ERRORS as exc:
         logger.warning("Could not load FastF1 schedule for warmup (%s): %s", year, exc)
         return None
 
@@ -336,7 +345,7 @@ def _resolve_checkpoint_context(
 
 
 def _load_predictor(artifact_versions: dict[str, tuple[int, str]], *, year: int) -> Any:
-    """Load predictor with compatibility fallback for older call signatures."""
+    """Load the predictor, supporting the older call signature too."""
     try:
         return get_predictor(artifact_versions, year=year)
     except TypeError:
@@ -349,7 +358,7 @@ def _refresh_anchor_practice_characteristics(
     targets: WarmupTargets,
     session_detector: SessionDetector,
 ) -> dict[str, Any]:
-    """Refresh practice-derived car characteristics for the anchor race when available."""
+    """Refresh anchor-race practice characteristics when possible."""
     practice_update = auto_update_practice_characteristics_if_needed(
         year=int(year),
         race_name=targets.anchor_race_name,
@@ -420,13 +429,13 @@ def _record_not_ready_status(
     context: CheckpointContext,
     now_utc: datetime,
 ) -> None:
-    """Persist a throttled not-ready heartbeat so scheduler runs are observable."""
+    """Write a throttled not-ready heartbeat."""
     state_key = f"{int(year)}::{anchor_race_name}"
     store = RuntimeStateStore()
 
     try:
         existing = store.get_record(_NOT_READY_STATUS_NAMESPACE, state_key)
-    except Exception as exc:
+    except _WARMUP_ERRORS as exc:
         logger.debug("Could not read existing warmup status heartbeat: %s", exc)
         existing = None
 
@@ -457,7 +466,7 @@ def _record_not_ready_status(
     }
     try:
         store.upsert_record(_NOT_READY_STATUS_NAMESPACE, state_key, payload)
-    except Exception as exc:
+    except _WARMUP_ERRORS as exc:
         logger.debug("Could not write warmup status heartbeat: %s", exc)
 
 
@@ -527,13 +536,16 @@ def _save_warmup_prediction_to_logger(
     )
 
 
-def _verify_runtime_state_record(namespace: str, state_key: str) -> bool:
-    """Verify that a runtime-state record exists immediately after write."""
+def _runtime_state_record_exists(namespace: str, state_key: str) -> bool:
+    """Check that a runtime-state record can be read back."""
     try:
         payload = RuntimeStateStore().get_record(namespace, state_key)
-    except Exception:
+    except _WARMUP_ERRORS:
         return False
     return isinstance(payload, dict)
+
+
+_verify_runtime_state_record = _runtime_state_record_exists
 
 
 def run_warmup_precompute_cycle(
@@ -543,7 +555,7 @@ def run_warmup_precompute_cycle(
     dry_run: bool = False,
     verify_db_writes: bool = True,
 ) -> WarmupSummary:
-    """Run one warmup cycle that precomputes horizon predictions outside Streamlit requests."""
+    """Run one warmup cycle."""
     run_now = now_utc or datetime.now(UTC)
     summary = WarmupSummary(year=int(year), status="success", dry_run=bool(dry_run))
 
@@ -768,7 +780,7 @@ def run_warmup_precompute_cycle(
                                 artifact_hash=artifact_hash,
                                 boundary_signature=target_boundary_signature,
                             )
-                            verified = _verify_runtime_state_record(
+                            verified = _runtime_state_record_exists(
                                 _STATE_NAMESPACE_PRECOMPUTED_BASE_FEATURES,
                                 base_state_key,
                             )
@@ -777,7 +789,7 @@ def run_warmup_precompute_cycle(
                                     f"Base-feature write could not be verified in DB for {target_race} ({target_checkpoint})."
                                 )
                         summary.base_generated += 1
-                    except Exception as exc:
+                    except _WARMUP_ERRORS as exc:
                         error_message = f"{target_race} [base_features]: {exc}"
                         summary.errors.append(error_message)
                         logger.warning("Warmup base-feature compute failed: %s", error_message)
@@ -834,7 +846,7 @@ def run_warmup_precompute_cycle(
                                 artifact_hash=artifact_hash,
                                 boundary_signature=target_boundary_signature,
                             )
-                            verified = _verify_runtime_state_record(
+                            verified = _runtime_state_record_exists(
                                 _STATE_NAMESPACE_PRECOMPUTED_PREDICTIONS,
                                 prediction_state_key,
                             )
@@ -844,7 +856,7 @@ def run_warmup_precompute_cycle(
                                 )
                         summary.predictions_generated += 1
                         race_weather_coverage.setdefault(target_race, set()).add(target_weather)
-                    except Exception as exc:
+                    except _WARMUP_ERRORS as exc:
                         error_message = f"{target_race} [{target_weather}]: {exc}"
                         summary.errors.append(error_message)
                         logger.warning("Warmup weather precompute failed: %s", error_message)
@@ -859,7 +871,7 @@ def run_warmup_precompute_cycle(
                         is_sprint=target_is_sprint,
                         prediction_results=prediction_results,
                     )
-                except Exception as exc:
+                except _WARMUP_ERRORS as exc:
                     logger.warning(
                         "Could not save warmup prediction to PredictionLogger for %s %s %s: %s",
                         int(year),
@@ -890,7 +902,7 @@ def run_warmup_precompute_cycle(
                 )
                 if db_verification_enabled:
                     horizon_state_key = f"{int(year)}::{str(artifact_hash).strip()}"
-                    verified = _verify_runtime_state_record(
+                    verified = _runtime_state_record_exists(
                         _STATE_NAMESPACE_PRECOMPUTE_HORIZON_INDEX,
                         horizon_state_key,
                     )
@@ -898,7 +910,7 @@ def run_warmup_precompute_cycle(
                         summary.db_verification_warnings.append(
                             "Horizon-index write could not be verified in DB."
                         )
-            except Exception as exc:
+            except _WARMUP_ERRORS as exc:
                 error_message = f"horizon_index: {exc}"
                 summary.errors.append(error_message)
                 logger.warning("Could not persist warmup horizon index: %s", exc)
@@ -913,5 +925,5 @@ def run_warmup_precompute_cycle(
         if should_write_to_db() and lock_acquired:
             try:
                 state_store.release_lock(lock_key, lock_owner)
-            except Exception as exc:
+            except _WARMUP_ERRORS as exc:
                 logger.warning("Could not release warmup lock %s: %s", lock_key, exc)

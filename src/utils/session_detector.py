@@ -14,6 +14,15 @@ from src.utils.operational_observability import record_alert, record_counter
 logger = logging.getLogger(__name__)
 
 SessionCompletionState = Literal["completed", "incomplete", "unknown"]
+_FASTF1_ERRORS = (
+    AttributeError,
+    DataNotLoadedError,
+    KeyError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 class SessionCompletionCheckError(RuntimeError):
@@ -49,7 +58,7 @@ class SessionDetector:
         cache_dir.mkdir(parents=True, exist_ok=True)
         try:
             fastf1.Cache.enable_cache(str(cache_dir))
-        except Exception as exc:
+        except _FASTF1_ERRORS as exc:
             logger.debug(f"Could not enable FastF1 cache in SessionDetector: {exc}")
         self._event_cache: dict[tuple[int, str], Any] = {}
         self._completion_cache: dict[tuple[int, str, str], SessionCompletionState] = {}
@@ -70,7 +79,7 @@ class SessionDetector:
                     )
                     if completion_state == "completed":
                         completed.append(session_name)
-                except Exception as exc:
+                except _FASTF1_ERRORS as exc:
                     logger.debug(f"Could not check session {session_name} for {race_name}: {exc}")
                     continue
 
@@ -82,7 +91,7 @@ class SessionDetector:
 
             return completed
 
-        except Exception as exc:
+        except _FASTF1_ERRORS as exc:
             error_msg = str(exc)
             if "not found" in error_msg.lower():
                 logger.error(f"Race not found: {race_name} {year}. Check race name spelling.")
@@ -123,7 +132,7 @@ class SessionDetector:
                 exc,
             )
             state = "unknown"
-        except Exception as exc:  # pragma: no cover - defensive
+        except _FASTF1_ERRORS as exc:  # pragma: no cover - defensive
             logger.warning(
                 "Unexpected error while checking completion state for %s %s %s: %s",
                 year,
@@ -168,7 +177,7 @@ class SessionDetector:
         event = self._get_event_cached(year, race_name)
         try:
             session_date = event.get_session_date(session_name)
-        except Exception as exc:  # pragma: no cover - fastf1 edge behavior
+        except _FASTF1_ERRORS as exc:  # pragma: no cover - fastf1 edge behavior
             raise SessionCompletionCheckError(f"could not load session schedule: {exc}") from exc
 
         if session_date is None:
@@ -191,7 +200,7 @@ class SessionDetector:
                 lambda: fastf1.get_session(year, race_name, session_name),
                 labels={"year": year, "race_name": race_name, "session_name": session_name},
             )
-        except Exception as exc:  # pragma: no cover - fastf1 edge behavior
+        except _FASTF1_ERRORS as exc:  # pragma: no cover - fastf1 edge behavior
             if is_practice:
                 return (
                     "completed"
@@ -218,7 +227,7 @@ class SessionDetector:
                     lambda: session.load(laps=True, telemetry=False, weather=False, messages=False),
                     labels={"year": year, "race_name": race_name, "session_name": session_name},
                 )
-            except Exception:
+            except _FASTF1_ERRORS:
                 return (
                     "completed"
                     if self._fallback_elapsed_completion(session_date_utc, session_name, now)
@@ -250,7 +259,7 @@ class SessionDetector:
                 lambda: session.load(laps=False, telemetry=False, weather=False, messages=False),
                 labels={"year": year, "race_name": race_name, "session_name": session_name},
             )
-        except Exception as exc:
+        except _FASTF1_ERRORS as exc:
             raise SessionCompletionCheckError(f"competitive session load failed: {exc}") from exc
 
         results = getattr(session, "results", None)
@@ -300,7 +309,7 @@ class SessionDetector:
 
         try:
             cleaned = status_values.dropna().astype(str)
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             return None
 
         if cleaned.empty:

@@ -178,7 +178,15 @@ def get_races_for_year(year: int, max_races: int | None = None) -> list[str]:
                 if event_format == "testing":
                     continue
                 races.append(event_name)
-    except Exception as exc:
+    except (
+        AttributeError,
+        ConnectionError,
+        FileNotFoundError,
+        KeyError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as exc:
         logger.warning(f"Could not load FastF1 schedule for {year}: {exc}")
 
     if not races:
@@ -222,7 +230,15 @@ def warm_fastf1_results_cache(
                         "rows_loaded": row_count,
                     }
                 )
-            except Exception as exc:
+            except (
+                AttributeError,
+                ConnectionError,
+                FileNotFoundError,
+                KeyError,
+                RuntimeError,
+                TypeError,
+                ValueError,
+            ) as exc:
                 reports.append(
                     {
                         "race_name": race_name,
@@ -334,7 +350,7 @@ def run_single_race_backtest(
             "race_predicted_top10": _top_n_entries(race_prediction["finish_order"]),
             "race_actual_top10": _top_n_entries(race_actual),
         }
-    except Exception as exc:
+    except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
         logger.warning(f"Backtest failed for {race_name}: {exc}")
         return {
             "race_name": race_name,

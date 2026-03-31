@@ -11,6 +11,7 @@ from typing import Any
 
 import fastf1 as ff1
 import pandas as pd
+from fastf1.exceptions import DataNotLoadedError
 
 from src.utils import config_loader
 from src.utils.fp_blending_flow import blend_available_sessions, build_session_priority
@@ -31,6 +32,15 @@ _SESSION_DURATION_HOURS: dict[str, float] = {
     "Sprint": 1.0,
     "Sprint Qualifying": 1.5,
 }
+_FASTF1_ERRORS = (
+    AttributeError,
+    DataNotLoadedError,
+    KeyError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 def _iter_fastf1_cache_dirs() -> tuple[Path, ...]:
@@ -102,7 +112,7 @@ def _load_session_with_cache_fallback(
 
             _fastf1_with_retry(load_session_laps)
             return session
-        except Exception as exc:
+        except _FASTF1_ERRORS as exc:
             last_error = exc
             logger.debug(
                 "FastF1 load failed for %s %s %s via cache %s: %s",
@@ -132,7 +142,7 @@ def _get_event_with_cache_fallback(year: int, race_name: str) -> Any:
             event = _fastf1_with_retry(load_event_metadata, max_retries=1)
             if event is not None:
                 return event
-        except Exception as exc:
+        except _FASTF1_ERRORS as exc:
             last_error = exc
             logger.debug(
                 "FastF1 event lookup failed for %s %s via cache %s: %s",
@@ -184,7 +194,7 @@ class CircuitBreaker:
                 self.failure_count = 0
                 self.state = "closed"
             return result
-        except Exception:
+        except _FASTF1_ERRORS:
             self.failure_count += 1
             self.last_failure_time = time.time()
 
@@ -209,7 +219,7 @@ def _fastf1_with_retry(
             if "Circuit breaker is open" in str(e):
                 raise
             raise
-        except Exception as e:
+        except _FASTF1_ERRORS as e:
             if attempt == max_retries - 1:
                 raise
             delay = initial_delay * (2**attempt)
@@ -467,7 +477,7 @@ def get_fp_team_performance(
 
         return team_performance, laps, None
 
-    except Exception as e:
+    except _FASTF1_ERRORS as e:
         logger.warning(
             f"FastF1 API failure for {session_type} at {race_name} ({year}): {e.__class__.__name__}: {e}"
         )
@@ -502,7 +512,7 @@ def get_fp_session_weather(year: int, race_name: str, session_type: str) -> str 
         if wet_ratio > 0.5:
             return "wet"
         return "mixed"
-    except Exception as e:
+    except _FASTF1_ERRORS as e:
         logger.warning(f"Could not determine weather for {session_type}: {e}")
         return None
 
@@ -556,7 +566,7 @@ def get_best_fp_performance_with_session_laps(
     event = None
     try:
         event = _get_event_with_cache_fallback(year, race_name)
-    except Exception:
+    except _FASTF1_ERRORS:
         event = None
 
     now_utc = datetime.now(UTC)
@@ -567,7 +577,7 @@ def get_best_fp_performance_with_session_laps(
         if event is not None:
             try:
                 raw_session_date = event.get_session_date(session_code)
-            except Exception:
+            except _FASTF1_ERRORS:
                 raw_session_date = None
 
             if raw_session_date is not None:

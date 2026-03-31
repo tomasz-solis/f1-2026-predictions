@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import fastf1
+from postgrest.exceptions import APIError
 
 from src.extractors.performance import extract_all_teams_performance
 from src.persistence.artifact_store import ArtifactStore
@@ -705,7 +706,15 @@ def replay_season_characteristics_from_cache(
 
         if not dry_run and not applied_sessions:
             raise ValueError("No cached sessions could be replayed into live car characteristics.")
-    except Exception:
+    except (
+        AttributeError,
+        FileNotFoundError,
+        KeyError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
         if not dry_run and reset_written:
             _restore_characteristics_from_backup(characteristics_file, backup_path)
         raise
@@ -913,7 +922,7 @@ def _extract_session_driver_deltas(
     """Estimate teammate-relative driver pace deltas for one session profile."""
     try:
         laps = session.laps
-    except Exception:
+    except (AttributeError, RuntimeError, TypeError, ValueError):
         return {}
 
     if laps is None or laps.empty or "Team" not in laps.columns or "Driver" not in laps.columns:
@@ -1093,7 +1102,7 @@ def update_from_testing_sessions(
             latest_known_version = int(
                 artifact_store.get_latest_version("car_characteristics", artifact_key)
             )
-        except Exception as exc:
+        except (APIError, AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
             logger.warning(
                 "Could not resolve latest DB version for %s before write: %s",
                 artifact_key,
@@ -1117,7 +1126,7 @@ def update_from_testing_sessions(
                 data=characteristics,
                 version=int(characteristics.get("version", 1)),
             )
-        except Exception as exc:
+        except (APIError, AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
             logger.warning(
                 "Could not persist testing/practice characteristics to ArtifactStore (%s): %s",
                 artifact_key,
@@ -1135,7 +1144,7 @@ def update_from_testing_sessions(
                 captured_at=now_iso,
                 season_characteristics_version=characteristics.get("version"),
             )
-        except Exception as exc:
+        except (APIError, AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
             logger.warning("Could not persist session snapshot history: %s", exc)
 
     return {

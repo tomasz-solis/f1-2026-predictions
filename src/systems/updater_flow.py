@@ -140,7 +140,7 @@ def _resolve_race_name(session: Any) -> str:
     """Resolve race name from session metadata with safe fallback."""
     try:
         return session.event["EventName"]
-    except Exception:
+    except (AttributeError, KeyError, TypeError):
         return getattr(session, "name", None) or "Unknown Race"
 
 
@@ -249,7 +249,7 @@ def _save_characteristics_payload(
             version=new_version,
         )
         logger.info(f"Updated team characteristics (v{new_version}) via ArtifactStore")
-    except Exception as exc:
+    except (RuntimeError, OSError, TypeError, ValueError) as exc:
         logger.error(f"ArtifactStore save failed: {exc}, falling back to file")
         with open(characteristics_file, "w") as f:
             json.dump(char_data, f, indent=2)
@@ -327,7 +327,7 @@ def update_team_characteristics_core(
             aggregate_compound_samples_fn=aggregate_compound_samples_fn,
             logger=logger,
         )
-    except Exception as exc:
+    except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
         logger.warning(f"Failed to extract compound metrics from race: {exc}")
 
     char_data["last_updated"] = now_iso

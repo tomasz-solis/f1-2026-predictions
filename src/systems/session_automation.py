@@ -153,7 +153,7 @@ def load_session_automation_config(year: int) -> SessionAutomationConfig:
             record = _runtime_state_store().get_record(_SCHEDULE_NAMESPACE, str(year))
             if isinstance(record, dict):
                 return SessionAutomationConfig.from_payload(year, record)
-        except Exception as exc:
+        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
             logger.warning("Could not load session-automation config from DB for %s: %s", year, exc)
 
     file_config = _load_schedule_from_file(year)
@@ -199,7 +199,7 @@ def _coerce_utc_datetime(value: Any) -> datetime | None:
     if hasattr(candidate, "to_pydatetime"):
         try:
             candidate = candidate.to_pydatetime()
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             return None
     if not isinstance(candidate, datetime):
         return None
@@ -239,7 +239,15 @@ def _iter_candidate_events(
 
     try:
         schedule = fastf1.get_event_schedule(year)
-    except Exception as exc:
+    except (
+        AttributeError,
+        ConnectionError,
+        FileNotFoundError,
+        KeyError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as exc:
         logger.warning("Could not load FastF1 schedule for session automation (%s): %s", year, exc)
         return candidates
 

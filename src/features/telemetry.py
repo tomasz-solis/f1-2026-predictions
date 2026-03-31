@@ -12,7 +12,10 @@ logger = logging.getLogger(__name__)
 class LapFeatureExtractor:
     """Extract telemetry features from a single F1 lap."""
 
-    def __init__(self, corner_speed_thresholds=None) -> None:
+    def __init__(
+        self,
+        corner_speed_thresholds: dict[str, tuple[int, int]] | None = None,
+    ) -> None:
         """
         Corner speed thresholds for classification.
         Default: slow <100, medium 100-200, high 200-250 km/h
@@ -26,7 +29,7 @@ class LapFeatureExtractor:
         else:
             self.corner_thresholds = corner_speed_thresholds
 
-    def extract_corner_speeds(self, telemetry) -> dict[str, float]:
+    def extract_corner_speeds(self, telemetry: pd.DataFrame) -> dict[str, float]:
         """Average speed in slow/medium/high-speed corners."""
         # Corner threshold: 250 km/h separates corners from straights
         # Based on typical F1 corner exit speeds (Monza Parabolica ~230, Spa Pouhon ~270)
@@ -44,7 +47,7 @@ class LapFeatureExtractor:
 
         return speeds
 
-    def extract_throttle_metrics(self, telemetry) -> dict[str, float]:
+    def extract_throttle_metrics(self, telemetry: pd.DataFrame) -> dict[str, float]:
         """Throttle usage - percentage at full throttle, average, smoothness."""
         throttle = telemetry["Throttle"]
 
@@ -54,7 +57,7 @@ class LapFeatureExtractor:
             "throttle_smoothness": throttle.std(),  # lower = smoother
         }
 
-    def extract_braking_metrics(self, telemetry) -> dict[str, float]:
+    def extract_braking_metrics(self, telemetry: pd.DataFrame) -> dict[str, float]:
         """Braking zones and intensity."""
         brake = telemetry["Brake"]
 
@@ -67,7 +70,7 @@ class LapFeatureExtractor:
             "avg_brake_intensity": brake[brake > 0].mean() if (brake > 0).any() else 0,
         }
 
-    def extract_straight_line_speed(self, telemetry) -> dict[str, float]:
+    def extract_straight_line_speed(self, telemetry: pd.DataFrame) -> dict[str, float]:
         """Top speed and speed at full throttle."""
         full_throttle = telemetry[telemetry["Throttle"] == 100]
 
@@ -83,12 +86,12 @@ class LapFeatureExtractor:
             "pct_at_max_gear": len(top_gear) / len(telemetry) * 100,
         }
 
-    def extract_drs_usage(self, telemetry) -> dict[str, float]:
+    def extract_drs_usage(self, telemetry: pd.DataFrame) -> dict[str, float]:
         """How much DRS was available and used."""
         drs = telemetry["DRS"]
         return {"drs_active_pct": (drs > 0).sum() / len(drs) * 100}
 
-    def extract_features(self, lap) -> dict[str, float]:
+    def extract_features(self, lap: Any) -> dict[str, float]:
         """
         Extract all features from a lap.
         Returns dict of feature_name -> value.
@@ -120,10 +123,10 @@ class LapFeatureExtractor:
 class SessionFeatureAggregator:
     """Aggregate lap-level features into session-level features for a driver."""
 
-    def __init__(self, lap_extractor) -> None:
+    def __init__(self, lap_extractor: LapFeatureExtractor) -> None:
         self.lap_extractor = lap_extractor
 
-    def filter_clean_laps(self, laps) -> Any:
+    def filter_clean_laps(self, laps: pd.DataFrame) -> pd.DataFrame:
         """
         Remove outliers and invalid laps.
         Keep laps where: in-lap, out-lap, yellow flags, accidents filtered out.
@@ -141,7 +144,7 @@ class SessionFeatureAggregator:
 
         return clean
 
-    def extract_driver_session(self, laps) -> dict[str, float]:
+    def extract_driver_session(self, laps: pd.DataFrame) -> dict[str, Any]:
         """
         Extract features for one driver's session.
         Returns aggregated features (median across clean laps).
@@ -189,7 +192,7 @@ class SessionFeatureAggregator:
         # Merge with driver info
         return {**driver_info, **aggregated}
 
-    def extract_all_drivers(self, session) -> pd.DataFrame:
+    def extract_all_drivers(self, session: Any) -> pd.DataFrame:
         """Extract features for all drivers in a session."""
         driver_features = []
 

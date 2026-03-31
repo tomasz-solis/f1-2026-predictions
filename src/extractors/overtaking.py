@@ -7,6 +7,8 @@ Monaco is processional (low overtakes), Bahrain/Monza have high overtakes.
 
 import json
 import logging
+from pathlib import Path
+from typing import Any
 
 import fastf1 as ff1
 import numpy as np
@@ -16,7 +18,7 @@ logging.getLogger("fastf1").setLevel(logging.CRITICAL)
 logger = logging.getLogger(__name__)
 
 
-def extract_overtakes_from_race(year, race_name):
+def extract_overtakes_from_race(year: int, race_name: str) -> dict[str, Any] | None:
     """Extract overtaking data from a race by counting position changes."""
     try:
         session = ff1.get_session(year, race_name, "R")
@@ -86,7 +88,7 @@ def extract_overtakes_from_race(year, race_name):
         return None
 
 
-def calculate_overtaking_likelihood(years=None):
+def calculate_overtaking_likelihood(years: list[int] | None = None) -> dict[str, dict[str, Any]]:
     """Calculate overtaking likelihood for all tracks from specified years."""
 
     if years is None:
@@ -101,7 +103,15 @@ def calculate_overtaking_likelihood(years=None):
 
         try:
             schedule = ff1.get_event_schedule(year)
-        except (ValueError, KeyError, ConnectionError, Exception) as e:
+        except (
+            ConnectionError,
+            FileNotFoundError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ) as e:
             logger.error(f"Failed to get event schedule for {year}: {e}. Skipping this season.")
             logger.warning("Could not get schedule for %s: %s", year, type(e).__name__)
             continue
@@ -149,16 +159,8 @@ def calculate_overtaking_likelihood(years=None):
     return track_likelihood
 
 
-def classify_overtaking_difficulty(avg_changes_per_lap):
-    """
-    Classify track overtaking difficulty.
-
-    Based on empirical data:
-    - Monaco: ~1-2 changes/lap (very hard)
-    - Barcelona: ~3-4 changes/lap (hard)
-    - Bahrain: ~5-6 changes/lap (moderate)
-    - Monza: ~7+ changes/lap (easy)
-    """
+def classify_overtaking_difficulty(avg_changes_per_lap: float) -> tuple[str, float]:
+    """Classify track overtaking difficulty from average position changes per lap."""
     if avg_changes_per_lap < 2.5:
         return "very_hard", 0.2
     elif avg_changes_per_lap < 4.0:
@@ -171,7 +173,11 @@ def classify_overtaking_difficulty(avg_changes_per_lap):
         return "very_easy", 1.0
 
 
-def add_overtaking_to_tracks(track_characteristics_path, overtaking_data, output_path=None):
+def add_overtaking_to_tracks(
+    track_characteristics_path: str | Path,
+    overtaking_data: dict[str, dict[str, Any]],
+    output_path: str | Path | None = None,
+) -> None:
     """Add overtaking likelihood to existing track characteristics JSON."""
     # Load existing tracks
     with open(track_characteristics_path) as f:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import warnings
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -103,7 +104,7 @@ def testing_session_has_started(
     event: fastf1.events.Event,
     day_number: int,
     now_utc: datetime | None = None,
-    coerce_utc_datetime_fn=coerce_utc_datetime,
+    coerce_utc_datetime_fn: Callable[[Any], datetime | None] = coerce_utc_datetime,
 ) -> bool:
     """Check whether a testing day has started based on UTC session timestamp."""
     session_dt_utc = coerce_utc_datetime_fn(event.get(f"Session{day_number}DateUtc"))
@@ -120,7 +121,7 @@ def get_testing_event_with_backends(
     test_number: int,
     testing_backends: tuple[str | None, ...],
     error_messages: list[str] | None = None,
-    fastf1_get_testing_event=fastf1.get_testing_event,
+    fastf1_get_testing_event: Callable[..., fastf1.events.Event] = fastf1.get_testing_event,
     logger_obj: Any = logger,
 ) -> fastf1.events.Event | None:
     """Load a testing event, trying explicit backends before auto mode."""
@@ -129,7 +130,15 @@ def get_testing_event_with_backends(
         backend_label = backend or "auto"
         try:
             return fastf1_get_testing_event(year, test_number, **kwargs)
-        except Exception as exc:
+        except (
+            AttributeError,
+            ConnectionError,
+            FileNotFoundError,
+            KeyError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ) as exc:
             logger_obj.debug(
                 "Unable to load testing event %s/%s via backend %s: %s",
                 year,
@@ -170,8 +179,10 @@ def load_testing_session_with_backends(
     day_number: int,
     testing_backends: tuple[str | None, ...],
     error_messages: list[str] | None = None,
-    fastf1_get_testing_event=fastf1.get_testing_event,
-    normalize_testing_event_sessions_fn=normalize_testing_event_sessions,
+    fastf1_get_testing_event: Callable[..., fastf1.events.Event] = fastf1.get_testing_event,
+    normalize_testing_event_sessions_fn: Callable[[fastf1.events.Event], None] = (
+        normalize_testing_event_sessions
+    ),
     logger_obj: Any = logger,
 ) -> fastf1.core.Session | None:
     """
@@ -195,7 +206,15 @@ def load_testing_session_with_backends(
             # Access row count to force DataNotLoadedError if load is incomplete.
             _ = len(laps)
             return session
-        except Exception as exc:
+        except (
+            AttributeError,
+            ConnectionError,
+            FileNotFoundError,
+            KeyError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ) as exc:
             logger_obj.debug(
                 "Unable to load testing session %s/%s day %s via backend %s: %s",
                 year,
@@ -219,13 +238,17 @@ def load_sessions_for_event(
     session_candidates: list[str],
     testing_backends: tuple[str | None, ...] = ("f1timing", "fastf1", None),
     error_messages: list[str] | None = None,
-    is_testing_event_fn=is_testing_event,
-    extract_testing_number_fn=extract_testing_number,
-    extract_testing_day_fn=extract_testing_day,
-    get_testing_event_with_backends_fn=get_testing_event_with_backends,
-    testing_session_has_started_fn=testing_session_has_started,
-    load_testing_session_with_backends_fn=load_testing_session_with_backends,
-    fastf1_get_session=fastf1.get_session,
+    is_testing_event_fn: Callable[[str], bool] = is_testing_event,
+    extract_testing_number_fn: Callable[[str], int | None] = extract_testing_number,
+    extract_testing_day_fn: Callable[[str], int | None] = extract_testing_day,
+    get_testing_event_with_backends_fn: Callable[..., fastf1.events.Event | None] = (
+        get_testing_event_with_backends
+    ),
+    testing_session_has_started_fn: Callable[..., bool] = testing_session_has_started,
+    load_testing_session_with_backends_fn: Callable[..., fastf1.core.Session | None] = (
+        load_testing_session_with_backends
+    ),
+    fastf1_get_session: Callable[..., fastf1.core.Session] = fastf1.get_session,
     logger_obj: Any = logger,
 ) -> list[tuple[str, fastf1.core.Session]]:
     """
@@ -251,7 +274,15 @@ def load_sessions_for_event(
                 # Access row count to force DataNotLoadedError if load is incomplete.
                 _ = len(laps)
                 loaded.append((session_name, session))
-            except Exception as exc:
+            except (
+                AttributeError,
+                ConnectionError,
+                FileNotFoundError,
+                KeyError,
+                RuntimeError,
+                TypeError,
+                ValueError,
+            ) as exc:
                 logger_obj.debug(
                     f"Skipping unavailable session {year} {event_name} {session_name}: {exc}"
                 )

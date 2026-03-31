@@ -6,6 +6,7 @@ The fix: Extract fastest laps for FP, use positions for Quali/Race.
 """
 
 import logging
+from typing import Any
 
 import fastf1 as ff1
 import numpy as np
@@ -15,10 +16,12 @@ logging.getLogger("fastf1").setLevel(logging.CRITICAL)
 logger = logging.getLogger(__name__)
 
 
-def extract_fp_order_from_laps(year, race_name, session_type):
-    """
-    Extract team order from FP session using lap times (FP sessions lack position data).
-    """
+def extract_fp_order_from_laps(
+    year: int,
+    race_name: str,
+    session_type: str,
+) -> dict[str, int] | None:
+    """Extract team order from an FP session using representative lap times."""
     # Try multiple session name variations
     variations = {
         "FP1": ["FP1", "Practice 1", "Free Practice 1"],
@@ -98,10 +101,12 @@ def extract_fp_order_from_laps(year, race_name, session_type):
     return None
 
 
-def extract_quali_order_from_positions(year, race_name, session_type):
-    """
-    Extract team order from Qualifying/Sprint Quali using position data.
-    """
+def extract_quali_order_from_positions(
+    year: int,
+    race_name: str,
+    session_type: str,
+) -> dict[str, int] | None:
+    """Extract team order from qualifying-style sessions using classified positions."""
     # Try multiple session name variations
     variations = {
         "Q": ["Q", "Qualifying"],
@@ -163,10 +168,12 @@ def extract_quali_order_from_positions(year, race_name, session_type):
     return None
 
 
-def extract_session_order_safe(year, race_name, session_type):
-    """
-    Extract team order from any session, auto-detecting FP (lap times) vs Quali (positions).
-    """
+def extract_session_order_safe(
+    year: int,
+    race_name: str,
+    session_type: str,
+) -> dict[str, int] | None:
+    """Extract team order from any supported session using the appropriate method."""
     # Determine extraction method based on session type
     fp_sessions = ["FP1", "FP2", "FP3"]
     quali_sessions = ["Q", "Sprint Qualifying", "Sprint Shootout", "SQ"]
@@ -185,10 +192,10 @@ def extract_session_order_safe(year, race_name, session_type):
         return extract_fp_order_from_laps(year, race_name, session_type)
 
 
-def calculate_order_mae(predicted_order, actual_order):
-    """
-    Calculate MAE between predicted and actual team order.
-    """
+def calculate_order_mae(
+    predicted_order: dict[str, int], actual_order: dict[str, int]
+) -> float | None:
+    """Calculate MAE between predicted and actual team order."""
     errors = []
 
     for team in predicted_order:
@@ -200,17 +207,15 @@ def calculate_order_mae(predicted_order, actual_order):
 
 
 def test_session_as_predictor_fixed(
-    year,
-    race_name,
-    predictor_session,
-    target_session="Q",
-    driver_ranker=None,
-    lineups=None,
-    actual_driver_results=None,
-):
-    """
-    Test prediction accuracy of a session against qualifying/race results.
-    """
+    year: int,
+    race_name: str,
+    predictor_session: str,
+    target_session: str = "Q",
+    driver_ranker: Any | None = None,
+    lineups: dict[str, list[str]] | None = None,
+    actual_driver_results: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Test how well one session predicts a later qualifying or race result."""
     # Get predictor session order
     predictor_order = extract_session_order_safe(year, race_name, predictor_session)
 
