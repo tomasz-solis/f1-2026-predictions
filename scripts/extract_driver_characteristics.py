@@ -226,6 +226,13 @@ def _absolute_finish_floor(
     return float(np.clip(baseline * 0.75, 0.35, 0.65))
 
 
+def _soft_driver_metric_clip(value: float) -> float:
+    """Compress top-end driver scores without flattening every elite driver to 0.99."""
+    if value <= 0.85:
+        return float(max(0.10, value))
+    return float(0.85 + (0.14 * np.tanh((value - 0.85) / 0.14)))
+
+
 def _is_render_web_instance() -> bool:
     """Return True when running inside Render web service context."""
     if not os.getenv("RENDER"):
@@ -962,8 +969,8 @@ def main():
 
         # Separate dimensions so downstream simulation can distinguish pace,
         # general race execution, and passing skill.
-        race_pace_score = np.clip(base_rating + championship_bonus, 0.10, 0.99)
-        general_skill = np.clip(base_rating + racecraft_bonus + championship_bonus, 0.10, 0.99)
+        race_pace_score = _soft_driver_metric_clip(base_rating + championship_bonus)
+        general_skill = _soft_driver_metric_clip(base_rating + racecraft_bonus + championship_bonus)
         overtaking_score = np.clip(
             base_rating + (racecraft_bonus * 1.5),
             0.10,

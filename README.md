@@ -432,3 +432,34 @@ The checked-in summary now keeps per-race predicted and actual top-10 rows, so
 you can inspect real race-by-race misses directly in
 `reports/backtest_2025/baseline/race_results_detailed.json` or the mirrored
 `data/backtesting/2025_backtest_results.json`.
+
+### Why the naive baseline wins on 2025 and why it will not in 2026
+
+The naive baseline copies last race's finishing order as this race's prediction.
+Under stable regulations from 2022 through 2025, where car performance barely
+changes between rounds, that works surprisingly well. The model cannot beat it
+because there is almost no new information to exploit. The same cars are fast at
+every track, and the model's overhead from simulation variance and parameter
+uncertainty costs more than it gains.
+
+2026 is a different problem. New aerodynamic regulations, new power units,
+active aero replacing DRS, and Cadillac joining as an 11th team mean there is
+no "last race" to copy at the start of the season. The naive baseline is
+literally undefined for the opening race and unreliable for the first handful
+of rounds while the competitive order is still settling.
+
+This is the part of the calendar where simulation-based prediction adds value:
+
+- Pre-season: blends constructor reputation priors with testing telemetry profiles
+  such as short-run pace, corner speeds, and tire degradation slopes to produce a
+  credible pre-race-1 ranking.
+- Early season: Bayesian form updates move driver ratings toward observed
+  results, while the naive baseline is still anchored to Round 1.
+- Probabilistic output: the model produces confidence bands, podium
+  probabilities, and DNF risk per driver. The naive baseline produces one rank
+  with no uncertainty estimate.
+
+The 2025 backtest is here to show the model's floor. In the worst case of
+stable regulations and almost no information advantage, it stays within 0.25
+places of a strong heuristic. The model is built for the regulation-reset case
+where that heuristic fails entirely.
