@@ -266,9 +266,10 @@ def save_prediction_if_enabled_core(
     )
     if not target_predictions:
         st_module.info(
-            f"Skipped saving {checkpoint_session} checkpoint because every tracked target "
-            "already has completed-session results. Accuracy requires a forecast saved before "
-            "that target finishes."
+            "Skipped saving "
+            f"{checkpoint_session} checkpoint because every tracked target already has "
+            "completed-session results. Accuracy requires a forecast saved before that "
+            "target finishes."
         )
         return
 

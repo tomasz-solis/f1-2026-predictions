@@ -293,8 +293,9 @@ def _render_track_temperature_context(result: dict) -> None:
             session_pct = int(round(session_weight * 100))
             forecast_pct = int(round(forecast_weight * 100))
             st.info(
-                f"Track temperature input: {track_temp_c:.1f}C "
-                f"({session_pct}% {session_label} + {forecast_pct}% race-weather baseline)"
+                "Track temperature input: "
+                f"{track_temp_c:.1f}C ({session_pct}% {session_label} + "
+                f"{forecast_pct}% race-weather baseline)"
             )
         else:
             st.info(

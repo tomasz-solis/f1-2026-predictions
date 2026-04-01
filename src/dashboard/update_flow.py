@@ -134,7 +134,7 @@ def build_event_boundary_snapshot(
     try:
         event = fastf1.get_event(year, race_name)
     except _UPDATE_ERRORS as exc:
-        logger.debug(f"Could not load FastF1 event for boundary refresh check: {exc}")
+        logger.debug("Could not load FastF1 event for boundary refresh check: %s", exc)
         return {
             "weekend_type": "sprint" if is_sprint else "conventional",
             "session_order": list(sessions),
@@ -300,7 +300,7 @@ def detect_event_boundary_refresh_if_needed(
     try:
         _save_event_boundary_state(state)
     except _UPDATE_ERRORS as exc:
-        logger.warning(f"Could not persist event-boundary refresh state: {exc}")
+        logger.warning("Could not persist event-boundary refresh state: %s", exc)
         record_counter(
             "event_boundary_state_persist_failure_total",
             labels={"year": year, "race_name": race_name},
@@ -364,8 +364,8 @@ def auto_update_if_needed(force_recheck: bool = False, year: int = 2026) -> None
         elif updated_count > 0:
             st.warning(
                 "Race refresh partially completed: "
-                f"updated {updated_count} of {len(new_races)} race(s). "
-                "Continuing with available updates; remaining races will retry automatically."
+                f"updated {updated_count} of {len(new_races)} race(s). Continuing with "
+                "available updates; remaining races will retry automatically."
             )
             logger.warning(
                 "Race refresh incomplete for %s: updated %s/%s race(s).",

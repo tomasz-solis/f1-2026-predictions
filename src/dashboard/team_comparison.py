@@ -477,8 +477,8 @@ def _render_team_comparison_section(year: int = 2026) -> None:
     profile_names = _collect_profile_names(teams_payload)
     if not profile_names:
         st.info(
-            "No session profile metrics are available yet for this season. "
-            f'Run `python scripts/update_from_testing.py "Testing 1" --year {year} --apply` '
+            "No session profile metrics are available yet for this season. Run "
+            f'`python scripts/update_from_testing.py "Testing 1" --year {year} --apply` '
             "to populate comparison profiles."
         )
         return

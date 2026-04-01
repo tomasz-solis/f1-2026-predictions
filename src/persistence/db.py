@@ -29,9 +29,9 @@ def get_supabase_client() -> Client:
 
         try:
             _supabase_client = create_client(supabase_url, supabase_key)
-            logger.info(f"Supabase client initialized: {supabase_url}")
+            logger.info("Supabase client initialized: %s", supabase_url)
         except (APIError, OSError, RuntimeError, TypeError, ValueError) as e:
-            logger.error(f"Failed to initialize Supabase client: {e}")
+            logger.error("Failed to initialize Supabase client: %s", e)
             raise RuntimeError(f"Failed to connect to Supabase: {e}") from e
 
     return _supabase_client

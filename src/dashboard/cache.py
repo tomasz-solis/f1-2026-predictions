@@ -58,7 +58,7 @@ def enable_fastf1_cache() -> None:
     try:
         fastf1.Cache.enable_cache(str(_FASTF1_CACHE_DIR))
     except Exception as exc:
-        logger.warning(f"Could not enable FastF1 cache at {_FASTF1_CACHE_DIR}: {exc}")
+        logger.warning("Could not enable FastF1 cache at %s: %s", _FASTF1_CACHE_DIR, exc)
 
 
 def get_artifact_versions(year: int = _DEFAULT_SEASON) -> dict[str, tuple[int, str]]:
@@ -86,7 +86,7 @@ def get_artifact_versions(year: int = _DEFAULT_SEASON) -> dict[str, tuple[int, s
             else:
                 versions[f"{artifact_type}::{artifact_key}"] = (0, "")
         except Exception as e:
-            logger.warning(f"Failed to load version for {artifact_type}::{artifact_key}: {e}")
+            logger.warning("Failed to load version for %s::%s: %s", artifact_type, artifact_key, e)
             versions[f"{artifact_type}::{artifact_key}"] = (0, "")
 
     # In DB-backed modes, ignore mutable local runtime files so hashes remain
@@ -151,7 +151,7 @@ def get_predictor(_artifact_versions: dict[str, tuple[int, str]], year: int = _D
     try:
         Config().reload()
     except Exception as exc:
-        logger.warning(f"Failed to reload config before predictor bootstrap: {exc}")
+        logger.warning("Failed to reload config before predictor bootstrap: %s", exc)
 
     predictor = Baseline2026Predictor(season_year=year)
 

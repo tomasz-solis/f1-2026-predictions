@@ -1,7 +1,7 @@
 """
 Persistence layer for F1 prediction artifacts.
 
-Provides abstraction over file-based and database-backed storage.
+Wraps file-based and Supabase storage behind a single import.
 """
 
 from .artifact_store import ArtifactStore

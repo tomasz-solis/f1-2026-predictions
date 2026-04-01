@@ -1,11 +1,7 @@
 """
-Artifact Store: Abstraction layer for file and database persistence.
-
-Supports multiple storage modes:
-- file_only: Read/write only to local files (development)
-- db_only: Read/write only to Supabase (production)
-- fallback: Read DB first, fall back to file if not found
-- dual_write: Write to both DB and file (migration phase)
+ArtifactStore handles serialized prediction outputs the dashboard reads later.
+It is optimized for writing one artifact per prediction cycle and loading those
+artifacts back quickly. Accuracy tracking still depends on PredictionLogger.
 """
 
 import json
@@ -41,7 +37,7 @@ class ArtifactStore:
         """Initialize artifact store with data_root for file-based storage."""
         self.data_root = Path(data_root)
         self.storage_mode = get_storage_mode()
-        logger.info(f"ArtifactStore initialized with mode: {self.storage_mode}")
+        logger.info("ArtifactStore initialized with mode: %s", self.storage_mode)
 
     def save_artifact(
         self,
@@ -75,17 +71,19 @@ class ArtifactStore:
             try:
                 run_uuid = uuid.UUID(run_id) if isinstance(run_id, str) else run_id
             except ValueError:
-                logger.warning(f"Invalid run_id format: {run_id}, ignoring")
+                logger.warning("Invalid run_id format: %s, ignoring", run_id)
 
         # Write to file
         if should_write_to_file():
             try:
                 self._write_file(artifact_type, artifact_key, data)
                 file_success = True
-                logger.debug(f"File write successful: {artifact_type}::{artifact_key} v{version}")
+                logger.debug(
+                    "File write successful: %s::%s v%s", artifact_type, artifact_key, version
+                )
             except (OSError, RuntimeError, TypeError, ValueError) as e:
                 last_error = e
-                logger.error(f"File write failed: {e}")
+                logger.error("File write failed: %s", e)
 
         # Write to DB
         if should_write_to_db():
@@ -94,13 +92,17 @@ class ArtifactStore:
                 db_success = True
                 elapsed = time.time() - start_time
                 logger.info(
-                    f"DB write successful: {artifact_type}::{artifact_key} v{version} ({elapsed:.3f}s)"
+                    "DB write successful: %s::%s v%s (%.3fs)",
+                    artifact_type,
+                    artifact_key,
+                    version,
+                    elapsed,
                 )
                 # Return DB result (includes id, timestamps)
                 return result
             except (APIError, AttributeError, RuntimeError, TypeError, ValueError) as e:
                 last_error = e
-                logger.error(f"DB write failed: {e}")
+                logger.error("DB write failed: %s", e)
 
         # Check if any write succeeded
         if not file_success and not db_success:
@@ -134,11 +136,14 @@ class ArtifactStore:
                 if result:
                     elapsed = time.time() - start_time
                     logger.debug(
-                        f"DB read successful: {artifact_type}::{artifact_key} ({elapsed:.3f}s)"
+                        "DB read successful: %s::%s (%.3fs)",
+                        artifact_type,
+                        artifact_key,
+                        elapsed,
                     )
                     return result
             except (APIError, AttributeError, RuntimeError, TypeError, ValueError) as e:
-                logger.warning(f"DB read failed, trying file fallback: {e}")
+                logger.warning("DB read failed, trying file fallback: %s", e)
 
         # Try file (either as primary or fallback)
         try:
@@ -146,11 +151,14 @@ class ArtifactStore:
             if result:
                 elapsed = time.time() - start_time
                 logger.debug(
-                    f"File read successful: {artifact_type}::{artifact_key} ({elapsed:.3f}s)"
+                    "File read successful: %s::%s (%.3fs)",
+                    artifact_type,
+                    artifact_key,
+                    elapsed,
                 )
                 return result
         except (OSError, json.JSONDecodeError, TypeError, ValueError) as e:
-            logger.error(f"File read failed: {e}")
+            logger.error("File read failed: %s", e)
 
         return None
 
@@ -168,7 +176,7 @@ class ArtifactStore:
                 if db_rows or self.storage_mode == "db_only":
                     return db_rows
             except (APIError, AttributeError, RuntimeError, TypeError, ValueError) as e:
-                logger.warning(f"DB list failed: {e}")
+                logger.warning("DB list failed: %s", e)
 
         # Fallback to file listing (less efficient)
         return self._list_files(artifact_type, key_prefix, limit)
@@ -191,7 +199,7 @@ class ArtifactStore:
                     row = cast(list[dict[str, Any]], result.data)[0]
                     return int(row.get("version", 0))
             except (APIError, AttributeError, RuntimeError, TypeError, ValueError) as e:
-                logger.warning(f"DB version check failed: {e}")
+                logger.warning("DB version check failed: %s", e)
 
         # Fallback: check file (version stored in data if available)
         try:
@@ -306,7 +314,7 @@ class ArtifactStore:
             try:
                 data = json.loads(file_path.read_text())
             except (OSError, json.JSONDecodeError, TypeError) as exc:
-                logger.warning(f"Skipping unreadable artifact file {file_path}: {exc}")
+                logger.warning("Skipping unreadable artifact file %s: %s", file_path, exc)
                 continue
 
             mtime = file_path.stat().st_mtime

@@ -49,7 +49,7 @@ class Config:
 
         # Validate required sections exist
         self._validate_config()
-        logger.info(f"Configuration loaded successfully from {config_path}")
+        logger.info("Configuration loaded successfully from %s", config_path)
 
     def _validate_config(self) -> None:
         """Validate that required config sections exist, with correct structure and value ranges."""
@@ -67,7 +67,7 @@ class Config:
                 logger.info("Config passed Pydantic schema validation")
             except Exception as pydantic_error:
                 logger.warning(
-                    f"Pydantic validation failed (falling back to legacy): {pydantic_error}"
+                    "Pydantic validation failed (falling back to legacy): %s", pydantic_error
                 )
                 # Continue with legacy validation below
         except ImportError:

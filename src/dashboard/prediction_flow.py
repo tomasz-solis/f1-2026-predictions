@@ -249,7 +249,7 @@ def fetch_grid_if_available(
     )
 
     if completion_state == "completed":
-        logger.info(f"{session_name} is completed, fetching actual grid from FastF1")
+        logger.info("%s is completed, fetching actual grid from FastF1", session_name)
         actual_grid = fetch_actual_session_results(year, race_name, session_name)
         if actual_grid:
             validated_grid = validate_qualifying_grid(actual_grid)

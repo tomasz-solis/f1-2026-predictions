@@ -1,4 +1,8 @@
-"""Persist and reconcile saved predictions for later accuracy analysis."""
+"""
+PredictionLogger records predictions that will later be scored against actual
+race results. Writing to ArtifactStore is not enough on its own. Anything that
+should show up in the accuracy view needs to pass through this logger too.
+"""
 
 from __future__ import annotations
 

@@ -139,9 +139,9 @@ def _clear_fastf1_race_cache(year: int, race_name: str) -> None:
                     shutil.rmtree(event_cache_dir)
                     removed_paths.append(event_cache_dir)
                 except Exception as exc:  # pragma: no cover - defensive logging
-                    logger.warning(f"Could not clear FastF1 cache path {event_cache_dir}: {exc}")
+                    logger.warning("Could not clear FastF1 cache path %s: %s", event_cache_dir, exc)
         except Exception as exc:
-            logger.warning(f"Could not inspect FastF1 cache at {year_dir}: {exc}")
+            logger.warning("Could not inspect FastF1 cache at %s: %s", year_dir, exc)
             continue
 
         if removed_paths:
@@ -149,11 +149,15 @@ def _clear_fastf1_race_cache(year: int, race_name: str) -> None:
             if len(removed_paths) > 5:
                 removed_labels += ", ..."
             logger.info(
-                f"Cleared FastF1 cache for {race_name} {year}: "
-                f"{len(removed_paths)} path(s) in {cache_dir} ({removed_labels})"
+                "Cleared FastF1 cache for %s %s: %s path(s) in %s (%s)",
+                race_name,
+                year,
+                len(removed_paths),
+                cache_dir,
+                removed_labels,
             )
         else:
-            logger.info(f"No FastF1 cache paths matched {race_name} {year} in {cache_dir}")
+            logger.info("No FastF1 cache paths matched %s %s in %s", race_name, year, cache_dir)
 
 
 def _normalize_cache_fragment(value: str) -> str:
