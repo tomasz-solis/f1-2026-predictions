@@ -9,6 +9,9 @@ from unittest.mock import patch
 import pytest
 
 import src.predictors.baseline.race.preparation_mixin as prep_module
+from src.predictors.baseline.race.preparation_flow import (
+    _blend_race_skill_with_bayesian_form,
+)
 from src.predictors.baseline.race.preparation_mixin import BaselineRacePreparationMixin
 
 
@@ -40,6 +43,28 @@ class DummyConfig:
 
     def get(self, key: str, default=None):
         return self._overrides.get(key, default)
+
+
+def _portable_skill_config() -> DummyConfig:
+    """Return the shared blend config used by portable-skill tests."""
+    return DummyConfig(
+        {
+            "grid.size": 22,
+            "baseline_predictor.driver_form.bayesian_pace_blend_per_race": 0.20,
+            "baseline_predictor.driver_form.bayesian_pace_blend_cap": 0.60,
+        }
+    )
+
+
+def _established_driver_with_rating(rating_mu: float) -> dict[str, object]:
+    """Build a minimal established-driver payload with Bayesian form."""
+    return {
+        "experience": {"tier": "established"},
+        "bayesian": {
+            "rating_mu": rating_mu,
+            "normalized_skill_score": 0.99,
+        },
+    }
 
 
 @contextmanager
@@ -288,20 +313,90 @@ def test_prepare_driver_info_resolves_team_alias_for_uncertainty():
 
 def test_build_portable_skill_signal_recomputes_bayesian_normalization():
     prep = DummyPreparation()
-    prep.config = DummyConfig({"grid.size": 22})
+    prep.races_completed = 3
+    prep.config = _portable_skill_config()
     prep.drivers = {
-        "HAM": {
-            "experience": {"tier": "veteran"},
-            "bayesian": {
-                "rating_mu": 11.0,
-                "normalized_skill_score": 0.95,
-            },
-        }
+        "HAM": _established_driver_with_rating(11.0),
     }
 
     portable_skill = prep._build_portable_skill_signal("HAM", base_skill=0.40)
 
-    assert portable_skill == pytest.approx((0.40 + (10.0 / 21.0)) / 2.0)
+    expected = _blend_race_skill_with_bayesian_form(
+        driver_data=prep.drivers["HAM"],
+        base_skill=0.40,
+        races_completed=3,
+        grid_size=22,
+        config=prep.config,
+    )
+
+    stale_cached_blend = (0.40 * 0.40) + (0.60 * 0.95)
+
+    assert portable_skill == pytest.approx(expected)
+    assert portable_skill != pytest.approx(stale_cached_blend)
+
+
+def test_portable_skill_signal_zero_races_returns_base_skill():
+    """Portable skill should stay at the prior until there is race evidence to blend."""
+    prep = DummyPreparation()
+    prep.races_completed = 0
+    prep.config = _portable_skill_config()
+    prep.drivers = {"HAM": _established_driver_with_rating(18.0)}
+
+    portable_skill = prep._build_portable_skill_signal("HAM", base_skill=0.50)
+
+    assert portable_skill == pytest.approx(0.50)
+
+
+def test_portable_skill_signal_moves_toward_positive_bayesian_form():
+    """Portable skill should move up when established-driver form is better than the prior."""
+    prep = DummyPreparation()
+    prep.races_completed = 5
+    prep.config = _portable_skill_config()
+    prep.drivers = {"HAM": _established_driver_with_rating(18.0)}
+
+    portable_skill = prep._build_portable_skill_signal("HAM", base_skill=0.30)
+
+    assert portable_skill > 0.30
+    assert portable_skill == pytest.approx(
+        _blend_race_skill_with_bayesian_form(
+            driver_data=prep.drivers["HAM"],
+            base_skill=0.30,
+            races_completed=5,
+            grid_size=22,
+            config=prep.config,
+        )
+    )
+
+
+def test_portable_skill_signal_moves_toward_negative_bayesian_form():
+    """Portable skill should move down when established-driver form is below the prior."""
+    prep = DummyPreparation()
+    prep.races_completed = 5
+    prep.config = _portable_skill_config()
+    prep.drivers = {"HAM": _established_driver_with_rating(3.0)}
+
+    portable_skill = prep._build_portable_skill_signal("HAM", base_skill=0.80)
+
+    assert portable_skill < 0.80
+
+
+def test_portable_skill_and_blend_race_skill_agree():
+    """Portable-skill and race-skill blending should share one live formula."""
+    prep = DummyPreparation()
+    prep.races_completed = 4
+    prep.config = _portable_skill_config()
+    prep.drivers = {"HAM": _established_driver_with_rating(14.0)}
+
+    portable_skill = prep._build_portable_skill_signal("HAM", base_skill=0.55)
+    blended_skill = _blend_race_skill_with_bayesian_form(
+        driver_data=prep.drivers["HAM"],
+        base_skill=0.55,
+        races_completed=4,
+        grid_size=22,
+        config=prep.config,
+    )
+
+    assert portable_skill == pytest.approx(blended_skill)
 
 
 def test_prepare_driver_info_with_compounds_resolves_team_alias_for_compound_data():

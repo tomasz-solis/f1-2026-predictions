@@ -224,7 +224,7 @@ def simulate_race_lap_by_lap(
             if rng.random() < info["dnf_probability"] / race_distance:
                 state["has_dnf"] = True
                 state["dnf_lap"] = lap_num
-                logger.debug(f"{driver} DNF on lap {lap_num}")
+                logger.debug("%s DNF on lap %s", driver, lap_num)
                 continue
 
             compound = state["current_compound"]
@@ -241,7 +241,7 @@ def simulate_race_lap_by_lap(
                 "team_pace_penalty_range", 5.0
             )
             skill_improvement_max = race_params.get("lap_time", {}).get(
-                "skill_improvement_max", 0.5
+                "skill_improvement_max", 0.75
             )
             team_strength_compression = race_params.get("team_strength_compression", 0.45)
 
@@ -594,12 +594,16 @@ def _apply_pit_stop(
         state["laps_on_tire"] = 0  # Fresh tires
 
         logger.debug(
-            f"Pit stop: {state.get('driver', 'unknown')} → {new_compound} (+{total_pit_loss:.2f}s)"
+            "Pit stop: %s → %s (+%ss)",
+            state.get("driver", "unknown"),
+            new_compound,
+            format(total_pit_loss, ".2f"),
         )
     else:
         logger.warning(
-            f"Stint number {state['stint_number']} exceeds compound sequence length "
-            f"{len(strategy['compound_sequence'])}"
+            "Stint number %s exceeds compound sequence length %s",
+            state["stint_number"],
+            len(strategy["compound_sequence"]),
         )
 
 

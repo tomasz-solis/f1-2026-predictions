@@ -34,8 +34,10 @@ def test_diagnostic_grid_to_race_correlation_is_finite(predictor):
         [grid_positions[driver] for driver in drivers],
         [race_positions[driver] for driver in drivers],
     )
-    assert np.isfinite(float(correlation))
-    assert -1.0 <= float(correlation) <= 1.0
+    assert correlation >= 0.60, (
+        f"Grid-to-race Spearman correlation is {correlation:.3f}. "
+        "Expected >= 0.60 so qualifying still matters."
+    )
 
 
 def test_diagnostic_mean_position_change_is_bounded(predictor):
@@ -44,9 +46,12 @@ def test_diagnostic_mean_position_change_is_bounded(predictor):
     grid_positions = {entry["driver"]: entry["position"] for entry in qualifying["grid"]}
     race_positions = {entry["driver"]: entry["position"] for entry in race["finish_order"]}
     position_changes = [abs(grid_positions[d] - race_positions[d]) for d in grid_positions]
+    mean_change = float(np.mean(position_changes))
 
-    assert np.isfinite(float(np.mean(position_changes)))
-    assert 0.0 <= float(np.mean(position_changes)) <= 19.0
+    assert 0.5 <= mean_change <= 4.0, (
+        f"Mean position change is {mean_change:.2f}. "
+        "Expected 0.5-4.0 positions for a believable race spread."
+    )
 
 
 def test_diagnostic_pole_sitter_podium_probability_is_valid(predictor):
@@ -55,9 +60,10 @@ def test_diagnostic_pole_sitter_podium_probability_is_valid(predictor):
     pole_driver = qualifying["grid"][0]["driver"]
     pole_finish = next(entry for entry in race["finish_order"] if entry["driver"] == pole_driver)
     podium_probability = float(pole_finish["podium_probability"])
-
-    assert np.isfinite(podium_probability)
-    assert 0.0 <= podium_probability <= 100.0
+    assert podium_probability >= 35.0, (
+        f"Pole sitter top-3 probability is {podium_probability:.1f}%. "
+        "Expected at least 35% so pole still carries a real edge."
+    )
 
 
 def test_diagnostic_top5_podium_share_is_valid(predictor):
@@ -77,8 +83,10 @@ def test_diagnostic_top5_podium_share_is_valid(predictor):
         if total_podium_probability > 0
         else 0.0
     )
-    assert np.isfinite(top5_fraction)
-    assert 0.0 <= top5_fraction <= 100.0
+    assert top5_fraction >= 55.0, (
+        f"Top-5 qualifiers hold only {top5_fraction:.1f}% of podium probability. "
+        "Expected at least 55% so the front of the grid still matters."
+    )
 
 
 def test_diagnostic_top_grid_falloff_frequency_is_bounded(predictor):

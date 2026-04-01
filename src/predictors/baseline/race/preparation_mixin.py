@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from src.persistence.artifact_store import ArtifactStore
-from src.predictors.baseline.qualifying_preparation import resolve_bayesian_skill_score
 from src.types.prediction_types import DriverRaceInfo, QualifyingGridEntry
 from src.utils import config_loader
 from src.utils.schema_validation import validate_track_characteristics
 
 from .preparation_flow import (
+    _blend_race_skill_with_bayesian_form,
     build_missing_driver_fallback,
     infer_missing_driver_experience_tier,
     prepare_driver_info_core,
@@ -63,7 +63,7 @@ class BaselineRacePreparationMixin:
 
             current_lineups = load_current_lineups() or {}
         except (FileNotFoundError, OSError, ValueError, TypeError) as e:
-            logger.warning(f"Could not load current lineups for race preparation: {e}")
+            logger.warning("Could not load current lineups for race preparation: %s", e)
             current_lineups = {}
 
         self._current_lineups_cache = current_lineups
@@ -87,17 +87,15 @@ class BaselineRacePreparationMixin:
         if experience_tier not in {"established", "veteran", "sunset"}:
             return float(base_skill)
 
-        cfg = getattr(self, "config", config_loader)
+        cfg = getattr(self, "config", None) or config_loader
         configured_grid_size = int(cfg.get("grid.size", len(self.drivers) or 22))
-        normalized_skill = resolve_bayesian_skill_score(
-            driver_data,
+        return _blend_race_skill_with_bayesian_form(
+            driver_data=driver_data,
+            base_skill=float(base_skill),
+            races_completed=int(getattr(self, "races_completed", 0)),
             grid_size=max(configured_grid_size, len(self.drivers) or 0, 2),
+            config=cfg,
         )
-        if normalized_skill is None:
-            normalized_skill = float(base_skill)
-
-        portable_skill = max(float(base_skill), (float(base_skill) + normalized_skill) / 2.0)
-        return min(1.0, max(0.0, portable_skill))
 
     def _annotate_driver_assignment_context(
         self,
@@ -175,7 +173,7 @@ class BaselineRacePreparationMixin:
                     artifact_key="driver_debuts",
                 )
             except Exception as e:
-                logger.warning(f"Could not load driver debuts artifact: {e}")
+                logger.warning("Could not load driver debuts artifact: %s", e)
                 payload = None
 
             if isinstance(payload, dict):
@@ -189,7 +187,7 @@ class BaselineRacePreparationMixin:
                             continue
                     if debuts_from_store:
                         logger.info(
-                            f"Loaded {len(debuts_from_store)} driver debuts from artifact store"
+                            "Loaded %s driver debuts from artifact store", len(debuts_from_store)
                         )
                         self._driver_debut_years_cache = debuts_from_store
                         return debuts_from_store
@@ -207,11 +205,11 @@ class BaselineRacePreparationMixin:
 
             debut_years = load_driver_debuts_from_csv(debut_csv)
         except (FileNotFoundError, OSError, KeyError, ValueError, TypeError) as e:
-            logger.warning(f"Could not load driver debuts CSV: {e}")
+            logger.warning("Could not load driver debuts CSV: %s", e)
             debut_years = {}
 
         if debut_years:
-            logger.info(f"Loaded {len(debut_years)} driver debuts from CSV fallback")
+            logger.info("Loaded %s driver debuts from CSV fallback", len(debut_years))
 
         self._driver_debut_years_cache = debut_years
         return debut_years
@@ -252,7 +250,7 @@ class BaselineRacePreparationMixin:
                 tracks = track_data["tracks"]
                 return tracks.get(race_name, {}).get("overtaking_difficulty", 0.5)
         except (FileNotFoundError, KeyError, json.JSONDecodeError, ValueError) as e:
-            logger.warning(f"Could not load track characteristics: {e}. Using default 0.5.")
+            logger.warning("Could not load track characteristics: %s. Using default 0.5.", e)
             return 0.5
 
     def _prepare_driver_info(

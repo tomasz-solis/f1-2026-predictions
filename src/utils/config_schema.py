@@ -676,7 +676,7 @@ class LapTimeConfig(StrictConfigModel):
 
     reference_base: float = Field(default=90.0, ge=0.0)
     team_pace_penalty_range: float = Field(default=5.0, ge=0.0)
-    skill_improvement_max: float = Field(default=0.35, ge=0.0)
+    skill_improvement_max: float = Field(default=0.75, ge=0.0)
     team_strength_compression: float = Field(default=0.40, ge=0.0)
     elite_skill_threshold: float = Field(default=0.88, ge=0.0)
     elite_skill_lap_bonus_max: float = Field(default=0.22, ge=0.0)

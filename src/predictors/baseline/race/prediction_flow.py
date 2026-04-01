@@ -189,7 +189,7 @@ def predict_race_core(
             "baseline_predictor.race.lap_time.team_pace_penalty_range", 5.0
         ),
         "skill_improvement_max": cfg.get(
-            "baseline_predictor.race.lap_time.skill_improvement_max", 0.5
+            "baseline_predictor.race.lap_time.skill_improvement_max", 0.75
         ),
         "bounds": cfg.get("baseline_predictor.race.lap_time.bounds", [70.0, 120.0]),
         "elite_skill_threshold": cfg.get(
