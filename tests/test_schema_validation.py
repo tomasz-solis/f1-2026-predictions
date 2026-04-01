@@ -196,6 +196,19 @@ class TestTeamCharacteristicsSchema:
 
         validate_team_characteristics(data)
 
+    def test_valid_team_data_with_blend_provenance_fields(self):
+        """Allow replayed testing payloads to keep blend provenance details."""
+        data = _team_payload()
+        data["teams"]["McLaren"]["testing_characteristics"].update(
+            {
+                "sessions_blended": 2,
+                "effective_blend_weight": 0.18,
+                "circuits_observed": ["Testing 1", "Testing 2"],
+            }
+        )
+
+        validate_team_characteristics(data)
+
     def test_invalid_missing_teams_key(self):
         """Reject payloads without the teams map."""
         with pytest.raises(ValueError, match="teams"):

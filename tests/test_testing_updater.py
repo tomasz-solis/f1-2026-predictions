@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import pytest
+from fastf1.exceptions import DataNotLoadedError
 
 from src.systems.testing_updater import (
     _aggregate_metric_samples,
@@ -28,6 +29,7 @@ from src.systems.testing_updater import (
     _select_program_aware_laps,
     _testing_session_has_started,
 )
+from src.systems.testing_updater_metrics import _session_rain_fraction
 
 
 def test_canonicalize_team_name_aliases():
@@ -238,6 +240,17 @@ def test_collect_session_metrics_requires_minimum_valid_team_laps():
 
     assert perf == {}
     assert tire == {}
+
+
+def test_session_rain_fraction_handles_unloaded_weather_data():
+    """Missing lazy weather data should behave like unknown conditions, not crash replay."""
+
+    class DummySession:
+        @property
+        def weather_data(self):
+            raise DataNotLoadedError("weather data not loaded")
+
+    assert _session_rain_fraction(DummySession()) is None
 
 
 def test_classify_run_laps_by_stint_length():

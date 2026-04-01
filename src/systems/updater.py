@@ -287,7 +287,7 @@ def extract_team_performance_from_telemetry(
         team_laps = laps[laps["_canonical_team"] == team]
 
         if len(team_laps) == 0:
-            logger.warning(f"  No laps found for {team}")
+            logger.warning("  No laps found for %s", team)
             continue
 
         mask = team_laps["LapTime"].notna()
@@ -302,7 +302,7 @@ def extract_team_performance_from_telemetry(
         valid_laps = team_laps[mask]
 
         if len(valid_laps) < 5:
-            logger.warning(f"  {team}: Only {len(valid_laps)} valid laps, skipping")
+            logger.warning("  %s: Only %s valid laps, skipping", team, len(valid_laps))
             continue
 
         lap_times_seconds = valid_laps["LapTime"].dt.total_seconds()
@@ -319,7 +319,12 @@ def extract_team_performance_from_telemetry(
 
         median_time = clean_times.median()
         race_pace[team] = median_time
-        logger.debug(f"  {team}: Median lap time {median_time:.3f}s ({len(clean_times)} laps)")
+        logger.debug(
+            "  %s: Median lap time %ss (%s laps)",
+            team,
+            format(median_time, ".3f"),
+            len(clean_times),
+        )
 
     if race_pace:
         ranked_items = sorted(race_pace.items(), key=lambda item: item[1])
@@ -369,6 +374,8 @@ def update_team_characteristics(
 def update_bayesian_driver_ratings(
     race_results: pd.DataFrame,
     qualifying_results: pd.DataFrame | None = None,
+    *,
+    data_root: str | Path = "data",
 ) -> None:
     """Update Bayesian driver ratings plus qualifying pace from completed sessions."""
     logger.info("Updating Bayesian driver ratings...")
@@ -382,7 +389,7 @@ def update_bayesian_driver_ratings(
     grid_size = max(configured_grid_size, len(priors) or configured_grid_size)
 
     bayesian = BayesianDriverRanking(priors, grid_size=grid_size)
-    store = ArtifactStore(data_root="data")
+    store = ArtifactStore(data_root=data_root)
     driver_payload = _load_driver_characteristics_payload(store, season_year)
     drivers_payload = driver_payload.get("drivers") if isinstance(driver_payload, dict) else None
     if isinstance(drivers_payload, dict):
@@ -515,14 +522,14 @@ def update_from_race(year: int, race_name: str, data_dir: str = "data/processed"
     4. Reduce uncertainty
     """
     logger.info("=" * 60)
-    logger.info(f"Updating from {year} {race_name}")
+    logger.info("Updating from %s %s", year, race_name)
     logger.info("=" * 60)
 
     try:
         race_results, session = load_race_session(year, race_name)
-        logger.info(f"Loaded results for {len(race_results)} drivers\n")
+        logger.info("Loaded results for %s drivers\n", len(race_results))
     except (AttributeError, FileNotFoundError, OSError, RuntimeError, TypeError, ValueError) as e:
-        logger.error(f"Failed to load race results: {e}")
+        logger.error("Failed to load race results: %s", e)
         logger.error("Make sure race has completed and data is available via FastF1")
         raise
 
@@ -542,9 +549,15 @@ def update_from_race(year: int, race_name: str, data_dir: str = "data/processed"
     if char_file.exists():
         update_team_characteristics(race_results, session, char_file)
     else:
-        logger.warning(f"Team characteristics file not found: {char_file}")
+        logger.warning("Team characteristics file not found: %s", char_file)
 
-    update_bayesian_driver_ratings(race_results, qualifying_results=qualifying_results)
+    data_dir_path = Path(data_dir)
+    data_root = data_dir_path.parent if data_dir_path.name == "processed" else data_dir_path
+    update_bayesian_driver_ratings(
+        race_results,
+        qualifying_results=qualifying_results,
+        data_root=data_root,
+    )
 
     logger.info("\n" + "=" * 60)
     logger.info("Race update complete.")

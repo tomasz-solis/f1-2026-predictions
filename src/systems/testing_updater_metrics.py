@@ -7,6 +7,7 @@ import logging
 import fastf1
 import numpy as np
 import pandas as pd
+from fastf1.exceptions import DataNotLoadedError
 
 from src.extractors.performance import extract_all_teams_performance
 from src.systems.compound_analyzer import (
@@ -66,7 +67,11 @@ def _filter_valid_laps(team_laps: pd.DataFrame) -> pd.DataFrame:
 
 def _session_rain_fraction(session: fastf1.core.Session) -> float | None:
     """Return the share of a session affected by rainfall when weather data exists."""
-    weather_data = getattr(session, "weather_data", None)
+    try:
+        weather_data = getattr(session, "weather_data", None)
+    except (AttributeError, DataNotLoadedError, RuntimeError, TypeError, ValueError):
+        return None
+
     if not isinstance(weather_data, pd.DataFrame) or weather_data.empty:
         return None
     if "Rainfall" not in weather_data.columns:
@@ -661,7 +666,7 @@ def _collect_session_metrics(
     try:
         laps = session.laps
     except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
-        logger.debug(f"Session laps unavailable for {session_key}: {exc}")
+        logger.debug("Session laps unavailable for %s: %s", session_key, exc)
         if diagnostics is not None:
             diagnostics.append(f"{session_key}: laps unavailable ({type(exc).__name__})")
         return {}, {}

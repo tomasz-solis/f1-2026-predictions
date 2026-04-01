@@ -813,6 +813,7 @@ def test_update_bayesian_driver_ratings_writes_year_scoped_fallback_on_store_sav
 
 
 def test_update_from_race_skips_team_update_when_characteristics_missing(patcher, tmp_path):
+    """Driver updates should inherit the replay data root when team data is absent."""
     data_dir = tmp_path / "processed"
     (data_dir / "car_characteristics").mkdir(parents=True)
 
@@ -834,7 +835,11 @@ def test_update_from_race_skips_team_update_when_characteristics_missing(patcher
     updater.update_from_race(2026, "Bahrain Grand Prix", str(data_dir))
 
     team_update.assert_not_called()
-    bayesian_update.assert_called_once_with(race_results, qualifying_results=qualifying_results)
+    bayesian_update.assert_called_once_with(
+        race_results,
+        qualifying_results=qualifying_results,
+        data_root=tmp_path,
+    )
 
 
 def test_update_from_race_reraises_load_errors(patcher):

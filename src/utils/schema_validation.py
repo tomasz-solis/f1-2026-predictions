@@ -155,6 +155,9 @@ _TESTING_CHARACTERISTICS_SCHEMA = {
         "consistency_performance": _UNIT_INTERVAL_NUMBER,
         "tire_deg_slope": {"type": "number", "minimum": -2.0, "maximum": 2.0},
         "sessions_used": {"type": "number", "minimum": 0.0},
+        "sessions_blended": {"type": "integer", "minimum": 0},
+        "effective_blend_weight": _UNIT_INTERVAL_NUMBER,
+        "circuits_observed": {"type": "array", "items": {"type": "string"}},
         "session_aggregation": {"type": "string"},
         "run_profile": {"type": "string", "enum": ["balanced", "short_run", "long_run"]},
         "last_updated": _STRING_OR_NULL,
@@ -345,17 +348,17 @@ def validate_json(data: dict[str, Any], schema: dict[str, Any], filename: str) -
     """Validate a payload against a JSON schema."""
     if validate is None:
         logger.warning(
-            f"jsonschema library not available. Skipping validation of {filename}. "
-            "Install jsonschema to enable validation: pip install jsonschema"
+            "jsonschema library not available. Skipping validation of %s. Install jsonschema to enable validation: pip install jsonschema",
+            filename,
         )
         return
 
     try:
         validate(instance=data, schema=schema)
-        logger.info(f"{filename} validated successfully")
+        logger.info("%s validated successfully", filename)
     except ValidationError as exc:
         error_msg = f"Invalid {filename}: {str(exc)}"
-        logger.error(f"{filename} validation failed: {error_msg}")
+        logger.error("%s validation failed: %s", filename, error_msg)
         raise ValueError(error_msg) from exc
     except (AttributeError, TypeError, KeyError, ValueError) as exc:
         error_msg = f"Unexpected validation error in {filename}: {str(exc)}"
@@ -370,7 +373,7 @@ def _validate_expected_year(
     *,
     allow_missing: bool = False,
 ) -> None:
-    """Ensure a payload matches the season we intended to load."""
+    """Raise ValueError if the payload year does not match expected_year."""
     if expected_year is None:
         return
 
