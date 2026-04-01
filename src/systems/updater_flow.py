@@ -129,10 +129,15 @@ def _apply_team_performance_updates(
             team_data["races_completed"] = len(team_data["current_season_performance"])
 
             logger.info(
-                f"  {team}: Race {new_performance:.3f} → Avg {running_avg:.3f} "
-                f"(baseline {old_baseline:.3f}→{updated_baseline:.3f}, "
-                f"{team_data['races_completed']} races, "
-                f"uncertainty {old_uncertainty:.2f}→{updated_uncertainty:.2f})"
+                "  %s: Race %s → Avg %s (baseline %s→%s, %s races, uncertainty %s→%s)",
+                team,
+                format(new_performance, ".3f"),
+                format(running_avg, ".3f"),
+                format(old_baseline, ".3f"),
+                format(updated_baseline, ".3f"),
+                team_data["races_completed"],
+                format(old_uncertainty, ".2f"),
+                format(updated_uncertainty, ".2f"),
             )
 
 
@@ -214,9 +219,11 @@ def _apply_compound_metric_updates(
                 compound_payload["last_updated"] = now_iso
 
             team_data["compound_characteristics"] = blended_compounds
-            logger.info(f"  {team_name}: Updated {len(blended_compounds)} compound characteristics")
+            logger.info(
+                "  %s: Updated %s compound characteristics", team_name, len(blended_compounds)
+            )
 
-    logger.info(f"Updated compound characteristics for {len(normalized_compound_metrics)} teams")
+    logger.info("Updated compound characteristics for %s teams", len(normalized_compound_metrics))
 
 
 def _create_backup_if_needed(*, characteristics_file: Path, logger: logging.Logger) -> None:
@@ -224,7 +231,7 @@ def _create_backup_if_needed(*, characteristics_file: Path, logger: logging.Logg
     if characteristics_file.exists():
         backup_file = Path(str(characteristics_file) + ".backup")
         shutil.copy2(characteristics_file, backup_file)
-        logger.debug(f"Created backup at {backup_file}")
+        logger.debug("Created backup at %s", backup_file)
 
 
 def _save_characteristics_payload(
@@ -248,12 +255,12 @@ def _save_characteristics_payload(
             data=char_data,
             version=new_version,
         )
-        logger.info(f"Updated team characteristics (v{new_version}) via ArtifactStore")
+        logger.info("Updated team characteristics (v%s) via ArtifactStore", new_version)
     except (RuntimeError, OSError, TypeError, ValueError) as exc:
-        logger.error(f"ArtifactStore save failed: {exc}, falling back to file")
+        logger.error("ArtifactStore save failed: %s, falling back to file", exc)
         with open(characteristics_file, "w") as f:
             json.dump(char_data, f, indent=2)
-        logger.info(f"Updated team characteristics (v{new_version}) in {characteristics_file}")
+        logger.info("Updated team characteristics (v%s) in %s", new_version, characteristics_file)
 
 
 def update_team_characteristics_core(
@@ -328,7 +335,7 @@ def update_team_characteristics_core(
             logger=logger,
         )
     except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
-        logger.warning(f"Failed to extract compound metrics from race: {exc}")
+        logger.warning("Failed to extract compound metrics from race: %s", exc)
 
     char_data["last_updated"] = now_iso
     char_data["data_freshness"] = "LIVE_UPDATED"

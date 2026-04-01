@@ -22,7 +22,7 @@ def update_compound_characteristics_from_session(
     """Extract, blend, cache, and optionally persist session compound characteristics."""
     cache_key = (race_name, year, len(session_laps))
     if cache_key in context._compound_cache:
-        logger.debug(f"Using cached compound metrics for {race_name} ({len(session_laps)} laps)")
+        logger.debug("Using cached compound metrics for %s (%s laps)", race_name, len(session_laps))
         cached_compounds = context._compound_cache[cache_key]
         for team_name, compounds in cached_compounds.items():
             if team_name in context.teams:
@@ -36,7 +36,7 @@ def update_compound_characteristics_from_session(
     )
     from src.utils.team_mapping import map_team_to_characteristics
 
-    logger.info(f"Extracting compound metrics from session for {race_name}...")
+    logger.info("Extracting compound metrics from session for %s...", race_name)
 
     race_compound_metrics: dict[str, dict[str, Any]] = {}
     known_teams = set(context.teams.keys())
@@ -103,15 +103,16 @@ def update_compound_characteristics_from_session(
                         ].get("compound_characteristics", {})
                 store.save_artifact("car_characteristics", artifact_key, car_data)
                 logger.debug(
-                    "Persisted compound characteristics for "
-                    f"{len(normalized_compound_metrics)} teams to DB"
+                    "Persisted compound characteristics for %s teams to DB",
+                    len(normalized_compound_metrics),
                 )
         except Exception as exc:
-            logger.warning(f"Failed to persist compound characteristics to DB: {exc}")
+            logger.warning("Failed to persist compound characteristics to DB: %s", exc)
     else:
         logger.debug("Skipping DB persistence (file-only mode or no artifact store)")
 
     logger.info(
-        f"Updated and cached compound characteristics for {len(normalized_compound_metrics)} teams "
-        f"(blend_weight={blend_weight:.0%})"
+        "Updated and cached compound characteristics for %s teams (blend_weight=%s)",
+        len(normalized_compound_metrics),
+        format(blend_weight, ".0%"),
     )

@@ -52,7 +52,11 @@ def get_lineups_from_session(
         ValueError,
     ) as e:
         logger.warning(
-            f"Failed to extract lineups from {race_name} ({year}) {session_type} session: {e}. Lineups from this session will be unavailable."
+            "Failed to extract lineups from %s (%s) %s session: %s. Lineups from this session will be unavailable.",
+            race_name,
+            year,
+            session_type,
+            e,
         )
         # Session data not available
         return None
@@ -131,7 +135,7 @@ def save_current_lineups(
     with open(config_file, "w") as f:
         json.dump(output, f, indent=2)
 
-    logger.info(f"Saved lineups to {config_file}")
+    logger.info("Saved lineups to %s", config_file)
 
 
 def extract_lineups_for_season(
@@ -144,7 +148,7 @@ def extract_lineups_for_season(
     schedule = ff1.get_event_schedule(year)
     all_lineups: dict[str, dict[str, list[str]]] = {}
 
-    logger.info(f"Extracting lineups for {year} season...")
+    logger.info("Extracting lineups for %s season...", year)
 
     for _, event in schedule.iterrows():
         race_name = event["EventName"]
@@ -156,11 +160,11 @@ def extract_lineups_for_season(
 
         if lineups:
             all_lineups[race_name] = lineups
-            logger.info(f"{race_name}: {len(lineups)} teams")
+            logger.info("%s: %s teams", race_name, len(lineups))
         else:
-            logger.warning(f"{race_name}: No data")
+            logger.warning("%s: No data", race_name)
 
-    logger.info(f"Extracted {len(all_lineups)} races")
+    logger.info("Extracted %s races", len(all_lineups))
 
     if output_path:
         output = {"season": year, "races": all_lineups}
@@ -171,6 +175,6 @@ def extract_lineups_for_season(
         with open(output_file, "w") as f:
             json.dump(output, f, indent=2)
 
-        logger.info(f"Saved to {output_file}")
+        logger.info("Saved to %s", output_file)
 
     return all_lineups

@@ -187,7 +187,7 @@ def get_races_for_year(year: int, max_races: int | None = None) -> list[str]:
         TypeError,
         ValueError,
     ) as exc:
-        logger.warning(f"Could not load FastF1 schedule for {year}: {exc}")
+        logger.warning("Could not load FastF1 schedule for %s: %s", year, exc)
 
     if not races:
         # Conservative deterministic fallback for offline use.
@@ -351,7 +351,7 @@ def run_single_race_backtest(
             "race_actual_top10": _top_n_entries(race_actual),
         }
     except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
-        logger.warning(f"Backtest failed for {race_name}: {exc}")
+        logger.warning("Backtest failed for %s: %s", race_name, exc)
         return {
             "race_name": race_name,
             "status": "skipped",

@@ -699,7 +699,9 @@ def load_track_specific_params(race_name: str | None = None, year: int = 2026) -
                 pit_loss = track_info.get("pit_stop_loss")
                 if pit_loss is not None:
                     track_params["pit_stops"] = {"loss_duration": float(pit_loss)}
-                    logger.info(f"Loaded track-specific pit stop loss for {race_name}: {pit_loss}s")
+                    logger.info(
+                        "Loaded track-specific pit stop loss for %s: %ss", race_name, pit_loss
+                    )
 
                 # Extract safety car probability
                 sc_prob = track_info.get("safety_car_prob")
@@ -731,18 +733,18 @@ def load_track_specific_params(race_name: str | None = None, year: int = 2026) -
 
             else:
                 logger.warning(
-                    f"Track '{race_name}' not found in track_characteristics. "
-                    "Using config defaults."
+                    "Track '%s' not found in track_characteristics. Using config defaults.",
+                    race_name,
                 )
 
         except json.JSONDecodeError:
             logger.error(
-                f"Failed to parse track characteristics JSON at {track_chars_path}. "
-                "Using config defaults."
+                "Failed to parse track characteristics JSON at %s. Using config defaults.",
+                track_chars_path,
             )
         except _TRACK_ERRORS as e:
             logger.error(
-                f"Unexpected error loading track characteristics: {e}. Using config defaults."
+                "Unexpected error loading track characteristics: %s. Using config defaults.", e
             )
 
     return track_params
@@ -790,10 +792,10 @@ def get_tire_stress_score(race_name: str | None = None, year: int = 2026) -> flo
 
             return float(stress_score)
         else:
-            logger.warning(f"Tire stress data not found for {race_name}. Using default (3.0).")
+            logger.warning("Tire stress data not found for %s. Using default (3.0).", race_name)
 
     except _TRACK_ERRORS as e:
-        logger.error(f"Error loading Pirelli data: {e}. Using default stress (3.0).")
+        logger.error("Error loading Pirelli data: %s. Using default stress (3.0).", e)
 
     # Fallback to config default
     return config_loader.get("baseline_predictor.compound_selection.default_stress_fallback", 3.0)
@@ -1053,8 +1055,12 @@ def resolve_race_distance_laps(year: int, race_name: str | None, is_sprint: bool
             return max(1, int(total_laps))
     except _TRACK_ERRORS as exc:
         logger.warning(
-            f"Could not resolve race distance for {race_name} ({year}, {session_name}): {exc}. "
-            f"Using fallback {default_distance} laps."
+            "Could not resolve race distance for %s (%s, %s): %s. Using fallback %s laps.",
+            race_name,
+            year,
+            session_name,
+            exc,
+            default_distance,
         )
 
     return default_distance

@@ -165,7 +165,7 @@ def select_race_compound(*, race_name: str, season_year: int, cfg: Any) -> str:
             return "SOFT"
         return "MEDIUM"
     except Exception as exc:
-        logger.debug(f"Could not determine race compound for {race_name}: {exc}")
+        logger.debug("Could not determine race compound for %s: %s", race_name, exc)
         return "MEDIUM"
 
 
@@ -194,7 +194,11 @@ def get_compound_adjusted_team_strength(
     compound_modifier = get_compound_performance_modifier_fn(compound_chars, compound)
     adjusted_strength = float(np.clip(base_strength + compound_modifier, 0.0, 1.0))
     logger.debug(
-        f"  {team} on {compound}: base={base_strength:.3f} + "
-        f"compound={compound_modifier:+.3f} = {adjusted_strength:.3f}"
+        "  %s on %s: base=%s + compound=%s = %s",
+        team,
+        compound,
+        format(base_strength, ".3f"),
+        format(compound_modifier, "+.3f"),
+        format(adjusted_strength, ".3f"),
     )
     return adjusted_strength

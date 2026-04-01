@@ -48,12 +48,12 @@ class SystematicLearningSystem:
                 data = json.load(f)
         except (OSError, json.JSONDecodeError) as exc:
             logger.warning(
-                f"Failed to load learning state from {self.state_file} ({exc}); resetting state."
+                "Failed to load learning state from %s (%s); resetting state.", self.state_file, exc
             )
             return self._default_state()
 
         if not isinstance(data, dict):
-            logger.warning(f"Learning state at {self.state_file} is not a JSON object; resetting.")
+            logger.warning("Learning state at %s is not a JSON object; resetting.", self.state_file)
             return self._default_state()
 
         merged = self._default_state()

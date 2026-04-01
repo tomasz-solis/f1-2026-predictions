@@ -478,7 +478,7 @@ class BaselineDataMixin:
         try:
             validate_team_characteristics(data, expected_year=target_year)
         except ValueError as e:
-            logger.error(f"Failed to load team characteristics: {e}")
+            logger.error("Failed to load team characteristics: %s", e)
             raise
 
         raw_teams = data.get("teams", {})
@@ -500,10 +500,10 @@ class BaselineDataMixin:
                 "Using pre-season baseline data; team performance remains uncertain until races complete."
             )
         elif data_freshness == "LIVE_UPDATED":
-            logger.info(f"Using live-updated data from {races_completed} race(s)")
+            logger.info("Using live-updated data from %s race(s)", races_completed)
         else:
             logger.warning(
-                f"Data freshness unknown ({data_freshness}); predictions may be outdated"
+                "Data freshness unknown (%s); predictions may be outdated", data_freshness
             )
 
         try:
@@ -552,7 +552,7 @@ class BaselineDataMixin:
         try:
             validate_driver_characteristics(driver_data, expected_year=target_year)
         except ValueError as e:
-            logger.error(f"Failed to load driver characteristics: {e}")
+            logger.error("Failed to load driver characteristics: %s", e)
             raise
 
         # ERROR DETECTION: Check for extraction bugs (does NOT correct)
@@ -561,8 +561,8 @@ class BaselineDataMixin:
         errors = validate_driver_data(driver_data["drivers"])
         if errors:
             logger.warning(
-                f"Driver data has {len(errors)} validation errors. "
-                "Consider re-running extraction: python scripts/extract_driver_characteristics.py --years 2023,2024,2025,2026"
+                "Driver data has %s validation errors. Consider re-running extraction: python scripts/extract_driver_characteristics.py --years 2023,2024,2025,2026",
+                len(errors),
             )
 
         self.drivers = driver_data["drivers"]
@@ -592,12 +592,12 @@ class BaselineDataMixin:
             try:
                 validate_track_characteristics(track_data, expected_year=target_year)
             except ValueError as e:
-                logger.error(f"Failed to load track characteristics: {e}")
+                logger.error("Failed to load track characteristics: %s", e)
                 raise
 
         self.tracks = track_data.get("tracks", {})
         if self.tracks:
-            logger.info(f"Loaded track characteristics for {len(self.tracks)} circuits")
+            logger.info("Loaded track characteristics for %s circuits", len(self.tracks))
 
         # Store races completed and year for weight schedule (from car characteristics)
         self.races_completed = races_completed

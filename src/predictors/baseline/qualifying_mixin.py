@@ -375,7 +375,7 @@ class BaselineQualifyingMixin:
                 )
             )
         except Exception as exc:
-            logger.debug(f"Could not load learned qualifying adjustment for {driver}: {exc}")
+            logger.debug("Could not load learned qualifying adjustment for %s: %s", driver, exc)
             return 0.0
 
     def _build_driver_list_with_strengths(

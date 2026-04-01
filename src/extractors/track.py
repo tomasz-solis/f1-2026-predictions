@@ -30,7 +30,7 @@ def extract_track_metrics(session) -> dict[str, float] | None:
             "high_pct": float((tel["Speed"] >= 200).mean()),
         }
     except (AttributeError, KeyError, ValueError, TypeError) as e:
-        logger.warning(f"Failed to extract track metrics: {e}")
+        logger.warning("Failed to extract track metrics: %s", e)
         return None
 
 
@@ -103,7 +103,8 @@ def extract_corner_characteristics(session) -> dict[str, float] | None:
         }
     except (AttributeError, KeyError, ValueError, TypeError) as e:
         logger.warning(
-            f"Could not extract corner characteristics: {e}. Corner metrics will be unavailable for car-track matching."
+            "Could not extract corner characteristics: %s. Corner metrics will be unavailable for car-track matching.",
+            e,
         )
         return None
 
@@ -118,7 +119,7 @@ def extract_full_throttle_pct(session) -> float | None:
         return float((tel["Throttle"] >= 98).mean())
     except (AttributeError, KeyError, ValueError, TypeError) as e:
         logger.warning(
-            f"Could not extract full throttle percentage: {e}. This metric will be unavailable."
+            "Could not extract full throttle percentage: %s. This metric will be unavailable.", e
         )
         return None
 
@@ -134,8 +135,8 @@ def extract_tire_stress_proxy(session) -> float | None:
         return float(energy_score)
     except (AttributeError, KeyError, ValueError, TypeError) as e:
         logger.warning(
-            f"Could not extract tire stress proxy (energy score): {e}. "
-            f"This metric will be unavailable."
+            "Could not extract tire stress proxy (energy score): %s. This metric will be unavailable.",
+            e,
         )
         return None
 

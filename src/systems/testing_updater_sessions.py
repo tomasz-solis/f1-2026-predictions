@@ -284,7 +284,7 @@ def load_sessions_for_event(
                 ValueError,
             ) as exc:
                 logger_obj.debug(
-                    f"Skipping unavailable session {year} {event_name} {session_name}: {exc}"
+                    "Skipping unavailable session %s %s %s: %s", year, event_name, session_name, exc
                 )
                 if error_messages is not None:
                     error_messages.append(

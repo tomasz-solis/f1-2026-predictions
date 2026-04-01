@@ -116,7 +116,7 @@ def generate_neutral_team_characteristics(data_dir: Path) -> None:
     with open(output_file, "w") as f:
         json.dump(team_characteristics, f, indent=2)
 
-    logger.info(f"  Generated {len(team_2025_standings)} team ratings from 2025 standings")
+    logger.info("  Generated %s team ratings from 2025 standings", len(team_2025_standings))
 
 
 def generate_default_track_characteristics(data_dir: Path) -> None:
@@ -276,7 +276,7 @@ def generate_default_track_characteristics(data_dir: Path) -> None:
     with open(output_file, "w") as f:
         json.dump(track_characteristics, f, indent=2)
 
-    logger.info(f"  Generated {len(tracks)} track characteristics")
+    logger.info("  Generated %s track characteristics", len(tracks))
 
 
 def create_driver_characteristics_if_missing(data_dir: Path) -> None:

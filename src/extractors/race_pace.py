@@ -77,7 +77,10 @@ def extract_fp2_pace(year: int, race_name: str, verbose: bool = False) -> dict |
 
     except (AttributeError, KeyError, ValueError, TypeError) as e:
         logger.error(
-            f"Failed to extract FP2 pace for {race_name} ({year}): {e}. Race pace simulation will be unavailable."
+            "Failed to extract FP2 pace for %s (%s): %s. Race pace simulation will be unavailable.",
+            race_name,
+            year,
+            e,
         )
         if verbose:
             logger.warning("FP2 extraction failed: %s", e)

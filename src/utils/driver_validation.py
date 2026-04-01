@@ -43,10 +43,10 @@ def validate_driver_data(drivers: dict) -> list[str]:
             errors.append(f"{driver_code}: DNF rate {dnf_rate:.3f} unrealistic (should be 0-50%)")
 
     if errors:
-        logger.warning(f"Found {len(errors)} validation errors:")
+        logger.warning("Found %s validation errors:", len(errors))
         for error in errors[:10]:  # Show first 10
-            logger.warning(f"   - {error}")
+            logger.warning("   - %s", error)
         if len(errors) > 10:
-            logger.warning(f"   ... and {len(errors) - 10} more")
+            logger.warning("   ... and %s more", len(errors) - 10)
 
     return errors

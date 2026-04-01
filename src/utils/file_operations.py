@@ -37,11 +37,11 @@ def atomic_json_write(file_path: Path, data: dict[str, Any], create_backup: bool
         if create_backup and file_path.exists():
             backup_path = file_path.with_suffix(file_path.suffix + ".backup")
             shutil.copy2(file_path, backup_path)
-            logger.debug(f"Created backup: {backup_path}")
+            logger.debug("Created backup: %s", backup_path)
 
         # Atomic move (on same filesystem, this is atomic)
         shutil.move(temp_path, file_path)
-        logger.debug(f"Atomically wrote: {file_path}")
+        logger.debug("Atomically wrote: %s", file_path)
 
     except (OSError, RuntimeError, TypeError, ValueError) as e:
         # Clean up temp file if it still exists
@@ -58,13 +58,13 @@ def restore_from_backup(file_path: Path) -> bool:
     backup_path = file_path.with_suffix(file_path.suffix + ".backup")
 
     if not backup_path.exists():
-        logger.warning(f"No backup found: {backup_path}")
+        logger.warning("No backup found: %s", backup_path)
         return False
 
     try:
         shutil.copy2(backup_path, file_path)
-        logger.info(f"Restored from backup: {file_path}")
+        logger.info("Restored from backup: %s", file_path)
         return True
     except OSError as e:
-        logger.error(f"Failed to restore from backup: {e}")
+        logger.error("Failed to restore from backup: %s", e)
         return False

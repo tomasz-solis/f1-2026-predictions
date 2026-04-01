@@ -59,7 +59,7 @@ class SessionDetector:
         try:
             fastf1.Cache.enable_cache(str(cache_dir))
         except _FASTF1_ERRORS as exc:
-            logger.debug(f"Could not enable FastF1 cache in SessionDetector: {exc}")
+            logger.debug("Could not enable FastF1 cache in SessionDetector: %s", exc)
         self._event_cache: dict[tuple[int, str], Any] = {}
         self._completion_cache: dict[tuple[int, str, str], SessionCompletionState] = {}
 
@@ -80,13 +80,17 @@ class SessionDetector:
                     if completion_state == "completed":
                         completed.append(session_name)
                 except _FASTF1_ERRORS as exc:
-                    logger.debug(f"Could not check session {session_name} for {race_name}: {exc}")
+                    logger.debug(
+                        "Could not check session %s for %s: %s", session_name, race_name, exc
+                    )
                     continue
 
             if not completed:
                 logger.info(
-                    f"No completed sessions found for {race_name} {year} "
-                    f"(checked: {', '.join(sessions_to_check)})"
+                    "No completed sessions found for %s %s (checked: %s)",
+                    race_name,
+                    year,
+                    ", ".join(sessions_to_check),
                 )
 
             return completed
@@ -94,11 +98,11 @@ class SessionDetector:
         except _FASTF1_ERRORS as exc:
             error_msg = str(exc)
             if "not found" in error_msg.lower():
-                logger.error(f"Race not found: {race_name} {year}. Check race name spelling.")
+                logger.error("Race not found: %s %s. Check race name spelling.", race_name, year)
             elif "connect" in error_msg.lower() or "network" in error_msg.lower():
-                logger.error(f"FastF1 API connection failed: {error_msg}")
+                logger.error("FastF1 API connection failed: %s", error_msg)
             else:
-                logger.error(f"Failed to detect sessions for {race_name} {year}: {error_msg}")
+                logger.error("Failed to detect sessions for %s %s: %s", race_name, year, error_msg)
             return []
 
     def get_latest_completed_session(

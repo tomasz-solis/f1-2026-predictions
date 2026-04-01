@@ -199,7 +199,7 @@ class CircuitBreaker:
             self.last_failure_time = time.time()
 
             if self.failure_count >= self.failure_threshold:
-                logger.error(f"Circuit breaker opened after {self.failure_count} failures")
+                logger.error("Circuit breaker opened after %s failures", self.failure_count)
                 self.state = "open"
             raise
 
@@ -224,7 +224,12 @@ def _fastf1_with_retry(
                 raise
             delay = initial_delay * (2**attempt)
             logger.warning(
-                f"FastF1 API error (attempt {attempt + 1}/{max_retries}): {e.__class__.__name__}: {e}. Retrying in {delay:.1f}s..."
+                "FastF1 API error (attempt %s/%s): %s: %s. Retrying in %ss...",
+                attempt + 1,
+                max_retries,
+                e.__class__.__name__,
+                e,
+                format(delay, ".1f"),
             )
             time.sleep(delay)
 
@@ -280,7 +285,7 @@ def _remove_outlier_laps(laps: pd.DataFrame, threshold: float = 1.5) -> pd.DataF
     mask = laps["LapTime"].dt.total_seconds().between(lower_bound, upper_bound, inclusive="both")
     removed = int((~mask).sum())
     if removed > 0:
-        logger.debug(f"Removed {removed} outlier laps (IQR threshold={threshold})")
+        logger.debug("Removed %s outlier laps (IQR threshold=%s)", removed, threshold)
 
     return laps[mask]
 
@@ -426,9 +431,11 @@ def get_fp_team_performance(
             session_age = datetime.now(tz=session.date.tzinfo) - session.date
             if session_age > timedelta(hours=max_data_age_hours):
                 logger.warning(
-                    f"{session_type} for {race_name} is "
-                    f"{session_age.total_seconds() / 3600:.1f}h old "
-                    f"(max {max_data_age_hours:.1f}h) - rejecting stale data"
+                    "%s for %s is %sh old (max %sh) - rejecting stale data",
+                    session_type,
+                    race_name,
+                    format(session_age.total_seconds() / 3600, ".1f"),
+                    format(max_data_age_hours, ".1f"),
                 )
                 return None, None, FPDataError.STALE_DATA
 
@@ -458,7 +465,10 @@ def get_fp_team_performance(
         # Reject red-flagged/truncated sessions (<10 total laps)
         if len(laps) < 10:
             logger.warning(
-                f"{session_type} for {race_name} has only {len(laps)} laps - likely red-flagged, rejecting"
+                "%s for %s has only %s laps - likely red-flagged, rejecting",
+                session_type,
+                race_name,
+                len(laps),
             )
             return None, None, FPDataError.INSUFFICIENT_LAPS
 
@@ -479,7 +489,12 @@ def get_fp_team_performance(
 
     except _FASTF1_ERRORS as e:
         logger.warning(
-            f"FastF1 API failure for {session_type} at {race_name} ({year}): {e.__class__.__name__}: {e}"
+            "FastF1 API failure for %s at %s (%s): %s: %s",
+            session_type,
+            race_name,
+            year,
+            e.__class__.__name__,
+            e,
         )
         return None, None, FPDataError.API_FAILURE
 
@@ -513,7 +528,7 @@ def get_fp_session_weather(year: int, race_name: str, session_type: str) -> str 
             return "wet"
         return "mixed"
     except _FASTF1_ERRORS as e:
-        logger.warning(f"Could not determine weather for {session_type}: {e}")
+        logger.warning("Could not determine weather for %s: %s", session_type, e)
         return None
 
 
@@ -616,21 +631,25 @@ def get_best_fp_performance_with_session_laps(
             if fp_weather and fp_weather != predicted_race_weather:
                 if len(available_sessions) == 1:
                     logger.warning(
-                        f"{primary_code} weather was {fp_weather} but race prediction uses "
-                        f"{predicted_race_weather}; FP blend confidence may be reduced"
+                        "%s weather was %s but race prediction uses %s; FP blend confidence may be reduced",
+                        primary_code,
+                        fp_weather,
+                        predicted_race_weather,
                     )
                 else:
                     logger.warning(
-                        f"Primary FP weather ({primary_code}: {fp_weather}) differs from "
-                        f"race prediction weather ({predicted_race_weather})"
+                        "Primary FP weather (%s: %s) differs from race prediction weather (%s)",
+                        primary_code,
+                        fp_weather,
+                        predicted_race_weather,
                     )
-        logger.info(f"Using {session_label} for blending")
+        logger.info("Using %s for blending", session_label)
         return session_label, blended_data, blended_laps, session_laps_by_code
 
     # Explain why practice data could not be blended.
     if errors_encountered:
         error_summary = ", ".join([f"{s}: {e.value}" for s, e in errors_encountered])
-        logger.info(f"No valid practice data ({error_summary}) - using model-only predictions")
+        logger.info("No valid practice data (%s) - using model-only predictions", error_summary)
     else:
         logger.info("No practice data available - using model-only predictions")
 
@@ -655,12 +674,13 @@ def blend_team_strength(
 
     if missing_from_fp:
         logger.warning(
-            f"Teams in model but missing from FP data (using model-only): {', '.join(sorted(missing_from_fp))}"
+            "Teams in model but missing from FP data (using model-only): %s",
+            ", ".join(sorted(missing_from_fp)),
         )
 
     if extra_in_fp:
         logger.debug(
-            f"Teams in FP data but not in model (ignoring): {', '.join(sorted(extra_in_fp))}"
+            "Teams in FP data but not in model (ignoring): %s", ", ".join(sorted(extra_in_fp))
         )
 
     blended = {}
@@ -669,13 +689,16 @@ def blend_team_strength(
         fp_score = fp_performance.get(team, model_score)
 
         if team in missing_from_fp:
-            logger.debug(f"  {team}: Model-only (no FP data) = {model_score:.3f}")
+            logger.debug("  %s: Model-only (no FP data) = %s", team, format(model_score, ".3f"))
             blended[team] = model_score
         else:
             blended_score = blend_weight * fp_score + (1 - blend_weight) * model_score
             logger.debug(
-                f"  {team}: FP={fp_score:.3f}, Model={model_score:.3f} "
-                f"→ Blended={blended_score:.3f}"
+                "  %s: FP=%s, Model=%s → Blended=%s",
+                team,
+                format(fp_score, ".3f"),
+                format(model_score, ".3f"),
+                format(blended_score, ".3f"),
             )
             blended[team] = blended_score
 

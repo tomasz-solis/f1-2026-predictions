@@ -94,7 +94,12 @@ def extract_fp_order_from_laps(
         except (AttributeError, KeyError, ValueError, TypeError) as e:
             # Try next variation
             logger.debug(
-                f"Session variation {variation} for {session_type} ({year} {race_name}) failed: {e}"
+                "Session variation %s for %s (%s %s) failed: %s",
+                variation,
+                session_type,
+                year,
+                race_name,
+                e,
             )
             continue
 
@@ -158,12 +163,20 @@ def extract_quali_order_from_positions(
 
         except (AttributeError, KeyError, ValueError, TypeError) as e:
             logger.debug(
-                f"Session variation {variation} for {session_type} ({year} {race_name}) failed: {e}"
+                "Session variation %s for %s (%s %s) failed: %s",
+                variation,
+                session_type,
+                year,
+                race_name,
+                e,
             )
             continue
 
     logger.warning(
-        f"Could not extract team order for {race_name} ({year}) using {session_type}. No session variation succeeded."
+        "Could not extract team order for %s (%s) using %s. No session variation succeeded.",
+        race_name,
+        year,
+        session_type,
     )
     return None
 
@@ -278,7 +291,9 @@ def test_session_as_predictor_fixed(
                 result["driver_within_3"] = sum(1 for e in errors if e <= 3) / len(errors)
         except (AttributeError, KeyError, ValueError, TypeError) as e:
             logger.error(
-                f"Error calculating driver-level accuracy for {race_name}: {e}. Driver metrics will be unavailable."
+                "Error calculating driver-level accuracy for %s: %s. Driver metrics will be unavailable.",
+                race_name,
+                e,
             )
             result["driver_error"] = str(e)
 

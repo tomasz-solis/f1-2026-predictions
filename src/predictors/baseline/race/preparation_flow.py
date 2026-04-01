@@ -198,8 +198,11 @@ def build_missing_driver_fallback(
         )
 
         logger.info(
-            f"Driver {driver_code} missing characteristics; using teammate-informed fallback from "
-            f"{teammate_code} for {team} (tier={inferred_tier})"
+            "Driver %s missing characteristics; using teammate-informed fallback from %s for %s (tier=%s)",
+            driver_code,
+            teammate_code,
+            team,
+            inferred_tier,
         )
         return {
             "pace": {
@@ -217,7 +220,7 @@ def build_missing_driver_fallback(
         }
 
     logger.warning(
-        f"Driver {driver_code} missing characteristics; using neutral fallback for {team}"
+        "Driver %s missing characteristics; using neutral fallback for %s", driver_code, team
     )
     neutral_pace = 0.5
     neutral_race = 0.5

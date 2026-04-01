@@ -157,7 +157,11 @@ def extract_compound_metrics(
         # Skip compounds with insufficient data
         if laps_count < MIN_LAPS_PER_COMPOUND:
             logger.debug(
-                f"  {canonical_team} {compound_name}: Only {laps_count} laps, skipping (need {MIN_LAPS_PER_COMPOUND})"
+                "  %s %s: Only %s laps, skipping (need %s)",
+                canonical_team,
+                compound_name,
+                laps_count,
+                MIN_LAPS_PER_COMPOUND,
             )
             continue
 

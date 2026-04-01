@@ -36,8 +36,10 @@ def calculate_adaptive_blend_weight(
         weather_penalty = 0.15
         base_weight -= weather_penalty
         logger.debug(
-            f"Weather mismatch (FP={fp_weather}, Race={predicted_race_weather}): "
-            f"-{weather_penalty} blend weight"
+            "Weather mismatch (FP=%s, Race=%s): -%s blend weight",
+            fp_weather,
+            predicted_race_weather,
+            weather_penalty,
         )
 
     # Factor 2: Representative running
@@ -47,7 +49,7 @@ def calculate_adaptive_blend_weight(
         representativeness_penalty = 0.10
         base_weight -= representativeness_penalty
         logger.debug(
-            f"Truncated session ({total_laps} laps): -{representativeness_penalty} blend weight"
+            "Truncated session (%s laps): -%s blend weight", total_laps, representativeness_penalty
         )
 
     # Factor 3: Track evolution
@@ -56,11 +58,11 @@ def calculate_adaptive_blend_weight(
     if session_type == "FP1":
         evolution_penalty = 0.08
         base_weight -= evolution_penalty
-        logger.debug(f"FP1 track evolution: -{evolution_penalty} blend weight")
+        logger.debug("FP1 track evolution: -%s blend weight", evolution_penalty)
     elif session_type == "FP3":
         evolution_bonus = 0.05
         base_weight += evolution_bonus
-        logger.debug(f"FP3 track evolution: +{evolution_bonus} blend weight")
+        logger.debug("FP3 track evolution: +%s blend weight", evolution_bonus)
 
     # Factor 4: Track limits violations
     # High violation count suggests drivers struggling with limits = less representative
@@ -69,7 +71,9 @@ def calculate_adaptive_blend_weight(
         validity_penalty = 0.05
         base_weight -= validity_penalty
         logger.debug(
-            f"High track limits violations ({track_limits_count}): -{validity_penalty} blend weight"
+            "High track limits violations (%s): -%s blend weight",
+            track_limits_count,
+            validity_penalty,
         )
 
     # Factor 5: Circuit-specific adjustments
@@ -83,12 +87,15 @@ def calculate_adaptive_blend_weight(
     if track_name in street_circuits:
         street_penalty = 0.05
         base_weight -= street_penalty
-        logger.debug(f"Street circuit: -{street_penalty} blend weight")
+        logger.debug("Street circuit: -%s blend weight", street_penalty)
 
     final_weight = max(0.50, min(0.85, base_weight))
     logger.info(
-        f"Adaptive FP blend weight for {track_name}: {final_weight:.2f} "
-        f"(base={0.70:.2f}, adjusted={base_weight:.2f})"
+        "Adaptive FP blend weight for %s: %s (base=%s, adjusted=%s)",
+        track_name,
+        format(final_weight, ".2f"),
+        format(0.70, ".2f"),
+        format(base_weight, ".2f"),
     )
 
     return final_weight
@@ -143,7 +150,7 @@ def get_session_quality_metadata(year: int, race_name: str, session_name: str) -
         }
 
     except Exception as e:
-        logger.warning(f"Could not extract session quality metadata: {e}")
+        logger.warning("Could not extract session quality metadata: %s", e)
         return {
             "session_type": session_name,
             "total_laps": 0,

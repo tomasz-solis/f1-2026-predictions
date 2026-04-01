@@ -171,7 +171,7 @@ def fetch_actual_session_results(
         )
 
         if results is None or len(results) == 0:
-            logger.warning(f"No results available for {race_name} {session_name}")
+            logger.warning("No results available for %s %s", race_name, session_name)
             record_counter("fastf1_results_empty_total", labels=labels)
             return None
 
@@ -257,7 +257,7 @@ def fetch_actual_session_results(
         TypeError,
         ValueError,
     ) as e:
-        logger.error(f"Failed to fetch {session_name} results for {race_name}: {e}")
+        logger.error("Failed to fetch %s results for %s: %s", session_name, race_name, e)
         record_counter(
             "fastf1_results_fetch_failure_total",
             labels={"year": year, "race_name": race_name, "session_name": session_name},

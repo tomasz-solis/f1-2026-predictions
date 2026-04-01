@@ -129,7 +129,7 @@ def generate_pit_strategy(
         available_compounds,
         enforce_two_compound_rule=enforce_two_compound_rule,
     ):
-        logger.warning(f"Invalid strategy generated: {strategy}. Falling back to default.")
+        logger.warning("Invalid strategy generated: %s. Falling back to default.", strategy)
         strategy = _get_default_strategy(
             race_distance,
             available_compounds,
@@ -261,7 +261,7 @@ def _sample_compound_sequence(
     available = _ordered_available_compounds(available_compounds)
 
     if enforce_two_compound_rule and len(available) < 2:
-        logger.warning(f"Insufficient compounds available: {available}. Cannot satisfy FIA rule.")
+        logger.warning("Insufficient compounds available: %s. Cannot satisfy FIA rule.", available)
         # Fallback: repeat available compound (will fail validation)
         available = available_compounds
 
@@ -384,7 +384,7 @@ def validate_strategy(
     # Check required fields
     required_fields = ["num_stops", "pit_laps", "compound_sequence", "stint_lengths"]
     if not all(field in strategy for field in required_fields):
-        logger.warning(f"Strategy missing required fields: {strategy}")
+        logger.warning("Strategy missing required fields: %s", strategy)
         return False
 
     num_stops = strategy["num_stops"]
@@ -394,20 +394,22 @@ def validate_strategy(
 
     # Check: pit_laps length matches num_stops
     if len(pit_laps) != num_stops:
-        logger.warning(f"Pit laps length ({len(pit_laps)}) != num_stops ({num_stops})")
+        logger.warning("Pit laps length (%s) != num_stops (%s)", len(pit_laps), num_stops)
         return False
 
     # Check: compound_sequence length = num_stops + 1
     if len(compound_sequence) != num_stops + 1:
         logger.warning(
-            f"Compound sequence length ({len(compound_sequence)}) != num_stops + 1 ({num_stops + 1})"
+            "Compound sequence length (%s) != num_stops + 1 (%s)",
+            len(compound_sequence),
+            num_stops + 1,
         )
         return False
 
     # Check: stint_lengths sum = race_distance
     if sum(stint_lengths) != race_distance:
         logger.warning(
-            f"Stint lengths sum ({sum(stint_lengths)}) != race_distance ({race_distance})"
+            "Stint lengths sum (%s) != race_distance (%s)", sum(stint_lengths), race_distance
         )
         return False
 
@@ -415,24 +417,29 @@ def validate_strategy(
         # FIA dry-race rule: >=2 unique compounds.
         unique_compounds = set(compound_sequence)
         if len(unique_compounds) < 2:
-            logger.warning(f"FIA rule violation: <2 unique compounds ({unique_compounds})")
+            logger.warning("FIA rule violation: <2 unique compounds (%s)", unique_compounds)
             return False
 
     # Check: all compounds available
     for compound in compound_sequence:
         if compound not in available_compounds:
-            logger.warning(f"Compound {compound} not in available compounds: {available_compounds}")
+            logger.warning(
+                "Compound %s not in available compounds: %s", compound, available_compounds
+            )
             return False
 
     # Check: pit laps are sorted and within race bounds
     if pit_laps != sorted(pit_laps):
-        logger.warning(f"Pit laps not sorted: {pit_laps}")
+        logger.warning("Pit laps not sorted: %s", pit_laps)
         return False
 
     for lap in pit_laps:
         if lap < min_pit_lap or lap > (race_distance - max_pit_lap_from_end):
             logger.warning(
-                f"Pit lap {lap} outside valid range [{min_pit_lap}, {race_distance - max_pit_lap_from_end}]"
+                "Pit lap %s outside valid range [%s, %s]",
+                lap,
+                min_pit_lap,
+                race_distance - max_pit_lap_from_end,
             )
             return False
 

@@ -38,7 +38,7 @@ def _load_fallback_schedule_rows(year: int) -> tuple[tuple[str, str], ...]:
         with open(fallback_file) as f:
             data = json.load(f)
     except (OSError, json.JSONDecodeError) as exc:
-        logger.warning(f"Could not load fallback schedule from {fallback_file}: {exc}")
+        logger.warning("Could not load fallback schedule from %s: %s", fallback_file, exc)
         return tuple()
 
     tracks = data.get("tracks", {})
@@ -96,7 +96,7 @@ def _get_schedule_rows(year: int) -> tuple[tuple[str, str], ...]:
                 if event_name and not should_skip_schedule_event(year, event_name):
                     rows.append((event_name, event_format))
     except Exception as exc:
-        logger.warning(f"Could not load FastF1 schedule for {year}: {exc}")
+        logger.warning("Could not load FastF1 schedule for %s: %s", year, exc)
 
     fallback_rows = _load_fallback_schedule_rows(year)
     if rows and fallback_rows:

@@ -173,7 +173,7 @@ def get_completed_races(year: int = 2026) -> list[str]:
                         FileNotFoundError,
                         RuntimeError,
                     ) as e:
-                        logger.debug(f"Race {race_name} not available yet: {e}")
+                        logger.debug("Race %s not available yet: %s", race_name, e)
                         continue  # Race not available yet
 
         return completed
@@ -188,7 +188,7 @@ def get_completed_races(year: int = 2026) -> list[str]:
         TypeError,
         ValueError,
     ) as e:
-        logger.warning(f"Could not check for completed races: {e}")
+        logger.warning("Could not check for completed races: %s", e)
         return []
 
 
@@ -230,7 +230,7 @@ def needs_update(year: int = 2026, force_recheck: bool = False) -> tuple[bool, l
 
     if force_recheck:
         # Force re-check: treat all completed races as potentially new
-        logger.info(f"Force recheck enabled: found {len(completed)} completed race(s)")
+        logger.info("Force recheck enabled: found %s completed race(s)", len(completed))
         return len(completed) > 0, completed
 
     learned = get_learned_races(year=year)
@@ -263,7 +263,7 @@ def auto_update_from_races(
             logger.info("No races provided for explicit update.")
             return 0
 
-    logger.info(f"Found {len(new_races)} new race(s) to learn from: {new_races}")
+    logger.info("Found %s new race(s) to learn from: %s", len(new_races), new_races)
 
     # Import here to avoid circular dependency
     from src.systems.updater import update_from_race
@@ -275,7 +275,7 @@ def auto_update_from_races(
             if progress_callback:
                 progress_callback(i + 1, len(new_races), f"Learning from {race_name}...")
 
-            logger.info(f"Updating from {race_name} ({i + 1}/{len(new_races)})...")
+            logger.info("Updating from %s (%s/%s)...", race_name, i + 1, len(new_races))
 
             # Update from race (loads results, updates teams & drivers)
             update_from_race(year, race_name)
@@ -284,14 +284,14 @@ def auto_update_from_races(
             mark_race_as_learned(race_name, year=year)
 
             updated_count += 1
-            logger.info(f"  Learned from {race_name}")
+            logger.info("  Learned from %s", race_name)
 
         except Exception as e:
-            logger.warning(f"  Could not update from {race_name}: {e}")
+            logger.warning("  Could not update from %s: %s", race_name, e)
             # Continue with other races even if one fails
 
     if updated_count > 0:
-        logger.info(f"Updated from {updated_count} race(s).")
+        logger.info("Updated from %s race(s).", updated_count)
 
     return updated_count
 

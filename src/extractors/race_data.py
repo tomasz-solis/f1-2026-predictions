@@ -86,7 +86,10 @@ def extract_race_data(year: int, race_name: str) -> dict[str, RaceResult] | None
 
     except (AttributeError, KeyError, ValueError, TypeError) as e:
         logger.error(
-            f"Failed to extract race data for {race_name} ({year}): {e}. This race data will be unavailable for analysis."
+            "Failed to extract race data for %s (%s): %s. This race data will be unavailable for analysis.",
+            race_name,
+            year,
+            e,
         )
         # Caller handles missing data
         return None

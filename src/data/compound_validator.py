@@ -135,10 +135,10 @@ def load_and_validate_compound_data(file_path: Path) -> dict | None:
         with open(file_path) as f:
             data = json.load(f)
     except json.JSONDecodeError as e:
-        logger.error(f"Invalid JSON in {file_path}: {e}")
+        logger.error("Invalid JSON in %s: %s", file_path, e)
         return None
     except FileNotFoundError:
-        logger.debug(f"Compound file not found: {file_path}")
+        logger.debug("Compound file not found: %s", file_path)
         return None
 
     # Determine validation type based on structure
@@ -148,7 +148,7 @@ def load_and_validate_compound_data(file_path: Path) -> dict | None:
         else:
             validate_compound_data(data)
     except ValueError as e:
-        logger.error(f"Validation failed for {file_path}: {e}")
+        logger.error("Validation failed for %s: %s", file_path, e)
         return None
 
     return data

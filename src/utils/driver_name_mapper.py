@@ -128,7 +128,7 @@ class DriverNameMapper:
                 return abbr
 
         # No match found - log warning
-        logger.warning(f"Could not normalize driver name: {name}")
+        logger.warning("Could not normalize driver name: %s", name)
         return name
 
     @classmethod
@@ -153,4 +153,4 @@ class DriverNameMapper:
         cls.DRIVER_MAP[abbreviation.upper()] = full_name
         cls.REVERSE_MAP[full_name] = abbreviation.upper()
         cls.NAME_VARIANTS[full_name.lower()] = abbreviation.upper()
-        logger.info(f"Added driver mapping: {abbreviation} -> {full_name}")
+        logger.info("Added driver mapping: %s -> %s", abbreviation, full_name)

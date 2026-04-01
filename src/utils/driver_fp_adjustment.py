@@ -51,7 +51,7 @@ def calculate_driver_fp_modifiers(
             try:
                 _, laps, _ = get_fp_team_performance(year, race_name, session_type)
             except Exception as e:
-                logger.warning(f"Could not read FP data for {session_type}: {e}")
+                logger.warning("Could not read FP data for %s: %s", session_type, e)
                 continue
 
         if laps is None or not isinstance(laps, pd.DataFrame) or laps.empty:
@@ -89,5 +89,5 @@ def calculate_driver_fp_modifiers(
     }
 
     if modifiers:
-        logger.info(f"Calculated FP driver modifiers for {len(modifiers)} drivers")
+        logger.info("Calculated FP driver modifiers for %s drivers", len(modifiers))
     return modifiers

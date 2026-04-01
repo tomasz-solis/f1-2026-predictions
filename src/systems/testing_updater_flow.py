@@ -283,7 +283,7 @@ def collect_sessions_for_events(
                         len(normalized_compound_metrics),
                     )
             except Exception as exc:
-                logger.warning(f"  Failed to extract compound metrics from {session_id}: {exc}")
+                logger.warning("  Failed to extract compound metrics from %s: %s", session_id, exc)
 
     return result
 

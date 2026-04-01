@@ -127,7 +127,7 @@ class BaselineRacePredictionMixin:
                 )
             )
         except Exception as exc:
-            logger.debug(f"Could not load learned race adjustment for {driver}: {exc}")
+            logger.debug("Could not load learned race adjustment for %s: %s", driver, exc)
             return 0.0
 
     def predict_race(

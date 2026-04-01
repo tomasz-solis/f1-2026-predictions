@@ -114,7 +114,8 @@ class LapFeatureExtractor:
 
         except (AttributeError, KeyError, ValueError, TypeError) as e:
             logger.warning(
-                f"Telemetry feature extraction failed: {e}. This lap's telemetry features will be unavailable."
+                "Telemetry feature extraction failed: %s. This lap's telemetry features will be unavailable.",
+                e,
             )
             # Sometimes telemetry fails to load
             return {}

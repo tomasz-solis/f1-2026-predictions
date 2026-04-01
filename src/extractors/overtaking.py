@@ -83,7 +83,10 @@ def extract_overtakes_from_race(year: int, race_name: str) -> dict[str, Any] | N
 
     except (AttributeError, KeyError, ValueError, TypeError) as e:
         logger.error(
-            f"Failed to extract overtaking data from {race_name} ({year}): {e}. Overtaking statistics will be unavailable."
+            "Failed to extract overtaking data from %s (%s): %s. Overtaking statistics will be unavailable.",
+            race_name,
+            year,
+            e,
         )
         return None
 
@@ -112,7 +115,7 @@ def calculate_overtaking_likelihood(years: list[int] | None = None) -> dict[str,
             TypeError,
             ValueError,
         ) as e:
-            logger.error(f"Failed to get event schedule for {year}: {e}. Skipping this season.")
+            logger.error("Failed to get event schedule for %s: %s. Skipping this season.", year, e)
             logger.warning("Could not get schedule for %s: %s", year, type(e).__name__)
             continue
 
