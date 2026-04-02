@@ -115,15 +115,7 @@ def select_race_compound(*, race_name: str, season_year: int, cfg: Any) -> str:
         if 2025 not in candidate_years:
             candidate_years.append(2025)
 
-        pirelli_file = next(
-            (
-                Path("data") / f"{candidate_year}_pirelli_info.json"
-                for candidate_year in candidate_years
-            ),
-            None,
-        )
-        if pirelli_file is None:
-            return "MEDIUM"
+        pirelli_file = Path("data") / f"{season_year}_pirelli_info.json"
         if not pirelli_file.exists():
             fallback_file = next(
                 (
