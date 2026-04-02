@@ -21,7 +21,7 @@ For each team and compound combination, we collect:
 
 1. **Median lap time** (raw seconds)
    - Most representative lap time on that compound
-   - Robust to outliers (uses median, not mean)
+   - Resistant to outliers (uses median, not mean)
 
 2. **Tire degradation slope** (seconds/lap)
    - How much lap time increases per lap

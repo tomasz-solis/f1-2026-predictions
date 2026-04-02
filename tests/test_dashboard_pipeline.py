@@ -237,7 +237,7 @@ def test_execute_live_prediction_pipeline_uses_warmed_boundary_fallback_when_cur
 def test_execute_live_prediction_pipeline_raises_when_boundary_ahead_but_no_warmed_fallback_exists(
     patcher,
 ):
-    """A newer checkpoint without a warmed fallback should stay fail-closed and actionable."""
+    """A newer checkpoint without a warmed fallback should stay fail-closed and report the gap."""
     _stub_single_target(patcher)
     load_calls: list[str] = []
 

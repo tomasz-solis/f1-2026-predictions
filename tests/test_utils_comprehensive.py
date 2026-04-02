@@ -1,5 +1,5 @@
 """
-Comprehensive tests for utils modules
+Tests for utils modules
 
 Increases test coverage for lineups, weekend, and config utilities.
 """
