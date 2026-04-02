@@ -6,8 +6,11 @@ path. The current dashboard relies on ``SystematicLearningSystem`` instead.
 """
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class LearningSystem:
@@ -60,8 +63,8 @@ class LearningSystem:
                 parts = best_method.split("_")
                 if len(parts) >= 2:
                     return int(parts[1]) / 100.0
-            except (ValueError, IndexError):
-                pass
+            except (ValueError, IndexError) as exc:
+                logger.debug("Could not parse feedback value: %s", exc)
         return default
 
     def get_recommended_method(

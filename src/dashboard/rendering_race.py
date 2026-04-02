@@ -1,5 +1,6 @@
 """Race-specific rendering helpers for dashboard prediction output."""
 
+import logging
 from typing import Any
 
 import pandas as pd
@@ -13,6 +14,8 @@ from src.dashboard.rendering_html import (
     render_stat_cards,
     render_surface_header,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _position_change_chart_title(prediction_name: str, result: dict) -> str:
@@ -510,8 +513,8 @@ def _style_race_table(df_display: pd.DataFrame):
 
     try:
         styled_df = styled_df.hide(axis="index")
-    except (AttributeError, TypeError):
-        pass
+    except (AttributeError, TypeError) as exc:
+        logger.debug("Could not hide dataframe index: %s", exc)
 
     return styled_df
 

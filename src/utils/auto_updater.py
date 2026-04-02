@@ -39,8 +39,8 @@ def _is_competitive_race_event(event: pd.Series, *, year: int) -> bool:
         try:
             if int(round_number) <= 0:
                 return False
-        except (TypeError, ValueError):
-            pass
+        except (TypeError, ValueError) as exc:
+            logger.debug("Could not parse round number: %s", exc)
 
     return True
 
@@ -162,8 +162,8 @@ def get_completed_races(year: int = 2026) -> list[str]:
                         try:
                             if len(results) == 0:
                                 continue
-                        except TypeError:
-                            pass
+                        except TypeError as exc:
+                            logger.debug("Result length check failed: %s", exc)
                         completed.append(race_name)
                     except (
                         ValueError,

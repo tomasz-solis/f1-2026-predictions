@@ -511,8 +511,8 @@ class PredictionLogger:
             )
             if data:
                 return True
-        except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
-            pass
+        except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
+            logger.debug("Could not check prediction history existence: %s", exc)
 
         filepath = self._prediction_file_path(
             normalized_year,

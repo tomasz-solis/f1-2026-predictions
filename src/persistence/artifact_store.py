@@ -206,8 +206,10 @@ class ArtifactStore:
             data = self._read_file(artifact_type, artifact_key)
             if data and "version" in data:
                 return data["version"]
-        except (OSError, json.JSONDecodeError, TypeError, ValueError):
-            pass
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            logger.debug(
+                "Could not read artifact version for %s/%s: %s", artifact_type, artifact_key, exc
+            )
 
         return 0
 

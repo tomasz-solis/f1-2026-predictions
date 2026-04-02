@@ -155,8 +155,8 @@ logging.getLogger("fastf1.logger").setLevel(logging.CRITICAL)
 logging.getLogger("requests_cache").setLevel(logging.CRITICAL)
 try:
     fastf1.set_log_level("CRITICAL")
-except (AttributeError, TypeError):
-    pass
+except (AttributeError, TypeError) as exc:
+    logging.getLogger(__name__).debug("Could not set fastf1 log level: %s", exc)
 
 
 DEFAULT_SESSION_CANDIDATES = [

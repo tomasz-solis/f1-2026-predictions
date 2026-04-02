@@ -139,8 +139,8 @@ def get_session_quality_metadata(year: int, race_name: str, session_name: str) -
                 track_limits = len(
                     messages[messages["Message"].str.contains("TRACK LIMITS", case=False, na=False)]
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Track limits metadata extraction failed: %s", exc)
 
         return {
             "session_type": session_name,
