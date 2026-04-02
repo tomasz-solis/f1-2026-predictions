@@ -99,7 +99,10 @@ def test_diagnostic_top_grid_falloff_frequency_is_bounded(predictor):
         if int(entry["p95"]) >= 10:
             falloff_count += 1
 
-    assert 0 <= falloff_count <= 3
+    assert falloff_count <= 1, (
+        f"{falloff_count} of 3 top-grid drivers have P95 >= 10. "
+        "Expected at most 1 in a realistic dry race."
+    )
 
 
 def test_diagnostic_podium_probability_ordering_has_limited_inversions(predictor):
@@ -114,4 +117,7 @@ def test_diagnostic_podium_probability_ordering_has_limited_inversions(predictor
         if current_probability > previous_probability + 5.0:
             inversions += 1
 
-    assert 0 <= inversions <= len(top8) - 1
+    assert inversions <= 2, (
+        f"Found {inversions} podium-probability inversions in top-8. "
+        "Expected at most 2 for coherent probability ordering."
+    )

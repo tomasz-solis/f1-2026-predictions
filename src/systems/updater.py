@@ -497,17 +497,52 @@ def update_bayesian_driver_ratings(
         pace_payload["quali_pace"] = round(float(np.clip(updated_quali_pace, 0.05, 0.99)), 3)
         touched_quali_pace_drivers += 1
 
-    if touched_skill_drivers == 0 and touched_quali_pace_drivers == 0:
+    # --- Race pace update (mirrors the qualifying pace update above) ---
+    race_pace_blend = float(
+        config_loader.get("baseline_predictor.driver_form.race_pace_update_blend", 0.25)
+    )
+    race_pace_blend = float(np.clip(race_pace_blend, 0.0, 1.0))
+    touched_race_pace_drivers = 0
+    for driver_code, finish_position in observations.items():
+        driver_entry = drivers_payload.get(driver_code)
+        if not isinstance(driver_entry, dict):
+            continue
+
+        pace_payload = driver_entry.get("pace")
+        if not isinstance(pace_payload, dict):
+            pace_payload = {}
+            driver_entry["pace"] = pace_payload
+
+        try:
+            existing_race_pace = float(pace_payload.get("race_pace", 0.5))
+        except (TypeError, ValueError):
+            existing_race_pace = 0.5
+        existing_race_pace = float(np.clip(existing_race_pace, 0.05, 0.99))
+
+        observed_race_pace = 1.0 - ((int(finish_position) - 1) / max(grid_size - 1, 1))
+        observed_race_pace = float(np.clip(observed_race_pace, 0.0, 1.0))
+        updated_race_pace = ((1.0 - race_pace_blend) * existing_race_pace) + (
+            race_pace_blend * observed_race_pace
+        )
+        pace_payload["race_pace"] = round(float(np.clip(updated_race_pace, 0.05, 0.99)), 3)
+        touched_race_pace_drivers += 1
+
+    if (
+        touched_skill_drivers == 0
+        and touched_quali_pace_drivers == 0
+        and touched_race_pace_drivers == 0
+    ):
         logger.warning("Bayesian update produced no persisted driver changes")
         return
 
     _persist_driver_characteristics_payload(store, driver_payload, season_year)
     logger.info(
-        "Updated Bayesian ratings for %s drivers, blended skill for %s drivers, and refreshed "
-        "qualifying pace for %s drivers",
+        "Updated Bayesian ratings for %s drivers, blended skill for %s, "
+        "qualifying pace for %s, race pace for %s",
         len(observations),
         touched_skill_drivers,
         touched_quali_pace_drivers,
+        touched_race_pace_drivers,
     )
 
 

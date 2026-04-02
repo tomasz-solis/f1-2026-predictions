@@ -200,9 +200,9 @@ def test_live_lap_time_ratio_keeps_driver_signal_visible():
     driver_range = skill_improvement_max
     influence_ratio = team_range / driver_range
 
-    assert influence_ratio <= 2.70, (
+    assert influence_ratio <= 2.40, (
         f"Team:driver lap-time ratio is {influence_ratio:.2f}:1. "
-        "The car is still crowding out too much of the driver signal."
+        "Target is <=2.4:1 so the driver signal remains visible."
     )
 
 

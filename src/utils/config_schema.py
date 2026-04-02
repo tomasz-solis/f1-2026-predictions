@@ -205,6 +205,7 @@ class DriverFormConfig(StrictConfigModel):
     bayesian_pace_blend_per_race: float = Field(default=0.20, ge=0.0, le=1.0)
     bayesian_pace_blend_cap: float = Field(default=0.60, ge=0.0, le=1.0)
     quali_pace_update_blend: float = Field(default=0.30, ge=0.0, le=1.0)
+    race_pace_update_blend: float = Field(default=0.25, ge=0.0, le=1.0)
 
 
 class ExperienceFloatMapConfig(StrictConfigModel):

@@ -144,6 +144,7 @@ baseline_predictor:
     bayesian_pace_blend_per_race: 0.20
     bayesian_pace_blend_cap: 0.60
     quali_pace_update_blend: 0.30
+    race_pace_update_blend: 0.25
 
   # Qualifying simulation parameters
   qualifying:
@@ -550,7 +551,7 @@ baseline_predictor:
       reference_base: 90.0             # baseline lap time (seconds) - generic
       team_pace_penalty_range: 5.0    # worst team is +5.0s slower than best
       skill_improvement_max: 0.75      # max lap time improvement from driver skill
-      team_strength_compression: 0.40  # compress car spread in race pace conversion
+      team_strength_compression: 0.35  # compress car spread in race pace conversion
       elite_skill_threshold: 0.88      # only exceptional drivers get extra race-craft pace bonus
       elite_skill_lap_bonus_max: 0.22  # max additional sec/lap improvement at skill=1.0 (up from 0.15)
       elite_skill_exponent: 1.30       # non-linear curve for elite-only uplift
