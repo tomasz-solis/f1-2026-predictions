@@ -503,7 +503,19 @@ def update_bayesian_driver_ratings(
     )
     race_pace_blend = float(np.clip(race_pace_blend, 0.0, 1.0))
     touched_race_pace_drivers = 0
+    # Filter out DNF'd drivers — retirement reflects reliability, not pace.
+    dnf_drivers: set[str] = set()
+    if isinstance(race_results, pd.DataFrame) and "Status" in race_results.columns:
+        for _, row in race_results.iterrows():
+            status = str(row.get("Status", "")).strip()
+            if status and status != "Finished" and "Lap" not in status:
+                abbrev = str(row.get("Abbreviation", "")).strip()
+                if abbrev:
+                    dnf_drivers.add(abbrev)
+
     for driver_code, finish_position in observations.items():
+        if driver_code in dnf_drivers:
+            continue
         driver_entry = drivers_payload.get(driver_code)
         if not isinstance(driver_entry, dict):
             continue

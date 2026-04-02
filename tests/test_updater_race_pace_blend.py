@@ -7,12 +7,17 @@ import pandas as pd
 from src.systems.updater import update_bayesian_driver_ratings
 
 
-def _make_race_results(driver_positions: dict[str, int]) -> pd.DataFrame:
+def _make_race_results(
+    driver_positions: dict[str, int],
+    statuses: dict[str, str] | None = None,
+) -> pd.DataFrame:
     """Build a minimal race results DataFrame the updater can consume."""
-    rows = [
-        {"Abbreviation": code, "Position": pos, "race_name": "Test GP"}
-        for code, pos in driver_positions.items()
-    ]
+    rows = []
+    for code, pos in driver_positions.items():
+        row: dict = {"Abbreviation": code, "Position": pos, "race_name": "Test GP"}
+        if statuses is not None:
+            row["Status"] = statuses.get(code, "Finished")
+        rows.append(row)
     return pd.DataFrame(rows)
 
 
@@ -35,6 +40,7 @@ def _run_update(
     driver_entries: dict[str, dict],
     race_positions: dict[str, int],
     quali_positions: dict[str, int],
+    statuses: dict[str, str] | None = None,
 ) -> dict:
     """
     Run one update cycle and return the mutated drivers dict.
@@ -51,7 +57,7 @@ def _run_update(
         for code, entry in driver_entries.items()
     }
 
-    race_results = _make_race_results(race_positions)
+    race_results = _make_race_results(race_positions, statuses=statuses)
     quali_results = _make_quali_results(quali_positions)
 
     with (
@@ -110,4 +116,32 @@ def test_race_pace_blend_is_partial():
     assert 0.51 < updated < 0.90, (
         f"Expected a partial blend toward 1.0 but got {updated:.3f}. "
         "Check that the blend weight isn't being treated as a hard replace."
+    )
+
+
+def test_dnf_driver_race_pace_unchanged():
+    """A mechanical retirement should not penalize race_pace."""
+    drivers = {"RIC": _make_driver_payload(0.60, 0.60, 0.55)}
+    result = _run_update(
+        drivers,
+        race_positions={"RIC": 18},
+        quali_positions={"RIC": 10},
+        statuses={"RIC": "Retired"},
+    )
+    assert result["RIC"]["pace"]["race_pace"] == 0.60, (
+        f"DNF'd driver should keep prior race_pace, got {result['RIC']['pace']['race_pace']}"
+    )
+
+
+def test_finished_driver_still_updated_with_status_column():
+    """When Status column is present, finished drivers should still get updated."""
+    drivers = {"NOR": _make_driver_payload(0.50, 0.50, 0.60)}
+    result = _run_update(
+        drivers,
+        race_positions={"NOR": 1},
+        quali_positions={"NOR": 2},
+        statuses={"NOR": "Finished"},
+    )
+    assert result["NOR"]["pace"]["race_pace"] > 0.50, (
+        "A P1 finisher with Status=Finished should still get race_pace updated"
     )
