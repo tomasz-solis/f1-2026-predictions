@@ -24,7 +24,7 @@ from src.utils.lap_by_lap_simulator import (
 )
 from src.utils.validation_helpers import validate_enum, validate_positive_int
 
-from .prediction_flow import RaceSimulationDeps, predict_race_core
+from .race_simulation import RaceSimulationDeps, predict_race_core
 
 logger = logging.getLogger("src.predictors.baseline_2026")
 

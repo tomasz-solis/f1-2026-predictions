@@ -27,7 +27,7 @@ _PREDICTION_CODE_FINGERPRINT_FILES = [
     "src/predictors/baseline/qualifying_preparation.py",
     "src/predictors/baseline/qualifying_simulation.py",
     "src/predictors/baseline/race/grid_uncertainty.py",
-    "src/predictors/baseline/race/prediction_flow.py",
+    "src/predictors/baseline/race/race_simulation.py",
     "src/predictors/baseline/race/preparation_flow.py",
     "src/predictors/baseline/race/result_processing.py",
     "src/predictors/baseline/team_strength.py",
