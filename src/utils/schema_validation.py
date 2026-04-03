@@ -101,6 +101,33 @@ _DRIVER_BAYESIAN_SCHEMA = {
     "additionalProperties": False,
 }
 
+# Fields that older code paths used to persist inside the bayesian dict.
+# The schema above rejects them, so they must be stripped before validation.
+LEGACY_BAYESIAN_KEYS = frozenset({"normalized_skill_score", "blended_skill_score", "blend_weight"})
+
+
+def strip_legacy_bayesian_fields(drivers_payload: dict[str, Any]) -> int:
+    """Remove bayesian keys that are no longer persisted.
+
+    Returns the number of individual fields stripped across all drivers.
+    """
+    stripped = 0
+    for driver_entry in drivers_payload.values():
+        if not isinstance(driver_entry, dict):
+            continue
+
+        bayesian_block = driver_entry.get("bayesian")
+        if not isinstance(bayesian_block, dict):
+            continue
+
+        for key in LEGACY_BAYESIAN_KEYS:
+            if key in bayesian_block:
+                del bayesian_block[key]
+                stripped += 1
+
+    return stripped
+
+
 _DRIVER_ENTRY_SCHEMA = {
     "type": "object",
     "required": ["racecraft", "pace", "dnf_risk"],

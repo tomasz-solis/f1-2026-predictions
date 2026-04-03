@@ -548,6 +548,20 @@ class BaselineDataMixin:
                     f"under {self.data_dir}"
                 )
 
+        # Strip legacy bayesian fields that older artifacts may contain.
+        # The updater already does this on the write path, but artifacts
+        # persisted before that cleanup was added still carry stale keys.
+        from src.utils.schema_validation import strip_legacy_bayesian_fields
+
+        drivers_section = driver_data.get("drivers") if isinstance(driver_data, dict) else None
+        if isinstance(drivers_section, dict):
+            stripped = strip_legacy_bayesian_fields(drivers_section)
+            if stripped:
+                logger.info(
+                    "Stripped %d legacy bayesian field(s) from loaded driver characteristics",
+                    stripped,
+                )
+
         # Validate driver characteristics before using
         try:
             validate_driver_characteristics(driver_data, expected_year=target_year)

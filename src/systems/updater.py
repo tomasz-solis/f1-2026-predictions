@@ -21,6 +21,7 @@ from src.systems.updater_flow import (
     update_team_characteristics_core as _update_team_characteristics_core,
 )
 from src.utils import config_loader
+from src.utils.schema_validation import strip_legacy_bayesian_fields
 from src.utils.team_mapping import map_team_to_characteristics
 
 logger = logging.getLogger(__name__)
@@ -168,28 +169,6 @@ def _restore_bayesian_state(
         seeded_drivers += 1
 
     return seeded_drivers
-
-
-_LEGACY_BAYESIAN_KEYS = {"normalized_skill_score", "blended_skill_score", "blend_weight"}
-
-
-def _remove_legacy_bayesian_fields(drivers_payload: dict[str, Any]) -> int:
-    """Drop Bayesian fields the updater no longer writes."""
-    stripped_fields = 0
-    for driver_entry in drivers_payload.values():
-        if not isinstance(driver_entry, dict):
-            continue
-
-        bayesian_payload = driver_entry.get("bayesian")
-        if not isinstance(bayesian_payload, dict):
-            continue
-
-        for legacy_key in _LEGACY_BAYESIAN_KEYS:
-            if legacy_key in bayesian_payload:
-                bayesian_payload.pop(legacy_key, None)
-                stripped_fields += 1
-
-    return stripped_fields
 
 
 def load_competitive_session(
@@ -413,7 +392,7 @@ def update_bayesian_driver_ratings(
     driver_payload = _load_driver_characteristics_payload(store, season_year)
     drivers_payload = driver_payload.get("drivers") if isinstance(driver_payload, dict) else None
     if isinstance(drivers_payload, dict):
-        _remove_legacy_bayesian_fields(drivers_payload)
+        strip_legacy_bayesian_fields(drivers_payload)
         _restore_bayesian_state(bayesian, drivers_payload)
 
     all_observations = _build_position_observations(race_results)
