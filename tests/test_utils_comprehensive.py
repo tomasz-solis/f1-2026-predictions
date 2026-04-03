@@ -133,7 +133,7 @@ class TestWeekendModule:
             assert weekend.get_best_qualifying_session(2026, "Australian Grand Prix") == "FP3"
 
     def test_invalid_race_name_handling(self):
-        """Test graceful handling of invalid race names"""
+        """Invalid race names should return default values."""
         from src.utils.weekend import get_weekend_type
 
         with pytest.raises(ValueError) as exc_info:

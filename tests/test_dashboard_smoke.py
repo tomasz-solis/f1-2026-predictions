@@ -154,8 +154,8 @@ class TestDashboardDataFlow:
 class TestDashboardEdgeCases:
     """Test edge cases in dashboard"""
 
-    def test_missing_sprint_detection_graceful(self):
-        """Test graceful handling when sprint detection fails"""
+    def test_missing_sprint_detection_fallback(self):
+        """Sprint detection failure should fall back to conventional weekend."""
         from src.utils.weekend import is_sprint_weekend
 
         # Invalid race should return False, not crash

@@ -87,7 +87,7 @@ def canonicalize_team(name: str) -> str:
 
 
 def normalize_team_column(df: pd.DataFrame | pd.Series, col: str = "team") -> pd.DataFrame:
-    """Normalize team names in DataFrame using canonical mapping, handling edge cases gracefully."""
+    """Normalize team names in DataFrame using canonical mapping, handling missing or aliased names."""
     # Handle Series input (convert to DataFrame)
     if isinstance(df, pd.Series):
         logger.warning(

@@ -66,7 +66,7 @@ def test_build_snapshot_overlay_car_characteristics_preserves_priors_and_replace
 
 
 def test_build_snapshot_overlay_car_characteristics_rejects_snapshots_without_team_profiles():
-    """Checkpoint overlays should fail closed when a snapshot has no usable team profiles."""
+    """Checkpoint overlays should return empty when a snapshot has no usable team profiles."""
     base_payload = {
         "year": 2026,
         "teams": {

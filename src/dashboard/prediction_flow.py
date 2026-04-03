@@ -180,7 +180,7 @@ def _predict_race_with_optional_confidence(
     year: int,
     input_confidence: float,
 ) -> dict[str, Any]:
-    """Call predictor.predict_race with graceful fallback for legacy signatures."""
+    """Call predictor.predict_race with fallback for legacy signatures."""
     kwargs = {
         "qualifying_grid": qualifying_grid,
         "weather": weather,
@@ -204,7 +204,7 @@ def _predict_sprint_race_with_optional_confidence(
     race_name: str,
     input_confidence: float,
 ) -> dict[str, Any]:
-    """Call predictor.predict_sprint_race with graceful fallback for legacy signatures."""
+    """Call predictor.predict_sprint_race with fallback for legacy signatures."""
     kwargs = {
         "sprint_quali_grid": sprint_quali_grid,
         "weather": weather,

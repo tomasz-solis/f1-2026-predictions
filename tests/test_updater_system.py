@@ -230,7 +230,7 @@ class TestUpdaterEdgeCases:
     """Test edge cases and error handling."""
 
     def test_update_with_missing_team(self, temp_data_dir, mock_session):
-        """Test update handles new teams gracefully."""
+        """Test update falls back when encountering unknown teams."""
         from src.systems.updater import update_from_race
 
         # Mock results with a new team

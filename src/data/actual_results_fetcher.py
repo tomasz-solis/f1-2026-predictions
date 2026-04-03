@@ -175,7 +175,7 @@ def fetch_actual_session_results(
             record_counter("fastf1_results_empty_total", labels=labels)
             return None
 
-        # Extract relevant data and fail closed on malformed rows.
+        # Extract relevant data; skip malformed rows.
         grid_rows: list[dict[str, Any]] = []
         for row_index, (_, row) in enumerate(results.iterrows(), start=1):
             try:

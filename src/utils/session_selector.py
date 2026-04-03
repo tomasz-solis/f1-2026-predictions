@@ -1,5 +1,5 @@
 """
-Smart Session Selector for F1 Predictions
+Session selector for F1 predictions
 
 Handles session selection based on:
 - Prediction timing (after which session are we predicting?)

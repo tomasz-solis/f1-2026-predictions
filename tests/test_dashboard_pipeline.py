@@ -121,7 +121,7 @@ def test_execute_live_prediction_pipeline_loads_persisted_prediction_and_emits_r
 
 
 def test_execute_live_prediction_pipeline_rejects_force_refresh(patcher):
-    """Manual refresh should fail closed so the UI stays read-only."""
+    """Manual refresh should return None so the UI stays read-only."""
     _stub_single_target(patcher)
     with pytest.raises(
         live_prediction_flow.PrecomputedPredictionUnavailableError,
@@ -237,7 +237,7 @@ def test_execute_live_prediction_pipeline_uses_warmed_boundary_fallback_when_cur
 def test_execute_live_prediction_pipeline_raises_when_boundary_ahead_but_no_warmed_fallback_exists(
     patcher,
 ):
-    """A newer checkpoint without a warmed fallback should stay fail-closed and report the gap."""
+    """A newer checkpoint without a warmed fallback should return None and report the gap."""
     _stub_single_target(patcher)
     load_calls: list[str] = []
 

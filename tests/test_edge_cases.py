@@ -156,7 +156,7 @@ def test_mixed_weather_race_completes():
 
 
 def test_qualifying_with_missing_team_data():
-    """Verify graceful handling when some team data is missing."""
+    """Predictions should still run when some team data is missing."""
     predictor = Baseline2026Predictor(seed=42)
 
     # Predict qualifying for a race
@@ -195,7 +195,7 @@ def test_race_with_invalid_grid_positions():
         {"driver": "SAR", "team": "Williams", "position": 20},
     ]
 
-    # Should either fix the grid or handle gracefully
+    # Should either fix the grid or fall back to defaults
     try:
         result = predictor.predict_race(
             race_name="Australian Grand Prix",
@@ -276,7 +276,7 @@ def test_minimum_simulation_count():
 
 
 def test_empty_or_none_fp_performance():
-    """Verify qualifying prediction handles missing FP data gracefully."""
+    """Qualifying prediction should fall back to model-only when FP data is missing."""
     predictor = Baseline2026Predictor(seed=42)
 
     # Pre-weekend prediction (no FP data available)
