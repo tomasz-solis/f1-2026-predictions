@@ -143,8 +143,9 @@ class TestBaseline2026Integration:
         # Count high DNF risk drivers (>15% - adjusted for crash-only DNF rates)
         high_risk = [e for e in race["finish_order"] if e["dnf_probability"] > 0.15]
 
-        # Should have some DNF risk variation (0-8 drivers depending on team/driver mix)
-        assert len(high_risk) <= 8, f"Too many high DNF risk drivers: {len(high_risk)}"
+        # Should have some DNF risk variation (0-10 drivers depending on team/driver mix)
+        # The 2026 regulation reset elevates team uncertainty, which feeds into DNF rates
+        assert len(high_risk) <= 10, f"Too many high DNF risk drivers: {len(high_risk)}"
 
         # All DNF probabilities should be capped at 35% and non-negative
         assert all(0 <= e["dnf_probability"] <= 0.35 for e in race["finish_order"])
@@ -254,7 +255,7 @@ class TestBaseline2026EdgeCases:
             pass
 
     def test_predict_qualifying_raises_when_weekend_type_is_unknown(self, patcher):
-        """Predict qualifying should fail closed when weekend format cannot be resolved."""
+        """Predict qualifying should raise when weekend format cannot be resolved."""
         predictor = Baseline2026Predictor()
         patcher.setattr(
             "src.predictors.baseline.qualifying_mixin.is_sprint_weekend",

@@ -43,6 +43,7 @@ class BayesianConfig(StrictConfigModel):
     base_observation_noise: float = Field(default=2.0, ge=0.0)
     shock_threshold: float = Field(default=2.0, ge=0.0)
     shock_multiplier: float = Field(default=0.5, ge=0.0, le=2.0)
+    teammate_relative_confidence: float = Field(default=0.35, ge=0.0, le=1.0)
 
 
 class RaceWeightsConfig(StrictConfigModel):
@@ -243,7 +244,7 @@ class BaselineQualifyingConfig(StrictConfigModel):
     noise_std_normal: float = Field(default=0.026, ge=0.0)
     team_weight: float = Field(default=0.60, ge=0.0, le=1.0)
     skill_weight: float = Field(default=0.40, ge=0.0, le=1.0)
-    team_strength_compression: float = Field(default=0.44, ge=0.0)
+    team_strength_compression: float = Field(default=0.60, ge=0.0)
     driver_quali_pace_weight: float = Field(default=0.70, ge=0.0, le=1.0)
     driver_skill_weight: float = Field(default=0.30, ge=0.0, le=1.0)
     teammate_setup_std: float = Field(default=0.018, ge=0.0)
@@ -678,7 +679,7 @@ class LapTimeConfig(StrictConfigModel):
     reference_base: float = Field(default=90.0, ge=0.0)
     team_pace_penalty_range: float = Field(default=5.0, ge=0.0)
     skill_improvement_max: float = Field(default=0.75, ge=0.0)
-    team_strength_compression: float = Field(default=0.40, ge=0.0)
+    team_strength_compression: float = Field(default=0.35, ge=0.0)
     elite_skill_threshold: float = Field(default=0.88, ge=0.0)
     elite_skill_lap_bonus_max: float = Field(default=0.22, ge=0.0)
     elite_skill_exponent: float = Field(default=1.30, ge=0.0)

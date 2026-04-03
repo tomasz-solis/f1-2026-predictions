@@ -243,7 +243,7 @@ def simulate_race_lap_by_lap(
             skill_improvement_max = race_params.get("lap_time", {}).get(
                 "skill_improvement_max", 0.75
             )
-            team_strength_compression = race_params.get("team_strength_compression", 0.45)
+            team_strength_compression = race_params.get("team_strength_compression", 0.35)
 
             compressed_team_strength = 0.5 + ((team_strength - 0.5) * team_strength_compression)
             compressed_team_strength = np.clip(compressed_team_strength, 0.0, 1.0)

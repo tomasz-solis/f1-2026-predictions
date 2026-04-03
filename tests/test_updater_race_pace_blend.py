@@ -22,8 +22,8 @@ def _make_race_results(
 
 
 def _make_quali_results(driver_positions: dict[str, int]) -> pd.DataFrame:
-    """Build a minimal qualifying results DataFrame."""
-    rows = [{"driver_code": code, "position": pos} for code, pos in driver_positions.items()]
+    """Build a minimal qualifying results DataFrame matching FastF1 column names."""
+    rows = [{"Abbreviation": code, "Position": pos} for code, pos in driver_positions.items()]
     return pd.DataFrame(rows)
 
 
@@ -144,4 +144,30 @@ def test_finished_driver_still_updated_with_status_column():
     )
     assert result["NOR"]["pace"]["race_pace"] > 0.50, (
         "A P1 finisher with Status=Finished should still get race_pace updated"
+    )
+
+
+def test_quali_pace_updated_after_strong_qualifying():
+    """A P1 qualifier should see their quali_pace pulled upward."""
+    drivers = {"VER": _make_driver_payload(0.60, 0.60, 0.75)}
+    result = _run_update(
+        drivers,
+        race_positions={"VER": 2},
+        quali_positions={"VER": 1},
+    )
+    assert result["VER"]["pace"]["quali_pace"] > 0.60, (
+        f"Expected quali_pace to increase after P1, got {result['VER']['pace']['quali_pace']}"
+    )
+
+
+def test_quali_pace_updated_after_poor_qualifying():
+    """A P18 qualifier should see their quali_pace pulled downward."""
+    drivers = {"ALO": _make_driver_payload(0.70, 0.70, 0.65)}
+    result = _run_update(
+        drivers,
+        race_positions={"ALO": 15},
+        quali_positions={"ALO": 18},
+    )
+    assert result["ALO"]["pace"]["quali_pace"] < 0.70, (
+        f"Expected quali_pace to decrease after P18, got {result['ALO']['pace']['quali_pace']}"
     )

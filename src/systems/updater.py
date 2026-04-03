@@ -1,5 +1,6 @@
 """Update team and driver characteristics after a completed race."""
 
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -62,8 +63,6 @@ def _load_driver_characteristics_payload(
         if not fallback_file.exists():
             continue
         try:
-            import json
-
             with open(fallback_file) as f:
                 fallback_payload = json.load(f)
             logger.info(
@@ -111,8 +110,6 @@ def _persist_driver_characteristics_payload(
 
     def _write_fallback_file() -> None:
         """Persist the same payload to the season-scoped JSON fallback."""
-        import json
-
         with open(fallback_file, "w") as f:
             json.dump(payload, f, indent=2)
 
@@ -173,8 +170,11 @@ def _restore_bayesian_state(
     return seeded_drivers
 
 
+_LEGACY_BAYESIAN_KEYS = {"normalized_skill_score", "blended_skill_score", "blend_weight"}
+
+
 def _remove_legacy_bayesian_fields(drivers_payload: dict[str, Any]) -> int:
-    """Drop old Bayesian fields we no longer save."""
+    """Drop Bayesian fields the updater no longer writes."""
     stripped_fields = 0
     for driver_entry in drivers_payload.values():
         if not isinstance(driver_entry, dict):
@@ -184,9 +184,10 @@ def _remove_legacy_bayesian_fields(drivers_payload: dict[str, Any]) -> int:
         if not isinstance(bayesian_payload, dict):
             continue
 
-        if "normalized_skill_score" in bayesian_payload:
-            bayesian_payload.pop("normalized_skill_score", None)
-            stripped_fields += 1
+        for legacy_key in _LEGACY_BAYESIAN_KEYS:
+            if legacy_key in bayesian_payload:
+                bayesian_payload.pop(legacy_key, None)
+                stripped_fields += 1
 
     return stripped_fields
 
@@ -371,6 +372,25 @@ def update_team_characteristics(
     )
 
 
+def _extract_dnf_drivers(race_results: pd.DataFrame) -> set[str]:
+    """Return driver codes that retired rather than finishing the race.
+
+    Keeps drivers who finished or were classified as lapped (Status contains
+    "Lap") but excludes mechanical retirements, collisions, and other DNFs.
+    """
+    dnf_drivers: set[str] = set()
+    if not isinstance(race_results, pd.DataFrame) or "Status" not in race_results.columns:
+        return dnf_drivers
+
+    for _, row in race_results.iterrows():
+        status = str(row.get("Status", "")).strip()
+        if status and status != "Finished" and "Lap" not in status:
+            abbrev = str(row.get("Abbreviation", "")).strip()
+            if abbrev:
+                dnf_drivers.add(abbrev)
+    return dnf_drivers
+
+
 def update_bayesian_driver_ratings(
     race_results: pd.DataFrame,
     qualifying_results: pd.DataFrame | None = None,
@@ -396,7 +416,15 @@ def update_bayesian_driver_ratings(
         _remove_legacy_bayesian_fields(drivers_payload)
         _restore_bayesian_state(bayesian, drivers_payload)
 
-    observations = _build_position_observations(race_results)
+    all_observations = _build_position_observations(race_results)
+    dnf_drivers = _extract_dnf_drivers(race_results)
+    observations = {code: pos for code, pos in all_observations.items() if code not in dnf_drivers}
+    if dnf_drivers:
+        logger.info(
+            "Excluded %s DNF drivers from Bayesian update: %s",
+            len(dnf_drivers),
+            ", ".join(sorted(dnf_drivers)),
+        )
     if not observations:
         logger.warning("No valid race positions available for Bayesian rating update")
         return
@@ -427,36 +455,18 @@ def update_bayesian_driver_ratings(
         )
         return
 
-    blend_weight = float(config_loader.get("bayesian.runtime_skill_blend_weight", 0.25))
-    blend_weight = float(max(0.0, min(blend_weight, 1.0)))
     touched_skill_drivers = 0
     for driver_code, (mu, sigma) in bayesian.ratings.items():
         driver_entry = drivers_payload.get(driver_code)
         if not isinstance(driver_entry, dict):
             continue
 
-        racecraft_payload = driver_entry.get("racecraft")
-        if not isinstance(racecraft_payload, dict):
-            racecraft_payload = {}
-            driver_entry["racecraft"] = racecraft_payload
-
-        existing_skill_raw = racecraft_payload.get("skill_score", 0.5)
-        try:
-            existing_skill = float(existing_skill_raw)
-        except (TypeError, ValueError):
-            existing_skill = 0.5
-        existing_skill = float(max(0.0, min(existing_skill, 1.0)))
-
-        bayesian_skill = float(max(0.0, min((float(mu) - 1.0) / max(grid_size - 1, 1), 1.0)))
-        blended_skill = ((1.0 - blend_weight) * existing_skill) + (blend_weight * bayesian_skill)
-        blended_skill = float(max(0.0, min(blended_skill, 1.0)))
-        racecraft_payload["skill_score"] = blended_skill
-
+        # Persist Bayesian state only. Prediction-time blending in
+        # _blend_race_skill_with_bayesian_form handles the skill_score
+        # adjustment — keeping it in one place avoids double-counting.
         driver_entry["bayesian"] = {
             "rating_mu": float(mu),
             "rating_sigma": float(sigma),
-            "blended_skill_score": blended_skill,
-            "blend_weight": blend_weight,
             "last_session": session_name,
             "last_updated": datetime.now().isoformat(),
             "season_year": season_year,
@@ -503,17 +513,10 @@ def update_bayesian_driver_ratings(
     )
     race_pace_blend = float(np.clip(race_pace_blend, 0.0, 1.0))
     touched_race_pace_drivers = 0
-    # Filter out DNF'd drivers — retirement reflects reliability, not pace.
-    dnf_drivers: set[str] = set()
-    if isinstance(race_results, pd.DataFrame) and "Status" in race_results.columns:
-        for _, row in race_results.iterrows():
-            status = str(row.get("Status", "")).strip()
-            if status and status != "Finished" and "Lap" not in status:
-                abbrev = str(row.get("Abbreviation", "")).strip()
-                if abbrev:
-                    dnf_drivers.add(abbrev)
-
-    for driver_code, finish_position in observations.items():
+    # dnf_drivers was computed earlier for the Bayesian filter — reuse it here.
+    # Use all_observations (not the filtered observations) so we can iterate
+    # every finisher and skip DNFs explicitly.
+    for driver_code, finish_position in all_observations.items():
         if driver_code in dnf_drivers:
             continue
         driver_entry = drivers_payload.get(driver_code)

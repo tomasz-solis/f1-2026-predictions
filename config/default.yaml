@@ -27,6 +27,14 @@ bayesian:
   # Shock multiplier for concept drift
   shock_multiplier: 0.5
 
+  # Confidence weight for teammate-relative Bayesian updates
+  teammate_relative_confidence: 0.35
+
+  # runtime_skill_blend_weight is intentionally NOT set.
+  # The updater persists Bayesian state (mu, sigma) only.
+  # Prediction-time blending in _blend_race_skill_with_bayesian_form
+  # is the single mechanism that mixes skill_score toward the posterior.
+
 # Race Simulation Parameters
 race:
   # Component weights
@@ -158,7 +166,7 @@ baseline_predictor:
 
     # Compress team spread before scoring.
     # 1.0 = raw team deltas, lower = closer field.
-    team_strength_compression: 0.44
+    team_strength_compression: 0.60
 
     # Driver signal composition for qualifying
     driver_quali_pace_weight: 0.70

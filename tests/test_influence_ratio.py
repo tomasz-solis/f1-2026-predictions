@@ -193,7 +193,7 @@ def test_live_lap_time_ratio_keeps_driver_signal_visible():
         config.get("baseline_predictor.race.lap_time.skill_improvement_max", 0.75)
     )
     team_strength_compression = float(
-        config.get("baseline_predictor.race.lap_time.team_strength_compression", 0.40)
+        config.get("baseline_predictor.race.lap_time.team_strength_compression", 0.35)
     )
 
     team_range = 2.0 * 0.5 * team_strength_compression * team_pace_penalty_range

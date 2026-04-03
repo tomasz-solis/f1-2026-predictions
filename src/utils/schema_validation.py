@@ -92,10 +92,6 @@ _DRIVER_BAYESIAN_SCHEMA = {
     "properties": {
         "rating_mu": {"type": "number"},
         "rating_sigma": {"type": "number", "minimum": 0.0},
-        # Newer artifacts compute this on the fly, so it may be missing.
-        "normalized_skill_score": _UNIT_INTERVAL_NUMBER,
-        "blended_skill_score": _UNIT_INTERVAL_NUMBER,
-        "blend_weight": _UNIT_INTERVAL_NUMBER,
         "sessions_observed": {"type": "integer", "minimum": 0},
         "seeded_from": {"type": "string"},
         "last_session": {"type": "string"},

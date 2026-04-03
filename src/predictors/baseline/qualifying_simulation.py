@@ -360,7 +360,7 @@ def _build_quali_sim_config(
         else (learning_position_to_score_scale * learning_with_practice_multiplier)
     )
     team_strength_compression = float(
-        cfg.get("baseline_predictor.qualifying.team_strength_compression", 0.50)
+        cfg.get("baseline_predictor.qualifying.team_strength_compression", 0.60)
     )
     driver_quali_pace_weight = float(
         cfg.get("baseline_predictor.qualifying.driver_quali_pace_weight", 0.70)

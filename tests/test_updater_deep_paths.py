@@ -442,8 +442,9 @@ def test_update_bayesian_driver_ratings_persists_driver_characteristics_updates(
     assert artifact_key == "2026::driver_characteristics"
     assert version == payload["version"]
     assert payload["version"] >= 2
-    assert payload["drivers"]["LEC"]["racecraft"]["skill_score"] != 0.55
-    assert "bayesian" in payload["drivers"]["LEC"]
+    assert payload["drivers"]["LEC"]["racecraft"]["skill_score"] == 0.55
+    assert "rating_mu" in payload["drivers"]["LEC"]["bayesian"]
+    assert "rating_sigma" in payload["drivers"]["LEC"]["bayesian"]
 
 
 def test_update_bayesian_driver_ratings_reuses_saved_posteriors_and_cleans_stale_fields(
