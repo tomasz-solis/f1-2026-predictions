@@ -13,7 +13,7 @@ class TestDashboardSmoke:
 
     def test_dashboard_imports(self):
         """Test that dashboard file can be imported"""
-        # This ensures all imports in app.py are valid
+        # If any import in app.py is broken, this import will fail
         import importlib.util
 
         spec = importlib.util.spec_from_file_location("app", "app.py")

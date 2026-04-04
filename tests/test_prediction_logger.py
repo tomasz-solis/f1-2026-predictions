@@ -18,8 +18,8 @@ def temp_predictions_dir():
     Create temporary directory for predictions.
 
     Returns path that looks like: /tmp/test_xyz/predictions
-    This ensures ArtifactStore writes to /tmp/test_xyz/predictions/
-    which is isolated per test.
+    ArtifactStore will write to /tmp/test_xyz/predictions/,
+    isolated per test.
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         # Return predictions subdir - ArtifactStore will create it

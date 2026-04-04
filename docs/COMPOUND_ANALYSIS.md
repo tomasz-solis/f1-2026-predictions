@@ -182,16 +182,15 @@ The race predictor now uses full lap-by-lap simulation with multi-compound pit s
 - [src/utils/pit_strategy.py](../src/utils/pit_strategy.py) - Monte Carlo pit strategy generation
 - [src/utils/lap_by_lap_simulator.py](../src/utils/lap_by_lap_simulator.py) - Race simulation engine
 
-**Key features:**
-1. **FIA Rule Enforcement:** All strategies use ≥2 different compounds per dry race
-2. **Monte Carlo Pit Timing:** Realistic variance in pit stop laps (±3 laps for 1-stop)
-3. **Tire Degradation Modeling:**
-   - Linear degradation based on tire_deg_slope from compound_characteristics
-   - Fuel load effect (heavier car = faster degradation)
-   - Fresh tire advantage (SOFT: 0.5s, MEDIUM: 0.3s, HARD: 0.1s for first 2-3 laps)
-   - Traffic effect (P1-5: 5% better, P16+: 5% worse tire life)
-4. **Track-Specific Pit Loss:** Uses actual track data (Monaco 19s, Singapore 24s)
-5. **Strategy Generation:** Tire stress drives stop count (high stress → 80% 2-stop probability)
+The simulation enforces the FIA two-compound rule for dry races and models
+pit timing with Monte Carlo variance (±3 laps for a 1-stop strategy). Tire
+degradation is linear from the compound-specific `tire_deg_slope`, modified by
+fuel load (heavier = faster wear), a fresh-tire advantage window (SOFT 0.5 s,
+MEDIUM 0.3 s, HARD 0.1 s over the first 2-3 laps), and a traffic-dependent
+correction (front-runners get ~5 % better tire life, backmarkers ~5 % worse).
+Pit-stop loss is track-specific using real circuit data (Monaco 19 s, Singapore
+24 s). Strategy generation is driven by tire stress — high-stress tracks see
+roughly 80 % two-stop probability.
 
 **Configuration:** All parameters in [config/default.yaml](../config/default.yaml) under `baseline_predictor.race`:
 - `tire_strategy.windows` - Pit stop lap windows (1-stop, 2-stop)

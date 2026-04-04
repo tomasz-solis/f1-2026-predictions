@@ -22,7 +22,7 @@ class TestRaceRealismRegression:
     def test_grid_to_race_correlation_minimum(self, predictor):
         """Grid-to-race correlation must be >= 0.75 in dry conditions.
 
-        This ensures qualifying order has meaningful impact on race result.
+        Qualifying order should have meaningful impact on race result.
         Target inspired by real F1 data where grid order correlates strongly
         with finishing order in clean races.
         """
@@ -106,7 +106,7 @@ class TestRaceRealismRegression:
     def test_top5_starters_dominate_podium(self, predictor):
         """Top-5 starters must account for >= 50% of total podium probability.
 
-        This ensures that front-runners don't get swamped by midfield
+        Front-runners should not get swamped by midfield
         in unrealistic ways.
         """
         quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=300)

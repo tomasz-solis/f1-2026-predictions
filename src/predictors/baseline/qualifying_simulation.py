@@ -760,6 +760,12 @@ def run_qualifying_simulations(
         count = team_counts.get(team_name, 1)
         team_driver_signal_means[team_name] = total_signal / count
 
+    # Weekend form is drawn once per driver for the entire simulation batch,
+    # not per individual sim iteration. This models persistent weekend effects
+    # (setup quality, driver comfort with the track, weather sensitivity)
+    # rather than lap-to-lap variance. The per-iteration randomness is
+    # captured separately by the noise_std and teammate_setup_std draws
+    # inside _score_single_driver_in_simulation.
     weekend_form = {
         str(driver_info["driver"]): (
             float(rng.normal(0, sim_cfg.weekend_form_std)) if sim_cfg.weekend_form_std > 0 else 0.0
