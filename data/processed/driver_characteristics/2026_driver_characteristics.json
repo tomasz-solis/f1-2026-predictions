@@ -91,7 +91,7 @@
       "name": "Lando Norris",
       "pace": {
         "quali_pace": 0.778,
-        "race_pace": 0.686
+        "race_pace": 0.753
       },
       "racecraft": {
         "skill_score": 0.701032034064949,
@@ -493,7 +493,7 @@
       "name": "Max Verstappen",
       "pace": {
         "quali_pace": 0.763,
-        "race_pace": 0.633
+        "race_pace": 0.725
       },
       "racecraft": {
         "skill_score": 0.7661707266203823,
@@ -785,8 +785,8 @@
       }
     }
   },
-  "version": 5,
-  "last_updated": "2026-04-02T18:16:19.826750",
+  "version": 6,
+  "last_updated": "2026-04-04T18:18:54.745538",
   "extraction_date": "2026-03-30T12:44:57.846556+00:00",
   "carried_over_from": 2025,
   "bayesian_last_updated_year": 2026
