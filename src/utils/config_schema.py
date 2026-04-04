@@ -205,6 +205,8 @@ class DriverFormConfig(StrictConfigModel):
 
     bayesian_pace_blend_per_race: float = Field(default=0.20, ge=0.0, le=1.0)
     bayesian_pace_blend_cap: float = Field(default=0.60, ge=0.0, le=1.0)
+    bayesian_race_skill_blend_per_race: float = Field(default=0.20, ge=0.0, le=1.0)
+    bayesian_race_skill_blend_cap: float = Field(default=0.60, ge=0.0, le=1.0)
     quali_pace_update_blend: float = Field(default=0.30, ge=0.0, le=1.0)
     race_pace_update_blend: float = Field(default=0.25, ge=0.0, le=1.0)
 
@@ -735,6 +737,15 @@ class OvertakingTransitionConfig(StrictConfigModel):
     max_delta_from_prior: float = Field(default=0.25, ge=0.0)
 
 
+class HypotheticalPointsFloorConfig(StrictConfigModel):
+    """Gate settings for the hypothetical team-swap points floor."""
+
+    portable_skill_threshold: float = Field(default=0.70, ge=0.0, le=1.0)
+    top_grid_limit: int = Field(default=10, ge=1)
+    team_strength_threshold: float = Field(default=0.50, ge=0.0, le=1.0)
+    dnf_probability_cap: float = Field(default=0.12, ge=0.0, le=1.0)
+
+
 class FinalBlendConfig(StrictConfigModel):
     """Final race ranking blend after simulation sampling."""
 
@@ -753,6 +764,9 @@ class FinalBlendConfig(StrictConfigModel):
     max_gain_race_advantage_scale: float = Field(default=1.5, ge=0.0)
     max_gain_floor: float = Field(default=4.0, ge=0.0)
     max_gain_ceiling: float = Field(default=11.0, ge=0.0)
+    hypothetical_points_floor: HypotheticalPointsFloorConfig = Field(
+        default_factory=HypotheticalPointsFloorConfig
+    )
 
 
 class PodiumProbabilityConfig(StrictConfigModel):

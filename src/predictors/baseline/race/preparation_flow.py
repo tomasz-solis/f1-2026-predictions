@@ -332,9 +332,17 @@ def _blend_race_skill_with_bayesian_form(
         return clipped_base_skill
 
     blend_per_race = float(
-        cfg.get("baseline_predictor.driver_form.bayesian_pace_blend_per_race", 0.20)
+        cfg.get(
+            "baseline_predictor.driver_form.bayesian_race_skill_blend_per_race",
+            cfg.get("baseline_predictor.driver_form.bayesian_pace_blend_per_race", 0.20),
+        )
     )
-    blend_cap = float(cfg.get("baseline_predictor.driver_form.bayesian_pace_blend_cap", 0.60))
+    blend_cap = float(
+        cfg.get(
+            "baseline_predictor.driver_form.bayesian_race_skill_blend_cap",
+            cfg.get("baseline_predictor.driver_form.bayesian_pace_blend_cap", 0.60),
+        )
+    )
     blend_weight = float(
         np.clip(max(0, int(races_completed)) * blend_per_race, 0.0, max(0.0, blend_cap))
     )

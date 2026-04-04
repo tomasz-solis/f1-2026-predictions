@@ -78,7 +78,11 @@ class BaselineRacePreparationMixin:
         return None
 
     def _build_portable_skill_signal(self, driver_code: str, base_skill: float) -> float:
-        """Build a portable driver-skill signal for hypothetical team swaps."""
+        """Build a portable driver-skill signal for hypothetical team swaps.
+
+        Uses the raw extraction skill_score (not the already-blended race skill)
+        as the base, so the Bayesian blend is applied exactly once.
+        """
         driver_data = self.drivers.get(driver_code, {})
         if not isinstance(driver_data, dict):
             return float(base_skill)
@@ -87,11 +91,12 @@ class BaselineRacePreparationMixin:
         if experience_tier not in {"established", "veteran", "sunset"}:
             return float(base_skill)
 
+        raw_skill = float(driver_data.get("racecraft", {}).get("skill_score", base_skill))
         cfg = getattr(self, "config", None) or config_loader
         configured_grid_size = int(cfg.get("grid.size", len(self.drivers) or 22))
         return _blend_race_skill_with_bayesian_form(
             driver_data=driver_data,
-            base_skill=float(base_skill),
+            base_skill=raw_skill,
             races_completed=int(getattr(self, "races_completed", 0)),
             grid_size=max(configured_grid_size, len(self.drivers) or 0, 2),
             config=cfg,
@@ -108,7 +113,14 @@ class BaselineRacePreparationMixin:
             is_hypothetical_team_assignment = bool(
                 assigned_team and current_lineup_team and assigned_team != current_lineup_team
             )
+            driver_data = self.drivers.get(driver_code, {})
+            raw_skill = float(
+                driver_data.get("racecraft", {}).get("skill_score", info.get("skill", 0.5))
+                if isinstance(driver_data, dict)
+                else info.get("skill", 0.5)
+            )
             info["current_lineup_team"] = current_lineup_team or assigned_team
+            info["raw_skill"] = raw_skill
             info["portable_skill"] = self._build_portable_skill_signal(
                 driver_code,
                 float(info.get("skill", 0.5)),

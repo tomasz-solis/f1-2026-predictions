@@ -151,6 +151,11 @@ baseline_predictor:
   driver_form:
     bayesian_pace_blend_per_race: 0.20
     bayesian_pace_blend_cap: 0.60
+    # Race-specific Bayesian blend rates. Falls back to the qualifying rates
+    # above when not set. Separate keys allow independent tuning because race
+    # results carry more signal per observation than qualifying.
+    bayesian_race_skill_blend_per_race: 0.20
+    bayesian_race_skill_blend_cap: 0.60
     quali_pace_update_blend: 0.30
     race_pace_update_blend: 0.25
 
@@ -638,6 +643,11 @@ baseline_predictor:
       max_gain_race_advantage_scale: 1.5
       max_gain_floor: 4.0
       max_gain_ceiling: 11.0
+      hypothetical_points_floor:
+        portable_skill_threshold: 0.70
+        top_grid_limit: 10
+        team_strength_threshold: 0.50
+        dnf_probability_cap: 0.12
 
     podium_probability:
       min_sample_count: 250

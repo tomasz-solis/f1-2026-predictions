@@ -290,7 +290,7 @@ def test_empty_or_none_fp_performance():
 
 
 def test_qualifying_stage_parameter_validation():
-    """Test qualifying stage parameter accepts valid values."""
+    """Each qualifying stage value should produce a full grid result."""
     predictor = Baseline2026Predictor(seed=42)
 
     valid_stages = ["auto", "main", "sprint"]
@@ -299,7 +299,13 @@ def test_qualifying_stage_parameter_validation():
         result = predictor.predict_qualifying(
             2026, race_name="Australian Grand Prix", qualifying_stage=stage, n_simulations=10
         )
-        assert result is not None, f"Stage '{stage}' should be valid"
+        grid = result.get("grid", [])
+        assert len(grid) >= 20, (
+            f"Stage '{stage}' produced only {len(grid)} grid entries, expected >= 20"
+        )
+        for entry in grid:
+            assert "driver" in entry, f"Stage '{stage}': grid entry missing 'driver' key"
+            assert "position" in entry, f"Stage '{stage}': grid entry missing 'position' key"
 
 
 def test_year_boundary_conditions():

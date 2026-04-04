@@ -30,6 +30,7 @@ class DriverRaceInfo(TypedDict):
     defensive_skill: float
     dnf_probability: float
     current_lineup_team: NotRequired[str]
+    raw_skill: NotRequired[float]
     portable_skill: NotRequired[float]
     is_hypothetical_team_assignment: NotRequired[bool]
 

@@ -196,6 +196,19 @@ def simulate_race_lap_by_lap(
             "teammate_setup_offset": persistent_setup_offset_by_driver.get(driver, 0.0),
         }
 
+    # Pre-extract constant lap-time parameters (unchanged lap-to-lap).
+    _lt_cfg = race_params.get("lap_time", {})
+    _reference_base = _lt_cfg.get("reference_base", 90.0)
+    _team_pace_penalty_range = _lt_cfg.get("team_pace_penalty_range", 5.0)
+    _skill_improvement_max = _lt_cfg.get("skill_improvement_max", 0.75)
+    _elite_skill_threshold = _lt_cfg.get("elite_skill_threshold", 0.88)
+    _elite_skill_lap_bonus_max = _lt_cfg.get("elite_skill_lap_bonus_max", 0.09)
+    _elite_skill_exponent = _lt_cfg.get("elite_skill_exponent", 1.3)
+    _team_strength_compression = race_params.get("team_strength_compression", 0.35)
+    _race_advantage_lap_impact = race_params.get("race_advantage_lap_impact", 0.35)
+    _elite_denominator = max(1e-6, 1.0 - _elite_skill_threshold)
+    _lap_time_bounds = _lt_cfg.get("bounds", [70.0, 120.0])
+
     # Lap-by-lap progression
     for lap_num in range(1, race_distance + 1):
         active_order = sorted(
@@ -235,36 +248,27 @@ def simulate_race_lap_by_lap(
             skill = info["skill"]
 
             # Base lap time from team strength (inverted: 1.0 = fastest, 0.0 = slowest)
-            # Load lap time modeling config
-            reference_base = race_params.get("lap_time", {}).get("reference_base", 90.0)
-            team_pace_penalty_range = race_params.get("lap_time", {}).get(
-                "team_pace_penalty_range", 5.0
-            )
-            skill_improvement_max = race_params.get("lap_time", {}).get(
-                "skill_improvement_max", 0.75
-            )
-            team_strength_compression = race_params.get("team_strength_compression", 0.35)
+            reference_base = _reference_base
+            team_pace_penalty_range = _team_pace_penalty_range
+            skill_improvement_max = _skill_improvement_max
+            team_strength_compression = _team_strength_compression
 
             compressed_team_strength = 0.5 + ((team_strength - 0.5) * team_strength_compression)
             compressed_team_strength = np.clip(compressed_team_strength, 0.0, 1.0)
 
             team_pace_penalty = (1.0 - compressed_team_strength) * team_pace_penalty_range
             skill_improvement = skill * skill_improvement_max
-            elite_skill_threshold = race_params.get("lap_time", {}).get(
-                "elite_skill_threshold", 0.88
-            )
-            elite_skill_lap_bonus_max = race_params.get("lap_time", {}).get(
-                "elite_skill_lap_bonus_max", 0.09
-            )
-            elite_skill_exponent = race_params.get("lap_time", {}).get("elite_skill_exponent", 1.3)
-            elite_denominator = max(1e-6, 1.0 - elite_skill_threshold)
+            elite_skill_threshold = _elite_skill_threshold
+            elite_skill_lap_bonus_max = _elite_skill_lap_bonus_max
+            elite_skill_exponent = _elite_skill_exponent
+            elite_denominator = _elite_denominator
             elite_skill_normalized = max(0.0, (skill - elite_skill_threshold) / elite_denominator)
             elite_skill_bonus = elite_skill_lap_bonus_max * (
                 elite_skill_normalized**elite_skill_exponent
             )
 
             # Reference lap time (track-specific if available in race_params)
-            race_advantage_lap_impact = race_params.get("race_advantage_lap_impact", 0.35)
+            race_advantage_lap_impact = _race_advantage_lap_impact
             race_advantage_delta = -info.get("race_advantage", 0.0) * race_advantage_lap_impact
             base_lap_time = (
                 reference_base
@@ -353,7 +357,7 @@ def simulate_race_lap_by_lap(
             )
 
             # Keep lap time within plausible bounds.
-            lap_time_bounds = race_params.get("lap_time", {}).get("bounds", [70.0, 120.0])
+            lap_time_bounds = _lap_time_bounds
             lap_time = max(lap_time_bounds[0], min(lap_time_bounds[1], lap_time))
 
             # Update cumulative time and tire age

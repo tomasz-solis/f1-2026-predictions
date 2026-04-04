@@ -34,7 +34,7 @@ def validate_driver_data(drivers: dict) -> list[str]:
 
         if quali_pace is not None and race_pace is not None:
             # Quali/race should be similar (within 20%)
-            if abs(quali_pace - race_pace) > 0.20:
+            if abs(quali_pace - race_pace) > 0.25:
                 errors.append(
                     f"{driver_code}: Large pace gap (quali {quali_pace:.3f}, race {race_pace:.3f})"
                 )

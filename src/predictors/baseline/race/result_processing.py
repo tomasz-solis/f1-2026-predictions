@@ -145,14 +145,15 @@ def apply_hypothetical_points_floor(
     if reference_grid_pos > top_grid_limit:
         return position_blend_score, blended_position_samples
 
-    portable_skill = float(info.get("portable_skill", info.get("skill", 0.5)))
+    # Gate on raw extraction skill — the team-independent driver quality signal.
+    raw_skill = float(info.get("raw_skill", info.get("skill", 0.5)))
     portable_skill_threshold = float(
         cfg.get(
             "baseline_predictor.race.final_blend.hypothetical_points_floor.portable_skill_threshold",
-            0.72,
+            0.70,
         )
     )
-    if portable_skill < portable_skill_threshold:
+    if raw_skill < portable_skill_threshold:
         return position_blend_score, blended_position_samples
 
     team_strength_threshold = float(
