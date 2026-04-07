@@ -266,8 +266,8 @@ class Config:
                 "front_threshold < upper_threshold < mid_threshold"
             )
 
-        team_weight = self.get("baseline_predictor.qualifying.team_weight", 0.7)
-        skill_weight = self.get("baseline_predictor.qualifying.skill_weight", 0.3)
+        team_weight = self.get("baseline_predictor.qualifying.team_weight", 0.60)
+        skill_weight = self.get("baseline_predictor.qualifying.skill_weight", 0.40)
         weight_sum = team_weight + skill_weight
 
         if not (0.99 <= weight_sum <= 1.01):  # Allow small floating point error

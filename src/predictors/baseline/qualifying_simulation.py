@@ -346,8 +346,8 @@ def _build_quali_sim_config(
     noise_std_normal = float(cfg.get("baseline_predictor.qualifying.noise_std_normal", 0.02))
     noise_std = noise_std_sprint if is_sprint else noise_std_normal
 
-    team_weight = float(cfg.get("baseline_predictor.qualifying.team_weight", 0.7))
-    skill_weight = float(cfg.get("baseline_predictor.qualifying.skill_weight", 0.3))
+    team_weight = float(cfg.get("baseline_predictor.qualifying.team_weight", 0.60))
+    skill_weight = float(cfg.get("baseline_predictor.qualifying.skill_weight", 0.40))
     learning_position_to_score_scale = float(
         cfg.get("baseline_predictor.qualifying.learning.position_to_score_scale", 0.03)
     )
