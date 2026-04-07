@@ -572,6 +572,7 @@ def _runtime_health_counters_caption(observability: dict[str, Any]) -> str | Non
 
 
 def render_live_prediction_page(enable_logging: bool) -> None:
+    """Render the main live prediction page with qualifying and race tabs."""
     selected_season = _get_selected_season()
     render_prediction_hero_deck(
         title="Race Weekend Prediction",
@@ -775,6 +776,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
 
 
 def render_model_insights_page() -> None:
+    """Render the model insights page with hyperparameters and learning state."""
     st.header("Model and Learning Runtime")
     st.markdown(MODEL_INSIGHTS_MARKDOWN)
 
@@ -891,6 +893,7 @@ def render_prediction_accuracy_page() -> None:
 
 
 def render_contact_page() -> None:
+    """Render the contact page."""
     st.header("Contact")
     st.markdown(CONTACT_PAGE_HTML, unsafe_allow_html=True)
 

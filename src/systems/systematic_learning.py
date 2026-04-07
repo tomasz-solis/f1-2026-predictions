@@ -90,6 +90,7 @@ class SystematicLearningSystem:
         return merged
 
     def save_state(self) -> None:
+        """Write the current learning state to disk."""
         adaptive = self.state.setdefault("adaptive_calibration", {})
         adaptive["last_updated"] = datetime.now(UTC).isoformat()
         with open(self.state_file, "w") as f:

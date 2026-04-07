@@ -142,7 +142,7 @@ class TestRaceRealismRegression:
         - At least one top-3 driver must have P95 <= 10 (strong performance floor)
         - Mean P95 for top-3 should be <= 12 (average stability)
 
-        This allows for some variance while preventing all three from having
+        Some variance is acceptable, but all three having
         unrealistic tail outcomes.
         """
         quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=300)

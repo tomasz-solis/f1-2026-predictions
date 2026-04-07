@@ -51,6 +51,7 @@ def _header_alignment() -> str:
 
 
 def configure_page() -> None:
+    """Set Streamlit page config and favicon."""
     st.set_page_config(
         page_title=BRAND_PAGE_TITLE,
         page_icon=_page_icon(),
@@ -60,6 +61,7 @@ def configure_page() -> None:
 
 
 def render_global_styles() -> None:
+    """Inject custom CSS into the Streamlit page."""
     st.markdown(_CUSTOM_CSS, unsafe_allow_html=True)
 
 
@@ -73,6 +75,7 @@ def _build_asset_data_uri(path_str: str) -> str:
 
 
 def render_header() -> None:
+    """Render the sticky header with logo, tagline, and disclaimer."""
     shell_class = f"brand-shell brand-shell--{_header_alignment()}"
     logo_path = _brand_asset_path(BRAND_WORDMARK_FILE)
 

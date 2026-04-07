@@ -28,6 +28,7 @@ class NestedDictConfig:
         self._data = data
 
     def get(self, key: str, default: Any = None) -> Any:
+        """Retrieve a value by dot-notation key, returning default if not found."""
         value: Any = self._data
         for part in key.split("."):
             if isinstance(value, dict) and part in value:
