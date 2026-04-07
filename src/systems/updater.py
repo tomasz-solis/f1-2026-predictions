@@ -414,6 +414,13 @@ def update_bayesian_driver_ratings(
     from src.utils.lineups import load_current_lineups
 
     lineups = load_current_lineups()
+
+    # Build driver->team mapping once; shared by both pace update blocks below.
+    driver_to_team: dict[str, str] = {}
+    for team_name, team_drivers in (lineups or {}).items():
+        for d in team_drivers:
+            driver_to_team[str(d)] = str(team_name)
+
     if lineups:
         bayesian.update_teammate_relative(
             observations=observations,
@@ -452,17 +459,68 @@ def update_bayesian_driver_ratings(
         }
         touched_skill_drivers += 1
 
+    # --- Qualifying Bayesian update ---
+    # Lower confidence than race (0.15 vs 0.35): qualifying is one lap in controlled
+    # conditions, so it's a noisier signal than race finishing position.
+    # Runs AFTER the race update so the prior going into prediction already
+    # reflects the weekend's race outcome; qualifying nudges it further for
+    # drivers whose one-lap pace diverges from their race pace (e.g. Gasly-era
+    # pattern of strong qualifying, weaker race management).
     qualifying_observations = (
         _build_position_observations(qualifying_results)
         if isinstance(qualifying_results, pd.DataFrame)
         else {}
     )
+    if qualifying_observations:
+        quali_bayesian_confidence = float(
+            config_loader.get("bayesian.qualifying_update_confidence", 0.15)
+        )
+        quali_bayesian_confidence = float(np.clip(quali_bayesian_confidence, 0.05, 0.5))
+        if lineups:
+            bayesian.update_teammate_relative(
+                observations=qualifying_observations,
+                session_name=f"Qualifying_{session_name}",
+                lineups=lineups,
+                confidence=quali_bayesian_confidence,
+            )
+        else:
+            bayesian.update(
+                observations=qualifying_observations,
+                session_name=f"Qualifying_{session_name}",
+                confidence=quali_bayesian_confidence,
+            )
+        logger.info(
+            "Qualifying Bayesian update applied for %s drivers (confidence=%.2f)",
+            len(qualifying_observations),
+            quali_bayesian_confidence,
+        )
+
+    # --- Qualifying pace EMA update (teammate-relative) ---
+    # Raw pace = 1 - (pos-1)/(grid-1). We subtract the team mean and re-center
+    # on the field mean so the field reflects driver ability, not car performance.
+    # A backmarker who beats their teammate gets a pace value near 0.5,
+    # not near 0.05 because their car finishes P19 every weekend.
     quali_pace_blend = float(
         config_loader.get("baseline_predictor.driver_form.quali_pace_update_blend", 0.30)
     )
     quali_pace_blend = float(np.clip(quali_pace_blend, 0.0, 1.0))
     touched_quali_pace_drivers = 0
-    for driver_code, quali_position in qualifying_observations.items():
+
+    raw_quali_paces: dict[str, float] = {
+        dc: float(np.clip(1.0 - ((int(pos) - 1) / max(grid_size - 1, 1)), 0.0, 1.0))
+        for dc, pos in qualifying_observations.items()
+    }
+    team_quali_paces: dict[str, list[float]] = {}
+    for dc, raw_pace in raw_quali_paces.items():
+        t = driver_to_team.get(dc)
+        if t is not None:
+            team_quali_paces.setdefault(t, []).append(raw_pace)
+    team_quali_means: dict[str, float] = {
+        t: float(np.mean(paces)) for t, paces in team_quali_paces.items() if len(paces) >= 2
+    }
+    field_quali_mean = float(np.mean(list(raw_quali_paces.values()))) if raw_quali_paces else 0.5
+
+    for driver_code, raw_pace in raw_quali_paces.items():
         driver_entry = drivers_payload.get(driver_code)
         if not isinstance(driver_entry, dict):
             continue
@@ -478,26 +536,44 @@ def update_bayesian_driver_ratings(
             existing_quali_pace = 0.5
         existing_quali_pace = float(np.clip(existing_quali_pace, 0.05, 0.99))
 
-        observed_quali_pace = 1.0 - ((int(quali_position) - 1) / max(grid_size - 1, 1))
+        driver_team = driver_to_team.get(driver_code)
+        if driver_team is not None and driver_team in team_quali_means:
+            observed_quali_pace = raw_pace - team_quali_means[driver_team] + field_quali_mean
+        else:
+            observed_quali_pace = raw_pace
         observed_quali_pace = float(np.clip(observed_quali_pace, 0.0, 1.0))
-        updated_quali_pace = ((1.0 - quali_pace_blend) * existing_quali_pace) + (
+
+        updated_quali_pace = (1.0 - quali_pace_blend) * existing_quali_pace + (
             quali_pace_blend * observed_quali_pace
         )
         pace_payload["quali_pace"] = round(float(np.clip(updated_quali_pace, 0.05, 0.99)), 3)
         touched_quali_pace_drivers += 1
 
-    # --- Race pace update (mirrors the qualifying pace update above) ---
+    # --- Race pace EMA update (teammate-relative, mirrors qualifying pace above) ---
     race_pace_blend = float(
         config_loader.get("baseline_predictor.driver_form.race_pace_update_blend", 0.25)
     )
     race_pace_blend = float(np.clip(race_pace_blend, 0.0, 1.0))
     touched_race_pace_drivers = 0
-    # dnf_drivers was computed earlier for the Bayesian filter — reuse it here.
-    # Use all_observations (not the filtered observations) so we can iterate
-    # every finisher and skip DNFs explicitly.
-    for driver_code, finish_position in all_observations.items():
-        if driver_code in dnf_drivers:
-            continue
+
+    race_finish_obs: dict[str, int] = {
+        dc: pos for dc, pos in all_observations.items() if dc not in dnf_drivers
+    }
+    raw_race_paces: dict[str, float] = {
+        dc: float(np.clip(1.0 - ((int(pos) - 1) / max(grid_size - 1, 1)), 0.0, 1.0))
+        for dc, pos in race_finish_obs.items()
+    }
+    team_race_paces: dict[str, list[float]] = {}
+    for dc, raw_pace in raw_race_paces.items():
+        t = driver_to_team.get(dc)
+        if t is not None:
+            team_race_paces.setdefault(t, []).append(raw_pace)
+    team_race_means: dict[str, float] = {
+        t: float(np.mean(paces)) for t, paces in team_race_paces.items() if len(paces) >= 2
+    }
+    field_race_mean = float(np.mean(list(raw_race_paces.values()))) if raw_race_paces else 0.5
+
+    for driver_code, raw_pace in raw_race_paces.items():
         driver_entry = drivers_payload.get(driver_code)
         if not isinstance(driver_entry, dict):
             continue
@@ -513,9 +589,14 @@ def update_bayesian_driver_ratings(
             existing_race_pace = 0.5
         existing_race_pace = float(np.clip(existing_race_pace, 0.05, 0.99))
 
-        observed_race_pace = 1.0 - ((int(finish_position) - 1) / max(grid_size - 1, 1))
+        driver_team = driver_to_team.get(driver_code)
+        if driver_team is not None and driver_team in team_race_means:
+            observed_race_pace = raw_pace - team_race_means[driver_team] + field_race_mean
+        else:
+            observed_race_pace = raw_pace
         observed_race_pace = float(np.clip(observed_race_pace, 0.0, 1.0))
-        updated_race_pace = ((1.0 - race_pace_blend) * existing_race_pace) + (
+
+        updated_race_pace = (1.0 - race_pace_blend) * existing_race_pace + (
             race_pace_blend * observed_race_pace
         )
         pace_payload["race_pace"] = round(float(np.clip(updated_race_pace, 0.05, 0.99)), 3)
@@ -588,12 +669,110 @@ def update_from_race(year: int, race_name: str, data_dir: str = "data/processed"
         data_root=data_root,
     )
 
-    logger.info("\n" + "=" * 60)
-    logger.info("Race update complete.")
-    logger.info("=" * 60)
-    logger.info("\nSystem learned from this race:")
-    logger.info("- Team performance updated from telemetry")
-    logger.info("- Driver skill confidence increased")
-    logger.info("- Uncertainty reduced")
-    logger.info("- Version incremented\n")
-    logger.info("Next prediction will use these updated characteristics.")
+    logger.info("Race update complete for %s %s", year, race_name)
+
+
+def update_from_sprint_race(
+    year: int,
+    race_name: str,
+    data_root: str = "data",
+) -> None:
+    """Update driver ratings from a sprint race result.
+
+    Call this after sprint results are available — typically Saturday.
+    It runs independently from update_from_race (Sunday) because the two
+    sessions have different timing; the pipeline layer decides the order.
+
+    Sprint races are roughly 1/3 race distance with less strategic variation,
+    so the Bayesian update uses a lower confidence weight than full races.
+    """
+    from src.utils.weekend import is_sprint_weekend
+
+    if not is_sprint_weekend(year, race_name):
+        logger.info("%s %s is not a sprint weekend; skipping sprint update", year, race_name)
+        return
+
+    try:
+        sprint_results, _sprint_session = load_competitive_session(
+            year, race_name, "Sprint", load_laps=False
+        )
+        logger.info("Loaded sprint results for %s drivers", len(sprint_results))
+    except (AttributeError, FileNotFoundError, OSError, RuntimeError, TypeError, ValueError) as exc:
+        logger.warning(
+            "Could not load sprint results for %s %s: %s",
+            year,
+            race_name,
+            exc,
+        )
+        return
+
+    sprint_confidence = float(config_loader.get("bayesian.sprint_race_confidence", 0.20))
+    sprint_confidence = float(np.clip(sprint_confidence, 0.05, 0.5))
+
+    data_root_path = Path(data_root)
+    store = ArtifactStore(data_root=data_root_path)
+    season_year = _coerce_season_year(sprint_results, default_year=year)
+    driver_payload = _load_driver_characteristics_payload(store, season_year)
+
+    if not isinstance(driver_payload, dict) or not isinstance(driver_payload.get("drivers"), dict):
+        logger.warning("No driver characteristics available for sprint update")
+        return
+
+    drivers_payload: dict = driver_payload["drivers"]
+
+    from src.models.priors_factory import PriorsFactory
+
+    factory = PriorsFactory(season_year=season_year)
+    priors = factory.create_priors()
+    configured_grid_size = int(config_loader.get("grid.size", len(priors) or 22))
+    grid_size = max(configured_grid_size, len(priors) or configured_grid_size)
+
+    bayesian = BayesianDriverRanking(priors, grid_size=grid_size)
+    strip_legacy_bayesian_fields(drivers_payload)
+    _restore_bayesian_state(bayesian, drivers_payload)
+
+    all_observations = _build_position_observations(sprint_results)
+    dnf_drivers = _extract_dnf_drivers(sprint_results)
+    observations = {dc: pos for dc, pos in all_observations.items() if dc not in dnf_drivers}
+
+    if not observations:
+        logger.warning("No valid sprint positions for Bayesian update")
+        return
+
+    session_name = f"Sprint_{race_name}"
+    from src.utils.lineups import load_current_lineups
+
+    lineups = load_current_lineups()
+    if lineups:
+        bayesian.update_teammate_relative(
+            observations=observations,
+            session_name=session_name,
+            lineups=lineups,
+            confidence=sprint_confidence,
+        )
+    else:
+        bayesian.update(
+            observations=observations,
+            session_name=session_name,
+            confidence=sprint_confidence,
+        )
+
+    for driver_code, (mu, sigma) in bayesian.ratings.items():
+        driver_entry = drivers_payload.get(driver_code)
+        if not isinstance(driver_entry, dict):
+            continue
+        driver_entry["bayesian"] = {
+            "rating_mu": float(mu),
+            "rating_sigma": float(sigma),
+            "last_session": session_name,
+            "last_updated": datetime.now().isoformat(),
+            "season_year": season_year,
+        }
+        strip_legacy_bayesian_fields({driver_code: driver_entry})
+
+    _persist_driver_characteristics_payload(store, driver_payload, season_year)
+    logger.info(
+        "Sprint Bayesian update applied for %s drivers (confidence=%.2f)",
+        len(observations),
+        sprint_confidence,
+    )

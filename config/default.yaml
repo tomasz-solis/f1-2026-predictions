@@ -30,6 +30,12 @@ bayesian:
   # Confidence weight for teammate-relative Bayesian updates
   teammate_relative_confidence: 0.35
 
+  # Qualifying results are one lap in controlled conditions — noisier than race.
+  qualifying_update_confidence: 0.15
+
+  # Sprint races are ~1/3 race distance with less strategic variation.
+  sprint_race_confidence: 0.20
+
   # runtime_skill_blend_weight is intentionally NOT set.
   # The updater persists Bayesian state (mu, sigma) only.
   # Prediction-time blending in _blend_race_skill_with_bayesian_form

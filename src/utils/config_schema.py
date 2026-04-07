@@ -44,6 +44,8 @@ class BayesianConfig(StrictConfigModel):
     shock_threshold: float = Field(default=2.0, ge=0.0)
     shock_multiplier: float = Field(default=0.5, ge=0.0, le=2.0)
     teammate_relative_confidence: float = Field(default=0.35, ge=0.0, le=1.0)
+    qualifying_update_confidence: float = Field(default=0.15, ge=0.0, le=1.0)
+    sprint_race_confidence: float = Field(default=0.20, ge=0.0, le=1.0)
 
 
 class RaceWeightsConfig(StrictConfigModel):
