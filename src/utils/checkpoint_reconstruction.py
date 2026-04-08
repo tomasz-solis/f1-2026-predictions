@@ -8,7 +8,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
-from src.dashboard.live_prediction_flow import prediction_targets_for_checkpoint
 from src.persistence.artifact_store import ArtifactStore
 from src.predictors.baseline_2026 import Baseline2026Predictor
 from src.utils import config_loader
@@ -596,6 +595,10 @@ def reconstruct_checkpoint_prediction(
         qualifying_n_simulations=qualifying_n_simulations,
         race_n_simulations=race_n_simulations,
     )
+    from src.dashboard.prediction_checkpointing import (
+        prediction_targets_for_checkpoint,
+    )
+
     target_predictions = prediction_targets_for_checkpoint(
         prediction_results=prediction_results,
         is_sprint=is_sprint,
