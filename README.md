@@ -463,3 +463,14 @@ The 2025 backtest is here to show the model's floor. In the worst case of
 stable regulations and almost no information advantage, it stays within 0.25
 places of a strong heuristic. The model is built for the regulation-reset case
 where that heuristic fails entirely.
+
+## Known Limitations / Planned Improvements
+
+### Wet skill ratings (driver_characteristics)
+`wet_skill` values are currently hardcoded based on manual research of 2022–2025
+wet/mixed qualifying sessions. A FastF1-based extraction script is planned that
+will compute these automatically from historical session data.
+
+To update: run `scripts/extract_wet_skill_ratings.py` (not yet implemented)
+then review output before applying — manual override for rookies will still be needed.
+Update cadence: once per season, after ≥3 wet qualifying sessions have occurred.

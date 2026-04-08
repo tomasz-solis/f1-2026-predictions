@@ -246,6 +246,11 @@ class BaselineQualifyingConfig(StrictConfigModel):
 
     noise_std_sprint: float = Field(default=0.030, ge=0.0)
     noise_std_normal: float = Field(default=0.026, ge=0.0)
+    wet_noise_multiplier: float = Field(default=1.60, ge=1.0)
+    mixed_noise_multiplier: float = Field(default=1.28, ge=1.0)
+    wet_skill_weight: float = Field(default=0.18, ge=0.0, le=1.0)
+    wet_skill_neutral: float = Field(default=0.70, ge=0.0, le=1.0)
+    mixed_wet_blend: float = Field(default=0.50, ge=0.0, le=1.0)
     team_weight: float = Field(default=0.60, ge=0.0, le=1.0)
     skill_weight: float = Field(default=0.40, ge=0.0, le=1.0)
     team_strength_compression: float = Field(default=0.60, ge=0.0)

@@ -171,6 +171,17 @@ baseline_predictor:
     noise_std_sprint: 0.030    # Sprint weekends (less practice data)
     noise_std_normal: 0.026    # Normal weekends
 
+    # Wet/mixed qualifying behaviour.
+    # Wet qualifying increases noise (red flags, track evolution, aquaplaning risk)
+    # and applies a per-driver wet_skill modifier that shifts their score relative
+    # to their dry pace. wet_skill_neutral is the reference point — drivers above
+    # it gain, drivers below it lose. Mixed blends dry and wet effects.
+    wet_noise_multiplier: 1.60        # noise_std scale in pure wet qualifying
+    mixed_noise_multiplier: 1.28      # noise_std scale in mixed conditions
+    wet_skill_weight: 0.18            # how much wet_skill shifts the score
+    wet_skill_neutral: 0.70           # wet_skill value that produces zero adjustment
+    mixed_wet_blend: 0.50             # fraction of wet effect applied in mixed
+
     # Score composition weights
     team_weight: 0.60          # Car remains dominant, but driver form should still matter
     skill_weight: 0.40         # Driver one-lap signal (pace+skill)
@@ -595,8 +606,8 @@ baseline_predictor:
       base: 0.28
       track_scale: 0.36
       min: 0.42
-      main_max: 0.70
-      sprint_min: 0.78
+      main_max: 0.62
+      sprint_min: 0.85
       low_confidence_scale: 0.30
 
     # Extra damping when the starting grid is itself probabilistic.

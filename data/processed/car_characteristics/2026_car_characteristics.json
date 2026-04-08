@@ -5,75 +5,95 @@
     "RB": {
       "note": "2025 P6 seed, updated with 3 race(s) of 2026 data",
       "uncertainty": 0.219,
-      "last_updated": "2026-04-01T10:37:41.824355",
+      "last_updated": "2026-04-07T21:29:43.879545",
       "races_completed": 3,
       "overall_performance": 0.5341,
       "directionality": {
-        "max_speed": 0.0368,
-        "slow_corner_speed": -0.0016,
-        "medium_corner_speed": -0.0044,
-        "high_corner_speed": 0.0218
+        "max_speed": 0.0361,
+        "slow_corner_speed": -0.0002,
+        "medium_corner_speed": -0.0026,
+        "high_corner_speed": 0.0244
       },
       "testing_characteristics": {
-        "slow_corner_performance": 0.4872,
-        "medium_corner_performance": 0.4741,
-        "fast_corner_performance": 0.7681,
-        "braking_performance": 0.7192,
-        "top_speed": 0.9048,
-        "overall_pace": 0.4956,
-        "consistency": 0.1399,
-        "tire_deg_slope": 0.045,
-        "tire_deg_performance": 0.3255,
-        "last_updated": "2026-03-27T20:51:39.538758",
-        "sessions_used": 2,
-        "session_aggregation": "mean",
-        "run_profile": "balanced"
+        "slow_corner_performance": 0.5035,
+        "medium_corner_performance": 0.4923,
+        "fast_corner_performance": 0.8016,
+        "braking_performance": 0.6876,
+        "top_speed": 0.9041,
+        "overall_pace": 0.5107,
+        "consistency": 0.2159,
+        "tire_deg_slope": 0.0139,
+        "tire_deg_performance": 0.4229,
+        "last_updated": "2026-04-07T21:29:43.879545",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced",
+        "sessions_blended": 3,
+        "effective_blend_weight": 0.1443,
+        "circuits_observed": [
+          "Japanese Grand Prix"
+        ]
       },
       "testing_characteristics_profiles": {
         "balanced": {
-          "slow_corner_performance": 0.4872,
-          "medium_corner_performance": 0.4741,
-          "fast_corner_performance": 0.7681,
-          "braking_performance": 0.7192,
-          "top_speed": 0.9048,
-          "overall_pace": 0.4956,
-          "consistency": 0.1399,
-          "tire_deg_slope": 0.045,
-          "tire_deg_performance": 0.3255,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "balanced"
+          "slow_corner_performance": 0.5035,
+          "medium_corner_performance": 0.4923,
+          "fast_corner_performance": 0.8016,
+          "braking_performance": 0.6876,
+          "top_speed": 0.9041,
+          "overall_pace": 0.5107,
+          "consistency": 0.2159,
+          "tire_deg_slope": 0.0139,
+          "tire_deg_performance": 0.4229,
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "short_run": {
-          "slow_corner_performance": 0.698,
-          "medium_corner_performance": 0.7342,
-          "fast_corner_performance": 0.7437,
+          "slow_corner_performance": 0.6839,
+          "medium_corner_performance": 0.7148,
+          "fast_corner_performance": 0.7807,
           "braking_performance": 0.529,
-          "top_speed": 0.8214,
-          "overall_pace": 0.7342,
-          "consistency": 0.3253,
-          "tire_deg_slope": 0.045,
-          "tire_deg_performance": 0.3255,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "short_run"
+          "top_speed": 0.8183,
+          "overall_pace": 0.7148,
+          "consistency": 0.3585,
+          "tire_deg_slope": 0.0139,
+          "tire_deg_performance": 0.4229,
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "long_run": {
-          "slow_corner_performance": 0.4256,
-          "medium_corner_performance": 0.5073,
-          "fast_corner_performance": 0.7795,
+          "slow_corner_performance": 0.4508,
+          "medium_corner_performance": 0.5351,
+          "fast_corner_performance": 0.768,
           "braking_performance": 0.7299,
-          "top_speed": 0.7333,
-          "overall_pace": 0.4877,
+          "top_speed": 0.7718,
+          "overall_pace": 0.5039,
           "consistency": 0.9074,
-          "tire_deg_slope": 0.045,
-          "tire_deg_performance": 0.3255,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "long_run"
+          "tire_deg_slope": 0.0139,
+          "tire_deg_performance": 0.4229,
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         }
       },
       "current_season_performance": [
@@ -83,28 +103,27 @@
       ],
       "compound_characteristics": {
         "SOFT": {
-          "track_name": "Australian Grand Prix",
-          "median_lap_time": 84.232,
-          "tire_deg_slope": 0.03155632411067195,
-          "consistency": 0.9200294912784762,
-          "pace_performance": 0.75,
-          "tire_deg_performance": 0.75,
-          "consistency_performance": 1.0,
-          "laps_sampled": 23.0,
+          "track_name": "Japanese Grand Prix",
+          "median_lap_time": 92.754,
+          "tire_deg_slope": null,
+          "consistency": 19.368568940894466,
+          "pace_performance": 0.6666666666666667,
+          "tire_deg_performance": null,
+          "consistency_performance": 0.5555555555555556,
+          "laps_sampled": 11.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
         },
         "MEDIUM": {
           "track_name": "Japanese Grand Prix",
-          "median_lap_time": 96.604,
+          "pace_performance": 0.4278312163512968,
           "tire_deg_slope": 0.006736713106295855,
-          "consistency": 0.550460670329708,
-          "pace_performance": 0.5,
           "tire_deg_performance": 0.19999999999999996,
-          "consistency_performance": 0.6,
-          "laps_sampled": 35.0,
-          "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "consistency": 3.395630044660648,
+          "median_lap_time": 97.9291632053575,
+          "laps_sampled": 45.0,
+          "sessions_used": 2.0,
+          "last_updated": "2026-04-07T21:29:43.879545"
         },
         "HARD": {
           "track_name": "Japanese Grand Prix",
@@ -116,82 +135,102 @@
           "consistency_performance": 0.8888888888888888,
           "laps_sampled": 53.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
         }
       }
     },
     "Audi": {
       "note": "2025 P10 seed, updated with 3 race(s) of 2026 data",
       "uncertainty": 0.219,
-      "last_updated": "2026-04-01T10:37:41.824355",
+      "last_updated": "2026-04-07T21:29:43.879545",
       "races_completed": 3,
       "overall_performance": 0.4225,
       "directionality": {
-        "max_speed": 0.0221,
-        "slow_corner_speed": 0.0197,
-        "medium_corner_speed": 0.0181,
-        "high_corner_speed": 0.0291
+        "max_speed": 0.0224,
+        "slow_corner_speed": 0.0192,
+        "medium_corner_speed": 0.0155,
+        "high_corner_speed": 0.0284
       },
       "testing_characteristics": {
-        "slow_corner_performance": 0.7449,
-        "medium_corner_performance": 0.7068,
-        "fast_corner_performance": 0.833,
-        "braking_performance": 0.726,
-        "top_speed": 0.7143,
-        "overall_pace": 0.7764,
-        "consistency": 0.8612,
+        "slow_corner_performance": 0.7384,
+        "medium_corner_performance": 0.677,
+        "fast_corner_performance": 0.8282,
+        "braking_performance": 0.6573,
+        "top_speed": 0.7267,
+        "overall_pace": 0.7654,
+        "consistency": 0.801,
         "tire_deg_slope": 0.3787,
         "tire_deg_performance": 0.1737,
-        "last_updated": "2026-03-27T20:51:39.538758",
-        "sessions_used": 2,
-        "session_aggregation": "mean",
-        "run_profile": "balanced"
+        "last_updated": "2026-04-07T21:29:43.879545",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced",
+        "sessions_blended": 3,
+        "effective_blend_weight": 0.1443,
+        "circuits_observed": [
+          "Japanese Grand Prix"
+        ]
       },
       "testing_characteristics_profiles": {
         "balanced": {
-          "slow_corner_performance": 0.7449,
-          "medium_corner_performance": 0.7068,
-          "fast_corner_performance": 0.833,
-          "braking_performance": 0.726,
-          "top_speed": 0.7143,
-          "overall_pace": 0.7764,
-          "consistency": 0.8612,
+          "slow_corner_performance": 0.7384,
+          "medium_corner_performance": 0.677,
+          "fast_corner_performance": 0.8282,
+          "braking_performance": 0.6573,
+          "top_speed": 0.7267,
+          "overall_pace": 0.7654,
+          "consistency": 0.801,
           "tire_deg_slope": 0.3787,
           "tire_deg_performance": 0.1737,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "balanced"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "short_run": {
-          "slow_corner_performance": 0.6815,
-          "medium_corner_performance": 0.6901,
-          "fast_corner_performance": 0.9114,
+          "slow_corner_performance": 0.6842,
+          "medium_corner_performance": 0.6627,
+          "fast_corner_performance": 0.9098,
           "braking_performance": 0.4855,
-          "top_speed": 0.7321,
-          "overall_pace": 0.7584,
-          "consistency": 0.6408,
+          "top_speed": 0.7563,
+          "overall_pace": 0.75,
+          "consistency": 0.6125,
           "tire_deg_slope": 0.3787,
           "tire_deg_performance": 0.1737,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "short_run"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "long_run": {
-          "slow_corner_performance": 0.8557,
-          "medium_corner_performance": 0.8531,
-          "fast_corner_performance": 0.6996,
+          "slow_corner_performance": 0.8332,
+          "medium_corner_performance": 0.8021,
+          "fast_corner_performance": 0.743,
           "braking_performance": 1.0,
-          "top_speed": 0.7167,
-          "overall_pace": 0.8334,
+          "top_speed": 0.7287,
+          "overall_pace": 0.8141,
           "consistency": 0.4892,
           "tire_deg_slope": 0.3787,
           "tire_deg_performance": 0.1737,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "long_run"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         }
       },
       "current_season_performance": [
@@ -200,17 +239,17 @@
         0.4
       ],
       "compound_characteristics": {
-        "MEDIUM": {
+        "SOFT": {
           "track_name": "Japanese Grand Prix",
-          "median_lap_time": 96.6225,
-          "tire_deg_slope": -0.06746090225563882,
-          "consistency": 0.6558335858338552,
-          "pace_performance": 0.4,
-          "tire_deg_performance": 1.0,
-          "consistency_performance": 0.4,
-          "laps_sampled": 40.0,
+          "median_lap_time": 91.0335,
+          "tire_deg_slope": 0.16150000000000192,
+          "consistency": 19.920630414848826,
+          "pace_performance": 0.8888888888888888,
+          "tire_deg_performance": 0.5,
+          "consistency_performance": 0.33333333333333337,
+          "laps_sampled": 8.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
         },
         "HARD": {
           "track_name": "Japanese Grand Prix",
@@ -222,82 +261,113 @@
           "consistency_performance": 0.2222222222222222,
           "laps_sampled": 52.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
+        },
+        "MEDIUM": {
+          "track_name": "Japanese Grand Prix",
+          "pace_performance": 0.48660254037844386,
+          "tire_deg_slope": -0.0930142949405865,
+          "tire_deg_performance": 1.0,
+          "consistency": 3.278083633202641,
+          "median_lap_time": 95.99282736266507,
+          "laps_sampled": 54.0,
+          "sessions_used": 2.0,
+          "last_updated": "2026-04-07T21:29:43.879545"
         }
       }
     },
     "Alpine": {
       "note": "2025 P9 seed, updated with 3 race(s) of 2026 data",
       "uncertainty": 0.219,
-      "last_updated": "2026-04-01T10:37:41.824355",
+      "last_updated": "2026-04-07T21:29:43.879545",
       "races_completed": 3,
       "overall_performance": 0.4768,
       "directionality": {
-        "max_speed": 0.0302,
-        "slow_corner_speed": -0.0026,
-        "medium_corner_speed": 0.0073,
-        "high_corner_speed": 0.0349
+        "max_speed": 0.0235,
+        "slow_corner_speed": -0.0022,
+        "medium_corner_speed": 0.0051,
+        "high_corner_speed": 0.0276
       },
       "testing_characteristics": {
-        "slow_corner_performance": 0.4555,
-        "medium_corner_performance": 0.5724,
-        "fast_corner_performance": 0.8905,
+        "slow_corner_performance": 0.4619,
+        "medium_corner_performance": 0.5475,
+        "fast_corner_performance": 0.8053,
         "braking_performance": 0.3786,
-        "top_speed": 0.7976,
-        "overall_pace": 0.5926,
-        "consistency": 0.4327,
+        "top_speed": 0.7258,
+        "overall_pace": 0.5648,
+        "consistency": 0.4504,
         "tire_deg_slope": 0.281,
         "tire_deg_performance": 0.1662,
-        "last_updated": "2026-03-27T20:51:39.538758",
-        "sessions_used": 2,
-        "session_aggregation": "mean",
-        "run_profile": "balanced"
+        "last_updated": "2026-04-07T21:29:43.879545",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced",
+        "sessions_blended": 3,
+        "effective_blend_weight": 0.1443,
+        "circuits_observed": [
+          "Japanese Grand Prix"
+        ]
       },
       "testing_characteristics_profiles": {
         "balanced": {
-          "slow_corner_performance": 0.4555,
-          "medium_corner_performance": 0.5724,
-          "fast_corner_performance": 0.8905,
+          "slow_corner_performance": 0.4619,
+          "medium_corner_performance": 0.5475,
+          "fast_corner_performance": 0.8053,
           "braking_performance": 0.3786,
-          "top_speed": 0.7976,
-          "overall_pace": 0.5926,
-          "consistency": 0.4327,
+          "top_speed": 0.7258,
+          "overall_pace": 0.5648,
+          "consistency": 0.4504,
           "tire_deg_slope": 0.281,
           "tire_deg_performance": 0.1662,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "balanced"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "short_run": {
-          "slow_corner_performance": 0.4307,
-          "medium_corner_performance": 0.504,
-          "fast_corner_performance": 0.793,
+          "slow_corner_performance": 0.4407,
+          "medium_corner_performance": 0.489,
+          "fast_corner_performance": 0.7218,
           "braking_performance": 0.6847,
-          "top_speed": 0.8393,
-          "overall_pace": 0.5382,
-          "consistency": 0.6198,
+          "top_speed": 0.7615,
+          "overall_pace": 0.5183,
+          "consistency": 0.6266,
           "tire_deg_slope": 0.281,
           "tire_deg_performance": 0.1662,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "short_run"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "long_run": {
-          "slow_corner_performance": 0.3617,
-          "medium_corner_performance": 0.5455,
-          "fast_corner_performance": 0.8793,
-          "braking_performance": 0.7597,
-          "top_speed": 0.4667,
-          "overall_pace": 0.4856,
-          "consistency": 0.0,
+          "slow_corner_performance": 0.3672,
+          "medium_corner_performance": 0.5101,
+          "fast_corner_performance": 0.7813,
+          "braking_performance": 0.7366,
+          "top_speed": 0.4426,
+          "overall_pace": 0.4588,
+          "consistency": 0.0866,
           "tire_deg_slope": 0.281,
           "tire_deg_performance": 0.1662,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "long_run"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         }
       },
       "current_season_performance": [
@@ -307,28 +377,27 @@
       ],
       "compound_characteristics": {
         "SOFT": {
-          "track_name": "Australian Grand Prix",
-          "median_lap_time": 83.912,
-          "tire_deg_slope": 0.11266666666666514,
-          "consistency": 1.3428038245071805,
-          "pace_performance": 1.0,
-          "tire_deg_performance": 0.5,
-          "consistency_performance": 0.5,
-          "laps_sampled": 9.0,
+          "track_name": "Japanese Grand Prix",
+          "median_lap_time": 122.3885,
+          "tire_deg_slope": 0.9418928571428647,
+          "consistency": 22.567152179997183,
+          "pace_performance": 0.0,
+          "tire_deg_performance": 0.0,
+          "consistency_performance": 0.0,
+          "laps_sampled": 12.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
         },
         "MEDIUM": {
           "track_name": "Japanese Grand Prix",
-          "median_lap_time": 95.944,
-          "tire_deg_slope": -0.0008672932330832229,
-          "consistency": 0.5550686655985999,
-          "pace_performance": 0.7,
-          "tire_deg_performance": 0.30000000000000004,
-          "consistency_performance": 0.5,
-          "laps_sampled": 35.0,
-          "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "pace_performance": 0.6278312163512967,
+          "tire_deg_slope": 0.0234870123984306,
+          "tire_deg_performance": 0.30481125224324696,
+          "consistency": 3.1176146136683105,
+          "median_lap_time": 95.75780453818635,
+          "laps_sampled": 50.0,
+          "sessions_used": 2.0,
+          "last_updated": "2026-04-07T21:29:43.879545"
         },
         "HARD": {
           "track_name": "Japanese Grand Prix",
@@ -340,82 +409,102 @@
           "consistency_performance": 0.11111111111111116,
           "laps_sampled": 54.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
         }
       }
     },
     "Ferrari": {
       "note": "2025 P4 seed, updated with 3 race(s) of 2026 data",
       "uncertainty": 0.219,
-      "last_updated": "2026-04-01T10:37:41.824355",
+      "last_updated": "2026-04-07T21:29:43.879545",
       "races_completed": 3,
       "overall_performance": 0.8214,
       "directionality": {
-        "max_speed": 0.0083,
-        "slow_corner_speed": 0.0178,
-        "medium_corner_speed": 0.0183,
-        "high_corner_speed": 0.0342
+        "max_speed": 0.0088,
+        "slow_corner_speed": 0.0198,
+        "medium_corner_speed": 0.0191,
+        "high_corner_speed": 0.0293
       },
       "testing_characteristics": {
-        "slow_corner_performance": 0.6338,
-        "medium_corner_performance": 0.6358,
-        "fast_corner_performance": 0.8493,
-        "braking_performance": 0.9542,
-        "top_speed": 0.6429,
-        "overall_pace": 0.6627,
-        "consistency": 0.3616,
+        "slow_corner_performance": 0.6722,
+        "medium_corner_performance": 0.6595,
+        "fast_corner_performance": 0.7989,
+        "braking_performance": 0.9247,
+        "top_speed": 0.6439,
+        "overall_pace": 0.697,
+        "consistency": 0.3575,
         "tire_deg_slope": -0.1547,
         "tire_deg_performance": 1.0,
-        "last_updated": "2026-03-27T20:51:39.538758",
-        "sessions_used": 2,
-        "session_aggregation": "mean",
-        "run_profile": "balanced"
+        "last_updated": "2026-04-07T21:29:43.879545",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced",
+        "sessions_blended": 3,
+        "effective_blend_weight": 0.1443,
+        "circuits_observed": [
+          "Japanese Grand Prix"
+        ]
       },
       "testing_characteristics_profiles": {
         "balanced": {
-          "slow_corner_performance": 0.6338,
-          "medium_corner_performance": 0.6358,
-          "fast_corner_performance": 0.8493,
-          "braking_performance": 0.9542,
-          "top_speed": 0.6429,
-          "overall_pace": 0.6627,
-          "consistency": 0.3616,
+          "slow_corner_performance": 0.6722,
+          "medium_corner_performance": 0.6595,
+          "fast_corner_performance": 0.7989,
+          "braking_performance": 0.9247,
+          "top_speed": 0.6439,
+          "overall_pace": 0.697,
+          "consistency": 0.3575,
           "tire_deg_slope": -0.1547,
           "tire_deg_performance": 1.0,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "balanced"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "short_run": {
-          "slow_corner_performance": 0.5611,
-          "medium_corner_performance": 0.6405,
-          "fast_corner_performance": 0.7555,
+          "slow_corner_performance": 0.61,
+          "medium_corner_performance": 0.6635,
+          "fast_corner_performance": 0.7475,
           "braking_performance": 0.9879,
-          "top_speed": 0.6607,
-          "overall_pace": 0.6541,
-          "consistency": 0.2033,
+          "top_speed": 0.6375,
+          "overall_pace": 0.6752,
+          "consistency": 0.206,
           "tire_deg_slope": -0.1547,
           "tire_deg_performance": 1.0,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "short_run"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "long_run": {
-          "slow_corner_performance": 0.655,
-          "medium_corner_performance": 0.6782,
-          "fast_corner_performance": 0.8445,
+          "slow_corner_performance": 0.6904,
+          "medium_corner_performance": 0.7102,
+          "fast_corner_performance": 0.7659,
           "braking_performance": 1.0,
-          "top_speed": 0.6667,
-          "overall_pace": 0.6801,
+          "top_speed": 0.6643,
+          "overall_pace": 0.7118,
           "consistency": 0.9345,
           "tire_deg_slope": -0.1547,
           "tire_deg_performance": 1.0,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "long_run"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         }
       },
       "current_season_performance": [
@@ -424,17 +513,17 @@
         0.8
       ],
       "compound_characteristics": {
-        "MEDIUM": {
+        "SOFT": {
           "track_name": "Japanese Grand Prix",
-          "median_lap_time": 95.287,
-          "tire_deg_slope": -0.013772838345864619,
-          "consistency": 0.31080994760369485,
-          "pace_performance": 0.8,
-          "tire_deg_performance": 0.6,
-          "consistency_performance": 1.0,
-          "laps_sampled": 35.0,
+          "median_lap_time": 103.05799999999999,
+          "tire_deg_slope": null,
+          "consistency": 20.226600646787272,
+          "pace_performance": 0.33333333333333337,
+          "tire_deg_performance": null,
+          "consistency_performance": 0.2222222222222222,
+          "laps_sampled": 26.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
         },
         "HARD": {
           "track_name": "Japanese Grand Prix",
@@ -446,82 +535,114 @@
           "consistency_performance": 0.4444444444444444,
           "laps_sampled": 55.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
+        },
+        "MEDIUM": {
+          "track_name": "Japanese Grand Prix",
+          "median_lap_time": 95.287,
+          "tire_deg_slope": -0.013772838345864619,
+          "consistency": 0.31080994760369485,
+          "pace_performance": 0.8,
+          "tire_deg_performance": 0.6,
+          "consistency_performance": 1.0,
+          "laps_sampled": 35.0,
+          "sessions_used": 1,
+          "last_updated": "2026-04-07T21:29:43.879545"
         }
       }
     },
     "McLaren": {
       "note": "2025 P1 seed, updated with 3 race(s) of 2026 data",
       "uncertainty": 0.219,
-      "last_updated": "2026-04-01T10:37:41.824355",
+      "last_updated": "2026-04-07T21:29:43.879545",
       "races_completed": 3,
       "overall_performance": 0.6632,
       "directionality": {
-        "max_speed": 0.0016,
-        "slow_corner_speed": 0.0435,
-        "medium_corner_speed": 0.0342,
-        "high_corner_speed": 0.0399
+        "max_speed": -0.0021,
+        "slow_corner_speed": 0.0407,
+        "medium_corner_speed": 0.0339,
+        "high_corner_speed": 0.033
       },
       "testing_characteristics": {
-        "slow_corner_performance": 0.9601,
-        "medium_corner_performance": 0.8442,
-        "fast_corner_performance": 0.934,
+        "slow_corner_performance": 0.937,
+        "medium_corner_performance": 0.8523,
+        "fast_corner_performance": 0.8569,
         "braking_performance": 0.7859,
-        "top_speed": 0.5476,
-        "overall_pace": 0.9268,
-        "consistency": 0.3421,
+        "top_speed": 0.4974,
+        "overall_pace": 0.9085,
+        "consistency": 0.405,
         "tire_deg_slope": 0.1414,
         "tire_deg_performance": 0.0,
-        "last_updated": "2026-03-27T20:51:39.538758",
-        "sessions_used": 2,
-        "session_aggregation": "mean",
-        "run_profile": "balanced"
+        "last_updated": "2026-04-07T21:29:43.879545",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced",
+        "sessions_blended": 3,
+        "effective_blend_weight": 0.1443,
+        "circuits_observed": [
+          "Japanese Grand Prix"
+        ]
       },
       "testing_characteristics_profiles": {
         "balanced": {
-          "slow_corner_performance": 0.9601,
-          "medium_corner_performance": 0.8442,
-          "fast_corner_performance": 0.934,
+          "slow_corner_performance": 0.937,
+          "medium_corner_performance": 0.8523,
+          "fast_corner_performance": 0.8569,
           "braking_performance": 0.7859,
-          "top_speed": 0.5476,
-          "overall_pace": 0.9268,
-          "consistency": 0.3421,
+          "top_speed": 0.4974,
+          "overall_pace": 0.9085,
+          "consistency": 0.405,
           "tire_deg_slope": 0.1414,
           "tire_deg_performance": 0.0,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "balanced"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "short_run": {
-          "slow_corner_performance": 0.897,
-          "medium_corner_performance": 0.8658,
-          "fast_corner_performance": 0.7807,
+          "slow_corner_performance": 0.883,
+          "medium_corner_performance": 0.8707,
+          "fast_corner_performance": 0.7258,
           "braking_performance": 0.9367,
-          "top_speed": 0.625,
-          "overall_pace": 0.9054,
-          "consistency": 0.5362,
+          "top_speed": 0.5637,
+          "overall_pace": 0.9046,
+          "consistency": 0.5711,
           "tire_deg_slope": 0.1414,
           "tire_deg_performance": 0.0,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "short_run"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "long_run": {
-          "slow_corner_performance": 0.7143,
-          "medium_corner_performance": 0.7235,
-          "fast_corner_performance": 0.7491,
-          "braking_performance": 0.8766,
-          "top_speed": 0.6,
-          "overall_pace": 0.7186,
-          "consistency": 0.9747,
+          "slow_corner_performance": 0.7267,
+          "medium_corner_performance": 0.7345,
+          "fast_corner_performance": 0.7276,
+          "braking_performance": 0.8655,
+          "top_speed": 0.5423,
+          "overall_pace": 0.7303,
+          "consistency": 0.8629,
           "tire_deg_slope": 0.1414,
           "tire_deg_performance": 0.0,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "long_run"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         }
       },
       "current_season_performance": [
@@ -530,17 +651,17 @@
         0.9
       ],
       "compound_characteristics": {
-        "MEDIUM": {
+        "SOFT": {
           "track_name": "Japanese Grand Prix",
-          "median_lap_time": 95.11,
-          "tire_deg_slope": -0.005100533290241069,
-          "consistency": 0.3670727025611092,
-          "pace_performance": 0.9,
-          "tire_deg_performance": 0.4,
-          "consistency_performance": 0.9,
-          "laps_sampled": 30.0,
+          "median_lap_time": 91.463,
+          "tire_deg_slope": -0.15405000000000318,
+          "consistency": 20.60813953059035,
+          "pace_performance": 0.7777777777777778,
+          "tire_deg_performance": 1.0,
+          "consistency_performance": 0.11111111111111116,
+          "laps_sampled": 19.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
         },
         "HARD": {
           "track_name": "Japanese Grand Prix",
@@ -552,82 +673,114 @@
           "consistency_performance": 1.0,
           "laps_sampled": 58.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
+        },
+        "MEDIUM": {
+          "track_name": "Japanese Grand Prix",
+          "median_lap_time": 95.11,
+          "tire_deg_slope": -0.005100533290241069,
+          "consistency": 0.3670727025611092,
+          "pace_performance": 0.9,
+          "tire_deg_performance": 0.4,
+          "consistency_performance": 0.9,
+          "laps_sampled": 30.0,
+          "sessions_used": 1,
+          "last_updated": "2026-04-07T21:29:43.879545"
         }
       }
     },
     "Mercedes": {
       "note": "2025 P2 seed, updated with 3 race(s) of 2026 data",
       "uncertainty": 0.219,
-      "last_updated": "2026-04-01T10:37:41.824355",
+      "last_updated": "2026-04-07T21:29:43.879545",
       "races_completed": 3,
       "overall_performance": 0.9143,
       "directionality": {
-        "max_speed": 0.0003,
-        "slow_corner_speed": 0.0481,
-        "medium_corner_speed": 0.0479,
-        "high_corner_speed": 0.0229
+        "max_speed": -0.0044,
+        "slow_corner_speed": 0.0469,
+        "medium_corner_speed": 0.0468,
+        "high_corner_speed": 0.0207
       },
       "testing_characteristics": {
         "slow_corner_performance": 1.0,
         "medium_corner_performance": 1.0,
-        "fast_corner_performance": 0.6939,
+        "fast_corner_performance": 0.6803,
         "braking_performance": 1.0,
-        "top_speed": 0.5,
+        "top_speed": 0.4423,
         "overall_pace": 1.0,
         "consistency": 0.8711,
         "tire_deg_slope": 0.0989,
         "tire_deg_performance": 0.1435,
-        "last_updated": "2026-03-27T20:51:39.538758",
-        "sessions_used": 2,
-        "session_aggregation": "mean",
-        "run_profile": "balanced"
+        "last_updated": "2026-04-07T21:29:43.879545",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced",
+        "sessions_blended": 3,
+        "effective_blend_weight": 0.1443,
+        "circuits_observed": [
+          "Japanese Grand Prix"
+        ]
       },
       "testing_characteristics_profiles": {
         "balanced": {
           "slow_corner_performance": 1.0,
           "medium_corner_performance": 1.0,
-          "fast_corner_performance": 0.6939,
+          "fast_corner_performance": 0.6803,
           "braking_performance": 1.0,
-          "top_speed": 0.5,
+          "top_speed": 0.4423,
           "overall_pace": 1.0,
           "consistency": 0.8711,
           "tire_deg_slope": 0.0989,
           "tire_deg_performance": 0.1435,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "balanced"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "short_run": {
           "slow_corner_performance": 1.0,
           "medium_corner_performance": 1.0,
-          "fast_corner_performance": 0.6637,
+          "fast_corner_performance": 0.6401,
           "braking_performance": 1.0,
-          "top_speed": 0.5357,
-          "overall_pace": 0.993,
+          "top_speed": 0.4728,
+          "overall_pace": 0.994,
           "consistency": 0.973,
           "tire_deg_slope": 0.0989,
           "tire_deg_performance": 0.1435,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "short_run"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "long_run": {
-          "slow_corner_performance": 0.6378,
-          "medium_corner_performance": 0.5769,
-          "fast_corner_performance": 0.7422,
-          "braking_performance": 0.7241,
-          "top_speed": 0.3833,
-          "overall_pace": 0.6272,
+          "slow_corner_performance": 0.6901,
+          "medium_corner_performance": 0.638,
+          "fast_corner_performance": 0.7505,
+          "braking_performance": 0.6196,
+          "top_speed": 0.3424,
+          "overall_pace": 0.681,
           "tire_deg_slope": 0.0989,
           "tire_deg_performance": 0.1435,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
           "run_profile": "long_run",
-          "consistency": 0.0
+          "consistency": 0.0,
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         }
       },
       "current_season_performance": [
@@ -636,17 +789,17 @@
         1.0
       ],
       "compound_characteristics": {
-        "MEDIUM": {
+        "SOFT": {
           "track_name": "Japanese Grand Prix",
-          "median_lap_time": 95.033,
-          "tire_deg_slope": -0.017352380952382486,
-          "consistency": 0.4643474866886461,
+          "median_lap_time": 90.4065,
+          "tire_deg_slope": null,
+          "consistency": 17.644967796937035,
           "pace_performance": 1.0,
-          "tire_deg_performance": 0.7,
-          "consistency_performance": 0.7,
-          "laps_sampled": 39.0,
+          "tire_deg_performance": null,
+          "consistency_performance": 0.8888888888888888,
+          "laps_sampled": 14.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
         },
         "HARD": {
           "track_name": "Japanese Grand Prix",
@@ -658,82 +811,114 @@
           "consistency_performance": 0.6666666666666667,
           "laps_sampled": 52.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
+        },
+        "MEDIUM": {
+          "track_name": "Japanese Grand Prix",
+          "median_lap_time": 95.033,
+          "tire_deg_slope": -0.017352380952382486,
+          "consistency": 0.4643474866886461,
+          "pace_performance": 1.0,
+          "tire_deg_performance": 0.7,
+          "consistency_performance": 0.7,
+          "laps_sampled": 39.0,
+          "sessions_used": 1,
+          "last_updated": "2026-04-07T21:29:43.879545"
         }
       }
     },
     "Williams": {
       "note": "2025 P5 seed, updated with 3 race(s) of 2026 data",
       "uncertainty": 0.219,
-      "last_updated": "2026-04-01T10:37:41.824355",
+      "last_updated": "2026-04-07T21:29:43.879545",
       "races_completed": 3,
       "overall_performance": 0.3406,
       "directionality": {
-        "max_speed": 0.0307,
-        "slow_corner_speed": 0.0069,
-        "medium_corner_speed": 0.0051,
-        "high_corner_speed": 0.0211
+        "max_speed": 0.032,
+        "slow_corner_speed": 0.0036,
+        "medium_corner_speed": 0.0021,
+        "high_corner_speed": 0.0227
       },
       "testing_characteristics": {
-        "slow_corner_performance": 0.5922,
-        "medium_corner_performance": 0.6083,
-        "fast_corner_performance": 0.7811,
-        "braking_performance": 0.3318,
-        "top_speed": 0.8036,
-        "overall_pace": 0.6278,
-        "consistency": 0.5169,
-        "tire_deg_slope": -0.1149,
-        "tire_deg_performance": 0.64,
-        "last_updated": "2026-03-27T20:51:39.538758",
-        "sessions_used": 2,
-        "session_aggregation": "mean",
-        "run_profile": "balanced"
+        "slow_corner_performance": 0.55,
+        "medium_corner_performance": 0.5638,
+        "fast_corner_performance": 0.7983,
+        "braking_performance": 0.2839,
+        "top_speed": 0.8319,
+        "overall_pace": 0.5805,
+        "consistency": 0.5706,
+        "tire_deg_slope": -0.0757,
+        "tire_deg_performance": 0.6073,
+        "last_updated": "2026-04-07T21:29:43.879545",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced",
+        "sessions_blended": 3,
+        "effective_blend_weight": 0.1443,
+        "circuits_observed": [
+          "Japanese Grand Prix"
+        ]
       },
       "testing_characteristics_profiles": {
         "balanced": {
-          "slow_corner_performance": 0.5922,
-          "medium_corner_performance": 0.6083,
-          "fast_corner_performance": 0.7811,
-          "braking_performance": 0.3318,
-          "top_speed": 0.8036,
-          "overall_pace": 0.6278,
-          "consistency": 0.5169,
-          "tire_deg_slope": -0.1149,
-          "tire_deg_performance": 0.64,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "balanced"
+          "slow_corner_performance": 0.55,
+          "medium_corner_performance": 0.5638,
+          "fast_corner_performance": 0.7983,
+          "braking_performance": 0.2839,
+          "top_speed": 0.8319,
+          "overall_pace": 0.5805,
+          "consistency": 0.5706,
+          "tire_deg_slope": -0.0757,
+          "tire_deg_performance": 0.6073,
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "short_run": {
-          "slow_corner_performance": 0.5755,
-          "medium_corner_performance": 0.5746,
-          "fast_corner_performance": 0.7213,
+          "slow_corner_performance": 0.5213,
+          "medium_corner_performance": 0.535,
+          "fast_corner_performance": 0.7327,
           "braking_performance": 0.4431,
-          "top_speed": 0.8036,
-          "overall_pace": 0.6252,
-          "consistency": 0.8395,
-          "tire_deg_slope": -0.1149,
-          "tire_deg_performance": 0.64,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "short_run"
+          "top_speed": 0.8319,
+          "overall_pace": 0.5783,
+          "consistency": 0.8466,
+          "tire_deg_slope": -0.0757,
+          "tire_deg_performance": 0.6073,
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "long_run": {
-          "slow_corner_performance": 0.372,
-          "medium_corner_performance": 0.4607,
-          "fast_corner_performance": 0.5201,
+          "slow_corner_performance": 0.3616,
+          "medium_corner_performance": 0.4808,
+          "fast_corner_performance": 0.5749,
           "braking_performance": 0.5157,
-          "top_speed": 0.5333,
-          "overall_pace": 0.4211,
+          "top_speed": 0.5862,
+          "overall_pace": 0.4325,
           "consistency": 0.9847,
-          "tire_deg_slope": -0.1149,
-          "tire_deg_performance": 0.64,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "long_run"
+          "tire_deg_slope": -0.0757,
+          "tire_deg_performance": 0.6073,
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         }
       },
       "current_season_performance": [
@@ -743,28 +928,27 @@
       ],
       "compound_characteristics": {
         "SOFT": {
-          "track_name": "Australian Grand Prix",
-          "median_lap_time": 84.86850000000001,
-          "tire_deg_slope": 0.016139328063239422,
-          "consistency": 2.0561921953861746,
-          "pace_performance": 0.5,
-          "tire_deg_performance": 1.0,
-          "consistency_performance": 0.0,
-          "laps_sampled": 42.0,
+          "track_name": "Japanese Grand Prix",
+          "median_lap_time": 114.637,
+          "tire_deg_slope": 0.2570166666666654,
+          "consistency": 18.38022764043704,
+          "pace_performance": 0.11111111111111116,
+          "tire_deg_performance": 0.25,
+          "consistency_performance": 0.7777777777777778,
+          "laps_sampled": 21.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
         },
         "MEDIUM": {
           "track_name": "Japanese Grand Prix",
-          "median_lap_time": 96.948,
-          "tire_deg_slope": -0.05064097744360918,
-          "consistency": 0.707011885400493,
-          "pace_performance": 0.19999999999999996,
-          "tire_deg_performance": 0.9,
-          "consistency_performance": 0.19999999999999996,
-          "laps_sampled": 41.0,
-          "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "pace_performance": 0.22886751345948128,
+          "tire_deg_slope": -0.03563632765163541,
+          "tire_deg_performance": 0.8663212342972719,
+          "consistency": 3.1894200773014783,
+          "median_lap_time": 96.60779635388,
+          "laps_sampled": 52.0,
+          "sessions_used": 2.0,
+          "last_updated": "2026-04-07T21:29:43.879545"
         },
         "HARD": {
           "track_name": "Japanese Grand Prix",
@@ -776,82 +960,102 @@
           "consistency_performance": 0.5555555555555556,
           "laps_sampled": 43.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
         }
       }
     },
     "Cadillac F1": {
       "note": "2025 P11 seed, updated with 3 race(s) of 2026 data",
       "uncertainty": 0.219,
-      "last_updated": "2026-04-01T10:37:41.824355",
+      "last_updated": "2026-04-07T21:29:43.879545",
       "races_completed": 3,
       "overall_performance": 0.2121,
       "directionality": {
-        "max_speed": 0.0137,
-        "slow_corner_speed": -0.0204,
-        "medium_corner_speed": -0.0272,
-        "high_corner_speed": -0.0281
+        "max_speed": 0.0106,
+        "slow_corner_speed": -0.0221,
+        "medium_corner_speed": -0.0267,
+        "high_corner_speed": -0.0287
       },
       "testing_characteristics": {
-        "slow_corner_performance": 0.3309,
-        "medium_corner_performance": 0.2443,
-        "fast_corner_performance": 0.2275,
+        "slow_corner_performance": 0.2976,
+        "medium_corner_performance": 0.2379,
+        "fast_corner_performance": 0.2091,
         "braking_performance": 0.5887,
-        "top_speed": 0.6726,
-        "overall_pace": 0.3066,
-        "consistency": 0.3959,
+        "top_speed": 0.6333,
+        "overall_pace": 0.284,
+        "consistency": 0.3708,
         "tire_deg_slope": 0.0471,
         "tire_deg_performance": 0.3185,
-        "last_updated": "2026-03-27T20:51:39.538758",
-        "sessions_used": 2,
-        "session_aggregation": "mean",
-        "run_profile": "balanced"
+        "last_updated": "2026-04-07T21:29:43.879545",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced",
+        "sessions_blended": 3,
+        "effective_blend_weight": 0.1443,
+        "circuits_observed": [
+          "Japanese Grand Prix"
+        ]
       },
       "testing_characteristics_profiles": {
         "balanced": {
-          "slow_corner_performance": 0.3309,
-          "medium_corner_performance": 0.2443,
-          "fast_corner_performance": 0.2275,
+          "slow_corner_performance": 0.2976,
+          "medium_corner_performance": 0.2379,
+          "fast_corner_performance": 0.2091,
           "braking_performance": 0.5887,
-          "top_speed": 0.6726,
-          "overall_pace": 0.3066,
-          "consistency": 0.3959,
+          "top_speed": 0.6333,
+          "overall_pace": 0.284,
+          "consistency": 0.3708,
           "tire_deg_slope": 0.0471,
           "tire_deg_performance": 0.3185,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "balanced"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "short_run": {
-          "slow_corner_performance": 0.2543,
-          "medium_corner_performance": 0.2905,
-          "fast_corner_performance": 0.2825,
+          "slow_corner_performance": 0.232,
+          "medium_corner_performance": 0.263,
+          "fast_corner_performance": 0.2562,
           "braking_performance": 0.0,
-          "top_speed": 0.8214,
-          "overall_pace": 0.2943,
-          "consistency": 0.6375,
+          "top_speed": 0.7606,
+          "overall_pace": 0.2663,
+          "consistency": 0.5936,
           "tire_deg_slope": 0.0471,
           "tire_deg_performance": 0.3185,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "short_run"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "long_run": {
-          "slow_corner_performance": 0.1258,
-          "medium_corner_performance": 0.2031,
-          "fast_corner_performance": 0.1407,
-          "braking_performance": 0.0,
-          "top_speed": 0.6,
-          "overall_pace": 0.1746,
-          "consistency": 0.9008,
+          "slow_corner_performance": 0.1221,
+          "medium_corner_performance": 0.2027,
+          "fast_corner_performance": 0.1348,
+          "braking_performance": 0.0289,
+          "top_speed": 0.6072,
+          "overall_pace": 0.1638,
+          "consistency": 0.8863,
           "tire_deg_slope": 0.0471,
           "tire_deg_performance": 0.3185,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "long_run"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         }
       },
       "current_season_performance": [
@@ -861,28 +1065,16 @@
       ],
       "compound_characteristics": {
         "SOFT": {
-          "track_name": "Australian Grand Prix",
-          "median_lap_time": 86.21,
-          "tire_deg_slope": 0.19420909090909258,
-          "consistency": 1.3794568825842635,
-          "pace_performance": 0.25,
-          "tire_deg_performance": 0.25,
-          "consistency_performance": 0.25,
-          "laps_sampled": 11.0,
-          "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
-        },
-        "MEDIUM": {
           "track_name": "Japanese Grand Prix",
-          "median_lap_time": 97.487,
-          "tire_deg_slope": 0.03866536437246943,
-          "consistency": 1.5367385496495027,
-          "pace_performance": 0.09999999999999998,
-          "tire_deg_performance": 0.0,
-          "consistency_performance": 0.0,
-          "laps_sampled": 44.0,
+          "median_lap_time": 95.3275,
+          "tire_deg_slope": null,
+          "consistency": 18.785088299247526,
+          "pace_performance": 0.4444444444444444,
+          "tire_deg_performance": null,
+          "consistency_performance": 0.6666666666666667,
+          "laps_sampled": 20.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
         },
         "HARD": {
           "track_name": "Japanese Grand Prix",
@@ -894,82 +1086,114 @@
           "consistency_performance": 0.0,
           "laps_sampled": 43.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
+        },
+        "MEDIUM": {
+          "track_name": "Japanese Grand Prix",
+          "median_lap_time": 97.487,
+          "tire_deg_slope": 0.03866536437246943,
+          "consistency": 1.5367385496495027,
+          "pace_performance": 0.09999999999999998,
+          "tire_deg_performance": 0.0,
+          "consistency_performance": 0.0,
+          "laps_sampled": 44.0,
+          "sessions_used": 1,
+          "last_updated": "2026-04-07T21:29:43.879545"
         }
       }
     },
     "Aston Martin": {
       "note": "2025 P7 seed, updated with 3 race(s) of 2026 data",
       "uncertainty": 0.219,
-      "last_updated": "2026-04-01T10:37:41.824355",
+      "last_updated": "2026-04-07T21:29:43.879545",
       "races_completed": 3,
       "overall_performance": 0.2169,
       "directionality": {
-        "max_speed": -0.0437,
-        "slow_corner_speed": -0.0324,
-        "medium_corner_speed": -0.0469,
-        "high_corner_speed": -0.0478
+        "max_speed": -0.0432,
+        "slow_corner_speed": -0.0335,
+        "medium_corner_speed": -0.0459,
+        "high_corner_speed": -0.0467
       },
       "testing_characteristics": {
-        "slow_corner_performance": 0.1507,
+        "slow_corner_performance": 0.1289,
         "medium_corner_performance": 0.0001,
         "fast_corner_performance": 0.0,
         "braking_performance": 0.2907,
-        "top_speed": 0.0476,
-        "overall_pace": 0.0582,
-        "consistency": 0.5013,
-        "last_updated": "2026-03-27T20:51:39.538758",
-        "sessions_used": 2,
-        "session_aggregation": "mean",
+        "top_speed": 0.0407,
+        "overall_pace": 0.0498,
+        "consistency": 0.445,
+        "last_updated": "2026-04-07T21:29:43.879545",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
         "run_profile": "balanced",
         "tire_deg_slope": -0.0147,
-        "tire_deg_performance": 0.6251
+        "tire_deg_performance": 0.6251,
+        "sessions_blended": 3,
+        "effective_blend_weight": 0.1443,
+        "circuits_observed": [
+          "Japanese Grand Prix"
+        ]
       },
       "testing_characteristics_profiles": {
         "balanced": {
-          "slow_corner_performance": 0.1507,
+          "slow_corner_performance": 0.1289,
           "medium_corner_performance": 0.0001,
           "fast_corner_performance": 0.0,
           "braking_performance": 0.2907,
-          "top_speed": 0.0476,
-          "overall_pace": 0.0582,
-          "consistency": 0.5013,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
+          "top_speed": 0.0407,
+          "overall_pace": 0.0498,
+          "consistency": 0.445,
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
           "run_profile": "balanced",
           "tire_deg_slope": -0.0147,
-          "tire_deg_performance": 0.6251
+          "tire_deg_performance": 0.6251,
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "short_run": {
           "slow_corner_performance": 0.0,
           "medium_corner_performance": 0.0,
           "fast_corner_performance": 0.0,
           "braking_performance": 0.2907,
-          "top_speed": 0.1429,
+          "top_speed": 0.1223,
           "overall_pace": 0.0,
-          "consistency": 0.2678,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
+          "consistency": 0.2452,
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
           "run_profile": "short_run",
           "tire_deg_slope": -0.0147,
-          "tire_deg_performance": 0.6251
+          "tire_deg_performance": 0.6251,
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "long_run": {
-          "slow_corner_performance": 0.3635,
-          "medium_corner_performance": 0.242,
-          "fast_corner_performance": 0.271,
-          "braking_performance": 0.2113,
+          "slow_corner_performance": 0.311,
+          "medium_corner_performance": 0.2071,
+          "fast_corner_performance": 0.2319,
+          "braking_performance": 0.2385,
           "top_speed": 0.0,
-          "overall_pace": 0.2876,
-          "consistency": 0.5344,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
+          "overall_pace": 0.2461,
+          "consistency": 0.6016,
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
           "run_profile": "long_run",
           "tire_deg_slope": -0.0147,
-          "tire_deg_performance": 0.6251
+          "tire_deg_performance": 0.6251,
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         }
       },
       "current_season_performance": [
@@ -979,28 +1203,16 @@
       ],
       "compound_characteristics": {
         "SOFT": {
-          "track_name": "Australian Grand Prix",
-          "median_lap_time": 86.528,
-          "tire_deg_slope": 0.2374999999999972,
-          "consistency": 1.0020721110127337,
-          "pace_performance": 0.0,
-          "tire_deg_performance": 0.0,
-          "consistency_performance": 0.75,
-          "laps_sampled": 27.0,
-          "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
-        },
-        "MEDIUM": {
           "track_name": "Japanese Grand Prix",
-          "median_lap_time": 98.229,
-          "tire_deg_slope": -0.00930692307692149,
-          "consistency": 0.6763889616218214,
-          "pace_performance": 0.0,
-          "tire_deg_performance": 0.5,
-          "consistency_performance": 0.30000000000000004,
-          "laps_sampled": 65.0,
+          "median_lap_time": 94.6055,
+          "tire_deg_slope": -0.00549999999999987,
+          "consistency": 19.74483451975271,
+          "pace_performance": 0.5555555555555556,
+          "tire_deg_performance": 0.75,
+          "consistency_performance": 0.4444444444444444,
+          "laps_sampled": 18.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
         },
         "HARD": {
           "track_name": "Chinese Grand Prix",
@@ -1012,82 +1224,114 @@
           "consistency_performance": 0.4444444444444444,
           "laps_sampled": 33.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
+        },
+        "MEDIUM": {
+          "track_name": "Japanese Grand Prix",
+          "median_lap_time": 98.229,
+          "tire_deg_slope": -0.00930692307692149,
+          "consistency": 0.6763889616218214,
+          "pace_performance": 0.0,
+          "tire_deg_performance": 0.5,
+          "consistency_performance": 0.30000000000000004,
+          "laps_sampled": 65.0,
+          "sessions_used": 1,
+          "last_updated": "2026-04-07T21:29:43.879545"
         }
       }
     },
     "Haas F1 Team": {
       "note": "2025 P8 seed, updated with 3 race(s) of 2026 data",
       "uncertainty": 0.219,
-      "last_updated": "2026-04-01T10:37:41.824355",
+      "last_updated": "2026-04-07T21:29:43.879545",
       "races_completed": 3,
       "overall_performance": 0.4413,
       "directionality": {
-        "max_speed": -0.0265,
-        "slow_corner_speed": -0.023,
-        "medium_corner_speed": -0.0332,
-        "high_corner_speed": -0.0127
+        "max_speed": -0.0209,
+        "slow_corner_speed": -0.0208,
+        "medium_corner_speed": -0.0261,
+        "high_corner_speed": -0.0086
       },
       "testing_characteristics": {
-        "slow_corner_performance": 0.2228,
-        "medium_corner_performance": 0.1045,
-        "fast_corner_performance": 0.3394,
+        "slow_corner_performance": 0.2484,
+        "medium_corner_performance": 0.1905,
+        "fast_corner_performance": 0.3914,
         "braking_performance": 0.285,
-        "top_speed": 0.1786,
-        "overall_pace": 0.1787,
-        "consistency": 0.5774,
+        "top_speed": 0.2466,
+        "overall_pace": 0.2251,
+        "consistency": 0.6384,
         "tire_deg_slope": 0.1438,
         "tire_deg_performance": 0.3615,
-        "last_updated": "2026-03-27T20:51:39.538758",
-        "sessions_used": 2,
-        "session_aggregation": "mean",
-        "run_profile": "balanced"
+        "last_updated": "2026-04-07T21:29:43.879545",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced",
+        "sessions_blended": 3,
+        "effective_blend_weight": 0.1443,
+        "circuits_observed": [
+          "Japanese Grand Prix"
+        ]
       },
       "testing_characteristics_profiles": {
         "balanced": {
-          "slow_corner_performance": 0.2228,
-          "medium_corner_performance": 0.1045,
-          "fast_corner_performance": 0.3394,
+          "slow_corner_performance": 0.2484,
+          "medium_corner_performance": 0.1905,
+          "fast_corner_performance": 0.3914,
           "braking_performance": 0.285,
-          "top_speed": 0.1786,
-          "overall_pace": 0.1787,
-          "consistency": 0.5774,
+          "top_speed": 0.2466,
+          "overall_pace": 0.2251,
+          "consistency": 0.6384,
           "tire_deg_slope": 0.1438,
           "tire_deg_performance": 0.3615,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "balanced"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "short_run": {
-          "slow_corner_performance": 0.4712,
-          "medium_corner_performance": 0.4749,
-          "fast_corner_performance": 0.3688,
+          "slow_corner_performance": 0.4465,
+          "medium_corner_performance": 0.5074,
+          "fast_corner_performance": 0.4022,
           "braking_performance": 0.6488,
-          "top_speed": 0.25,
-          "overall_pace": 0.4889,
-          "consistency": 0.5177,
+          "top_speed": 0.3005,
+          "overall_pace": 0.4905,
+          "consistency": 0.5873,
           "tire_deg_slope": 0.1438,
           "tire_deg_performance": 0.3615,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "short_run"
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "long_run": {
-          "slow_corner_performance": 0.1677,
-          "medium_corner_performance": 0.2071,
-          "fast_corner_performance": 0.132,
-          "braking_performance": 0.779,
-          "top_speed": 0.1167,
-          "overall_pace": 0.153,
+          "slow_corner_performance": 0.2157,
+          "medium_corner_performance": 0.2349,
+          "fast_corner_performance": 0.1851,
+          "braking_performance": 0.8109,
+          "top_speed": 0.1648,
+          "overall_pace": 0.1887,
           "tire_deg_slope": 0.1438,
           "tire_deg_performance": 0.3615,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
           "run_profile": "long_run",
-          "consistency": 0.9735
+          "consistency": 0.8907,
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         }
       },
       "current_season_performance": [
@@ -1106,19 +1350,7 @@
           "consistency_performance": 0.5,
           "laps_sampled": 8.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
-        },
-        "MEDIUM": {
-          "track_name": "Japanese Grand Prix",
-          "median_lap_time": 96.645,
-          "tire_deg_slope": 0.016688970588236585,
-          "consistency": 0.4477009682692765,
-          "pace_performance": 0.30000000000000004,
-          "tire_deg_performance": 0.09999999999999998,
-          "consistency_performance": 0.8,
-          "laps_sampled": 31.0,
-          "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
         },
         "HARD": {
           "track_name": "Japanese Grand Prix",
@@ -1130,82 +1362,113 @@
           "consistency_performance": 0.7777777777777778,
           "laps_sampled": 29.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
+        },
+        "MEDIUM": {
+          "track_name": "Japanese Grand Prix",
+          "pace_performance": 0.3721687836487033,
+          "tire_deg_slope": 0.016688970588236585,
+          "tire_deg_performance": 0.09999999999999998,
+          "consistency": 2.741567397501588,
+          "median_lap_time": 96.02911160034196,
+          "laps_sampled": 44.0,
+          "sessions_used": 2.0,
+          "last_updated": "2026-04-07T21:29:43.879545"
         }
       }
     },
     "Red Bull Racing": {
       "note": "2025 P3 seed, updated with 3 race(s) of 2026 data",
       "uncertainty": 0.219,
-      "last_updated": "2026-04-01T10:37:41.824355",
+      "last_updated": "2026-04-07T21:29:43.879545",
       "races_completed": 3,
       "overall_performance": 0.6627,
       "directionality": {
-        "max_speed": 0.0203,
-        "slow_corner_speed": -0.0204,
-        "medium_corner_speed": -0.0146,
-        "high_corner_speed": 0.0178
+        "max_speed": 0.0174,
+        "slow_corner_speed": -0.0209,
+        "medium_corner_speed": -0.0171,
+        "high_corner_speed": 0.0118
       },
       "testing_characteristics": {
-        "slow_corner_performance": 0.2464,
-        "medium_corner_performance": 0.3126,
-        "fast_corner_performance": 0.6908,
-        "braking_performance": 0.6734,
-        "top_speed": 0.7143,
-        "overall_pace": 0.3269,
-        "consistency": 0.3086,
-        "tire_deg_slope": -0.0163,
-        "tire_deg_performance": 0.6138,
-        "last_updated": "2026-03-27T20:51:39.538758",
-        "sessions_used": 2,
-        "session_aggregation": "mean",
-        "run_profile": "balanced"
+        "slow_corner_performance": 0.2397,
+        "medium_corner_performance": 0.2819,
+        "fast_corner_performance": 0.62,
+        "braking_performance": 0.7205,
+        "top_speed": 0.6834,
+        "overall_pace": 0.3014,
+        "consistency": 0.2641,
+        "tire_deg_slope": 0.0421,
+        "tire_deg_performance": 0.5252,
+        "last_updated": "2026-04-07T21:29:43.879545",
+        "sessions_used": 3,
+        "session_aggregation": "laps_weighted",
+        "run_profile": "balanced",
+        "sessions_blended": 3,
+        "effective_blend_weight": 0.1443,
+        "circuits_observed": [
+          "Japanese Grand Prix"
+        ]
       },
       "testing_characteristics_profiles": {
         "balanced": {
-          "slow_corner_performance": 0.2464,
-          "medium_corner_performance": 0.3126,
-          "fast_corner_performance": 0.6908,
-          "braking_performance": 0.6734,
-          "top_speed": 0.7143,
-          "overall_pace": 0.3269,
-          "consistency": 0.3086,
-          "tire_deg_slope": -0.0163,
-          "tire_deg_performance": 0.6138,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "balanced"
+          "slow_corner_performance": 0.2397,
+          "medium_corner_performance": 0.2819,
+          "fast_corner_performance": 0.62,
+          "braking_performance": 0.7205,
+          "top_speed": 0.6834,
+          "overall_pace": 0.3014,
+          "consistency": 0.2641,
+          "tire_deg_slope": 0.0421,
+          "tire_deg_performance": 0.5252,
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "balanced",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "short_run": {
-          "slow_corner_performance": 0.4708,
-          "medium_corner_performance": 0.4206,
-          "fast_corner_performance": 0.7529,
+          "slow_corner_performance": 0.4606,
+          "medium_corner_performance": 0.3888,
+          "fast_corner_performance": 0.6731,
           "braking_performance": 0.4625,
-          "top_speed": 0.7679,
-          "overall_pace": 0.4832,
-          "consistency": 0.5,
-          "tire_deg_slope": -0.0163,
-          "tire_deg_performance": 0.6138,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "short_run"
+          "top_speed": 0.7581,
+          "overall_pace": 0.4423,
+          "consistency": 0.4278,
+          "tire_deg_slope": 0.0421,
+          "tire_deg_performance": 0.5252,
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "short_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         },
         "long_run": {
-          "slow_corner_performance": 0.1885,
-          "medium_corner_performance": 0.2154,
-          "fast_corner_performance": 0.4769,
+          "slow_corner_performance": 0.1902,
+          "medium_corner_performance": 0.1987,
+          "fast_corner_performance": 0.4658,
           "braking_performance": 0.7262,
-          "top_speed": 0.4667,
-          "overall_pace": 0.2067,
+          "top_speed": 0.4643,
+          "overall_pace": 0.2057,
           "consistency": 1.0,
-          "tire_deg_slope": -0.0163,
-          "tire_deg_performance": 0.6138,
-          "last_updated": "2026-03-27T20:51:39.538758",
-          "sessions_used": 2,
-          "session_aggregation": "mean",
-          "run_profile": "long_run"
+          "tire_deg_slope": 0.0421,
+          "tire_deg_performance": 0.5252,
+          "last_updated": "2026-04-07T21:29:43.879545",
+          "sessions_used": 3,
+          "session_aggregation": "laps_weighted",
+          "run_profile": "long_run",
+          "sessions_blended": 3,
+          "effective_blend_weight": 0.1443,
+          "circuits_observed": [
+            "Japanese Grand Prix"
+          ]
         }
       },
       "current_season_performance": [
@@ -1214,17 +1477,17 @@
         0.6
       ],
       "compound_characteristics": {
-        "MEDIUM": {
+        "SOFT": {
           "track_name": "Japanese Grand Prix",
-          "median_lap_time": 96.203,
-          "tire_deg_slope": -0.02435582522482727,
-          "consistency": 0.7358918094769462,
-          "pace_performance": 0.6,
-          "tire_deg_performance": 0.8,
-          "consistency_performance": 0.09999999999999998,
-          "laps_sampled": 37.0,
+          "median_lap_time": 112.93100000000001,
+          "tire_deg_slope": null,
+          "consistency": 14.120978430453512,
+          "pace_performance": 0.2222222222222222,
+          "tire_deg_performance": null,
+          "consistency_performance": 1.0,
+          "laps_sampled": 10.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
         },
         "HARD": {
           "track_name": "Japanese Grand Prix",
@@ -1236,17 +1499,28 @@
           "consistency_performance": 0.33333333333333337,
           "laps_sampled": 52.0,
           "sessions_used": 1,
-          "last_updated": "2026-04-01T10:37:41.824355"
+          "last_updated": "2026-04-07T21:29:43.879545"
+        },
+        "MEDIUM": {
+          "track_name": "Japanese Grand Prix",
+          "pace_performance": 0.6,
+          "tire_deg_slope": 0.005753832112192988,
+          "tire_deg_performance": 0.6845299461620749,
+          "consistency": 2.807920583480337,
+          "median_lap_time": 95.7858644305105,
+          "laps_sampled": 54.0,
+          "sessions_used": 2.0,
+          "last_updated": "2026-04-07T21:29:43.879545"
         }
       }
     }
   },
-  "version": 4,
+  "version": 5,
   "generated_at": "2026-02-27T15:34:51.528956",
-  "last_updated": "2026-04-01T10:37:41.824355",
+  "last_updated": "2026-04-07T21:29:43.879545",
   "data_freshness": "LIVE_UPDATED",
   "directionality_source": "SESSION_EXTRACTION",
-  "directionality_last_updated": "2026-03-27T20:51:39.538758",
+  "directionality_last_updated": "2026-04-07T21:29:43.879545",
   "directionality_meta": {
     "year": 2026,
     "characteristics_year": 2026,
@@ -1254,15 +1528,14 @@
       "Japanese Grand Prix"
     ],
     "sessions_loaded": [
-      "Japanese Grand Prix::FP1",
-      "Japanese Grand Prix::FP2"
+      "Japanese Grand Prix::FP3"
     ],
     "testing_backend": "auto",
     "cache_dir": "data/raw/.fastf1_cache",
     "force_renew_cache": false,
-    "new_weight": 0.7,
-    "directionality_scale": 0.1,
-    "session_aggregation": "mean",
+    "new_weight": 0.25,
+    "directionality_scale": 0.08,
+    "session_aggregation": "laps_weighted",
     "run_profile": "balanced",
     "profiles_captured": [
       "balanced",

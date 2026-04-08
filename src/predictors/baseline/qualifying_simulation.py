@@ -288,9 +288,10 @@ def _score_single_driver_in_simulation(
     team_driver_signal_means: dict[str, float],
     sim_cfg: QualiSimConfig,
     weekend_form_offset: float,
+    wet_skill_adjustment: float,
     rng: np.random.Generator,
 ) -> float:
-    """Combine team, driver, form, and noise into one simulation score."""
+    """Combine team, driver, form, wet skill, and noise into one simulation score."""
     compressed_team = 0.5 + (
         (float(driver_info["team_strength"]) - 0.5) * sim_cfg.team_strength_compression
     )
@@ -306,6 +307,7 @@ def _score_single_driver_in_simulation(
         sim_cfg.effective_learning_scale
     )
     score += weekend_form_offset
+    score += wet_skill_adjustment
     score += _compute_teammate_anchor_adjustment(
         driver_info=driver_info,
         raw_driver_signal=raw_driver_signal,
@@ -714,6 +716,29 @@ def _build_quali_sim_config(
     )
 
 
+def _compute_wet_skill_adjustment(
+    driver_info: dict[str, Any],
+    *,
+    weather: str,
+    wet_skill_weight: float,
+    wet_skill_neutral: float,
+    mixed_wet_blend: float,
+) -> float:
+    """Return the score delta from a driver's wet skill relative to the neutral baseline.
+
+    Positive values mean the driver gains in wet conditions; negative means they lose.
+    Mixed conditions apply a fractional blend of the full wet effect.
+    """
+    weather_key = str(weather).strip().lower()
+    if weather_key not in {"wet", "rain", "mixed"}:
+        return 0.0
+    wet_skill = float(driver_info.get("wet_skill", wet_skill_neutral))
+    full_adjustment = (wet_skill - wet_skill_neutral) * wet_skill_weight
+    if weather_key == "mixed":
+        return full_adjustment * float(mixed_wet_blend)
+    return full_adjustment
+
+
 def run_qualifying_simulations(
     *,
     all_drivers: list[dict[str, Any]],
@@ -723,12 +748,14 @@ def run_qualifying_simulations(
     rng: np.random.Generator,
     cfg: Any,
     logger: Any,
+    weather: str = "dry",
     has_testing_fallback_data: bool = False,
 ) -> dict[str, list[int]]:
     """Run Monte Carlo qualifying simulations and return position histories.
 
     When we only have testing data, keep enough driver variance that the grid
-    does not turn into pure team order.
+    does not turn into pure team order. Wet and mixed weather increase noise and
+    apply per-driver wet_skill adjustments so the hierarchy can shuffle.
     """
     _ = logger
     sim_cfg = _build_quali_sim_config(
@@ -737,6 +764,34 @@ def run_qualifying_simulations(
         has_practice_data=has_practice_data,
         has_testing_fallback_data=has_testing_fallback_data,
     )
+
+    # Scale noise for wet/mixed conditions.
+    weather_key = str(weather).strip().lower()
+    wet_noise_multiplier = float(
+        cfg.get("baseline_predictor.qualifying.wet_noise_multiplier", 1.60)
+    )
+    mixed_noise_multiplier = float(
+        cfg.get("baseline_predictor.qualifying.mixed_noise_multiplier", 1.28)
+    )
+    if weather_key in {"wet", "rain"}:
+        noise_scale = wet_noise_multiplier
+    elif weather_key == "mixed":
+        noise_scale = mixed_noise_multiplier
+    else:
+        noise_scale = 1.0
+
+    # Rebuild sim_cfg with scaled noise rather than mutating the frozen dataclass.
+    import dataclasses
+
+    sim_cfg = dataclasses.replace(
+        sim_cfg,
+        noise_std=sim_cfg.noise_std * noise_scale,
+        teammate_setup_std=sim_cfg.teammate_setup_std * noise_scale,
+    )
+
+    wet_skill_weight = float(cfg.get("baseline_predictor.qualifying.wet_skill_weight", 0.18))
+    wet_skill_neutral = float(cfg.get("baseline_predictor.qualifying.wet_skill_neutral", 0.70))
+    mixed_wet_blend = float(cfg.get("baseline_predictor.qualifying.mixed_wet_blend", 0.50))
 
     position_records: dict[str, list[int]] = {str(d["driver"]): [] for d in all_drivers}
     driver_weight_sum = sim_cfg.driver_quali_pace_weight + sim_cfg.driver_skill_weight
@@ -786,6 +841,13 @@ def run_qualifying_simulations(
                 team_driver_signal_means=team_driver_signal_means,
                 sim_cfg=sim_cfg,
             )
+            wet_adj = _compute_wet_skill_adjustment(
+                driver_info,
+                weather=weather,
+                wet_skill_weight=wet_skill_weight,
+                wet_skill_neutral=wet_skill_neutral,
+                mixed_wet_blend=mixed_wet_blend,
+            )
             score = _score_single_driver_in_simulation(
                 driver_info=driver_info,
                 raw_driver_signal=raw_driver_signal,
@@ -794,6 +856,7 @@ def run_qualifying_simulations(
                 team_driver_signal_means=team_driver_signal_means,
                 sim_cfg=sim_cfg,
                 weekend_form_offset=weekend_form.get(str(driver_info["driver"]), 0.0),
+                wet_skill_adjustment=wet_adj,
                 rng=rng,
             )
 

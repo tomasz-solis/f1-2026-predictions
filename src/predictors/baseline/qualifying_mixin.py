@@ -90,7 +90,9 @@ class BaselineQualifyingMixin:
             is_sprint: bool,
         ) -> None: ...
 
-        def get_blended_team_strength(self, team: str, race_name: str) -> float: ...
+        def get_blended_team_strength(self, team: str, race_name: str) -> float:
+            """Return team strength blended with track suitability and form."""
+            ...
 
         def predict_race(
             self,
@@ -102,7 +104,9 @@ class BaselineQualifyingMixin:
             race_compound: str = "MEDIUM",
             year: int | None = None,
             input_confidence: float | None = None,
-        ) -> dict[str, Any]: ...
+        ) -> dict[str, Any]:
+            """Run a race simulation and return finishing probabilities."""
+            ...
 
     def _stored_profile_data_source_label(
         self,
@@ -434,6 +438,7 @@ class BaselineQualifyingMixin:
         has_practice_data: bool,
         rng: np.random.Generator,
         has_testing_fallback_data: bool = False,
+        weather: str = "dry",
     ) -> dict[str, list[int]]:
         """Run Monte Carlo qualifying simulations and return position records."""
         cfg = getattr(self, "config", config_loader)
@@ -446,6 +451,7 @@ class BaselineQualifyingMixin:
             rng=rng,
             cfg=cfg,
             logger=logger,
+            weather=weather,
         )
 
     def _aggregate_grid_results(
@@ -590,6 +596,7 @@ class BaselineQualifyingMixin:
         qualifying_stage: str = "auto",
         practice_signal_mode: str = "auto",
         checkpoint_session_name: str | None = None,
+        weather: str = "dry",
     ) -> dict[str, Any]:
         """Predict qualifying with Monte Carlo simulation (sprint/normal weekends)."""
         cfg = getattr(self, "config", config_loader)
@@ -602,6 +609,7 @@ class BaselineQualifyingMixin:
             "practice_signal_mode",
             list(_PRACTICE_SIGNAL_MODES),
         )
+        validate_enum(weather, "weather", ["dry", "rain", "mixed"])
 
         try:
             is_sprint = is_sprint_weekend(year, race_name)
@@ -716,6 +724,7 @@ class BaselineQualifyingMixin:
             session_name is not None or practice_like_stored_profiles,
             rng,
             (testing_fallback_used and not practice_like_stored_profiles),
+            weather=weather,
         )
 
         grid = self._aggregate_grid_results(
@@ -750,6 +759,7 @@ class BaselineQualifyingMixin:
             "data_confidence_score": round(float(data_confidence_score), 3),
             "fp_blend_weight_used": round(float(effective_fp_blend_weight), 3),
             "qualifying_stage": qualifying_stage,
+            "weather": str(weather).strip().lower(),
             "practice_signal_mode_used": normalized_practice_signal_mode,
             "practice_signal_checkpoint": checkpoint_label,
             "characteristics_profile_used": "short_run",

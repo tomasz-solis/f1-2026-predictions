@@ -556,6 +556,9 @@ def build_driver_list_with_strengths_core(
                 session="qualifying",
             )
 
+            wet_skill = float(
+                driver_data.get("wet_skill", 0.70) if isinstance(driver_data, dict) else 0.70
+            )
             all_drivers.append(
                 {
                     "driver": driver_code,
@@ -569,6 +572,7 @@ def build_driver_list_with_strengths_core(
                     "experience_tier": experience_tier,
                     "experience_total_races": experience_total_races,
                     "learned_position_adjustment": learned_position_adjustment,
+                    "wet_skill": wet_skill,
                 }
             )
 

@@ -31,7 +31,8 @@
         "rating_sigma": 2.5,
         "sessions_observed": 0,
         "seeded_from": "extraction_prior"
-      }
+      },
+      "wet_skill": 0.71
     },
     "GAS": {
       "name": "Pierre Gasly",
@@ -58,7 +59,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684666",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.72
     },
     "HUL": {
       "name": "Nico Hulkenberg",
@@ -85,7 +87,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684675",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.77
     },
     "NOR": {
       "name": "Lando Norris",
@@ -112,7 +115,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684657",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.75
     },
     "ALO": {
       "name": "Fernando Alonso",
@@ -139,7 +143,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684664",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.85
     },
     "ALB": {
       "name": "Alexander Albon",
@@ -166,7 +171,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684674",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.67
     },
     "STR": {
       "name": "Lance Stroll",
@@ -193,7 +199,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684665",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.76
     },
     "LAW": {
       "name": "Liam Lawson",
@@ -220,7 +227,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684671",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.68
     },
     "HAD": {
       "name": "Isack Hadjar",
@@ -247,7 +255,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684655",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.69
     },
     "PER": {
       "name": "Sergio Perez",
@@ -274,7 +283,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684678",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.63
     },
     "LEC": {
       "name": "Charles Leclerc",
@@ -301,7 +311,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684659",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.73
     },
     "DOO": {
       "name": "Jack Doohan",
@@ -327,7 +338,8 @@
         "rating_sigma": 2.5,
         "sessions_observed": 0,
         "seeded_from": "extraction_prior"
-      }
+      },
+      "wet_skill": 0.67
     },
     "COL": {
       "name": "Franco Colapinto",
@@ -354,7 +366,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684667",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.68
     },
     "TSU": {
       "name": "Yuki Tsunoda",
@@ -380,7 +393,8 @@
         "rating_sigma": 2.5,
         "sessions_observed": 0,
         "seeded_from": "extraction_prior"
-      }
+      },
+      "wet_skill": 0.65
     },
     "RUS": {
       "name": "George Russell",
@@ -407,7 +421,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684661",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.79
     },
     "SAR": {
       "name": "Logan Sargeant",
@@ -433,7 +448,8 @@
         "rating_sigma": 2.5,
         "sessions_observed": 0,
         "seeded_from": "extraction_prior"
-      }
+      },
+      "wet_skill": 0.6
     },
     "BOR": {
       "name": "Gabriel Bortoleto",
@@ -460,7 +476,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684676",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.7
     },
     "PIA": {
       "name": "Oscar Piastri",
@@ -487,7 +504,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684658",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.7
     },
     "VER": {
       "name": "Max Verstappen",
@@ -514,7 +532,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684650",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.88
     },
     "SAI": {
       "name": "Carlos Sainz",
@@ -541,7 +560,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684673",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.7
     },
     "HAM": {
       "name": "Lewis Hamilton",
@@ -568,7 +588,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684660",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.92
     },
     "BEA": {
       "name": "Oliver Bearman",
@@ -595,7 +616,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684670",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.68
     },
     "ANT": {
       "name": "Kimi Antonelli",
@@ -622,7 +644,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684663",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.74
     },
     "ZHO": {
       "name": "Guanyu Zhou",
@@ -648,7 +671,8 @@
         "rating_sigma": 2.5,
         "sessions_observed": 0,
         "seeded_from": "extraction_prior"
-      }
+      },
+      "wet_skill": 0.68
     },
     "DEV": {
       "name": "Nyck de Vries",
@@ -674,7 +698,8 @@
         "rating_sigma": 2.5,
         "sessions_observed": 0,
         "seeded_from": "extraction_prior"
-      }
+      },
+      "wet_skill": 0.67
     },
     "RIC": {
       "name": "Daniel Ricciardo",
@@ -700,7 +725,8 @@
         "rating_sigma": 2.5,
         "sessions_observed": 0,
         "seeded_from": "extraction_prior"
-      }
+      },
+      "wet_skill": 0.7
     },
     "OCO": {
       "name": "Esteban Ocon",
@@ -727,7 +753,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684668",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.68
     },
     "BOT": {
       "name": "Valtteri Bottas",
@@ -754,7 +781,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684679",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.65
     },
     "LIN": {
       "name": "Arvid Lindblad",
@@ -782,7 +810,8 @@
         "last_session": "Japanese Grand Prix",
         "last_updated": "2026-04-01T13:12:35.684672",
         "season_year": 2026
-      }
+      },
+      "wet_skill": 0.66
     }
   },
   "version": 6,

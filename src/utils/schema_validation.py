@@ -142,6 +142,7 @@ _DRIVER_ENTRY_SCHEMA = {
         "tire_management": _TIRE_MANAGEMENT_SCHEMA,
         "bayesian": _DRIVER_BAYESIAN_SCHEMA,
         "prior_source": {"type": "string"},
+        "wet_skill": {"type": "number", "minimum": 0.0, "maximum": 1.0},
     },
     "additionalProperties": False,
 }
