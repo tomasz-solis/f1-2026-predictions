@@ -10,7 +10,7 @@ of an actual Sunday.
 The code intentionally keeps those moving parts explicit. Grid position matters,
 but it is not destiny. Faster cars can pass if the active-aero window opens,
 fresh tires create short-lived undercut opportunities, and a chaotic race
-should look different from a chaotic one. The production predictor
+should look different from a calm one. The production predictor
 aggregates many runs rather than trusting one simulated race, which is the same
 reason teams run thousands of strategy scenarios before a grand prix.
 """

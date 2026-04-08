@@ -36,6 +36,7 @@ class AbsoluteDifferenceScoring(PerformanceScoringMethod):
     """Score = (value - median) in actual units.  Vectorized."""
 
     def score_drivers(self, testing_features: pd.DataFrame) -> pd.DataFrame:
+        """Score each driver as their raw deviation from the field median."""
         result = testing_features[["driver_number"]].copy()
         for metric_name, col in _SCORING_FEATURES.items():
             if col in testing_features.columns:
@@ -51,6 +52,7 @@ class RankingScoring(PerformanceScoringMethod):
     """Score = rank (1 = best, 20 = worst).  Vectorized."""
 
     def score_drivers(self, testing_features: pd.DataFrame) -> pd.DataFrame:
+        """Rank each driver from 1 (best) to N (worst) for each metric."""
         result = testing_features[["driver_number"]].copy()
         for metric_name, col in _SCORING_FEATURES.items():
             if col in testing_features.columns:
@@ -66,6 +68,7 @@ class QuantileScoring(PerformanceScoringMethod):
     """Score = quantile tier (3 = top 25%, 2 = middle 50%, 1 = bottom 25%).  Vectorized."""
 
     def score_drivers(self, testing_features: pd.DataFrame) -> pd.DataFrame:
+        """Assign each driver a tier (1-3) based on where they fall in the field distribution."""
         result = testing_features[["driver_number"]].copy()
         for metric_name, col in _SCORING_FEATURES.items():
             if col in testing_features.columns:
@@ -86,6 +89,7 @@ class ZScoreScoring(PerformanceScoringMethod):
     """Score = standardized z-score.  Vectorized."""
 
     def score_drivers(self, testing_features: pd.DataFrame) -> pd.DataFrame:
+        """Score each driver as standard deviations from the field mean."""
         result = testing_features[["driver_number"]].copy()
         for metric_name, col in _SCORING_FEATURES.items():
             if col in testing_features.columns:

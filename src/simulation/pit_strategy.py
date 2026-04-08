@@ -178,6 +178,7 @@ def _sample_pit_laps(
     scale_factor = race_distance / 60.0
 
     def scale_window(window):
+        """Scale a pit window from the 60-lap baseline to the actual race distance."""
         return [int(window[0] * scale_factor), int(window[1] * scale_factor)]
 
     one_stop_scaled = scale_window(one_stop_window)

@@ -43,14 +43,18 @@ class BaselineRacePreparationMixin:
             scale: float,
         ) -> tuple[float, bool]: ...
 
-        def get_blended_team_strength(self, team: str, race_name: str) -> float: ...
+        def get_blended_team_strength(self, team: str, race_name: str) -> float:
+            """Return team strength blended with track suitability and form."""
+            ...
 
         def get_compound_adjusted_team_strength(
             self,
             team: str,
             race_name: str,
             compound: str = "MEDIUM",
-        ) -> float: ...
+        ) -> float:
+            """Return team strength adjusted for tyre compound performance characteristics."""
+            ...
 
     def _load_current_lineups_for_preparation(self) -> dict[str, list[str]]:
         """Load and cache current lineups for custom-grid context checks."""
