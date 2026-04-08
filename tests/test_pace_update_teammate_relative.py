@@ -5,11 +5,15 @@ performance. A backmarker who consistently beats their teammate should not
 accumulate a depressed pace just because their car finishes P18 every Sunday.
 """
 
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
 from src.systems.updater import update_bayesian_driver_ratings
+
+if TYPE_CHECKING:
+    from src.models.bayesian import BayesianDriverRanking
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -337,3 +341,130 @@ class TestQualifyingBayesianInteraction:
         assert race_and_quali["NOR"] <= race_only["NOR"] + 0.05, (
             "Conflicting qualifying signal should moderate NOR's rating, not inflate it"
         )
+
+
+class TestBayesianSequentialUpdates:
+    """Validate that sequential Bayesian updates across a race weekend don't amplify badly.
+
+    These tests cover the order in which updater.py ingests completed session results
+    into the ratings store — not the on-track session calendar order.
+
+    On-track calendar:
+      Normal:  FP1 -> FP2 -> FP3 -> Qualifying -> Race
+      Sprint:  FP1 -> Sprint Qualifying -> Sprint Race -> Qualifying -> Race
+
+    Ratings store update order (after sessions complete):
+      Normal:  race results first, then qualifying appended in the same
+               update_bayesian_driver_ratings() call (updater.py:425, 480).
+      Sprint:  sprint (Saturday, update_from_sprint_race) -> race -> qualifying
+               (Sunday, update_bayesian_driver_ratings — race then quali internally).
+    """
+
+    @staticmethod
+    def _fresh_ranker() -> "BayesianDriverRanking":
+        from src.models.bayesian import BayesianDriverRanking, DriverPrior
+
+        priors = {
+            "VER": DriverPrior("1", "VER", "Red Bull", "top", 11.0, 3.0),
+            "NOR": DriverPrior("4", "NOR", "McLaren", "top", 11.0, 3.0),
+            "PIA": DriverPrior("81", "PIA", "Williams", "midfield", 11.0, 3.0),
+        }
+        return BayesianDriverRanking(priors, grid_size=22)
+
+    def test_normal_weekend_sequential_shift_bounded(self):
+        """Normal weekend: race then qualifying update should not over-amplify.
+
+        Qualifying and race at the same weekend are correlated — grid advantage
+        carries over. The combined shift is allowed to be up to 1.5x the sum of
+        the individual shifts, which catches runaway amplification while still
+        permitting normal accumulation.
+
+        Production order: race update -> qualifying update (see updater.py:425, 480).
+        """
+
+        race_obs = {"VER": 1, "NOR": 3, "PIA": 19}
+        quali_obs = {"VER": 1, "NOR": 4, "PIA": 18}
+
+        # Race only
+        race_only = self._fresh_ranker()
+        race_only.update(race_obs, session_name="Race", confidence=0.35)
+        race_shift = {d: abs(race_only.ratings[d][0] - 11.0) for d in race_obs}
+
+        # Qualifying only
+        quali_only = self._fresh_ranker()
+        quali_only.update(quali_obs, session_name="Qualifying", confidence=0.15)
+        quali_shift = {d: abs(quali_only.ratings[d][0] - 11.0) for d in race_obs}
+
+        # Combined: race first, then qualifying — production order
+        combined = self._fresh_ranker()
+        combined.update(race_obs, session_name="Race", confidence=0.35)
+        combined.update(quali_obs, session_name="Qualifying", confidence=0.15)
+        combined_shift = {d: abs(combined.ratings[d][0] - 11.0) for d in race_obs}
+
+        for driver in race_obs:
+            individual_sum = race_shift[driver] + quali_shift[driver]
+            assert combined_shift[driver] <= individual_sum * 1.5, (
+                f"{driver}: combined shift {combined_shift[driver]:.3f} exceeds "
+                f"1.5x individual sum {individual_sum:.3f}"
+            )
+
+    def test_sprint_weekend_three_updates_bounded(self):
+        """Sprint weekend: sprint -> race -> qualifying should not over-amplify.
+
+        Sprint weekends have three Bayesian update calls across Saturday and Sunday
+        (update_from_sprint_race, then update_bayesian_driver_ratings which does
+        race then qualifying). All three are correlated — the same car advantage
+        shows up in each session. The combined shift must stay within 1.5x the
+        sum of the three individual shifts.
+        """
+        sprint_obs = {"VER": 1, "NOR": 2, "PIA": 18}
+        race_obs = {"VER": 1, "NOR": 3, "PIA": 19}
+        quali_obs = {"VER": 1, "NOR": 4, "PIA": 18}
+
+        sprint_only = self._fresh_ranker()
+        sprint_only.update(sprint_obs, session_name="Sprint", confidence=0.20)
+        sprint_shift = {d: abs(sprint_only.ratings[d][0] - 11.0) for d in race_obs}
+
+        race_only = self._fresh_ranker()
+        race_only.update(race_obs, session_name="Race", confidence=0.35)
+        race_shift = {d: abs(race_only.ratings[d][0] - 11.0) for d in race_obs}
+
+        quali_only = self._fresh_ranker()
+        quali_only.update(quali_obs, session_name="Qualifying", confidence=0.15)
+        quali_shift = {d: abs(quali_only.ratings[d][0] - 11.0) for d in race_obs}
+
+        # Combined: sprint -> race -> qualifying — production order for sprint weekends
+        combined = self._fresh_ranker()
+        combined.update(sprint_obs, session_name="Sprint", confidence=0.20)
+        combined.update(race_obs, session_name="Race", confidence=0.35)
+        combined.update(quali_obs, session_name="Qualifying", confidence=0.15)
+        combined_shift = {d: abs(combined.ratings[d][0] - 11.0) for d in race_obs}
+
+        for driver in race_obs:
+            individual_sum = sprint_shift[driver] + race_shift[driver] + quali_shift[driver]
+            assert combined_shift[driver] <= individual_sum * 1.5, (
+                f"{driver}: sprint weekend combined shift {combined_shift[driver]:.3f} "
+                f"exceeds 1.5x individual sum {individual_sum:.3f}"
+            )
+
+    def test_qualifying_update_smaller_than_race_for_same_positions(self):
+        """Qualifying shift should be smaller than race shift for identical finishing order.
+
+        Qualifying confidence (0.15) is lower than race confidence (0.35) by design —
+        one flying lap in controlled conditions is a noisier signal than full race pace.
+        """
+        positions = {"VER": 1, "NOR": 5, "PIA": 15}
+
+        quali_ranker = self._fresh_ranker()
+        quali_ranker.update(positions, session_name="Qualifying", confidence=0.15)
+
+        race_ranker = self._fresh_ranker()
+        race_ranker.update(positions, session_name="Race", confidence=0.35)
+
+        for driver in positions:
+            quali_shift = abs(quali_ranker.ratings[driver][0] - 11.0)
+            race_shift = abs(race_ranker.ratings[driver][0] - 11.0)
+            assert quali_shift < race_shift, (
+                f"{driver}: qualifying shift ({quali_shift:.3f}) should be smaller "
+                f"than race shift ({race_shift:.3f})"
+            )
