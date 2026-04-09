@@ -769,7 +769,7 @@ def _build_directionality_from_metrics(
             value = float(metrics[metric_name])
         elif fallback_pace is not None and metric_name != "top_speed":
             # Conservative fallback: use overall pace only for corner directionality
-            # when granular sector telemetry is still sparse.
+            # when per-sector telemetry is still sparse.
             value = float(fallback_pace)
         else:
             value = 0.5

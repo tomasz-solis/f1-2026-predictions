@@ -840,6 +840,7 @@ def test_update_from_race_skips_team_update_when_characteristics_missing(patcher
         race_results,
         qualifying_results=qualifying_results,
         data_root=tmp_path,
+        weather="dry",
     )
 
 
@@ -852,3 +853,124 @@ def test_update_from_race_reraises_load_errors(patcher):
 
     with pytest.raises(RuntimeError, match="load failed"):
         updater.update_from_race(2026, "Bahrain Grand Prix")
+
+
+def test_sprint_race_updates_race_pace_ema(patcher, tmp_path):
+    from src.models.bayesian import DriverPrior
+
+    patcher.chdir(tmp_path)
+
+    sprint_results = pd.DataFrame(
+        {
+            "Abbreviation": ["VER", "NOR", "LEC", "HAM"],
+            "Position": [1, 2, 3, 4],
+            "Status": ["Finished", "Finished", "Finished", "Finished"],
+            "race_name": ["China Grand Prix"] * 4,
+            "year": [2026] * 4,
+        }
+    )
+    sprint_session = MagicMock()
+
+    patcher.setattr(
+        "src.utils.weekend.is_sprint_weekend",
+        lambda year, race_name: True,
+    )
+    patcher.setattr(
+        updater,
+        "load_competitive_session",
+        lambda year, race_name, session_name, load_laps=False: (sprint_results, sprint_session),
+    )
+    patcher.setattr(
+        "src.utils.lineups.load_current_lineups",
+        lambda config_path="data/current_lineups.json": {
+            "Red Bull": ["VER", "PER"],
+            "McLaren": ["NOR", "PIA"],
+            "Ferrari": ["LEC", "HAM"],
+        },
+    )
+
+    priors = {
+        "VER": DriverPrior("1", "VER", "Red Bull", "top", mu=18.0, sigma=2.0),
+        "NOR": DriverPrior("4", "NOR", "McLaren", "top", mu=17.0, sigma=2.1),
+        "LEC": DriverPrior("16", "LEC", "Ferrari", "top", mu=16.5, sigma=2.0),
+        "HAM": DriverPrior("44", "HAM", "Ferrari", "top", mu=16.0, sigma=2.2),
+    }
+    patcher.setattr("src.models.priors_factory.PriorsFactory.create_priors", lambda self: priors)
+
+    initial_race_pace = {"VER": 0.60, "NOR": 0.58, "LEC": 0.55, "HAM": 0.52}
+
+    class _Store:
+        def __init__(self, data_root):
+            self.saved = []
+
+        def load_artifact(self, artifact_type, artifact_key):
+            if artifact_type == "driver_characteristics":
+                return {
+                    "version": 1,
+                    "drivers": {
+                        dc: {
+                            "racecraft": {"skill_score": 0.60},
+                            "pace": {"race_pace": initial_race_pace[dc]},
+                        }
+                        for dc in initial_race_pace
+                    },
+                }
+            return None
+
+        def get_latest_version(self, artifact_type, artifact_key):
+            return 1
+
+        def save_artifact(self, artifact_type, artifact_key, data, version):
+            self.saved.append((artifact_type, artifact_key, data, version))
+
+    patcher.setattr(updater, "ArtifactStore", _Store)
+
+    configured_blend = 0.25
+
+    def _config_get(key, default=None):
+        if key == "baseline_predictor.driver_form.race_pace_update_blend":
+            return configured_blend
+        return default
+
+    patcher.setattr(updater.config_loader, "get", _config_get)
+
+    updater.update_from_sprint_race(2026, "China Grand Prix", data_root=str(tmp_path))
+
+    # Read the year-scoped fallback file that _persist_driver_characteristics_payload writes.
+    fallback = (
+        tmp_path
+        / "data"
+        / "processed"
+        / "driver_characteristics"
+        / "2026_driver_characteristics.json"
+    )
+    assert fallback.exists(), "Sprint update should persist driver characteristics"
+    saved = json.loads(fallback.read_text())
+    drivers = saved["drivers"]
+
+    # Every driver's race_pace must have moved from its initial value.
+    for dc in initial_race_pace:
+        updated_pace = drivers[dc]["pace"]["race_pace"]
+        assert updated_pace != initial_race_pace[dc], f"{dc} race_pace was not updated"
+
+    # Verify blend weight is half of normal race_pace_update_blend.
+    # Re-derive expected pace for VER (P1) using the same EMA formula.
+    expected_blend = configured_blend * 0.5  # 0.125
+    grid_size = max(22, len(priors))
+    ver_raw_pace = 1.0 - ((1 - 1) / (grid_size - 1))  # P1 -> 1.0
+    # VER has no teammate in the sprint observations, so team-mean correction
+    # uses field mean fallback -> observed_pace is clipped raw_pace.
+    ver_old = initial_race_pace["VER"]
+    # Allow for teammate-relative adjustments; just check the blend magnitude.
+    ver_updated = drivers["VER"]["pace"]["race_pace"]
+    # The movement should be proportional to expected_blend (0.125), not
+    # the full blend (0.25). Verify approximate half-weight by checking
+    # that the absolute shift is closer to half-blend than full-blend.
+    full_blend_shift = abs(configured_blend * (ver_raw_pace - ver_old))
+    half_blend_shift = abs(expected_blend * (ver_raw_pace - ver_old))
+    actual_shift = abs(ver_updated - ver_old)
+    assert actual_shift == pytest.approx(half_blend_shift, abs=0.03), (
+        f"Sprint pace blend should be ~half of normal: "
+        f"actual_shift={actual_shift:.4f}, expected_half={half_blend_shift:.4f}, "
+        f"full_would_be={full_blend_shift:.4f}"
+    )

@@ -370,11 +370,88 @@ def _extract_dnf_drivers(race_results: pd.DataFrame) -> set[str]:
     return dnf_drivers
 
 
+def _update_teammate_relative_pace_ema(
+    *,
+    observations: dict[str, int],
+    drivers_payload: dict[str, dict],
+    driver_to_team: dict[str, str],
+    grid_size: int,
+    blend_weight: float,
+    pace_key: str,
+) -> int:
+    """Apply teammate-relative EMA update to a driver pace field.
+
+    Normalizes finishing positions into 0-1 pace, removes team-level effects
+    by subtracting each team's mean and re-centering on the field mean, then
+    blends with the existing pace value via exponential moving average.
+
+    Args:
+        observations: driver_code -> finishing position (1-indexed).
+        drivers_payload: mutable driver entries; updated in-place.
+        driver_to_team: driver_code -> team name mapping.
+        grid_size: total grid size for position normalization.
+        blend_weight: EMA blend toward new observation (0=ignore, 1=replace).
+        pace_key: field name in the pace dict ("quali_pace" or "race_pace").
+
+    Returns:
+        Count of drivers whose pace was updated.
+    """
+    if not observations:
+        return 0
+
+    raw_paces: dict[str, float] = {
+        dc: float(np.clip(1.0 - ((int(pos) - 1) / max(grid_size - 1, 1)), 0.0, 1.0))
+        for dc, pos in observations.items()
+    }
+
+    team_paces: dict[str, list[float]] = {}
+    for dc, raw_pace in raw_paces.items():
+        t = driver_to_team.get(dc)
+        if t is not None:
+            team_paces.setdefault(t, []).append(raw_pace)
+
+    team_means: dict[str, float] = {
+        t: float(np.mean(paces)) for t, paces in team_paces.items() if len(paces) >= 2
+    }
+    field_mean = float(np.mean(list(raw_paces.values()))) if raw_paces else 0.5
+
+    touched = 0
+    for driver_code, raw_pace in raw_paces.items():
+        driver_entry = drivers_payload.get(driver_code)
+        if not isinstance(driver_entry, dict):
+            continue
+
+        pace_payload = driver_entry.get("pace")
+        if not isinstance(pace_payload, dict):
+            pace_payload = {}
+            driver_entry["pace"] = pace_payload
+
+        try:
+            existing_pace = float(pace_payload.get(pace_key, 0.5))
+        except (TypeError, ValueError):
+            existing_pace = 0.5
+        existing_pace = float(np.clip(existing_pace, 0.05, 0.95))
+
+        driver_team = driver_to_team.get(driver_code)
+        if driver_team is not None and driver_team in team_means:
+            observed_pace = raw_pace - team_means[driver_team] + field_mean
+        else:
+            observed_pace = raw_pace
+        observed_pace = float(np.clip(observed_pace, 0.0, 1.0))
+
+        updated_pace = (1.0 - blend_weight) * existing_pace + (blend_weight * observed_pace)
+        pace_payload[pace_key] = round(float(np.clip(updated_pace, 0.05, 0.95)), 3)
+        touched += 1
+
+    return touched
+
+
 def update_bayesian_driver_ratings(
     race_results: pd.DataFrame,
     qualifying_results: pd.DataFrame | None = None,
     *,
     data_root: str | Path = "data",
+    weather: str = "dry",
 ) -> None:
     """Update Bayesian driver ratings plus qualifying pace from completed sessions."""
     logger.info("Updating Bayesian driver ratings...")
@@ -496,116 +573,87 @@ def update_bayesian_driver_ratings(
         )
 
     # --- Qualifying pace EMA update (teammate-relative) ---
-    # Raw pace = 1 - (pos-1)/(grid-1). We subtract the team mean and re-center
-    # on the field mean so the field reflects driver ability, not car performance.
-    # A backmarker who beats their teammate gets a pace value near 0.5,
-    # not near 0.05 because their car finishes P19 every weekend.
     quali_pace_blend = float(
         config_loader.get("baseline_predictor.driver_form.quali_pace_update_blend", 0.30)
     )
     quali_pace_blend = float(np.clip(quali_pace_blend, 0.0, 1.0))
-    touched_quali_pace_drivers = 0
+    touched_quali_pace_drivers = _update_teammate_relative_pace_ema(
+        observations=qualifying_observations,
+        drivers_payload=drivers_payload,
+        driver_to_team=driver_to_team,
+        grid_size=grid_size,
+        blend_weight=quali_pace_blend,
+        pace_key="quali_pace",
+    )
 
-    raw_quali_paces: dict[str, float] = {
-        dc: float(np.clip(1.0 - ((int(pos) - 1) / max(grid_size - 1, 1)), 0.0, 1.0))
-        for dc, pos in qualifying_observations.items()
-    }
-    team_quali_paces: dict[str, list[float]] = {}
-    for dc, raw_pace in raw_quali_paces.items():
-        t = driver_to_team.get(dc)
-        if t is not None:
-            team_quali_paces.setdefault(t, []).append(raw_pace)
-    team_quali_means: dict[str, float] = {
-        t: float(np.mean(paces)) for t, paces in team_quali_paces.items() if len(paces) >= 2
-    }
-    field_quali_mean = float(np.mean(list(raw_quali_paces.values()))) if raw_quali_paces else 0.5
-
-    for driver_code, raw_pace in raw_quali_paces.items():
-        driver_entry = drivers_payload.get(driver_code)
-        if not isinstance(driver_entry, dict):
-            continue
-
-        pace_payload = driver_entry.get("pace")
-        if not isinstance(pace_payload, dict):
-            pace_payload = {}
-            driver_entry["pace"] = pace_payload
-
-        try:
-            existing_quali_pace = float(pace_payload.get("quali_pace", 0.5))
-        except (TypeError, ValueError):
-            existing_quali_pace = 0.5
-        existing_quali_pace = float(np.clip(existing_quali_pace, 0.05, 0.99))
-
-        driver_team = driver_to_team.get(driver_code)
-        if driver_team is not None and driver_team in team_quali_means:
-            observed_quali_pace = raw_pace - team_quali_means[driver_team] + field_quali_mean
-        else:
-            observed_quali_pace = raw_pace
-        observed_quali_pace = float(np.clip(observed_quali_pace, 0.0, 1.0))
-
-        updated_quali_pace = (1.0 - quali_pace_blend) * existing_quali_pace + (
-            quali_pace_blend * observed_quali_pace
-        )
-        pace_payload["quali_pace"] = round(float(np.clip(updated_quali_pace, 0.05, 0.99)), 3)
-        touched_quali_pace_drivers += 1
-
-    # --- Race pace EMA update (teammate-relative, mirrors qualifying pace above) ---
+    # --- Race pace EMA update (teammate-relative, DNF drivers excluded) ---
     race_pace_blend = float(
         config_loader.get("baseline_predictor.driver_form.race_pace_update_blend", 0.25)
     )
     race_pace_blend = float(np.clip(race_pace_blend, 0.0, 1.0))
-    touched_race_pace_drivers = 0
-
     race_finish_obs: dict[str, int] = {
         dc: pos for dc, pos in all_observations.items() if dc not in dnf_drivers
     }
-    raw_race_paces: dict[str, float] = {
-        dc: float(np.clip(1.0 - ((int(pos) - 1) / max(grid_size - 1, 1)), 0.0, 1.0))
-        for dc, pos in race_finish_obs.items()
-    }
-    team_race_paces: dict[str, list[float]] = {}
-    for dc, raw_pace in raw_race_paces.items():
-        t = driver_to_team.get(dc)
-        if t is not None:
-            team_race_paces.setdefault(t, []).append(raw_pace)
-    team_race_means: dict[str, float] = {
-        t: float(np.mean(paces)) for t, paces in team_race_paces.items() if len(paces) >= 2
-    }
-    field_race_mean = float(np.mean(list(raw_race_paces.values()))) if raw_race_paces else 0.5
+    touched_race_pace_drivers = _update_teammate_relative_pace_ema(
+        observations=race_finish_obs,
+        drivers_payload=drivers_payload,
+        driver_to_team=driver_to_team,
+        grid_size=grid_size,
+        blend_weight=race_pace_blend,
+        pace_key="race_pace",
+    )
 
-    for driver_code, raw_pace in raw_race_paces.items():
-        driver_entry = drivers_payload.get(driver_code)
-        if not isinstance(driver_entry, dict):
-            continue
-
-        pace_payload = driver_entry.get("pace")
-        if not isinstance(pace_payload, dict):
-            pace_payload = {}
-            driver_entry["pace"] = pace_payload
-
-        try:
-            existing_race_pace = float(pace_payload.get("race_pace", 0.5))
-        except (TypeError, ValueError):
-            existing_race_pace = 0.5
-        existing_race_pace = float(np.clip(existing_race_pace, 0.05, 0.99))
-
-        driver_team = driver_to_team.get(driver_code)
-        if driver_team is not None and driver_team in team_race_means:
-            observed_race_pace = raw_pace - team_race_means[driver_team] + field_race_mean
-        else:
-            observed_race_pace = raw_pace
-        observed_race_pace = float(np.clip(observed_race_pace, 0.0, 1.0))
-
-        updated_race_pace = (1.0 - race_pace_blend) * existing_race_pace + (
-            race_pace_blend * observed_race_pace
+    # --- Wet-skill EMA update (only in wet/mixed conditions) ---
+    weather_key = str(weather).strip().lower()
+    touched_wet_skill_drivers = 0
+    if weather_key in {"wet", "rain", "mixed"}:
+        wet_skill_blend = float(
+            config_loader.get("baseline_predictor.driver_form.wet_skill_update_blend", 0.15)
         )
-        pace_payload["race_pace"] = round(float(np.clip(updated_race_pace, 0.05, 0.99)), 3)
-        touched_race_pace_drivers += 1
+        wet_skill_blend = float(np.clip(wet_skill_blend, 0.0, 0.5))
+        if weather_key == "mixed":
+            wet_skill_blend *= 0.5
+
+        wet_skill_neutral = float(
+            config_loader.get("baseline_predictor.race.lap_time.wet_skill_neutral", 0.70)
+        )
+
+        for driver_code, pos in race_finish_obs.items():
+            driver_entry = drivers_payload.get(driver_code)
+            if not isinstance(driver_entry, dict):
+                continue
+
+            raw_pace = float(np.clip(1.0 - ((int(pos) - 1) / max(grid_size - 1, 1)), 0.0, 1.0))
+
+            driver_team = driver_to_team.get(driver_code)
+            team_finish_paces = [
+                float(np.clip(1.0 - ((int(tp) - 1) / max(grid_size - 1, 1)), 0.0, 1.0))
+                for tdc, tp in race_finish_obs.items()
+                if driver_to_team.get(tdc) == driver_team and tdc != driver_code
+            ]
+            if not team_finish_paces:
+                continue
+
+            relative_performance = raw_pace - float(np.mean(team_finish_paces))
+            observed_wet_signal = wet_skill_neutral + (relative_performance * 0.40)
+            observed_wet_signal = float(np.clip(observed_wet_signal, 0.40, 0.95))
+
+            existing = driver_entry.get("wet_skill")
+            existing_wet_skill = float(existing if existing is not None else wet_skill_neutral)
+            updated = (
+                1.0 - wet_skill_blend
+            ) * existing_wet_skill + wet_skill_blend * observed_wet_signal
+            driver_entry["wet_skill"] = round(round(updated * 20) / 20, 2)
+            touched_wet_skill_drivers += 1
+
+        if touched_wet_skill_drivers > 0:
+            logger.info("Updated wet_skill for %d drivers", touched_wet_skill_drivers)
 
     if (
         touched_skill_drivers == 0
         and touched_quali_pace_drivers == 0
         and touched_race_pace_drivers == 0
+        and touched_wet_skill_drivers == 0
     ):
         logger.warning("Bayesian update produced no persisted driver changes")
         return
@@ -613,11 +661,12 @@ def update_bayesian_driver_ratings(
     _persist_driver_characteristics_payload(store, driver_payload, season_year)
     logger.info(
         "Updated Bayesian ratings for %s drivers, blended skill for %s, "
-        "qualifying pace for %s, race pace for %s",
+        "qualifying pace for %s, race pace for %s, wet_skill for %s",
         len(observations),
         touched_skill_drivers,
         touched_quali_pace_drivers,
         touched_race_pace_drivers,
+        touched_wet_skill_drivers,
     )
 
 
@@ -655,6 +704,23 @@ def update_from_race(year: int, race_name: str, data_dir: str = "data/processed"
         )
         qualifying_results = None
 
+    # Detect race weather from session for wet_skill updating
+    race_weather = "dry"
+    try:
+        weather_data = session.weather_data
+        if (
+            weather_data is not None
+            and not weather_data.empty
+            and "Rainfall" in weather_data.columns
+        ):
+            wet_fraction = float(weather_data["Rainfall"].dropna().astype(bool).mean())
+            if wet_fraction > 0.30:
+                race_weather = "wet"
+            elif wet_fraction > 0.05:
+                race_weather = "mixed"
+    except Exception:
+        race_weather = "dry"
+
     char_file = Path(data_dir) / "car_characteristics" / f"{year}_car_characteristics.json"
     if char_file.exists():
         update_team_characteristics(race_results, session, char_file)
@@ -667,6 +733,7 @@ def update_from_race(year: int, race_name: str, data_dir: str = "data/processed"
         race_results,
         qualifying_results=qualifying_results,
         data_root=data_root,
+        weather=race_weather,
     )
 
     logger.info("Race update complete for %s %s", year, race_name)
@@ -770,9 +837,35 @@ def update_from_sprint_race(
         }
         strip_legacy_bayesian_fields({driver_code: driver_entry})
 
+    # Sprint race pace EMA — lower blend than main race because sprint is ~1/3 distance.
+    from src.utils.lineups import load_current_lineups
+
+    lineups = load_current_lineups()
+    driver_to_team: dict[str, str] = {}
+    for team_name, team_drivers in (lineups or {}).items():
+        for d in team_drivers:
+            driver_to_team[str(d)] = str(team_name)
+
+    sprint_pace_blend = (
+        float(config_loader.get("baseline_predictor.driver_form.race_pace_update_blend", 0.25))
+        * 0.5
+    )  # Half weight for sprint distance
+    sprint_pace_blend = float(np.clip(sprint_pace_blend, 0.0, 0.5))
+    touched_pace = _update_teammate_relative_pace_ema(
+        observations=observations,
+        drivers_payload=drivers_payload,
+        driver_to_team=driver_to_team,
+        grid_size=grid_size,
+        blend_weight=sprint_pace_blend,
+        pace_key="race_pace",
+    )
+
     _persist_driver_characteristics_payload(store, driver_payload, season_year)
     logger.info(
-        "Sprint Bayesian update applied for %s drivers (confidence=%.2f)",
+        "Sprint update applied for %s drivers: Bayesian (confidence=%.2f), "
+        "race_pace EMA (%d drivers, blend=%.2f)",
         len(observations),
         sprint_confidence,
+        touched_pace,
+        sprint_pace_blend,
     )
