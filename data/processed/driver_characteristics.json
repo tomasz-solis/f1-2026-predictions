@@ -11,6 +11,7 @@
   "drivers": {
     "MAG": {
       "name": "Kevin Magnussen",
+      "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.605,
         "race_pace": 0.508
@@ -38,6 +39,7 @@
     },
     "GAS": {
       "name": "Pierre Gasly",
+      "wet_skill": 0.75,
       "pace": {
         "quali_pace": 0.722,
         "race_pace": 0.762
@@ -65,6 +67,7 @@
     },
     "HUL": {
       "name": "Nico Hulkenberg",
+      "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.671,
         "race_pace": 0.746
@@ -92,6 +95,7 @@
     },
     "NOR": {
       "name": "Lando Norris",
+      "wet_skill": 0.8,
       "pace": {
         "quali_pace": 0.767,
         "race_pace": 0.812
@@ -119,6 +123,7 @@
     },
     "ALO": {
       "name": "Fernando Alonso",
+      "wet_skill": 0.85,
       "pace": {
         "quali_pace": 0.748,
         "race_pace": 0.808
@@ -146,6 +151,7 @@
     },
     "ALB": {
       "name": "Alexander Albon",
+      "wet_skill": 0.75,
       "pace": {
         "quali_pace": 0.765,
         "race_pace": 0.8
@@ -173,6 +179,7 @@
     },
     "STR": {
       "name": "Lance Stroll",
+      "wet_skill": 0.6,
       "pace": {
         "quali_pace": 0.603,
         "race_pace": 0.543
@@ -200,6 +207,7 @@
     },
     "LAW": {
       "name": "Liam Lawson",
+      "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.643,
         "race_pace": 0.598
@@ -227,6 +235,7 @@
     },
     "HAD": {
       "name": "Isack Hadjar",
+      "wet_skill": 0.65,
       "pace": {
         "quali_pace": 0.752,
         "race_pace": 0.767
@@ -254,6 +263,7 @@
     },
     "PER": {
       "name": "Sergio Perez",
+      "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.467,
         "race_pace": 0.367
@@ -281,6 +291,7 @@
     },
     "LEC": {
       "name": "Charles Leclerc",
+      "wet_skill": 0.75,
       "pace": {
         "quali_pace": 0.707,
         "race_pace": 0.802
@@ -308,6 +319,7 @@
     },
     "DOO": {
       "name": "Jack Doohan",
+      "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.465,
         "race_pace": 0.365
@@ -335,6 +347,7 @@
     },
     "COL": {
       "name": "Franco Colapinto",
+      "wet_skill": 0.65,
       "pace": {
         "quali_pace": 0.698,
         "race_pace": 0.631
@@ -362,6 +375,7 @@
     },
     "TSU": {
       "name": "Yuki Tsunoda",
+      "wet_skill": 0.6,
       "pace": {
         "quali_pace": 0.522,
         "race_pace": 0.497
@@ -389,6 +403,7 @@
     },
     "RUS": {
       "name": "George Russell",
+      "wet_skill": 0.8,
       "pace": {
         "quali_pace": 0.795,
         "race_pace": 0.87
@@ -416,6 +431,7 @@
     },
     "SAR": {
       "name": "Logan Sargeant",
+      "wet_skill": 0.65,
       "pace": {
         "quali_pace": 0.45,
         "race_pace": 0.42
@@ -443,6 +459,7 @@
     },
     "BOR": {
       "name": "Gabriel Bortoleto",
+      "wet_skill": 0.65,
       "pace": {
         "quali_pace": 0.755,
         "race_pace": 0.725
@@ -470,6 +487,7 @@
     },
     "PIA": {
       "name": "Oscar Piastri",
+      "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.584,
         "race_pace": 0.539
@@ -497,12 +515,13 @@
     },
     "VER": {
       "name": "Max Verstappen",
+      "wet_skill": 0.9,
       "pace": {
         "quali_pace": 0.95,
-        "race_pace": 0.975
+        "race_pace": 0.95
       },
       "racecraft": {
-        "skill_score": 0.965,
+        "skill_score": 0.95,
         "overtaking_skill": 0.893
       },
       "experience": {
@@ -524,6 +543,7 @@
     },
     "SAI": {
       "name": "Carlos Sainz",
+      "wet_skill": 0.75,
       "pace": {
         "quali_pace": 0.716,
         "race_pace": 0.656
@@ -551,6 +571,7 @@
     },
     "HAM": {
       "name": "Lewis Hamilton",
+      "wet_skill": 0.9,
       "pace": {
         "quali_pace": 0.63,
         "race_pace": 0.585
@@ -578,6 +599,7 @@
     },
     "BEA": {
       "name": "Oliver Bearman",
+      "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.623,
         "race_pace": 0.548
@@ -605,6 +627,7 @@
     },
     "ANT": {
       "name": "Kimi Antonelli",
+      "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.509,
         "race_pace": 0.409
@@ -632,6 +655,7 @@
     },
     "ZHO": {
       "name": "Guanyu Zhou",
+      "wet_skill": 0.65,
       "pace": {
         "quali_pace": 0.714,
         "race_pace": 0.767
@@ -659,6 +683,7 @@
     },
     "DEV": {
       "name": "Nyck de Vries",
+      "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.416,
         "race_pace": 0.416
@@ -686,6 +711,7 @@
     },
     "RIC": {
       "name": "Daniel Ricciardo",
+      "wet_skill": 0.75,
       "pace": {
         "quali_pace": 0.656,
         "race_pace": 0.611
@@ -713,6 +739,7 @@
     },
     "OCO": {
       "name": "Esteban Ocon",
+      "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.647,
         "race_pace": 0.692
@@ -740,6 +767,7 @@
     },
     "BOT": {
       "name": "Valtteri Bottas",
+      "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.637,
         "race_pace": 0.584
@@ -767,6 +795,7 @@
     },
     "LIN": {
       "name": "Arvid Lindblad",
+      "wet_skill": 0.6,
       "pace": {
         "quali_pace": 0.515,
         "race_pace": 0.542

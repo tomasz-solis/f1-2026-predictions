@@ -2,9 +2,52 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
+
+
+def _safe_call_resolver(
+    resolver: Any,
+    kwargs: dict[str, Any],
+    resolver_name: str = "resolver",
+) -> Any | None:
+    """Call resolver with kwargs, falling back to positional args on TypeError.
+
+    Logs failures at debug level so internal resolver bugs are traceable
+    rather than silently swallowed.
+    """
+    if not callable(resolver):
+        logger.debug(
+            "%s is not callable (type=%s), returning None",
+            resolver_name,
+            type(resolver).__name__,
+        )
+        return None
+    try:
+        return resolver(**kwargs)
+    except TypeError:
+        try:
+            return resolver(*kwargs.values())
+        except (TypeError, ValueError) as exc:
+            logger.debug(
+                "%s positional fallback failed: %s: %s",
+                resolver_name,
+                type(exc).__name__,
+                exc,
+            )
+            return None
+    except (ValueError, KeyError, AttributeError) as exc:
+        logger.debug(
+            "%s failed: %s: %s",
+            resolver_name,
+            type(exc).__name__,
+            exc,
+        )
+        return None
 
 
 def coerce_optional_float(value: Any) -> float | None:
@@ -103,25 +146,11 @@ def resolve_race_environment_context(
     if "track_temperature_c" not in race_params:
         resolved_temperature_profile: dict[str, Any] | None = None
         if callable(resolve_track_temperature_profile):
-            try:
-                candidate_profile = resolve_track_temperature_profile(
-                    year=year,
-                    race_name=race_name,
-                    weather=weather,
-                    is_sprint=is_sprint,
-                )
-            except TypeError:
-                try:
-                    candidate_profile = resolve_track_temperature_profile(
-                        year,
-                        race_name,
-                        weather,
-                        is_sprint,
-                    )
-                except Exception:
-                    candidate_profile = None
-            except Exception:
-                candidate_profile = None
+            candidate_profile = _safe_call_resolver(
+                resolve_track_temperature_profile,
+                {"year": year, "race_name": race_name, "weather": weather, "is_sprint": is_sprint},
+                resolver_name="resolve_track_temperature_profile",
+            )
 
             if isinstance(candidate_profile, dict):
                 resolved_temperature_profile = dict(candidate_profile)
@@ -134,24 +163,16 @@ def resolve_race_environment_context(
                 resolved_track_temp = None
 
         if resolved_track_temp is None and callable(resolve_track_temperature_c):
-            try:
-                resolved_track_temp = float(
-                    resolve_track_temperature_c(
-                        year=year,
-                        race_name=race_name,
-                        weather=weather,
-                        is_sprint=is_sprint,
-                    )
-                )
-            except TypeError:
+            resolved_track_temp_candidate = _safe_call_resolver(
+                resolve_track_temperature_c,
+                {"year": year, "race_name": race_name, "weather": weather, "is_sprint": is_sprint},
+                resolver_name="resolve_track_temperature_c",
+            )
+            if resolved_track_temp_candidate is not None:
                 try:
-                    resolved_track_temp = float(
-                        resolve_track_temperature_c(year, race_name, weather, is_sprint)
-                    )
-                except Exception:
+                    resolved_track_temp = float(resolved_track_temp_candidate)
+                except (TypeError, ValueError):
                     resolved_track_temp = None
-            except Exception:
-                resolved_track_temp = None
 
         if resolved_track_temp is not None:
             race_params["track_temperature_c"] = resolved_track_temp
@@ -260,23 +281,11 @@ def resolve_race_environment_context(
     }
     if callable(resolve_non_competitive_weather_features):
         raw_weather_features: dict[str, Any] | None = None
-        try:
-            candidate_features = resolve_non_competitive_weather_features(
-                year=year,
-                race_name=race_name,
-                is_sprint=is_sprint,
-            )
-        except TypeError:
-            try:
-                candidate_features = resolve_non_competitive_weather_features(
-                    year,
-                    race_name,
-                    is_sprint,
-                )
-            except Exception:
-                candidate_features = None
-        except Exception:
-            candidate_features = None
+        candidate_features = _safe_call_resolver(
+            resolve_non_competitive_weather_features,
+            {"year": year, "race_name": race_name, "is_sprint": is_sprint},
+            resolver_name="resolve_non_competitive_weather_features",
+        )
 
         if isinstance(candidate_features, dict):
             raw_weather_features = dict(candidate_features)

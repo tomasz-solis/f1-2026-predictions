@@ -110,8 +110,9 @@ def test_predict_qualifying_uses_testing_short_run_fallback():
         has_practice_data,
         rng,
         has_testing_fallback_data,
+        weather="dry",
     ):
-        _ = (n_simulations, is_sprint, rng, has_testing_fallback_data)
+        _ = (n_simulations, is_sprint, rng, has_testing_fallback_data, weather)
         captured["has_practice_data"] = has_practice_data
         captured["all_drivers"] = all_drivers
         return {"AAA": [1], "BBB": [2]}
@@ -166,8 +167,9 @@ def test_predict_qualifying_blends_bayesian_form_into_quali_pace():
         has_practice_data,
         rng,
         has_testing_fallback_data,
+        weather="dry",
     ):
-        _ = (n_simulations, is_sprint, has_practice_data, rng, has_testing_fallback_data)
+        _ = (n_simulations, is_sprint, has_practice_data, rng, has_testing_fallback_data, weather)
         captured["all_drivers"] = all_drivers
         return {"AAA": [1], "BBB": [2]}
 
@@ -244,8 +246,9 @@ def test_predict_qualifying_can_force_stored_checkpoint_profiles():
         has_practice_data,
         rng,
         has_testing_fallback_data,
+        weather="dry",
     ):
-        _ = (n_simulations, is_sprint, rng, has_testing_fallback_data)
+        _ = (n_simulations, is_sprint, rng, has_testing_fallback_data, weather)
         captured["has_practice_data"] = has_practice_data
         captured["all_drivers"] = all_drivers
         return {"AAA": [1], "BBB": [2]}
@@ -332,8 +335,9 @@ def test_predict_qualifying_stored_profiles_without_snapshot_stays_fallback_like
         has_practice_data,
         rng,
         has_testing_fallback_data,
+        weather="dry",
     ):
-        _ = (all_drivers, n_simulations, is_sprint, rng, has_testing_fallback_data)
+        _ = (all_drivers, n_simulations, is_sprint, rng, has_testing_fallback_data, weather)
         captured["has_practice_data"] = has_practice_data
         return {"AAA": [1], "BBB": [2]}
 
@@ -440,8 +444,9 @@ def test_predict_qualifying_remains_model_only_without_testing_profiles():
         has_practice_data,
         rng,
         has_testing_fallback_data,
+        weather="dry",
     ):
-        _ = (n_simulations, is_sprint, rng, has_testing_fallback_data)
+        _ = (n_simulations, is_sprint, rng, has_testing_fallback_data, weather)
         captured["has_practice_data"] = has_practice_data
         captured["all_drivers"] = all_drivers
         return {"AAA": [1], "BBB": [2]}

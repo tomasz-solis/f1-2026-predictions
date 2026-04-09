@@ -491,6 +491,9 @@ def prepare_driver_info_core(
             "overtaking_skill": overtaking_skill,
             "defensive_skill": defensive_skill,
             "dnf_probability": dnf_probability,
+            "wet_skill": float(
+                driver_data.get("wet_skill", 0.70) if isinstance(driver_data, dict) else 0.70
+            ),
         }
 
     return driver_info_map, len(teams_with_long_profile)
@@ -604,6 +607,9 @@ def prepare_driver_info_with_compounds_core(
             "overtaking_skill": overtaking_skill,
             "defensive_skill": defensive_skill,
             "dnf_probability": dnf_probability,
+            "wet_skill": float(
+                driver_data.get("wet_skill", 0.70) if isinstance(driver_data, dict) else 0.70
+            ),
         }
 
     return driver_info_map, len(teams_with_long_profile)

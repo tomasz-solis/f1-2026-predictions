@@ -59,10 +59,10 @@ def _expand_overtake_cfg(compact: dict[str, Any]) -> dict[str, Any]:
         track_factor        (0.35) – track influence on passing difficulty
         pass_chance_base    (0.30) – base pass probability when threshold met
 
-    If callers still supply the old 11+ granular keys they are used directly
+    If callers still supply the old 11+ detailed keys they are used directly
     for backward compatibility.
     """
-    # If the legacy granular keys are present, pass through unchanged.
+    # If the legacy detailed keys are present, pass through unchanged.
     if "pace_diff_scale" in compact or "skill_scale" in compact:
         return dict(compact)
 
@@ -205,6 +205,11 @@ def simulate_race_lap_by_lap(
     _elite_skill_lap_bonus_max = _lt_cfg.get("elite_skill_lap_bonus_max", 0.09)
     _elite_skill_exponent = _lt_cfg.get("elite_skill_exponent", 1.3)
     _team_strength_compression = race_params.get("team_strength_compression", 0.35)
+    _wet_skill_lap_weight = float(race_params.get("wet_skill_lap_weight", 0.16))
+    # Track-specific wet severity: street circuits / high-downforce tracks amplify wet effects
+    _track_wet_severity = float(np.clip(race_params.get("track_wet_severity", 1.0), 0.5, 2.0))
+    _wet_skill_lap_weight *= _track_wet_severity
+    _wet_skill_neutral = float(race_params.get("wet_skill_neutral", 0.70))
     _race_advantage_lap_impact = race_params.get("race_advantage_lap_impact", 0.35)
     _elite_denominator = max(1e-6, 1.0 - _elite_skill_threshold)
     _lap_time_bounds = _lt_cfg.get("bounds", [70.0, 120.0])
@@ -270,12 +275,20 @@ def simulate_race_lap_by_lap(
             # Reference lap time (track-specific if available in race_params)
             race_advantage_lap_impact = _race_advantage_lap_impact
             race_advantage_delta = -info.get("race_advantage", 0.0) * race_advantage_lap_impact
+            wet_skill_delta = _compute_race_wet_skill_modifier(
+                skill_info=info,
+                weather=weather,
+                wet_skill_weight=_wet_skill_lap_weight,
+                wet_skill_neutral=_wet_skill_neutral,
+            )
+
             base_lap_time = (
                 reference_base
                 + team_pace_penalty
                 - skill_improvement
                 - elite_skill_bonus
                 + race_advantage_delta
+                + wet_skill_delta
             )
 
             # Cache base pace (used for overtake opportunity modeling)
@@ -396,6 +409,42 @@ def _resolve_base_chaos_std(race_params: dict[str, Any], weather: str) -> float:
     if weather_key == "mixed":
         return float(mixed_std)
     return dry_std
+
+
+def _compute_race_wet_skill_modifier(
+    skill_info: dict[str, Any],
+    weather: str,
+    wet_skill_weight: float,
+    wet_skill_neutral: float,
+) -> float:
+    """Per-lap lap time adjustment from wet-weather ability.
+
+    Returns a NEGATIVE value (faster) for good wet drivers and POSITIVE
+    (slower) for weak wet drivers. Only active in non-dry conditions.
+
+    SIGN CONVENTION: This is OPPOSITE to the qualifying path's
+    _compute_wet_skill_adjustment, which returns POSITIVE for good wet
+    drivers. The difference is intentional:
+    - Qualifying scores: higher = better → positive adjustment helps
+    - Lap times: lower = better → negative adjustment helps
+    The lap time formula ADDS this return value, so negative = faster.
+    DO NOT change the sign to match qualifying.
+
+    Mixed conditions apply 0.5x of the full wet adjustment — a configurable
+    default analogous to mixed_weather_chaos_blend in the chaos model.
+    """
+    weather_key = str(weather).strip().lower()
+    if weather_key not in {"wet", "rain", "mixed"}:
+        return 0.0
+
+    raw_wet_skill = skill_info.get("wet_skill")
+    wet_skill = float(raw_wet_skill if raw_wet_skill is not None else wet_skill_neutral)
+    raw_adjustment = (wet_skill - wet_skill_neutral) * wet_skill_weight
+
+    if weather_key == "mixed":
+        raw_adjustment *= 0.5
+
+    return -raw_adjustment
 
 
 def _get_traffic_overtake_effect(

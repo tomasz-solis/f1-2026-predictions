@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -187,23 +188,52 @@ def apply_hypothetical_points_floor(
     return min(position_blend_score, capped_position), capped_samples
 
 
-def build_finish_order(
+@dataclass(frozen=True)
+class _FinishOrderConfig:
+    """Resolved config for the build_finish_order scoring loop."""
+
+    confidence_floor: float
+    confidence_cap: float
+    context_confidence: float
+    low_confidence_share: float
+    context_confidence_adjustment: float
+    weather_penalty: float
+    predicted_grid_uncertainty_share: float
+    grid_anchor_weight: float
+    overtake_blend_scale: float
+    race_adv_blend_scale: float
+    skill_blend_scale: float
+    elite_skill_threshold: float
+    elite_driver_scale: float
+    elite_driver_exponent: float
+    max_driver_adjustment: float
+    max_gain_base: float
+    max_gain_track_scale: float
+    skill_gain_scale: float
+    race_adv_gain_scale: float
+    max_gain_floor: float
+    max_gain_ceiling: float
+    racecraft_confidence_scale: float
+    max_gain_confidence_scale: float
+    predicted_grid_racecraft_scale: float
+    predicted_grid_max_gain_scale: float
+    dnf_probability_output_cap: float
+    learning_position_scale: float
+    track_overtaking: float
+
+
+def _load_finish_order_config(
     *,
-    aggregated: dict[str, Any],
-    driver_info_map: dict[str, dict[str, Any]],
+    cfg: Any,
+    weather: str,
+    weather_feature_modifiers: dict[str, float],
+    race_params: dict[str, Any],
+    input_confidence: float | None,
+    is_sprint: bool,
     grid_position_samples_by_driver: dict[str, list[float]],
     field_size: int,
-    weather: str,
-    is_sprint: bool,
-    input_confidence: float | None,
-    cfg: Any,
-    race_params: dict[str, Any],
-    weather_feature_modifiers: dict[str, float],
-    get_learned_position_adjustment: Any,
-    enforce_non_increasing: Any,
-    base_seed: int,
-) -> list[dict[str, Any]]:
-    """Convert aggregated simulation outputs into the final finish-order payload."""
+) -> _FinishOrderConfig:
+    """Load and resolve all config for build_finish_order."""
     confidence_floor = cfg.get("baseline_predictor.race.confidence.min", 40.0)
     confidence_cap = cfg.get("baseline_predictor.race.confidence.max", 60.0)
     context_confidence_scale = float(
@@ -355,16 +385,75 @@ def build_finish_order(
         )
     )
     dnf_probability_output_cap = float(cfg.get("baseline_predictor.race.dnf_rate_final_cap", 0.35))
+    learning_position_scale = float(
+        cfg.get("baseline_predictor.race.learning.position_adjustment_scale", 0.70)
+    )
+
+    return _FinishOrderConfig(
+        confidence_floor=confidence_floor,
+        confidence_cap=confidence_cap,
+        context_confidence=context_confidence,
+        low_confidence_share=low_confidence_share,
+        context_confidence_adjustment=context_confidence_adjustment,
+        weather_penalty=weather_penalty,
+        predicted_grid_uncertainty_share=predicted_grid_uncertainty_share,
+        grid_anchor_weight=float(grid_anchor_weight),
+        overtake_blend_scale=overtake_blend_scale,
+        race_adv_blend_scale=race_adv_blend_scale,
+        skill_blend_scale=skill_blend_scale,
+        elite_skill_threshold=elite_skill_threshold,
+        elite_driver_scale=elite_driver_scale,
+        elite_driver_exponent=elite_driver_exponent,
+        max_driver_adjustment=max_driver_adjustment,
+        max_gain_base=max_gain_base,
+        max_gain_track_scale=max_gain_track_scale,
+        skill_gain_scale=skill_gain_scale,
+        race_adv_gain_scale=race_adv_gain_scale,
+        max_gain_floor=max_gain_floor,
+        max_gain_ceiling=max_gain_ceiling,
+        racecraft_confidence_scale=racecraft_confidence_scale,
+        max_gain_confidence_scale=max_gain_confidence_scale,
+        predicted_grid_racecraft_scale=predicted_grid_racecraft_scale,
+        predicted_grid_max_gain_scale=predicted_grid_max_gain_scale,
+        dnf_probability_output_cap=dnf_probability_output_cap,
+        learning_position_scale=learning_position_scale,
+        track_overtaking=track_overtaking,
+    )
+
+
+def build_finish_order(
+    *,
+    aggregated: dict[str, Any],
+    driver_info_map: dict[str, dict[str, Any]],
+    grid_position_samples_by_driver: dict[str, list[float]],
+    field_size: int,
+    weather: str,
+    is_sprint: bool,
+    input_confidence: float | None,
+    cfg: Any,
+    race_params: dict[str, Any],
+    weather_feature_modifiers: dict[str, float],
+    get_learned_position_adjustment: Any,
+    enforce_non_increasing: Any,
+    base_seed: int,
+) -> list[dict[str, Any]]:
+    """Convert aggregated simulation outputs into the final finish-order payload."""
+    fo_cfg = _load_finish_order_config(
+        cfg=cfg,
+        weather=weather,
+        weather_feature_modifiers=weather_feature_modifiers,
+        race_params=race_params,
+        input_confidence=input_confidence,
+        is_sprint=is_sprint,
+        grid_position_samples_by_driver=grid_position_samples_by_driver,
+        field_size=field_size,
+    )
 
     finish_order: list[dict[str, Any]] = []
     blended_samples_by_driver: dict[str, list[float]] = {}
     team_to_drivers: dict[str, list[str]] = {}
     for driver_code, info in driver_info_map.items():
         team_to_drivers.setdefault(info["team"], []).append(driver_code)
-
-    learning_position_scale = float(
-        cfg.get("baseline_predictor.race.learning.position_adjustment_scale", 0.70)
-    )
     grid_reference_positions = {
         driver_code: (
             float(np.mean(grid_position_samples_by_driver.get(driver_code, [])))
@@ -384,40 +473,40 @@ def build_finish_order(
 
         position_std = np.std(positions)
         confidence = max(
-            confidence_floor,
+            fo_cfg.confidence_floor,
             min(
-                confidence_cap,
-                confidence_cap
+                fo_cfg.confidence_cap,
+                fo_cfg.confidence_cap
                 - (position_std * 3.0)
-                - weather_penalty
-                + context_confidence_adjustment,
+                - fo_cfg.weather_penalty
+                + fo_cfg.context_confidence_adjustment,
             ),
         )
 
-        overtake_ease = 1.0 - track_overtaking
+        overtake_ease = 1.0 - fo_cfg.track_overtaking
         racecraft_adjustment = (
-            ((info["overtaking_skill"] - 0.5) * overtake_ease * overtake_blend_scale)
-            + (info["race_advantage"] * race_adv_blend_scale)
-            + ((info["skill"] - 0.5) * skill_blend_scale)
+            ((info["overtaking_skill"] - 0.5) * overtake_ease * fo_cfg.overtake_blend_scale)
+            + (info["race_advantage"] * fo_cfg.race_adv_blend_scale)
+            + ((info["skill"] - 0.5) * fo_cfg.skill_blend_scale)
         )
-        elite_denominator = max(1e-6, 1.0 - elite_skill_threshold)
+        elite_denominator = max(1e-6, 1.0 - fo_cfg.elite_skill_threshold)
         elite_driver_normalized = max(
             0.0,
-            (info["skill"] - elite_skill_threshold) / elite_denominator,
+            (info["skill"] - fo_cfg.elite_skill_threshold) / elite_denominator,
         )
         elite_driver_adjustment = (
-            (elite_driver_normalized**elite_driver_exponent)
-            * elite_driver_scale
+            (elite_driver_normalized**fo_cfg.elite_driver_exponent)
+            * fo_cfg.elite_driver_scale
             * (0.6 + (0.4 * overtake_ease))
         )
         racecraft_adjustment += elite_driver_adjustment
-        racecraft_adjustment *= racecraft_confidence_scale
-        racecraft_adjustment *= predicted_grid_racecraft_scale
+        racecraft_adjustment *= fo_cfg.racecraft_confidence_scale
+        racecraft_adjustment *= fo_cfg.predicted_grid_racecraft_scale
 
-        is_elite_driver = info["skill"] >= elite_skill_threshold
+        is_elite_driver = info["skill"] >= fo_cfg.elite_skill_threshold
         if reference_grid_pos <= 3.0 and not is_elite_driver:
-            adjustment_cap_negative = max_driver_adjustment * 0.5
-            adjustment_cap_positive = max_driver_adjustment
+            adjustment_cap_negative = fo_cfg.max_driver_adjustment * 0.5
+            adjustment_cap_positive = fo_cfg.max_driver_adjustment
             racecraft_adjustment = np.clip(
                 racecraft_adjustment,
                 -adjustment_cap_negative,
@@ -426,24 +515,24 @@ def build_finish_order(
         else:
             racecraft_adjustment = np.clip(
                 racecraft_adjustment,
-                -max_driver_adjustment,
-                max_driver_adjustment,
+                -fo_cfg.max_driver_adjustment,
+                fo_cfg.max_driver_adjustment,
             )
 
         max_gain = (
-            max_gain_base
-            + (overtake_ease * max_gain_track_scale)
-            + ((info["overtaking_skill"] - 0.5) * skill_gain_scale)
-            + (max(0.0, info["race_advantage"]) * race_adv_gain_scale)
+            fo_cfg.max_gain_base
+            + (overtake_ease * fo_cfg.max_gain_track_scale)
+            + ((info["overtaking_skill"] - 0.5) * fo_cfg.skill_gain_scale)
+            + (max(0.0, info["race_advantage"]) * fo_cfg.race_adv_gain_scale)
         )
-        max_gain *= max_gain_confidence_scale
-        max_gain *= predicted_grid_max_gain_scale
-        max_gain = np.clip(max_gain, max_gain_floor, max_gain_ceiling)
+        max_gain *= fo_cfg.max_gain_confidence_scale
+        max_gain *= fo_cfg.predicted_grid_max_gain_scale
+        max_gain = np.clip(max_gain, fo_cfg.max_gain_floor, fo_cfg.max_gain_ceiling)
         min_position_score = max(1.0, reference_grid_pos - max_gain)
 
         position_blend_score = (
-            ((1.0 - grid_anchor_weight) * median_pos)
-            + (grid_anchor_weight * reference_grid_pos)
+            ((1.0 - fo_cfg.grid_anchor_weight) * median_pos)
+            + (fo_cfg.grid_anchor_weight * reference_grid_pos)
             - racecraft_adjustment
         )
         learned_position_adjustment = get_learned_position_adjustment(
@@ -452,7 +541,7 @@ def build_finish_order(
             teammates=team_to_drivers.get(info["team"], []),
             session="race",
         )
-        position_blend_score -= learned_position_adjustment * learning_position_scale
+        position_blend_score -= learned_position_adjustment * fo_cfg.learning_position_scale
         position_blend_score = max(position_blend_score, min_position_score)
 
         blended_position_samples = []
@@ -465,8 +554,8 @@ def build_finish_order(
             blended_position_samples.append(
                 max(
                     (
-                        ((1.0 - grid_anchor_weight) * position_sample)
-                        + (grid_anchor_weight * float(grid_position_sample))
+                        ((1.0 - fo_cfg.grid_anchor_weight) * position_sample)
+                        + (fo_cfg.grid_anchor_weight * float(grid_position_sample))
                         - racecraft_adjustment
                     ),
                     min_sample_position_score,
@@ -474,7 +563,7 @@ def build_finish_order(
             )
         if learned_position_adjustment:
             blended_position_samples = [
-                sample - (learned_position_adjustment * learning_position_scale)
+                sample - (learned_position_adjustment * fo_cfg.learning_position_scale)
                 for sample in blended_position_samples
             ]
         blended_position_samples = [
@@ -505,7 +594,7 @@ def build_finish_order(
                         np.clip(
                             aggregated["dnf_rates"].get(driver_code, 0.0),
                             0.0,
-                            dnf_probability_output_cap,
+                            fo_cfg.dnf_probability_output_cap,
                         )
                     ),
                     3,
@@ -537,7 +626,7 @@ def build_finish_order(
             blended_samples_by_driver=blended_samples_by_driver,
             driver_info_map=driver_info_map,
             grid_reference_positions=grid_reference_positions,
-            track_overtaking=float(track_overtaking),
+            track_overtaking=float(fo_cfg.track_overtaking),
             cfg=cfg,
         )
 

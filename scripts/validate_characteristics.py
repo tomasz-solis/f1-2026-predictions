@@ -242,8 +242,10 @@ def validate_driver_characteristics(
                 quali_pace = driver_data["pace"].get("quali_pace", 0)
                 race_pace = driver_data["pace"].get("race_pace", 0)
 
-                # Race and quali pace should be similar (within 20%)
-                if abs(quali_pace - race_pace) > 0.20:
+                # Race and quali pace should be similar. Wider threshold (0.30)
+                # because in-season EMA updates can legitimately pull them apart
+                # when a driver's qualifying and race results diverge.
+                if abs(quali_pace - race_pace) > 0.30:
                     errors.append(
                         f"{driver_code}: Large pace gap between quali ({quali_pace:.3f}) and race ({race_pace:.3f})"
                     )

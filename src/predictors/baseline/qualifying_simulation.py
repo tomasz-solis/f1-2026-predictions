@@ -320,180 +320,211 @@ def _score_single_driver_in_simulation(
     return float(score)
 
 
-def _build_quali_sim_config(
-    *,
-    cfg: Any,
-    is_sprint: bool,
-    has_practice_data: bool,
-    has_testing_fallback_data: bool,
-) -> QualiSimConfig:
-    """Build the qualifying simulation config."""
-    use_model_only_profile = not has_practice_data
-    apply_model_only_teammate_regularization = use_model_only_profile and (
-        not has_testing_fallback_data
-    )
-    apply_testing_fallback_teammate_guard = (
-        use_model_only_profile
-        and has_testing_fallback_data
-        and bool(
-            cfg.get(
-                "baseline_predictor.qualifying.testing_fallback_teammate_guard_enabled",
-                True,
-            )
-        )
-    )
-    apply_recent_form_adjustment = not (has_testing_fallback_data and not has_practice_data)
+@dataclass(frozen=True)
+class _DataAvailabilityContext:
+    """Which data sources are available for this qualifying prediction."""
 
+    has_practice_data: bool
+    has_testing_fallback_data: bool
+
+    @property
+    def use_model_only_profile(self) -> bool:
+        """True when no practice session data is available."""
+        return not self.has_practice_data
+
+    @property
+    def apply_model_only_teammate_regularization(self) -> bool:
+        """True when no practice AND no testing fallback data is available."""
+        return self.use_model_only_profile and not self.has_testing_fallback_data
+
+    @property
+    def apply_recent_form_adjustment(self) -> bool:
+        """True unless we're in testing-fallback-only mode."""
+        return not (self.has_testing_fallback_data and not self.has_practice_data)
+
+
+def _load_base_quali_weights(cfg: Any, is_sprint: bool) -> dict[str, float]:
+    """Load raw qualifying weights from config, with defensive guards."""
     noise_std_sprint = float(cfg.get("baseline_predictor.qualifying.noise_std_sprint", 0.025))
     noise_std_normal = float(cfg.get("baseline_predictor.qualifying.noise_std_normal", 0.02))
-    noise_std = noise_std_sprint if is_sprint else noise_std_normal
 
-    team_weight = float(cfg.get("baseline_predictor.qualifying.team_weight", 0.60))
-    skill_weight = float(cfg.get("baseline_predictor.qualifying.skill_weight", 0.40))
-    learning_position_to_score_scale = float(
-        cfg.get("baseline_predictor.qualifying.learning.position_to_score_scale", 0.03)
-    )
-    learning_with_practice_multiplier = float(
-        cfg.get("baseline_predictor.qualifying.learning.with_practice_multiplier", 0.65)
-    )
-    effective_learning_scale = (
-        learning_position_to_score_scale
-        if not has_practice_data
-        else (learning_position_to_score_scale * learning_with_practice_multiplier)
-    )
-    team_strength_compression = float(
-        cfg.get("baseline_predictor.qualifying.team_strength_compression", 0.60)
-    )
     driver_quali_pace_weight = float(
         cfg.get("baseline_predictor.qualifying.driver_quali_pace_weight", 0.70)
     )
     driver_skill_weight = float(cfg.get("baseline_predictor.qualifying.driver_skill_weight", 0.30))
-    driver_weight_sum = driver_quali_pace_weight + driver_skill_weight
-    if driver_weight_sum <= 0:
+    # Guard: reset to defaults if config produces non-positive sum
+    if driver_quali_pace_weight + driver_skill_weight <= 0:
         driver_quali_pace_weight, driver_skill_weight = 0.70, 0.30
 
-    driver_offset_cap = float(cfg.get("baseline_predictor.qualifying.driver_offset_cap", 0.18))
     driver_signal_softness = float(
         cfg.get("baseline_predictor.qualifying.driver_signal_softness", 0.20)
     )
+    # Guard: prevent division by zero downstream
     if driver_signal_softness <= 0:
         driver_signal_softness = 0.20
-    teammate_setup_std = float(cfg.get("baseline_predictor.qualifying.teammate_setup_std", 0.015))
-    recent_form_scale = float(cfg.get("baseline_predictor.qualifying.recent_form_scale", 0.12))
-    recent_form_cap = float(cfg.get("baseline_predictor.qualifying.recent_form_cap", 0.03))
 
-    if has_practice_data:
-        team_weight *= float(
+    return {
+        "noise_std": noise_std_sprint if is_sprint else noise_std_normal,
+        "team_weight": float(cfg.get("baseline_predictor.qualifying.team_weight", 0.60)),
+        "skill_weight": float(cfg.get("baseline_predictor.qualifying.skill_weight", 0.40)),
+        "team_strength_compression": float(
+            cfg.get("baseline_predictor.qualifying.team_strength_compression", 0.60)
+        ),
+        "driver_offset_cap": float(
+            cfg.get("baseline_predictor.qualifying.driver_offset_cap", 0.18)
+        ),
+        "driver_signal_softness": driver_signal_softness,
+        "driver_quali_pace_weight": driver_quali_pace_weight,
+        "driver_skill_weight": driver_skill_weight,
+        "teammate_setup_std": float(
+            cfg.get("baseline_predictor.qualifying.teammate_setup_std", 0.015)
+        ),
+        "recent_form_scale": float(
+            cfg.get("baseline_predictor.qualifying.recent_form_scale", 0.12)
+        ),
+        "recent_form_cap": float(cfg.get("baseline_predictor.qualifying.recent_form_cap", 0.03)),
+        "learning_position_to_score_scale": float(
+            cfg.get("baseline_predictor.qualifying.learning.position_to_score_scale", 0.03)
+        ),
+        "learning_with_practice_multiplier": float(
+            cfg.get("baseline_predictor.qualifying.learning.with_practice_multiplier", 0.65)
+        ),
+    }
+
+
+def _apply_data_source_multipliers(
+    weights: dict[str, float],
+    ctx: _DataAvailabilityContext,
+    cfg: Any,
+) -> dict[str, float]:
+    """Apply practice/model-only/testing-fallback multipliers to base weights.
+
+    IMPORTANT: These are THREE SEQUENTIAL if-blocks, NOT if/elif/else.
+    When has_testing_fallback_data=True and has_practice_data=False, BOTH
+    the model-only AND testing-fallback blocks fire. Multipliers stack.
+    """
+    # --- Block 1: Practice data multipliers ---
+    if ctx.has_practice_data:
+        weights["team_weight"] *= float(
             cfg.get(
                 "baseline_predictor.qualifying.practice_data_team_weight_multiplier",
                 0.94,
             )
         )
-        skill_weight *= float(
+        weights["skill_weight"] *= float(
             cfg.get(
                 "baseline_predictor.qualifying.practice_data_skill_weight_multiplier",
                 1.12,
             )
         )
-        team_weight, skill_weight = _rebalance_component_weights(
-            team_weight=team_weight,
-            skill_weight=skill_weight,
+        weights["team_weight"], weights["skill_weight"] = _rebalance_component_weights(
+            team_weight=weights["team_weight"],
+            skill_weight=weights["skill_weight"],
             fallback_team_weight=0.62,
             fallback_skill_weight=0.38,
         )
 
-        team_strength_compression *= float(
+        weights["team_strength_compression"] *= float(
             cfg.get(
                 "baseline_predictor.qualifying.practice_data_team_compression_multiplier",
                 0.88,
             )
         )
-        team_strength_compression = float(np.clip(team_strength_compression, 0.20, 1.0))
+        weights["team_strength_compression"] = float(
+            np.clip(weights["team_strength_compression"], 0.20, 1.0)
+        )
 
-        driver_offset_cap *= float(
+        weights["driver_offset_cap"] *= float(
             cfg.get(
                 "baseline_predictor.qualifying.practice_data_driver_offset_cap_multiplier",
                 1.33,
             )
         )
-        driver_offset_cap = float(np.clip(driver_offset_cap, 0.05, 0.24))
+        weights["driver_offset_cap"] = float(np.clip(weights["driver_offset_cap"], 0.05, 0.24))
 
-        teammate_setup_std *= float(
+        weights["teammate_setup_std"] *= float(
             cfg.get(
                 "baseline_predictor.qualifying.practice_data_teammate_setup_multiplier",
                 1.05,
             )
         )
 
-    if use_model_only_profile:
-        team_weight *= float(
+    # --- Block 2: Model-only multipliers ---
+    # This is a SEPARATE if, NOT elif. It fires whenever has_practice_data=False.
+    if ctx.use_model_only_profile:
+        weights["team_weight"] *= float(
             cfg.get("baseline_predictor.qualifying.model_only_team_weight_multiplier", 0.82)
         )
-        skill_weight *= float(
+        weights["skill_weight"] *= float(
             cfg.get("baseline_predictor.qualifying.model_only_skill_weight_multiplier", 1.35)
         )
-        team_weight, skill_weight = _rebalance_component_weights(
-            team_weight=team_weight,
-            skill_weight=skill_weight,
+        weights["team_weight"], weights["skill_weight"] = _rebalance_component_weights(
+            team_weight=weights["team_weight"],
+            skill_weight=weights["skill_weight"],
             fallback_team_weight=0.66,
             fallback_skill_weight=0.34,
         )
 
-        team_strength_compression *= float(
+        weights["team_strength_compression"] *= float(
             cfg.get("baseline_predictor.qualifying.model_only_team_compression_multiplier", 0.87)
         )
-        team_strength_compression = float(np.clip(team_strength_compression, 0.20, 1.0))
+        weights["team_strength_compression"] = float(
+            np.clip(weights["team_strength_compression"], 0.20, 1.0)
+        )
 
-        driver_offset_cap *= float(
+        weights["driver_offset_cap"] *= float(
             cfg.get("baseline_predictor.qualifying.model_only_driver_offset_cap_multiplier", 1.33)
         )
-        driver_offset_cap = float(np.clip(driver_offset_cap, 0.05, 0.30))
+        weights["driver_offset_cap"] = float(np.clip(weights["driver_offset_cap"], 0.05, 0.30))
 
-        noise_std *= float(
+        weights["noise_std"] *= float(
             cfg.get("baseline_predictor.qualifying.model_only_noise_multiplier", 1.12)
         )
-        teammate_setup_std *= float(
+        weights["teammate_setup_std"] *= float(
             cfg.get("baseline_predictor.qualifying.model_only_teammate_setup_multiplier", 1.10)
         )
 
-    if has_testing_fallback_data and not has_practice_data:
-        team_weight *= float(
+    # --- Block 3: Testing fallback multipliers ---
+    # This is a SEPARATE if, NOT elif. It stacks ON TOP of Block 2.
+    if ctx.has_testing_fallback_data and not ctx.has_practice_data:
+        weights["team_weight"] *= float(
             cfg.get("baseline_predictor.qualifying.testing_fallback_team_weight_multiplier", 0.92)
         )
-        skill_weight *= float(
+        weights["skill_weight"] *= float(
             cfg.get("baseline_predictor.qualifying.testing_fallback_skill_weight_multiplier", 1.08)
         )
-        team_weight, skill_weight = _rebalance_component_weights(
-            team_weight=team_weight,
-            skill_weight=skill_weight,
+        weights["team_weight"], weights["skill_weight"] = _rebalance_component_weights(
+            team_weight=weights["team_weight"],
+            skill_weight=weights["skill_weight"],
             fallback_team_weight=0.52,
             fallback_skill_weight=0.48,
         )
 
-        driver_offset_cap *= float(
+        weights["driver_offset_cap"] *= float(
             cfg.get(
                 "baseline_predictor.qualifying.testing_fallback_driver_offset_cap_multiplier",
                 1.33,
             )
         )
-        driver_offset_cap = float(np.clip(driver_offset_cap, 0.05, 0.30))
+        weights["driver_offset_cap"] = float(np.clip(weights["driver_offset_cap"], 0.05, 0.30))
 
-        noise_std *= float(
+        weights["noise_std"] *= float(
             cfg.get("baseline_predictor.qualifying.testing_fallback_noise_multiplier", 1.30)
         )
-        teammate_setup_std *= float(
+        weights["teammate_setup_std"] *= float(
             cfg.get(
                 "baseline_predictor.qualifying.testing_fallback_teammate_setup_multiplier",
                 1.20,
             )
         )
 
+    # --- Weekend form std ---
     weekend_form_std = float(cfg.get("baseline_predictor.qualifying.weekend_form_std", 0.0))
-    if use_model_only_profile:
+    if ctx.use_model_only_profile:
         weekend_form_std *= float(
             cfg.get("baseline_predictor.qualifying.model_only_weekend_form_multiplier", 1.0)
         )
-    if has_testing_fallback_data and not has_practice_data:
+    if ctx.has_testing_fallback_data and not ctx.has_practice_data:
         weekend_form_floor = float(
             cfg.get(
                 "baseline_predictor.qualifying.testing_fallback_weekend_form_std_floor",
@@ -501,217 +532,265 @@ def _build_quali_sim_config(
             )
         )
         weekend_form_std = max(float(weekend_form_std), weekend_form_floor)
+    weights["weekend_form_std"] = weekend_form_std
+
+    return weights
+
+
+def _build_model_only_regularization(cfg: Any) -> RegularizationConfig:
+    """Build RegularizationConfig for model-only mode (no practice, no testing)."""
+    return RegularizationConfig(
+        driver_signal_shrink=float(
+            np.clip(
+                float(
+                    cfg.get(
+                        "baseline_predictor.qualifying.model_only_driver_signal_shrink",
+                        0.35,
+                    )
+                ),
+                0.0,
+                1.0,
+            )
+        ),
+        experience_shrink=_normalized_tier_mapping(
+            cfg.get(
+                "baseline_predictor.qualifying.model_only_experience_shrink",
+                {
+                    "rookie": 0.45,
+                    "second_year": 0.30,
+                    "developing": 0.20,
+                    "sunset": 0.05,
+                    "unknown": 0.30,
+                },
+            )
+        ),
+        teammate_gap_cap_by_tier=_normalized_tier_mapping(
+            cfg.get(
+                "baseline_predictor.qualifying.model_only_teammate_gap_cap_by_experience",
+                {
+                    "rookie": 0.16,
+                    "second_year": 0.12,
+                    "developing": 0.10,
+                    "unknown": 0.12,
+                },
+            )
+        ),
+        teammate_gap_cap_max_races_by_tier=_normalized_tier_mapping(
+            cfg.get(
+                "baseline_predictor.qualifying.model_only_teammate_gap_cap_max_races_by_experience",
+                {
+                    "rookie": 40,
+                    "second_year": 55,
+                    "developing": 55,
+                    "unknown": 45,
+                },
+            )
+        ),
+        teammate_gap_cap_min_scale=float(
+            np.clip(
+                float(
+                    cfg.get(
+                        "baseline_predictor.qualifying.model_only_teammate_gap_cap_min_scale",
+                        0.35,
+                    )
+                ),
+                0.0,
+                1.0,
+            )
+        ),
+        teammate_anchor_scale=float(
+            cfg.get("baseline_predictor.qualifying.model_only_teammate_anchor_scale", 0.12)
+        ),
+        teammate_anchor_cap=float(
+            cfg.get("baseline_predictor.qualifying.model_only_teammate_anchor_cap", 0.04)
+        ),
+        anchor_experience_multiplier=_normalized_tier_mapping(
+            cfg.get(
+                "baseline_predictor.qualifying.model_only_teammate_anchor_experience_multiplier",
+                {
+                    "rookie": 0.30,
+                    "second_year": 0.45,
+                    "developing": 0.55,
+                    "sunset": 1.00,
+                    "unknown": 0.45,
+                },
+            )
+        ),
+        negative_delta_threshold=float(
+            cfg.get("baseline_predictor.qualifying.model_only_negative_delta_threshold", 0.08)
+        ),
+        negative_delta_shrink_scale=float(
+            cfg.get(
+                "baseline_predictor.qualifying.model_only_negative_delta_shrink_scale",
+                1.0,
+            )
+        ),
+        negative_delta_shrink_cap=float(
+            cfg.get("baseline_predictor.qualifying.model_only_negative_delta_shrink_cap", 0.25)
+        ),
+        max_total_shrink=0.95,
+    )
+
+
+def _build_testing_fallback_regularization(cfg: Any) -> RegularizationConfig:
+    """Build RegularizationConfig for testing-fallback mode."""
+    return RegularizationConfig(
+        driver_signal_shrink=float(
+            np.clip(
+                float(
+                    cfg.get(
+                        "baseline_predictor.qualifying.testing_fallback_driver_signal_shrink",
+                        0.14,
+                    )
+                ),
+                0.0,
+                1.0,
+            )
+        ),
+        experience_shrink=_normalized_tier_mapping(
+            cfg.get(
+                "baseline_predictor.qualifying.testing_fallback_experience_shrink",
+                {
+                    "rookie": 0.22,
+                    "second_year": 0.14,
+                    "developing": 0.09,
+                    "sunset": 0.03,
+                    "unknown": 0.14,
+                },
+            )
+        ),
+        teammate_gap_cap_by_tier=_normalized_tier_mapping(
+            cfg.get(
+                "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_by_experience",
+                {
+                    "rookie": 0.22,
+                    "second_year": 0.18,
+                    "developing": 0.14,
+                    "unknown": 0.18,
+                },
+            )
+        ),
+        teammate_gap_cap_max_races_by_tier=_normalized_tier_mapping(
+            cfg.get(
+                "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_max_races_by_experience",
+                {
+                    "rookie": 40,
+                    "second_year": 55,
+                    "developing": 55,
+                    "unknown": 45,
+                },
+            )
+        ),
+        teammate_gap_cap_min_scale=float(
+            np.clip(
+                float(
+                    cfg.get(
+                        "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_min_scale",
+                        0.30,
+                    )
+                ),
+                0.0,
+                1.0,
+            )
+        ),
+        teammate_anchor_scale=float(
+            cfg.get("baseline_predictor.qualifying.testing_fallback_teammate_anchor_scale", 0.07)
+        ),
+        teammate_anchor_cap=float(
+            cfg.get("baseline_predictor.qualifying.testing_fallback_teammate_anchor_cap", 0.025)
+        ),
+        anchor_experience_multiplier=_normalized_tier_mapping(
+            cfg.get(
+                "baseline_predictor.qualifying.testing_fallback_teammate_anchor_experience_multiplier",
+                {
+                    "rookie": 0.55,
+                    "second_year": 0.70,
+                    "developing": 0.80,
+                    "sunset": 1.00,
+                    "unknown": 0.70,
+                },
+            )
+        ),
+        negative_delta_threshold=float(
+            cfg.get(
+                "baseline_predictor.qualifying.testing_fallback_negative_delta_threshold",
+                0.12,
+            )
+        ),
+        negative_delta_shrink_scale=float(
+            cfg.get(
+                "baseline_predictor.qualifying.testing_fallback_negative_delta_shrink_scale",
+                0.7,
+            )
+        ),
+        negative_delta_shrink_cap=float(
+            cfg.get(
+                "baseline_predictor.qualifying.testing_fallback_negative_delta_shrink_cap",
+                0.12,
+            )
+        ),
+        max_total_shrink=0.90,
+    )
+
+
+def _build_quali_sim_config(
+    *,
+    cfg: Any,
+    is_sprint: bool,
+    has_practice_data: bool,
+    has_testing_fallback_data: bool,
+) -> QualiSimConfig:
+    """Build qualifying simulation config from data context and settings."""
+    ctx = _DataAvailabilityContext(
+        has_practice_data=has_practice_data,
+        has_testing_fallback_data=has_testing_fallback_data,
+    )
+    weights = _load_base_quali_weights(cfg, is_sprint)
+    weights = _apply_data_source_multipliers(weights, ctx, cfg)
+
+    effective_learning_scale = (
+        weights["learning_position_to_score_scale"]
+        if not ctx.has_practice_data
+        else (
+            weights["learning_position_to_score_scale"]
+            * weights["learning_with_practice_multiplier"]
+        )
+    )
+
+    # Regularization — resolved here because it requires cfg lookup
+    apply_testing_fallback_teammate_guard = (
+        ctx.use_model_only_profile
+        and ctx.has_testing_fallback_data
+        and bool(
+            cfg.get(
+                "baseline_predictor.qualifying.testing_fallback_teammate_guard_enabled",
+                True,
+            )
+        )
+    )
 
     regularization: RegularizationConfig | None = None
-    if apply_model_only_teammate_regularization:
-        regularization = RegularizationConfig(
-            driver_signal_shrink=float(
-                np.clip(
-                    float(
-                        cfg.get(
-                            "baseline_predictor.qualifying.model_only_driver_signal_shrink",
-                            0.35,
-                        )
-                    ),
-                    0.0,
-                    1.0,
-                )
-            ),
-            experience_shrink=_normalized_tier_mapping(
-                cfg.get(
-                    "baseline_predictor.qualifying.model_only_experience_shrink",
-                    {
-                        "rookie": 0.45,
-                        "second_year": 0.30,
-                        "developing": 0.20,
-                        "sunset": 0.05,
-                        "unknown": 0.30,
-                    },
-                )
-            ),
-            teammate_gap_cap_by_tier=_normalized_tier_mapping(
-                cfg.get(
-                    "baseline_predictor.qualifying.model_only_teammate_gap_cap_by_experience",
-                    {
-                        "rookie": 0.16,
-                        "second_year": 0.12,
-                        "developing": 0.10,
-                        "unknown": 0.12,
-                    },
-                )
-            ),
-            teammate_gap_cap_max_races_by_tier=_normalized_tier_mapping(
-                cfg.get(
-                    "baseline_predictor.qualifying.model_only_teammate_gap_cap_max_races_by_experience",
-                    {
-                        "rookie": 40,
-                        "second_year": 55,
-                        "developing": 55,
-                        "unknown": 45,
-                    },
-                )
-            ),
-            teammate_gap_cap_min_scale=float(
-                np.clip(
-                    float(
-                        cfg.get(
-                            "baseline_predictor.qualifying.model_only_teammate_gap_cap_min_scale",
-                            0.35,
-                        )
-                    ),
-                    0.0,
-                    1.0,
-                )
-            ),
-            teammate_anchor_scale=float(
-                cfg.get("baseline_predictor.qualifying.model_only_teammate_anchor_scale", 0.12)
-            ),
-            teammate_anchor_cap=float(
-                cfg.get("baseline_predictor.qualifying.model_only_teammate_anchor_cap", 0.04)
-            ),
-            anchor_experience_multiplier=_normalized_tier_mapping(
-                cfg.get(
-                    "baseline_predictor.qualifying.model_only_teammate_anchor_experience_multiplier",
-                    {
-                        "rookie": 0.30,
-                        "second_year": 0.45,
-                        "developing": 0.55,
-                        "sunset": 1.00,
-                        "unknown": 0.45,
-                    },
-                )
-            ),
-            negative_delta_threshold=float(
-                cfg.get("baseline_predictor.qualifying.model_only_negative_delta_threshold", 0.08)
-            ),
-            negative_delta_shrink_scale=float(
-                cfg.get(
-                    "baseline_predictor.qualifying.model_only_negative_delta_shrink_scale",
-                    1.0,
-                )
-            ),
-            negative_delta_shrink_cap=float(
-                cfg.get("baseline_predictor.qualifying.model_only_negative_delta_shrink_cap", 0.25)
-            ),
-            max_total_shrink=0.95,
-        )
+    if ctx.apply_model_only_teammate_regularization:
+        regularization = _build_model_only_regularization(cfg)
     elif apply_testing_fallback_teammate_guard:
-        regularization = RegularizationConfig(
-            driver_signal_shrink=float(
-                np.clip(
-                    float(
-                        cfg.get(
-                            "baseline_predictor.qualifying.testing_fallback_driver_signal_shrink",
-                            0.14,
-                        )
-                    ),
-                    0.0,
-                    1.0,
-                )
-            ),
-            experience_shrink=_normalized_tier_mapping(
-                cfg.get(
-                    "baseline_predictor.qualifying.testing_fallback_experience_shrink",
-                    {
-                        "rookie": 0.22,
-                        "second_year": 0.14,
-                        "developing": 0.09,
-                        "sunset": 0.03,
-                        "unknown": 0.14,
-                    },
-                )
-            ),
-            teammate_gap_cap_by_tier=_normalized_tier_mapping(
-                cfg.get(
-                    "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_by_experience",
-                    {
-                        "rookie": 0.22,
-                        "second_year": 0.18,
-                        "developing": 0.14,
-                        "unknown": 0.18,
-                    },
-                )
-            ),
-            teammate_gap_cap_max_races_by_tier=_normalized_tier_mapping(
-                cfg.get(
-                    "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_max_races_by_experience",
-                    {
-                        "rookie": 40,
-                        "second_year": 55,
-                        "developing": 55,
-                        "unknown": 45,
-                    },
-                )
-            ),
-            teammate_gap_cap_min_scale=float(
-                np.clip(
-                    float(
-                        cfg.get(
-                            "baseline_predictor.qualifying.testing_fallback_teammate_gap_cap_min_scale",
-                            0.30,
-                        )
-                    ),
-                    0.0,
-                    1.0,
-                )
-            ),
-            teammate_anchor_scale=float(
-                cfg.get(
-                    "baseline_predictor.qualifying.testing_fallback_teammate_anchor_scale", 0.07
-                )
-            ),
-            teammate_anchor_cap=float(
-                cfg.get("baseline_predictor.qualifying.testing_fallback_teammate_anchor_cap", 0.025)
-            ),
-            anchor_experience_multiplier=_normalized_tier_mapping(
-                cfg.get(
-                    "baseline_predictor.qualifying.testing_fallback_teammate_anchor_experience_multiplier",
-                    {
-                        "rookie": 0.55,
-                        "second_year": 0.70,
-                        "developing": 0.80,
-                        "sunset": 1.00,
-                        "unknown": 0.70,
-                    },
-                )
-            ),
-            negative_delta_threshold=float(
-                cfg.get(
-                    "baseline_predictor.qualifying.testing_fallback_negative_delta_threshold",
-                    0.12,
-                )
-            ),
-            negative_delta_shrink_scale=float(
-                cfg.get(
-                    "baseline_predictor.qualifying.testing_fallback_negative_delta_shrink_scale",
-                    0.7,
-                )
-            ),
-            negative_delta_shrink_cap=float(
-                cfg.get(
-                    "baseline_predictor.qualifying.testing_fallback_negative_delta_shrink_cap",
-                    0.12,
-                )
-            ),
-            max_total_shrink=0.90,
-        )
+        regularization = _build_testing_fallback_regularization(cfg)
 
     return QualiSimConfig(
-        noise_std=float(noise_std),
-        team_weight=float(team_weight),
-        skill_weight=float(skill_weight),
-        team_strength_compression=float(team_strength_compression),
-        driver_offset_cap=float(driver_offset_cap),
-        driver_signal_softness=float(driver_signal_softness),
-        driver_quali_pace_weight=float(driver_quali_pace_weight),
-        driver_skill_weight=float(driver_skill_weight),
-        effective_learning_scale=float(effective_learning_scale),
-        weekend_form_std=float(weekend_form_std),
-        teammate_setup_std=float(teammate_setup_std),
-        recent_form_scale=float(recent_form_scale),
-        recent_form_cap=float(recent_form_cap),
+        noise_std=weights["noise_std"],
+        team_weight=weights["team_weight"],
+        skill_weight=weights["skill_weight"],
+        team_strength_compression=weights["team_strength_compression"],
+        driver_offset_cap=weights["driver_offset_cap"],
+        driver_signal_softness=weights["driver_signal_softness"],
+        driver_quali_pace_weight=weights["driver_quali_pace_weight"],
+        driver_skill_weight=weights["driver_skill_weight"],
+        effective_learning_scale=effective_learning_scale,
+        weekend_form_std=weights["weekend_form_std"],
+        teammate_setup_std=weights["teammate_setup_std"],
+        recent_form_scale=weights["recent_form_scale"],
+        recent_form_cap=weights["recent_form_cap"],
         apply_regularization=regularization is not None,
-        apply_recent_form_adjustment=apply_recent_form_adjustment,
+        apply_recent_form_adjustment=ctx.apply_recent_form_adjustment,
         regularization=regularization,
     )
 
@@ -732,7 +811,8 @@ def _compute_wet_skill_adjustment(
     weather_key = str(weather).strip().lower()
     if weather_key not in {"wet", "rain", "mixed"}:
         return 0.0
-    wet_skill = float(driver_info.get("wet_skill", wet_skill_neutral))
+    raw_wet_skill = driver_info.get("wet_skill")
+    wet_skill = float(raw_wet_skill if raw_wet_skill is not None else wet_skill_neutral)
     full_adjustment = (wet_skill - wet_skill_neutral) * wet_skill_weight
     if weather_key == "mixed":
         return full_adjustment * float(mixed_wet_blend)
@@ -790,6 +870,11 @@ def run_qualifying_simulations(
     )
 
     wet_skill_weight = float(cfg.get("baseline_predictor.qualifying.wet_skill_weight", 0.18))
+    if is_sprint:
+        sprint_wet_scale = float(
+            cfg.get("baseline_predictor.qualifying.sprint_wet_skill_scale", 0.75)
+        )
+        wet_skill_weight *= sprint_wet_scale
     wet_skill_neutral = float(cfg.get("baseline_predictor.qualifying.wet_skill_neutral", 0.70))
     mixed_wet_blend = float(cfg.get("baseline_predictor.qualifying.mixed_wet_blend", 0.50))
 

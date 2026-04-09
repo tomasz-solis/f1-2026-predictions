@@ -164,6 +164,7 @@ baseline_predictor:
     bayesian_race_skill_blend_cap: 0.60
     quali_pace_update_blend: 0.30
     race_pace_update_blend: 0.25
+    wet_skill_update_blend: 0.15    # EMA blend toward observed wet performance (halved for mixed)
 
   # Qualifying simulation parameters
   qualifying:
@@ -179,6 +180,7 @@ baseline_predictor:
     wet_noise_multiplier: 1.60        # noise_std scale in pure wet qualifying
     mixed_noise_multiplier: 1.28      # noise_std scale in mixed conditions
     wet_skill_weight: 0.18            # how much wet_skill shifts the score
+    sprint_wet_skill_scale: 0.75      # multiply wet_skill_weight by this for sprint qualifying
     wet_skill_neutral: 0.70           # wet_skill value that produces zero adjustment
     mixed_wet_blend: 0.50             # fraction of wet effect applied in mixed
 
@@ -584,8 +586,25 @@ baseline_predictor:
       team_strength_compression: 0.35  # compress car spread in race pace conversion
       elite_skill_threshold: 0.88      # only exceptional drivers get extra race-craft pace bonus
       elite_skill_lap_bonus_max: 0.22  # max additional sec/lap improvement at skill=1.0 (up from 0.15)
-      elite_skill_exponent: 1.30       # non-linear curve for elite-only uplift
+      elite_skill_exponent: 0.85       # concave curve: diminishing returns at the very top
       bounds: [70.0, 120.0]            # min/max lap time clamps (safety)
+      # Per-lap seconds impact from wet_skill deviation from neutral.
+      # At 0.16, a driver at 0.90 wet_skill gains 0.032s/lap over neutral,
+      # accumulating to ~2.24s over 70 laps. Pairwise noise (sqrt(2)*0.42)
+      # accumulates to ~4.97s, giving signal-to-noise of 0.45 sigma —
+      # visible in ~67% of simulation runs but not dominant.
+      # Qualifying uses 0.18 (higher signal in single-lap format).
+      wet_skill_lap_weight: 0.16
+      # Neutral set at 0.70 (not 0.50) because F1 drivers are a
+      # pre-selected population — the typical F1 driver is above-average
+      # at wet driving. Most drivers cluster here; only drivers with
+      # clear evidence of above/below-average wet ability deviate.
+      wet_skill_neutral: 0.70
+      # Track-specific wet severity: street circuits amplify wet effects.
+      # Derived as base + (track_overtaking * scale) when not set per-track.
+      # Monaco (0.9 overtaking) → 1.16x; Monza (0.2) → 0.88x.
+      track_wet_severity_base: 0.80
+      track_wet_severity_scale: 0.40
 
     # Driver race-pace signal impact per lap (higher = more racecraft influence)
     race_advantage_lap_impact: 0.20

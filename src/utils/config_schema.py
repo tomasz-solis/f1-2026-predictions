@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class StrictConfigModel(BaseModel):
@@ -211,6 +211,7 @@ class DriverFormConfig(StrictConfigModel):
     bayesian_race_skill_blend_cap: float = Field(default=0.60, ge=0.0, le=1.0)
     quali_pace_update_blend: float = Field(default=0.30, ge=0.0, le=1.0)
     race_pace_update_blend: float = Field(default=0.25, ge=0.0, le=1.0)
+    wet_skill_update_blend: float = Field(default=0.15, ge=0.0, le=0.5)
 
 
 class ExperienceFloatMapConfig(StrictConfigModel):
@@ -249,10 +250,22 @@ class BaselineQualifyingConfig(StrictConfigModel):
     wet_noise_multiplier: float = Field(default=1.60, ge=1.0)
     mixed_noise_multiplier: float = Field(default=1.28, ge=1.0)
     wet_skill_weight: float = Field(default=0.18, ge=0.0, le=1.0)
+    sprint_wet_skill_scale: float = Field(default=0.75, ge=0.0, le=1.0)
     wet_skill_neutral: float = Field(default=0.70, ge=0.0, le=1.0)
     mixed_wet_blend: float = Field(default=0.50, ge=0.0, le=1.0)
     team_weight: float = Field(default=0.60, ge=0.0, le=1.0)
     skill_weight: float = Field(default=0.40, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _check_weight_sum(self) -> BaselineQualifyingConfig:
+        total = self.team_weight + self.skill_weight
+        if abs(total - 1.0) > 0.01:
+            raise ValueError(
+                f"team_weight ({self.team_weight}) + skill_weight ({self.skill_weight}) "
+                f"must sum to 1.0 (got {total})"
+            )
+        return self
+
     team_strength_compression: float = Field(default=0.60, ge=0.0)
     driver_quali_pace_weight: float = Field(default=0.70, ge=0.0, le=1.0)
     driver_skill_weight: float = Field(default=0.30, ge=0.0, le=1.0)
@@ -691,8 +704,12 @@ class LapTimeConfig(StrictConfigModel):
     team_strength_compression: float = Field(default=0.35, ge=0.0)
     elite_skill_threshold: float = Field(default=0.88, ge=0.0)
     elite_skill_lap_bonus_max: float = Field(default=0.22, ge=0.0)
-    elite_skill_exponent: float = Field(default=1.30, ge=0.0)
+    elite_skill_exponent: float = Field(default=0.85, gt=0.0, le=2.0)
     bounds: list[float] = Field(default_factory=lambda: [70.0, 120.0])
+    wet_skill_lap_weight: float = Field(default=0.16, ge=0.0, le=0.5)
+    wet_skill_neutral: float = Field(default=0.70, ge=0.0, le=1.0)
+    track_wet_severity_base: float = Field(default=0.80, ge=0.0, le=2.0)
+    track_wet_severity_scale: float = Field(default=0.40, ge=0.0, le=2.0)
 
 
 class GridUncertaintyConfig(StrictConfigModel):

@@ -205,6 +205,23 @@ def predict_race_core(
     race_params["team_strength_compression"] = cfg.get(
         "baseline_predictor.race.lap_time.team_strength_compression", 0.35
     )
+    race_params["wet_skill_lap_weight"] = cfg.get(
+        "baseline_predictor.race.lap_time.wet_skill_lap_weight", 0.16
+    )
+    race_params["wet_skill_neutral"] = cfg.get(
+        "baseline_predictor.race.lap_time.wet_skill_neutral", 0.70
+    )
+    # Track-specific wet severity: derived from track_overtaking if not set directly.
+    # Street circuits (high overtaking difficulty) amplify wet effects.
+    if "track_wet_severity" not in race_params:
+        track_ot = float(race_params.get("track_overtaking", 0.5))
+        wet_sev_base = float(
+            cfg.get("baseline_predictor.race.lap_time.track_wet_severity_base", 0.80)
+        )
+        wet_sev_scale = float(
+            cfg.get("baseline_predictor.race.lap_time.track_wet_severity_scale", 0.40)
+        )
+        race_params["track_wet_severity"] = wet_sev_base + (track_ot * wet_sev_scale)
     race_params["start_grid_gap_seconds"] = cfg.get(
         "baseline_predictor.race.start_grid_gap_seconds", 0.32
     )

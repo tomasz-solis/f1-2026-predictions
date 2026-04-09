@@ -64,6 +64,43 @@ _RACE_NAME_CACHE: dict[int, list[str]] = {}
 _DNF_RATE_FLOOR = 0.03
 _DEFAULT_BAYESIAN_SIGMA = 2.5
 
+# Wet-weather ability ratings. Expert priors from career wet-race analysis,
+# rounded to 0.05 to reflect actual precision. Replace with data-driven
+# values from scripts/compute_wet_skill_from_data.py when sufficient
+# wet-race data has been collected.
+WET_SKILL_PRIORS: dict[str, float] = {
+    "VER": 0.90,
+    "HAM": 0.90,
+    "ALO": 0.85,
+    "NOR": 0.80,
+    "RUS": 0.80,
+    "LEC": 0.75,
+    "GAS": 0.75,
+    "SAI": 0.75,
+    "RIC": 0.75,
+    "ALB": 0.75,
+    "BOT": 0.70,
+    "HUL": 0.70,
+    "PER": 0.70,
+    "OCO": 0.70,
+    "PIA": 0.70,
+    "MAG": 0.70,
+    "LAW": 0.70,
+    "ANT": 0.70,
+    "BEA": 0.70,
+    "DOO": 0.70,
+    "DEV": 0.70,
+    "ZHO": 0.65,
+    "COL": 0.65,
+    "BOR": 0.65,
+    "HAD": 0.65,
+    "SAR": 0.65,
+    "LIN": 0.60,
+    "TSU": 0.60,
+    "STR": 0.60,
+}
+WET_SKILL_DEFAULT = 0.70
+
 DRIVER_FULL_NAMES = {
     "VER": "Max Verstappen",
     "NOR": "Lando Norris",
@@ -227,10 +264,15 @@ def _absolute_finish_floor(
 
 
 def _soft_driver_metric_clip(value: float) -> float:
-    """Compress top-end driver scores without flattening every elite driver to 0.99."""
+    """Compress top-end driver scores so no driver exceeds ~0.95.
+
+    Uses tanh compression above 0.85 to keep the field spread realistic.
+    The asymptote is 0.85 + 0.10 = 0.95 — even the best driver on the
+    grid should not saturate a 0-1 percentile scale.
+    """
     if value <= 0.85:
         return float(max(0.10, value))
-    return float(0.85 + (0.14 * np.tanh((value - 0.85) / 0.14)))
+    return float(0.85 + (0.10 * np.tanh((value - 0.85) / 0.10)))
 
 
 def _is_render_web_instance() -> bool:
@@ -974,11 +1016,12 @@ def main():
         overtaking_score = np.clip(
             base_rating + (racecraft_bonus * 1.5),
             0.10,
-            0.99,
+            0.95,
         )
 
         final_ratings[driver] = {
             "name": DRIVER_FULL_NAMES.get(driver, driver),
+            "wet_skill": WET_SKILL_PRIORS.get(driver, WET_SKILL_DEFAULT),
             "pace": {
                 "quali_pace": round(base_rating, 3),
                 "race_pace": round(race_pace_score, 3),
@@ -1022,6 +1065,7 @@ def main():
             )
             final_ratings[driver_code] = {
                 "name": DRIVER_FULL_NAMES.get(driver_code, driver_code),
+                "wet_skill": WET_SKILL_PRIORS.get(driver_code, WET_SKILL_DEFAULT),
                 "pace": {
                     "quali_pace": round(prior_rating * 0.95, 3),
                     "race_pace": round(prior_rating, 3),
