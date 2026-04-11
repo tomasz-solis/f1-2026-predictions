@@ -165,6 +165,7 @@ baseline_predictor:
     quali_pace_update_blend: 0.30
     race_pace_update_blend: 0.25
     wet_skill_update_blend: 0.15    # EMA blend toward observed wet performance (halved for mixed)
+    wet_skill_observation_scale: 0.40  # scales teammate-relative finish gap into wet_skill delta
 
   # Qualifying simulation parameters
   qualifying:

@@ -23,6 +23,7 @@ from src.systems.updater_flow import (
 from src.utils import config_loader
 from src.utils.schema_validation import strip_legacy_bayesian_fields
 from src.utils.team_mapping import map_team_to_characteristics
+from src.utils.validation_helpers import normalize_weather_key
 
 logger = logging.getLogger(__name__)
 
@@ -604,9 +605,9 @@ def update_bayesian_driver_ratings(
     )
 
     # --- Wet-skill EMA update (only in wet/mixed conditions) ---
-    weather_key = str(weather).strip().lower()
+    weather_key = normalize_weather_key(weather)
     touched_wet_skill_drivers = 0
-    if weather_key in {"wet", "rain", "mixed"}:
+    if weather_key in {"rain", "mixed"}:
         wet_skill_blend = float(
             config_loader.get("baseline_predictor.driver_form.wet_skill_update_blend", 0.15)
         )
@@ -616,6 +617,9 @@ def update_bayesian_driver_ratings(
 
         wet_skill_neutral = float(
             config_loader.get("baseline_predictor.race.lap_time.wet_skill_neutral", 0.70)
+        )
+        wet_skill_observation_scale = float(
+            config_loader.get("baseline_predictor.driver_form.wet_skill_observation_scale", 0.40)
         )
 
         for driver_code, pos in race_finish_obs.items():
@@ -635,7 +639,9 @@ def update_bayesian_driver_ratings(
                 continue
 
             relative_performance = raw_pace - float(np.mean(team_finish_paces))
-            observed_wet_signal = wet_skill_neutral + (relative_performance * 0.40)
+            observed_wet_signal = wet_skill_neutral + (
+                relative_performance * wet_skill_observation_scale
+            )
             observed_wet_signal = float(np.clip(observed_wet_signal, 0.40, 0.95))
 
             existing = driver_entry.get("wet_skill")
@@ -715,7 +721,7 @@ def update_from_race(year: int, race_name: str, data_dir: str = "data/processed"
         ):
             wet_fraction = float(weather_data["Rainfall"].dropna().astype(bool).mean())
             if wet_fraction > 0.30:
-                race_weather = "wet"
+                race_weather = "rain"
             elif wet_fraction > 0.05:
                 race_weather = "mixed"
     except Exception:
@@ -772,6 +778,23 @@ def update_from_sprint_race(
             exc,
         )
         return
+
+    # Detect sprint weather for wet_skill updating
+    sprint_weather = "dry"
+    try:
+        weather_data = _sprint_session.weather_data
+        if (
+            weather_data is not None
+            and not weather_data.empty
+            and "Rainfall" in weather_data.columns
+        ):
+            wet_fraction = float(weather_data["Rainfall"].dropna().astype(bool).mean())
+            if wet_fraction > 0.30:
+                sprint_weather = "rain"
+            elif wet_fraction > 0.05:
+                sprint_weather = "mixed"
+    except Exception:
+        sprint_weather = "dry"
 
     sprint_confidence = float(config_loader.get("bayesian.sprint_race_confidence", 0.20))
     sprint_confidence = float(np.clip(sprint_confidence, 0.05, 0.5))
@@ -838,9 +861,6 @@ def update_from_sprint_race(
         strip_legacy_bayesian_fields({driver_code: driver_entry})
 
     # Sprint race pace EMA — lower blend than main race because sprint is ~1/3 distance.
-    from src.utils.lineups import load_current_lineups
-
-    lineups = load_current_lineups()
     driver_to_team: dict[str, str] = {}
     for team_name, team_drivers in (lineups or {}).items():
         for d in team_drivers:
@@ -860,12 +880,57 @@ def update_from_sprint_race(
         pace_key="race_pace",
     )
 
+    # Sprint wet_skill EMA — quarter weight of main race
+    touched_wet = 0
+    sprint_weather_key = normalize_weather_key(sprint_weather)
+    if sprint_weather_key in {"rain", "mixed"}:
+        wet_blend = (
+            float(config_loader.get("baseline_predictor.driver_form.wet_skill_update_blend", 0.15))
+            * 0.25
+        )  # Quarter weight: sprint is shorter and less representative
+        wet_blend = float(np.clip(wet_blend, 0.0, 0.25))
+        if sprint_weather_key == "mixed":
+            wet_blend *= 0.5
+
+        wet_neutral = float(
+            config_loader.get("baseline_predictor.race.lap_time.wet_skill_neutral", 0.70)
+        )
+        wet_obs_scale = float(
+            config_loader.get("baseline_predictor.driver_form.wet_skill_observation_scale", 0.40)
+        )
+
+        for driver_code, pos in observations.items():
+            driver_entry = drivers_payload.get(driver_code)
+            if not isinstance(driver_entry, dict):
+                continue
+            raw_pace = float(np.clip(1.0 - ((int(pos) - 1) / max(grid_size - 1, 1)), 0.0, 1.0))
+            driver_team = driver_to_team.get(driver_code)
+            team_paces = [
+                float(np.clip(1.0 - ((int(tp) - 1) / max(grid_size - 1, 1)), 0.0, 1.0))
+                for tdc, tp in observations.items()
+                if driver_to_team.get(tdc) == driver_team and tdc != driver_code
+            ]
+            if not team_paces:
+                continue
+            relative_performance = raw_pace - float(np.mean(team_paces))
+            observed_signal = wet_neutral + (relative_performance * wet_obs_scale)
+            observed_signal = float(np.clip(observed_signal, 0.40, 0.95))
+            existing = driver_entry.get("wet_skill")
+            existing_val = float(existing if existing is not None else wet_neutral)
+            updated = (1.0 - wet_blend) * existing_val + wet_blend * observed_signal
+            driver_entry["wet_skill"] = round(round(updated * 20) / 20, 2)
+            touched_wet += 1
+
+        if touched_wet > 0:
+            logger.info("Sprint wet_skill update: %d drivers", touched_wet)
+
     _persist_driver_characteristics_payload(store, driver_payload, season_year)
     logger.info(
         "Sprint update applied for %s drivers: Bayesian (confidence=%.2f), "
-        "race_pace EMA (%d drivers, blend=%.2f)",
+        "race_pace EMA (%d drivers, blend=%.2f), wet_skill (%d drivers)",
         len(observations),
         sprint_confidence,
         touched_pace,
         sprint_pace_blend,
+        touched_wet,
     )

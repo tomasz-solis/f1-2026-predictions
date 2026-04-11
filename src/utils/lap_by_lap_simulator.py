@@ -31,6 +31,7 @@ from src.simulation.traffic_model import (
     get_track_downforce_level,
 )
 from src.types.prediction_types import PitStrategy, RaceSimulationResult
+from src.utils.validation_helpers import normalize_weather_key
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +122,8 @@ def simulate_race_lap_by_lap(
         - dnf_drivers: List[str] (drivers who did not finish)
         - strategies_used: Dict[str, Dict] (strategy per driver)
     """
+    weather = normalize_weather_key(weather)
+
     # Expand compact overtake config once before the lap loop.
     race_params = dict(race_params)
     race_params["overtake_model"] = _expand_overtake_cfg(race_params.get("overtake_model", {}))
@@ -210,6 +213,7 @@ def simulate_race_lap_by_lap(
     _track_wet_severity = float(np.clip(race_params.get("track_wet_severity", 1.0), 0.5, 2.0))
     _wet_skill_lap_weight *= _track_wet_severity
     _wet_skill_neutral = float(race_params.get("wet_skill_neutral", 0.70))
+    _mixed_wet_blend = float(race_params.get("mixed_wet_blend", 0.50))
     _race_advantage_lap_impact = race_params.get("race_advantage_lap_impact", 0.35)
     _elite_denominator = max(1e-6, 1.0 - _elite_skill_threshold)
     _lap_time_bounds = _lt_cfg.get("bounds", [70.0, 120.0])
@@ -280,6 +284,7 @@ def simulate_race_lap_by_lap(
                 weather=weather,
                 wet_skill_weight=_wet_skill_lap_weight,
                 wet_skill_neutral=_wet_skill_neutral,
+                mixed_wet_blend=_mixed_wet_blend,
             )
 
             base_lap_time = (
@@ -403,8 +408,8 @@ def _resolve_base_chaos_std(race_params: dict[str, Any], weather: str) -> float:
         mixed_blend = float(np.clip(race_params.get("mixed_weather_chaos_blend", 0.55), 0.0, 1.0))
         mixed_std = dry_std + ((wet_std - dry_std) * mixed_blend)
 
-    weather_key = str(weather).strip().lower()
-    if weather_key in {"wet", "rain"}:
+    weather_key = normalize_weather_key(weather)
+    if weather_key == "rain":
         return wet_std
     if weather_key == "mixed":
         return float(mixed_std)
@@ -416,6 +421,7 @@ def _compute_race_wet_skill_modifier(
     weather: str,
     wet_skill_weight: float,
     wet_skill_neutral: float,
+    mixed_wet_blend: float = 0.50,
 ) -> float:
     """Per-lap lap time adjustment from wet-weather ability.
 
@@ -430,11 +436,11 @@ def _compute_race_wet_skill_modifier(
     The lap time formula ADDS this return value, so negative = faster.
     DO NOT change the sign to match qualifying.
 
-    Mixed conditions apply 0.5x of the full wet adjustment — a configurable
-    default analogous to mixed_weather_chaos_blend in the chaos model.
+    Mixed conditions scale the full wet adjustment by ``mixed_wet_blend``.
+    The default stays aligned with the mixed-weather chaos blending path.
     """
-    weather_key = str(weather).strip().lower()
-    if weather_key not in {"wet", "rain", "mixed"}:
+    weather_key = normalize_weather_key(weather)
+    if weather_key not in {"rain", "mixed"}:
         return 0.0
 
     raw_wet_skill = skill_info.get("wet_skill")
@@ -442,7 +448,7 @@ def _compute_race_wet_skill_modifier(
     raw_adjustment = (wet_skill - wet_skill_neutral) * wet_skill_weight
 
     if weather_key == "mixed":
-        raw_adjustment *= 0.5
+        raw_adjustment *= mixed_wet_blend
 
     return -raw_adjustment
 

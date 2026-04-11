@@ -239,8 +239,8 @@ def compute_ratings(
     wet/mixed sessions against dry sessions. A positive wet effect means
     the driver is faster relative to their teammate in wet conditions.
 
-    Returns dict of driver -> {wet_skill, wet_sessions, dry_sessions,
-    raw_wet_effect_s, confidence}.
+    Returns dict of driver -> {wet_skill, wet_sessions, mixed_sessions,
+    dry_sessions, raw_wet_effect_s, confidence}.
     """
     if df.empty:
         return {}
@@ -252,30 +252,54 @@ def compute_ratings(
     results: dict[str, dict] = {}
 
     for driver, group in df.groupby("driver"):
-        wet_rows = group[group["weather"].isin(["wet", "mixed"])]
+        wet_rows = group[group["weather"] == "wet"]
+        mixed_rows = group[group["weather"] == "mixed"]
         dry_rows = group[group["weather"] == "dry"]
 
         n_wet = len(wet_rows)
+        n_mixed = len(mixed_rows)
         n_dry = len(dry_rows)
+        # Mixed conditions count as 0.4x of a true wet session for threshold purposes.
+        effective_wet = n_wet + (n_mixed * 0.4)
 
-        if n_wet < min_wet or n_dry < min_dry:
+        if effective_wet < min_wet or n_dry < min_dry:
             results[str(driver)] = {
                 "wet_skill": neutral,
                 "wet_sessions": n_wet,
+                "mixed_sessions": n_mixed,
                 "dry_sessions": n_dry,
                 "raw_wet_effect_s": 0.0,
                 "confidence": "insufficient",
             }
             continue
 
-        wet_mean = float(np.average(wet_rows["relative_pace_s"], weights=wet_rows["weight"]))
+        combined_wet = pd.concat(
+            [
+                wet_rows,
+                mixed_rows.assign(weight=mixed_rows["weight"] * 0.4),
+            ]
+        )
+        if combined_wet.empty:
+            results[str(driver)] = {
+                "wet_skill": neutral,
+                "wet_sessions": n_wet,
+                "mixed_sessions": n_mixed,
+                "dry_sessions": n_dry,
+                "raw_wet_effect_s": 0.0,
+                "confidence": "insufficient",
+            }
+            continue
+
+        wet_mean = float(
+            np.average(combined_wet["relative_pace_s"], weights=combined_wet["weight"])
+        )
         dry_mean = float(np.average(dry_rows["relative_pace_s"], weights=dry_rows["weight"]))
 
         # Positive = driver is faster (lower pace) in wet relative to teammate
         raw_effect = float(dry_mean - wet_mean)
 
         # Uncertainty: standard error of the wet-dry difference
-        wet_vals = wet_rows["relative_pace_s"].values
+        wet_vals = combined_wet["relative_pace_s"].values
         dry_vals = dry_rows["relative_pace_s"].values
         wet_se = float(np.std(wet_vals) / np.sqrt(len(wet_vals))) if len(wet_vals) > 1 else 0.5
         dry_se = float(np.std(dry_vals) / np.sqrt(len(dry_vals))) if len(dry_vals) > 1 else 0.5
@@ -287,10 +311,13 @@ def compute_ratings(
             confidence = "medium"
         else:
             confidence = "low"
+        if n_wet < 1:
+            confidence = "mixed_only"
 
         results[str(driver)] = {
             "wet_skill": raw_effect,  # will be normalized below
             "wet_sessions": n_wet,
+            "mixed_sessions": n_mixed,
             "dry_sessions": n_dry,
             "raw_wet_effect_s": round(raw_effect, 4),
             "raw_uncertainty_s": round(raw_uncertainty_s, 4),

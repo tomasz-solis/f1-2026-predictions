@@ -11,6 +11,15 @@ import pytest
 
 from src.models.bayesian import DriverPrior
 
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_REPO_DRIVER_CHARACTERISTICS_2026 = (
+    _REPO_ROOT
+    / "data"
+    / "processed"
+    / "driver_characteristics"
+    / "2026_driver_characteristics.json"
+)
+
 
 def pytest_addoption(parser):
     """Register repo-local pytest options used by regression tests."""
@@ -68,6 +77,41 @@ def patcher():
 def default_file_only_storage(monkeypatch):
     """Run tests in file-only mode unless a test explicitly overrides persistence behavior."""
     monkeypatch.setenv("USE_DB_STORAGE", "file_only")
+
+
+@pytest.fixture(scope="session")
+def repo_driver_characteristics_2026_baseline() -> bytes | None:
+    """Cache the tracked 2026 driver characteristics bytes for test isolation.
+
+    Storing the raw bytes preserves exact file formatting, including whether
+    the tracked JSON ends with a trailing newline.
+    """
+    if not _REPO_DRIVER_CHARACTERISTICS_2026.exists():
+        return None
+    return _REPO_DRIVER_CHARACTERISTICS_2026.read_bytes()
+
+
+@pytest.fixture(autouse=True)
+def restore_repo_driver_characteristics_2026(repo_driver_characteristics_2026_baseline):
+    """Restore the tracked 2026 driver file after tests that write fallback payloads.
+
+    Some updater tests exercise code paths that persist a season-scoped fallback
+    file relative to the repo root. Restoring the tracked file after each test
+    prevents later tests from inheriting mutated driver form data based only on
+    execution order.
+    """
+    yield
+
+    if repo_driver_characteristics_2026_baseline is None:
+        return
+    if not _REPO_DRIVER_CHARACTERISTICS_2026.exists():
+        return
+
+    current_bytes = _REPO_DRIVER_CHARACTERISTICS_2026.read_bytes()
+    if current_bytes != repo_driver_characteristics_2026_baseline:
+        _REPO_DRIVER_CHARACTERISTICS_2026.write_bytes(
+            repo_driver_characteristics_2026_baseline,
+        )
 
 
 @pytest.fixture

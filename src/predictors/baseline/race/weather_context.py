@@ -129,6 +129,38 @@ def build_weather_feature_context(
     return modifiers, context
 
 
+def _build_track_temperature_context(
+    *,
+    track_temperature_c: float,
+    source: str,
+    reason: str,
+    weather_bucket: str,
+    session_name: str | None = None,
+    session_track_temperature_c: float | None = None,
+    session_temperature_source: str | None = None,
+    session_air_temperature_c: float | None = None,
+    forecast_track_temperature_c: float | None = None,
+    session_weight: float | None = None,
+    forecast_weight: float | None = None,
+    blend_enabled: bool = False,
+) -> dict[str, Any]:
+    """Build a standardized track temperature context dict."""
+    return {
+        "track_temperature_c": track_temperature_c,
+        "source": source,
+        "reason": reason,
+        "weather_bucket": weather_bucket,
+        "session_name": session_name,
+        "session_track_temperature_c": session_track_temperature_c,
+        "session_temperature_source": session_temperature_source,
+        "session_air_temperature_c": session_air_temperature_c,
+        "forecast_track_temperature_c": forecast_track_temperature_c,
+        "session_weight": session_weight,
+        "forecast_weight": forecast_weight,
+        "blend_enabled": blend_enabled,
+    }
+
+
 def resolve_race_environment_context(
     *,
     race_params: dict[str, Any],
@@ -177,47 +209,35 @@ def resolve_race_environment_context(
         if resolved_track_temp is not None:
             race_params["track_temperature_c"] = resolved_track_temp
             if resolved_temperature_profile is not None:
-                track_temperature_context = {
-                    "track_temperature_c": float(resolved_track_temp),
-                    "source": str(
-                        resolved_temperature_profile.get("source", "session_or_fallback")
-                    ),
-                    "reason": str(resolved_temperature_profile.get("reason", "")),
-                    "weather_bucket": str(
-                        resolved_temperature_profile.get("weather_bucket", weather)
-                    ),
-                    "session_name": resolved_temperature_profile.get("session_name"),
-                    "session_track_temperature_c": resolved_temperature_profile.get(
+                track_temperature_context = _build_track_temperature_context(
+                    track_temperature_c=float(resolved_track_temp),
+                    source=str(resolved_temperature_profile.get("source", "session_or_fallback")),
+                    reason=str(resolved_temperature_profile.get("reason", "")),
+                    weather_bucket=str(resolved_temperature_profile.get("weather_bucket", weather)),
+                    session_name=resolved_temperature_profile.get("session_name"),
+                    session_track_temperature_c=resolved_temperature_profile.get(
                         "session_track_temperature_c"
                     ),
-                    "session_temperature_source": resolved_temperature_profile.get(
+                    session_temperature_source=resolved_temperature_profile.get(
                         "session_temperature_source"
                     ),
-                    "session_air_temperature_c": resolved_temperature_profile.get(
+                    session_air_temperature_c=resolved_temperature_profile.get(
                         "session_air_temperature_c"
                     ),
-                    "forecast_track_temperature_c": resolved_temperature_profile.get(
+                    forecast_track_temperature_c=resolved_temperature_profile.get(
                         "forecast_track_temperature_c"
                     ),
-                    "session_weight": resolved_temperature_profile.get("session_weight"),
-                    "forecast_weight": resolved_temperature_profile.get("forecast_weight"),
-                    "blend_enabled": bool(resolved_temperature_profile.get("blend_enabled", False)),
-                }
+                    session_weight=resolved_temperature_profile.get("session_weight"),
+                    forecast_weight=resolved_temperature_profile.get("forecast_weight"),
+                    blend_enabled=bool(resolved_temperature_profile.get("blend_enabled", False)),
+                )
             else:
-                track_temperature_context = {
-                    "track_temperature_c": float(resolved_track_temp),
-                    "source": "legacy_scalar_resolver",
-                    "reason": "legacy_temperature_resolver",
-                    "weather_bucket": str(weather).strip().lower(),
-                    "session_name": None,
-                    "session_track_temperature_c": None,
-                    "session_temperature_source": None,
-                    "session_air_temperature_c": None,
-                    "forecast_track_temperature_c": None,
-                    "session_weight": None,
-                    "forecast_weight": None,
-                    "blend_enabled": False,
-                }
+                track_temperature_context = _build_track_temperature_context(
+                    track_temperature_c=float(resolved_track_temp),
+                    source="legacy_scalar_resolver",
+                    reason="legacy_temperature_resolver",
+                    weather_bucket=str(weather).strip().lower(),
+                )
         else:
             default_track_temp = {
                 "dry": cfg.get("baseline_predictor.race.track_temperature.dry_c", 36.0),
@@ -228,36 +248,23 @@ def resolve_race_environment_context(
                 default_track_temp.get(str(weather).strip().lower(), default_track_temp["dry"])
             )
             race_params["track_temperature_c"] = fallback_track_temp
-            track_temperature_context = {
-                "track_temperature_c": fallback_track_temp,
-                "source": "forecast_fallback",
-                "reason": "no_temperature_signal",
-                "weather_bucket": str(weather).strip().lower(),
-                "session_name": None,
-                "session_track_temperature_c": None,
-                "session_temperature_source": None,
-                "session_air_temperature_c": None,
-                "forecast_track_temperature_c": fallback_track_temp,
-                "session_weight": 0.0,
-                "forecast_weight": 1.0,
-                "blend_enabled": False,
-            }
+            track_temperature_context = _build_track_temperature_context(
+                track_temperature_c=fallback_track_temp,
+                source="forecast_fallback",
+                reason="no_temperature_signal",
+                weather_bucket=str(weather).strip().lower(),
+                forecast_track_temperature_c=fallback_track_temp,
+                session_weight=0.0,
+                forecast_weight=1.0,
+            )
     else:
         existing_temp = float(race_params["track_temperature_c"])
-        track_temperature_context = {
-            "track_temperature_c": existing_temp,
-            "source": "track_params_override",
-            "reason": "track_params_override",
-            "weather_bucket": str(weather).strip().lower(),
-            "session_name": None,
-            "session_track_temperature_c": None,
-            "session_temperature_source": None,
-            "session_air_temperature_c": None,
-            "forecast_track_temperature_c": None,
-            "session_weight": None,
-            "forecast_weight": None,
-            "blend_enabled": False,
-        }
+        track_temperature_context = _build_track_temperature_context(
+            track_temperature_c=existing_temp,
+            source="track_params_override",
+            reason="track_params_override",
+            weather_bucket=str(weather).strip().lower(),
+        )
 
     weather_feature_modifiers: dict[str, float] = {
         "chaos_multiplier": 1.0,

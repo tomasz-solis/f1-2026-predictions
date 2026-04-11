@@ -1,6 +1,10 @@
 """Tests for wet-weather skill system across qualifying and race paths."""
 
+import json
+from unittest.mock import MagicMock
+
 import numpy as np
+import pandas as pd
 import pytest
 
 
@@ -409,3 +413,185 @@ class TestWetSkillSprintPath:
             mixed_wet_blend=0.5,
         )
         assert mixed_adj == pytest.approx(rain_adj * 0.5)
+
+
+def _build_sprint_weather_session(rainfall_samples: list[bool]) -> MagicMock:
+    """Create a sprint session stub with controllable rainfall samples."""
+    session = MagicMock()
+    session.weather_data = pd.DataFrame({"Rainfall": rainfall_samples})
+    return session
+
+
+def _run_sprint_wet_skill_update(
+    *,
+    patcher,
+    tmp_path,
+    rainfall_samples: list[bool],
+    initial_wet_skills: dict[str, float],
+    wet_skill_update_blend: float = 0.15,
+) -> dict[str, dict[str, object]]:
+    """Run the sprint updater with controlled weather and return saved drivers."""
+    from src.models.bayesian import DriverPrior
+    from src.systems import updater
+
+    patcher.chdir(tmp_path)
+
+    sprint_results = pd.DataFrame(
+        {
+            "Abbreviation": ["LEC", "HAM"],
+            "Position": [1, 20],
+            "Status": ["Finished", "Finished"],
+            "race_name": ["China Grand Prix"] * 2,
+            "year": [2026] * 2,
+        }
+    )
+    sprint_session = _build_sprint_weather_session(rainfall_samples)
+
+    patcher.setattr("src.utils.weekend.is_sprint_weekend", lambda year, race_name: True)
+    patcher.setattr(
+        updater,
+        "load_competitive_session",
+        lambda year, race_name, session_name, load_laps=False: (sprint_results, sprint_session),
+    )
+    patcher.setattr(
+        "src.utils.lineups.load_current_lineups",
+        lambda config_path="data/current_lineups.json": {"Ferrari": ["LEC", "HAM"]},
+    )
+
+    priors = {
+        "LEC": DriverPrior("16", "LEC", "Ferrari", "top", mu=16.5, sigma=2.0),
+        "HAM": DriverPrior("44", "HAM", "Ferrari", "top", mu=16.0, sigma=2.2),
+    }
+    patcher.setattr("src.models.priors_factory.PriorsFactory.create_priors", lambda self: priors)
+
+    driver_payload = {
+        "version": 1,
+        "drivers": {
+            driver_code: {
+                "racecraft": {"skill_score": 0.60},
+                "pace": {"race_pace": 0.50},
+                "wet_skill": wet_skill,
+            }
+            for driver_code, wet_skill in initial_wet_skills.items()
+        },
+    }
+
+    class _Store:
+        """Minimal artifact store stub for sprint wet-skill tests."""
+
+        def __init__(self, data_root):
+            self.data_root = data_root
+
+        def load_artifact(self, artifact_type, artifact_key):
+            if artifact_type == "driver_characteristics":
+                return driver_payload
+            return None
+
+        def get_latest_version(self, artifact_type, artifact_key):
+            return 1
+
+        def save_artifact(self, artifact_type, artifact_key, data, version):
+            """Accept persistence writes without hitting a real backend."""
+
+    patcher.setattr(updater, "ArtifactStore", _Store)
+
+    def _config_get(key, default=None):
+        """Return stable config values for the sprint wet-skill tests."""
+        overrides = {
+            "bayesian.sprint_race_confidence": 0.20,
+            "baseline_predictor.driver_form.race_pace_update_blend": 0.25,
+            "baseline_predictor.driver_form.wet_skill_update_blend": wet_skill_update_blend,
+            "baseline_predictor.driver_form.wet_skill_observation_scale": 0.40,
+            "baseline_predictor.race.lap_time.wet_skill_neutral": 0.70,
+            "grid.size": 22,
+        }
+        return overrides.get(key, default)
+
+    patcher.setattr(updater.config_loader, "get", _config_get)
+
+    updater.update_from_sprint_race(2026, "China Grand Prix", data_root=str(tmp_path))
+
+    fallback_file = (
+        tmp_path
+        / "data"
+        / "processed"
+        / "driver_characteristics"
+        / "2026_driver_characteristics.json"
+    )
+    saved_payload = json.loads(fallback_file.read_text())
+    return saved_payload["drivers"]
+
+
+class TestSprintWetSkillUpdate:
+    """Sprint race should update wet_skill in wet and mixed conditions."""
+
+    def test_sprint_wet_updates_wet_skill(self, patcher, tmp_path):
+        """Wet sprint race should modify wet_skill values when teammates are observed."""
+        initial_wet_skills = {"LEC": 0.724, "HAM": 0.726}
+
+        drivers = _run_sprint_wet_skill_update(
+            patcher=patcher,
+            tmp_path=tmp_path,
+            rainfall_samples=[True, True, False, True],
+            initial_wet_skills=initial_wet_skills,
+        )
+
+        assert drivers["LEC"]["wet_skill"] == 0.75
+        assert drivers["HAM"]["wet_skill"] == 0.70
+        assert drivers["LEC"]["wet_skill"] != initial_wet_skills["LEC"]
+        assert drivers["HAM"]["wet_skill"] != initial_wet_skills["HAM"]
+
+    def test_sprint_dry_leaves_wet_skill_unchanged(self, patcher, tmp_path):
+        """Dry sprint race should leave wet_skill untouched."""
+        initial_wet_skills = {"LEC": 0.724, "HAM": 0.726}
+
+        drivers = _run_sprint_wet_skill_update(
+            patcher=patcher,
+            tmp_path=tmp_path,
+            rainfall_samples=[False, False, False, False],
+            initial_wet_skills=initial_wet_skills,
+        )
+
+        assert drivers["LEC"]["wet_skill"] == initial_wet_skills["LEC"]
+        assert drivers["HAM"]["wet_skill"] == initial_wet_skills["HAM"]
+
+    def test_sprint_wet_blend_is_quarter_of_main_race(self, patcher, tmp_path):
+        """Sprint wet-skill blend should stay at one quarter of the main-race blend."""
+        initial_wet_skills = {"LEC": 0.70, "HAM": 0.70}
+
+        drivers = _run_sprint_wet_skill_update(
+            patcher=patcher,
+            tmp_path=tmp_path,
+            rainfall_samples=[True, True, False, True],
+            initial_wet_skills=initial_wet_skills,
+        )
+
+        observed_signal = 0.95
+        main_race_blend = 0.15
+        sprint_blend = main_race_blend * 0.25
+        expected_sprint = round(
+            round(
+                (
+                    ((1.0 - sprint_blend) * initial_wet_skills["LEC"])
+                    + (sprint_blend * observed_signal)
+                )
+                * 20
+            )
+            / 20,
+            2,
+        )
+        full_race_counterfactual = round(
+            round(
+                (
+                    ((1.0 - main_race_blend) * initial_wet_skills["LEC"])
+                    + (main_race_blend * observed_signal)
+                )
+                * 20
+            )
+            / 20,
+            2,
+        )
+
+        assert expected_sprint == 0.70
+        assert full_race_counterfactual == 0.75
+        assert drivers["LEC"]["wet_skill"] == expected_sprint

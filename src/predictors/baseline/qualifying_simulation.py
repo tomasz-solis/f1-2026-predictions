@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+
+from src.utils.validation_helpers import normalize_weather_key
 
 
 @dataclass(frozen=True)
@@ -808,8 +811,8 @@ def _compute_wet_skill_adjustment(
     Positive values mean the driver gains in wet conditions; negative means they lose.
     Mixed conditions apply a fractional blend of the full wet effect.
     """
-    weather_key = str(weather).strip().lower()
-    if weather_key not in {"wet", "rain", "mixed"}:
+    weather_key = normalize_weather_key(weather)
+    if weather_key not in {"rain", "mixed"}:
         return 0.0
     raw_wet_skill = driver_info.get("wet_skill")
     wet_skill = float(raw_wet_skill if raw_wet_skill is not None else wet_skill_neutral)
@@ -846,14 +849,14 @@ def run_qualifying_simulations(
     )
 
     # Scale noise for wet/mixed conditions.
-    weather_key = str(weather).strip().lower()
+    weather_key = normalize_weather_key(weather)
     wet_noise_multiplier = float(
         cfg.get("baseline_predictor.qualifying.wet_noise_multiplier", 1.60)
     )
     mixed_noise_multiplier = float(
         cfg.get("baseline_predictor.qualifying.mixed_noise_multiplier", 1.28)
     )
-    if weather_key in {"wet", "rain"}:
+    if weather_key == "rain":
         noise_scale = wet_noise_multiplier
     elif weather_key == "mixed":
         noise_scale = mixed_noise_multiplier
@@ -861,8 +864,6 @@ def run_qualifying_simulations(
         noise_scale = 1.0
 
     # Rebuild sim_cfg with scaled noise rather than mutating the frozen dataclass.
-    import dataclasses
-
     sim_cfg = dataclasses.replace(
         sim_cfg,
         noise_std=sim_cfg.noise_std * noise_scale,

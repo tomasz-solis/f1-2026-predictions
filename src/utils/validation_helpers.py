@@ -44,3 +44,16 @@ def validate_year(
     if not isinstance(value, int) or not (min_year <= value <= max_year):
         raise ValueError(f"{name} must be between {min_year} and {max_year}, got {value}")
     logger.debug("Validated %s=%s is in range [%s, %s]", name, value, min_year, max_year)
+
+
+def normalize_weather_key(weather: str) -> str:
+    """Normalize weather string to the canonical external API form.
+
+    The external API uses ``rain`` while some internal paths still produce
+    ``wet``. This helper keeps the comparison surface consistent by mapping
+    both to ``rain``.
+    """
+    key = str(weather).strip().lower()
+    if key == "wet":
+        return "rain"
+    return key

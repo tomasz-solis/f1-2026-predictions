@@ -42,11 +42,23 @@ def load_actual_results(year: int, race_name: str) -> dict[str, int]:
     for _, row in session.results.iterrows():
         driver = str(row.get("Abbreviation", "")).strip()
         pos = row.get("Position")
+        status = str(row.get("Status", "")).strip()
         if driver and pd.notna(pos):
             try:
-                results[driver] = int(pos)
+                int_pos = int(pos)
             except (TypeError, ValueError):
                 continue
+            # Only include classified finishers.
+            # FastF1 Status is "Finished" or "+N Lap(s)" for classified drivers;
+            # mechanical failures, accidents, etc. have other values.
+            if status == "Finished" or status.startswith("+"):
+                results[driver] = int_pos
+
+    logger.info(
+        "Classified finishers: %d (excluded %d DNF/DNS/DSQ)",
+        len(results),
+        len(session.results) - len(results),
+    )
 
     return results
 

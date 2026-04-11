@@ -211,6 +211,7 @@ def predict_race_core(
     race_params["wet_skill_neutral"] = cfg.get(
         "baseline_predictor.race.lap_time.wet_skill_neutral", 0.70
     )
+    race_params["mixed_wet_blend"] = cfg.get("baseline_predictor.qualifying.mixed_wet_blend", 0.50)
     # Track-specific wet severity: derived from track_overtaking if not set directly.
     # Street circuits (high overtaking difficulty) amplify wet effects.
     if "track_wet_severity" not in race_params:
