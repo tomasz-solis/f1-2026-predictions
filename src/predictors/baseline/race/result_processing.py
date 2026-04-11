@@ -716,7 +716,7 @@ def apply_main_race_movement_constraints(
     cfg: Any,
 ) -> None:
     """Keep main-race grid movement within configured realism bounds."""
-    movement_floor = float(cfg.get("baseline_predictor.race.main_race_movement_floor", 1.0))
+    base_movement_floor = float(cfg.get("baseline_predictor.race.main_race_movement_floor", 1.0))
     movement_quantile = float(cfg.get("baseline_predictor.race.main_race_movement_quantile", 20.0))
     movement_ceiling_base = float(
         cfg.get("baseline_predictor.race.main_race_movement_ceiling_base", 2.5)
@@ -725,12 +725,20 @@ def apply_main_race_movement_constraints(
         cfg.get("baseline_predictor.race.main_race_movement_ceiling_track_scale", 0.70)
     )
     movement_ceiling_min = float(
-        cfg.get("baseline_predictor.race.main_race_movement_ceiling_min", movement_floor)
+        cfg.get("baseline_predictor.race.main_race_movement_ceiling_min", base_movement_floor)
     )
     movement_ceiling = max(
         movement_ceiling_min,
         movement_ceiling_base
         - (float(np.clip(track_overtaking, 0.0, 1.0)) * movement_ceiling_track_scale),
+    )
+    movement_floor_track_scale = float(
+        cfg.get("baseline_predictor.race.main_race_movement_floor_track_scale", 0.25)
+    )
+    overtake_ease = 1.0 - float(np.clip(track_overtaking, 0.0, 1.0))
+    movement_floor = min(
+        movement_ceiling,
+        base_movement_floor + (overtake_ease * movement_floor_track_scale),
     )
 
     avg_grid_change = _avg_grid_change(

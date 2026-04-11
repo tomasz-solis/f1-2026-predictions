@@ -29,6 +29,7 @@ class DriverRaceInfo(TypedDict):
     overtaking_skill: float
     defensive_skill: float
     dnf_probability: float
+    wet_skill: NotRequired[float]
     current_lineup_team: NotRequired[str]
     raw_skill: NotRequired[float]
     portable_skill: NotRequired[float]
