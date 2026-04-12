@@ -165,6 +165,9 @@ def predict_race_core(
     deps: RaceSimulationDeps,
 ) -> dict[str, Any]:
     """Run the full race prediction flow with injectable dependencies."""
+    from src.utils.validation_helpers import normalize_weather_key
+
+    weather = normalize_weather_key(weather)
     _ = race_compound
 
     try:

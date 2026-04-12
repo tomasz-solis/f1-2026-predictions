@@ -26,9 +26,10 @@ def _make_finish_order(n: int = 10) -> list[dict]:
     """Return a finish order where every driver is at their starting grid slot."""
     return [
         {
-            "driver_code": f"D{i:02d}",
+            "driver": f"D{i:02d}",
+            "position": i,
+            "position_blend_score": float(i),
             "grid_pos": i,
-            "predicted_position": float(i),
         }
         for i in range(1, n + 1)
     ]
@@ -36,18 +37,18 @@ def _make_finish_order(n: int = 10) -> list[dict]:
 
 def _make_driver_info_map(finish_order: list[dict]) -> dict:
     """Build the minimal driver_info_map expected by _avg_grid_change."""
-    return {row["driver_code"]: {"grid_pos": row["grid_pos"]} for row in finish_order}
+    return {row["driver"]: {"grid_pos": row["grid_pos"]} for row in finish_order}
 
 
 def _make_grid_reference(finish_order: list[dict]) -> dict:
     """Map each driver to their starting grid position."""
-    return {row["driver_code"]: float(row["grid_pos"]) for row in finish_order}
+    return {row["driver"]: float(row["grid_pos"]) for row in finish_order}
 
 
 def _make_samples(finish_order: list[dict], n_samples: int = 50) -> dict:
     """Generate random samples for each driver — enough for quantile logic to engage."""
     rng = np.random.default_rng(42)
-    return {row["driver_code"]: rng.uniform(0.0, 1.0, n_samples).tolist() for row in finish_order}
+    return {row["driver"]: rng.uniform(0.0, 1.0, n_samples).tolist() for row in finish_order}
 
 
 class TestMovementFloorTrackScale:
@@ -126,8 +127,8 @@ class TestMovementFloorTrackScale:
             cfg=_make_cfg(),
         )
         for row in finish:
-            assert 1 <= row["predicted_position"] <= 10, (
-                f"Driver {row['driver_code']} ended at {row['predicted_position']}, "
+            assert 1 <= row["position"] <= 10, (
+                f"Driver {row['driver']} ended at {row['position']}, "
                 "which is outside valid grid range"
             )
 
@@ -146,6 +147,6 @@ class TestMovementFloorTrackScale:
             track_overtaking=0.4,
             cfg=_make_cfg(),
         )
-        positions = [row["predicted_position"] for row in finish]
+        positions = [row["position"] for row in finish]
         assert len(positions) == 20
         assert all(isinstance(p, float) for p in positions)

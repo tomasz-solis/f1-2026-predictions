@@ -590,10 +590,12 @@ baseline_predictor:
       elite_skill_exponent: 0.85       # concave curve: diminishing returns at the very top
       bounds: [70.0, 120.0]            # min/max lap time clamps (safety)
       # Per-lap seconds impact from wet_skill deviation from neutral.
-      # At 0.16, a driver at 0.90 wet_skill gains 0.032s/lap over neutral,
-      # accumulating to ~2.24s over 70 laps. Pairwise noise (sqrt(2)*0.42)
-      # accumulates to ~4.97s, giving signal-to-noise of 0.45 sigma —
-      # visible in ~67% of simulation runs but not dominant.
+      # At 0.80, a driver at 0.90 wet_skill gains 0.16s/lap over neutral,
+      # accumulating to ~9.1s over 57 laps (typical race distance).
+      # Pairwise noise (sqrt(2)*0.42) accumulates to ~4.5s, giving
+      # signal-to-noise of ~2.0 sigma — dominant in wet conditions,
+      # which matches F1 reality where wet skill is the primary
+      # differentiator in rain races.
       # Qualifying uses 0.18 (higher signal in single-lap format).
       wet_skill_lap_weight: 0.80
       # Neutral set at 0.70 (not 0.50) because F1 drivers are a
