@@ -877,7 +877,7 @@ def run_qualifying_simulations(
         )
         wet_skill_weight *= sprint_wet_scale
     wet_skill_neutral = float(cfg.get("baseline_predictor.qualifying.wet_skill_neutral", 0.70))
-    mixed_wet_blend = float(cfg.get("baseline_predictor.qualifying.mixed_wet_blend", 0.50))
+    mixed_wet_blend = float(cfg.get("baseline_predictor.mixed_wet_blend", 0.50))
 
     position_records: dict[str, list[int]] = {str(d["driver"]): [] for d in all_drivers}
     driver_weight_sum = sim_cfg.driver_quali_pace_weight + sim_cfg.driver_skill_weight

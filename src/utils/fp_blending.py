@@ -525,7 +525,7 @@ def get_fp_session_weather(year: int, race_name: str, session_type: str) -> str 
         if wet_ratio == 0:
             return "dry"
         if wet_ratio > 0.5:
-            return "wet"
+            return "rain"
         return "mixed"
     except _FASTF1_ERRORS as e:
         logger.warning("Could not determine weather for %s: %s", session_type, e)

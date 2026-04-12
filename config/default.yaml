@@ -166,6 +166,7 @@ baseline_predictor:
     race_pace_update_blend: 0.25
     wet_skill_update_blend: 0.15    # EMA blend toward observed wet performance (halved for mixed)
     wet_skill_observation_scale: 0.40  # scales teammate-relative finish gap into wet_skill delta
+  mixed_wet_blend: 0.50              # fraction of full wet effect applied in mixed conditions (shared by qualifying and race)
 
   # Qualifying simulation parameters
   qualifying:
@@ -183,7 +184,6 @@ baseline_predictor:
     wet_skill_weight: 0.18            # how much wet_skill shifts the score
     sprint_wet_skill_scale: 0.75      # multiply wet_skill_weight by this for sprint qualifying
     wet_skill_neutral: 0.70           # wet_skill value that produces zero adjustment
-    mixed_wet_blend: 0.50             # fraction of wet effect applied in mixed
 
     # Score composition weights
     team_weight: 0.60          # Car remains dominant, but driver form should still matter
@@ -595,7 +595,7 @@ baseline_predictor:
       # accumulates to ~4.97s, giving signal-to-noise of 0.45 sigma —
       # visible in ~67% of simulation runs but not dominant.
       # Qualifying uses 0.18 (higher signal in single-lap format).
-      wet_skill_lap_weight: 0.16
+      wet_skill_lap_weight: 0.80
       # Neutral set at 0.70 (not 0.50) because F1 drivers are a
       # pre-selected population — the typical F1 driver is above-average
       # at wet driving. Most drivers cluster here; only drivers with
@@ -643,6 +643,7 @@ baseline_predictor:
     # Guardrail to prevent over-anchoring in full-distance races.
     # If movement is too low, re-rank with an upside quantile from simulation samples.
     main_race_movement_floor: 0.70
+    main_race_movement_floor_track_scale: 0.25  # scales floor upward for low-overtaking tracks
     main_race_movement_quantile: 20.0
 
     # Low-confidence interval floor for top positions.

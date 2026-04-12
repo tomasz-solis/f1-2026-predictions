@@ -74,7 +74,7 @@ class PredictionLogger:
             if "driver" not in prediction or "team" not in prediction:
                 raise ValueError(f"Race prediction {index} missing 'driver' or 'team' field")
 
-        valid_weather = ["dry", "rain", "mixed", "wet"]
+        valid_weather = ["dry", "rain", "mixed"]
         if weather not in valid_weather:
             logger.warning("Unusual weather value: %s. Expected one of %s", weather, valid_weather)
 

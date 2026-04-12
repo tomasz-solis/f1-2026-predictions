@@ -280,7 +280,7 @@ class TestWetSkillIntegration:
             },
             "team_strength_compression": 0.35,
             "race_advantage_lap_impact": 0.20,
-            "wet_skill_lap_weight": 0.16,
+            "wet_skill_lap_weight": 0.80,
             "wet_skill_neutral": 0.70,
             "sc_probability": 0.0,
             "safety_car_trigger_lap": 999,
@@ -371,7 +371,7 @@ class TestWetSkillEdgeCases:
         from src.utils.lap_by_lap_simulator import _compute_race_wet_skill_modifier
 
         for _ in range(20):
-            assert _compute_race_wet_skill_modifier({"wet_skill": 0.70}, "wet", 0.16, 0.70) == 0.0
+            assert _compute_race_wet_skill_modifier({"wet_skill": 0.70}, "rain", 0.16, 0.70) == 0.0
 
 
 class TestWetSkillSprintPath:
@@ -536,10 +536,18 @@ class TestSprintWetSkillUpdate:
             initial_wet_skills=initial_wet_skills,
         )
 
-        assert drivers["LEC"]["wet_skill"] == 0.75
-        assert drivers["HAM"]["wet_skill"] == 0.70
-        assert drivers["LEC"]["wet_skill"] != initial_wet_skills["LEC"]
-        assert drivers["HAM"]["wet_skill"] != initial_wet_skills["HAM"]
+        assert drivers["LEC"]["wet_skill"] != initial_wet_skills["LEC"], (
+            "Sprint wet update should change LEC"
+        )
+        assert drivers["HAM"]["wet_skill"] != initial_wet_skills["HAM"], (
+            "Sprint wet update should change HAM"
+        )
+        assert drivers["LEC"]["wet_skill"] > initial_wet_skills["LEC"], (
+            "LEC won sprint, should increase"
+        )
+        assert drivers["HAM"]["wet_skill"] < initial_wet_skills["HAM"], (
+            "HAM lost sprint, should decrease"
+        )
 
     def test_sprint_dry_leaves_wet_skill_unchanged(self, patcher, tmp_path):
         """Dry sprint race should leave wet_skill untouched."""
@@ -569,29 +577,50 @@ class TestSprintWetSkillUpdate:
         observed_signal = 0.95
         main_race_blend = 0.15
         sprint_blend = main_race_blend * 0.25
-        expected_sprint = round(
-            round(
-                (
-                    ((1.0 - sprint_blend) * initial_wet_skills["LEC"])
-                    + (sprint_blend * observed_signal)
-                )
-                * 20
-            )
-            / 20,
-            2,
-        )
-        full_race_counterfactual = round(
-            round(
-                (
-                    ((1.0 - main_race_blend) * initial_wet_skills["LEC"])
-                    + (main_race_blend * observed_signal)
-                )
-                * 20
-            )
-            / 20,
-            2,
+        expected_sprint = (1.0 - sprint_blend) * initial_wet_skills[
+            "LEC"
+        ] + sprint_blend * observed_signal
+        full_race_counterfactual = (1.0 - main_race_blend) * initial_wet_skills[
+            "LEC"
+        ] + main_race_blend * observed_signal
+        assert abs(drivers["LEC"]["wet_skill"] - round(expected_sprint, 3)) < 0.002
+        assert full_race_counterfactual > expected_sprint, (
+            "Full race blend should move more than sprint"
         )
 
-        assert expected_sprint == 0.70
-        assert full_race_counterfactual == 0.75
-        assert drivers["LEC"]["wet_skill"] == expected_sprint
+
+class TestNormalizeWeatherKey:
+    """normalize_weather_key maps all variants to canonical forms."""
+
+    def test_wet_maps_to_rain(self):
+        from src.utils.validation_helpers import normalize_weather_key
+
+        assert normalize_weather_key("wet") == "rain"
+
+    def test_rain_stays_rain(self):
+        from src.utils.validation_helpers import normalize_weather_key
+
+        assert normalize_weather_key("rain") == "rain"
+
+    def test_dry_stays_dry(self):
+        from src.utils.validation_helpers import normalize_weather_key
+
+        assert normalize_weather_key("dry") == "dry"
+
+    def test_mixed_stays_mixed(self):
+        from src.utils.validation_helpers import normalize_weather_key
+
+        assert normalize_weather_key("mixed") == "mixed"
+
+    def test_case_insensitive(self):
+        from src.utils.validation_helpers import normalize_weather_key
+
+        assert normalize_weather_key("WET") == "rain"
+        assert normalize_weather_key("Rain") == "rain"
+        assert normalize_weather_key(" DRY ") == "dry"
+
+    def test_unknown_passes_through(self):
+        from src.utils.validation_helpers import normalize_weather_key
+
+        assert normalize_weather_key("sunny") == "sunny"
+        assert normalize_weather_key("") == ""

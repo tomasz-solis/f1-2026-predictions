@@ -649,7 +649,7 @@ def update_bayesian_driver_ratings(
             updated = (
                 1.0 - wet_skill_blend
             ) * existing_wet_skill + wet_skill_blend * observed_wet_signal
-            driver_entry["wet_skill"] = round(round(updated * 20) / 20, 2)
+            driver_entry["wet_skill"] = round(updated, 3)
             touched_wet_skill_drivers += 1
 
         if touched_wet_skill_drivers > 0:
@@ -918,7 +918,7 @@ def update_from_sprint_race(
             existing = driver_entry.get("wet_skill")
             existing_val = float(existing if existing is not None else wet_neutral)
             updated = (1.0 - wet_blend) * existing_val + wet_blend * observed_signal
-            driver_entry["wet_skill"] = round(round(updated * 20) / 20, 2)
+            driver_entry["wet_skill"] = round(updated, 3)
             touched_wet += 1
 
         if touched_wet > 0:

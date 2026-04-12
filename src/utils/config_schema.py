@@ -253,7 +253,6 @@ class BaselineQualifyingConfig(StrictConfigModel):
     wet_skill_weight: float = Field(default=0.18, ge=0.0, le=1.0)
     sprint_wet_skill_scale: float = Field(default=0.75, ge=0.0, le=1.0)
     wet_skill_neutral: float = Field(default=0.70, ge=0.0, le=1.0)
-    mixed_wet_blend: float = Field(default=0.50, ge=0.0, le=1.0)
     team_weight: float = Field(default=0.60, ge=0.0, le=1.0)
     skill_weight: float = Field(default=0.40, ge=0.0, le=1.0)
 
@@ -707,7 +706,7 @@ class LapTimeConfig(StrictConfigModel):
     elite_skill_lap_bonus_max: float = Field(default=0.22, ge=0.0)
     elite_skill_exponent: float = Field(default=0.85, gt=0.0, le=2.0)
     bounds: list[float] = Field(default_factory=lambda: [70.0, 120.0])
-    wet_skill_lap_weight: float = Field(default=0.16, ge=0.0, le=0.5)
+    wet_skill_lap_weight: float = Field(default=0.80, ge=0.0, le=2.0)
     wet_skill_neutral: float = Field(default=0.70, ge=0.0, le=1.0)
     track_wet_severity_base: float = Field(default=0.80, ge=0.0, le=2.0)
     track_wet_severity_scale: float = Field(default=0.40, ge=0.0, le=2.0)
@@ -896,6 +895,7 @@ class BaselineRaceConfig(StrictConfigModel):
         default_factory=PredictedGridUncertaintyConfig
     )
     main_race_movement_floor: float = Field(default=0.70, ge=0.0)
+    main_race_movement_floor_track_scale: float = Field(default=0.25, ge=0.0, le=1.0)
     main_race_movement_quantile: float = Field(default=20.0, ge=0.0)
     position_interval_floor: PositionIntervalFloorConfig = Field(
         default_factory=PositionIntervalFloorConfig
@@ -932,6 +932,7 @@ class BaselinePredictorSectionConfig(StrictConfigModel):
 
     team_strength_schedule: str = Field(default="rapid_adaptive")
     baseline_learning_rate: float = Field(default=0.3, ge=0.0, le=1.0)
+    mixed_wet_blend: float = Field(default=0.50, ge=0.0, le=1.0)
     current_season_form: CurrentSeasonFormConfig = Field(default_factory=CurrentSeasonFormConfig)
     driver_form: DriverFormConfig = Field(default_factory=DriverFormConfig)
     qualifying: BaselineQualifyingConfig = Field(default_factory=BaselineQualifyingConfig)

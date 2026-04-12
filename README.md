@@ -471,6 +471,6 @@ where that heuristic fails entirely.
 wet/mixed qualifying sessions. A FastF1-based extraction script is planned that
 will compute these automatically from historical session data.
 
-To update: run `scripts/extract_wet_skill_ratings.py` (not yet implemented)
+To compute from data: run `scripts/compute_wet_skill_from_data.py --years 2022,2023,2024,2025`
 then review output before applying — manual override for rookies will still be needed.
 Update cadence: once per season, after ≥3 wet qualifying sessions have occurred.
