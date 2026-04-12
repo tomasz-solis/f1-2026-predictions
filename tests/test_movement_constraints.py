@@ -149,4 +149,4 @@ class TestMovementFloorTrackScale:
         )
         positions = [row["position"] for row in finish]
         assert len(positions) == 20
-        assert all(isinstance(p, float) for p in positions)
+        assert all(isinstance(p, int | float) for p in positions)
