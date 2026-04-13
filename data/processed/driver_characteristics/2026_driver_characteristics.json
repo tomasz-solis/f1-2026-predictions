@@ -39,7 +39,7 @@
       "wet_skill": 0.75,
       "pace": {
         "quali_pace": 0.675,
-        "race_pace": 0.755
+        "race_pace": 0.741
       },
       "racecraft": {
         "skill_score": 0.712,
@@ -55,10 +55,10 @@
         "dnf_rate": 0.129
       },
       "bayesian": {
-        "rating_mu": 16.213526665012,
-        "rating_sigma": 1.9969171465722282,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946813",
+        "rating_mu": 16.14765794563446,
+        "rating_sigma": 1.9606135734813708,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968610",
         "season_year": 2026
       }
     },
@@ -85,8 +85,8 @@
       "bayesian": {
         "rating_mu": 14.912372225953854,
         "rating_sigma": 2.1289463820539525,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946819",
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968618",
         "season_year": 2026
       }
     },
@@ -95,7 +95,7 @@
       "wet_skill": 0.8,
       "pace": {
         "quali_pace": 0.58,
-        "race_pace": 0.899
+        "race_pace": 0.714
       },
       "racecraft": {
         "skill_score": 0.777,
@@ -111,10 +111,10 @@
         "dnf_rate": 0.057
       },
       "bayesian": {
-        "rating_mu": 14.331789802353098,
-        "rating_sigma": 3.965492328974361,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946807",
+        "rating_mu": 14.28667989826904,
+        "rating_sigma": 3.687247276382214,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968594",
         "season_year": 2026
       }
     },
@@ -123,7 +123,7 @@
       "wet_skill": 0.85,
       "pace": {
         "quali_pace": 0.564,
-        "race_pace": 0.654
+        "race_pace": 0.647
       },
       "racecraft": {
         "skill_score": 0.758,
@@ -139,10 +139,10 @@
         "dnf_rate": 0.1
       },
       "bayesian": {
-        "rating_mu": 8.733229088493077,
-        "rating_sigma": 4.735461215841078,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946812",
+        "rating_mu": 9.606686792475536,
+        "rating_sigma": 4.28061952566928,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968607",
         "season_year": 2026
       }
     },
@@ -151,7 +151,7 @@
       "wet_skill": 0.75,
       "pace": {
         "quali_pace": 0.554,
-        "race_pace": 0.687
+        "race_pace": 0.661
       },
       "racecraft": {
         "skill_score": 0.75,
@@ -167,10 +167,10 @@
         "dnf_rate": 0.2
       },
       "bayesian": {
-        "rating_mu": 13.359012316573574,
-        "rating_sigma": 3.9880864781107612,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946819",
+        "rating_mu": 13.03512268554786,
+        "rating_sigma": 3.705367148123592,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968617",
         "season_year": 2026
       }
     },
@@ -179,7 +179,7 @@
       "wet_skill": 0.6,
       "pace": {
         "quali_pace": 0.533,
-        "race_pace": 0.467
+        "race_pace": 0.477
       },
       "racecraft": {
         "skill_score": 0.593,
@@ -195,10 +195,10 @@
         "dnf_rate": 0.13
       },
       "bayesian": {
-        "rating_mu": 9.406183781424668,
-        "rating_sigma": 4.210676638514784,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946813",
+        "rating_mu": 9.872331517340065,
+        "rating_sigma": 3.881614148748293,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968609",
         "season_year": 2026
       }
     },
@@ -207,7 +207,7 @@
       "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.539,
-        "race_pace": 0.637
+        "race_pace": 0.647
       },
       "racecraft": {
         "skill_score": 0.622,
@@ -223,10 +223,10 @@
         "dnf_rate": 0.171
       },
       "bayesian": {
-        "rating_mu": 14.283889411727351,
-        "rating_sigma": 1.9969171465722282,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946817",
+        "rating_mu": 14.3498574582526,
+        "rating_sigma": 1.9606135734813708,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968614",
         "season_year": 2026
       }
     },
@@ -235,7 +235,7 @@
       "wet_skill": 0.65,
       "pace": {
         "quali_pace": 0.662,
-        "race_pace": 0.67
+        "race_pace": 0.64
       },
       "racecraft": {
         "skill_score": 0.717,
@@ -251,10 +251,10 @@
         "dnf_rate": 0.125
       },
       "bayesian": {
-        "rating_mu": 13.55758693800488,
-        "rating_sigma": 3.75758019165698,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946806",
+        "rating_mu": 13.117147953396529,
+        "rating_sigma": 3.518543656744333,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968593",
         "season_year": 2026
       }
     },
@@ -263,7 +263,7 @@
       "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.499,
-        "race_pace": 0.46
+        "race_pace": 0.42
       },
       "racecraft": {
         "skill_score": 0.417,
@@ -279,10 +279,10 @@
         "dnf_rate": 0.152
       },
       "bayesian": {
-        "rating_mu": 11.83576086507678,
-        "rating_sigma": 3.0472619823170572,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946821",
+        "rating_mu": 9.275308320039425,
+        "rating_sigma": 5.716307820628703,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968620",
         "season_year": 2026
       }
     },
@@ -291,7 +291,7 @@
       "wet_skill": 0.75,
       "pace": {
         "quali_pace": 0.601,
-        "race_pace": 0.704
+        "race_pace": 0.69
       },
       "racecraft": {
         "skill_score": 0.852,
@@ -307,10 +307,10 @@
         "dnf_rate": 0.1
       },
       "bayesian": {
-        "rating_mu": 17.22521969385559,
-        "rating_sigma": 1.9969171465722282,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946809",
+        "rating_mu": 17.082020608808055,
+        "rating_sigma": 1.9606135734813708,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968597",
         "season_year": 2026
       }
     },
@@ -346,7 +346,7 @@
       "wet_skill": 0.65,
       "pace": {
         "quali_pace": 0.489,
-        "race_pace": 0.53
+        "race_pace": 0.526
       },
       "racecraft": {
         "skill_score": 0.581,
@@ -362,10 +362,10 @@
         "dnf_rate": 0.111
       },
       "bayesian": {
-        "rating_mu": 11.020042562214392,
-        "rating_sigma": 3.5995410779357804,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946814",
+        "rating_mu": 11.075134173178201,
+        "rating_sigma": 3.3879672334552744,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968611",
         "season_year": 2026
       }
     },
@@ -401,7 +401,7 @@
       "wet_skill": 0.8,
       "pace": {
         "quali_pace": 0.603,
-        "race_pace": 0.697
+        "race_pace": 0.693
       },
       "racecraft": {
         "skill_score": 0.82,
@@ -417,10 +417,10 @@
         "dnf_rate": 0.1
       },
       "bayesian": {
-        "rating_mu": 14.37010571643219,
-        "rating_sigma": 3.85619534727522,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946810",
+        "rating_mu": 14.451695562562454,
+        "rating_sigma": 3.599001702191119,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968599",
         "season_year": 2026
       }
     },
@@ -456,7 +456,7 @@
       "wet_skill": 0.65,
       "pace": {
         "quali_pace": 0.605,
-        "race_pace": 0.649
+        "race_pace": 0.621
       },
       "racecraft": {
         "skill_score": 0.675,
@@ -472,10 +472,10 @@
         "dnf_rate": 0.208
       },
       "bayesian": {
-        "rating_mu": 14.50210112668355,
-        "rating_sigma": 2.1289463820539525,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946820",
+        "rating_mu": 13.776767839652868,
+        "rating_sigma": 4.013830325602158,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968619",
         "season_year": 2026
       }
     },
@@ -484,7 +484,7 @@
       "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.562,
-        "race_pace": 0.559
+        "race_pace": 0.555
       },
       "racecraft": {
         "skill_score": 0.589,
@@ -500,10 +500,10 @@
         "dnf_rate": 0.071
       },
       "bayesian": {
-        "rating_mu": 13.47051036223647,
-        "rating_sigma": 2.291929315654208,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946808",
+        "rating_mu": 13.39698703758132,
+        "rating_sigma": 2.236023443283653,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968595",
         "season_year": 2026
       }
     },
@@ -512,7 +512,7 @@
       "wet_skill": 0.9,
       "pace": {
         "quali_pace": 0.704,
-        "race_pace": 0.95
+        "race_pace": 0.823
       },
       "racecraft": {
         "skill_score": 0.95,
@@ -528,10 +528,10 @@
         "dnf_rate": 0.03
       },
       "bayesian": {
-        "rating_mu": 17.748676165804802,
-        "rating_sigma": 3.8990408425007215,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946802",
+        "rating_mu": 17.51778110971763,
+        "rating_sigma": 3.633711556784649,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968584",
         "season_year": 2026
       }
     },
@@ -540,7 +540,7 @@
       "wet_skill": 0.75,
       "pace": {
         "quali_pace": 0.618,
-        "race_pace": 0.637
+        "race_pace": 0.641
       },
       "racecraft": {
         "skill_score": 0.648,
@@ -556,10 +556,10 @@
         "dnf_rate": 0.13
       },
       "bayesian": {
-        "rating_mu": 14.325403631163933,
-        "rating_sigma": 1.9969171465722282,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946818",
+        "rating_mu": 14.351335412570828,
+        "rating_sigma": 1.9606135734813708,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968616",
         "season_year": 2026
       }
     },
@@ -568,7 +568,7 @@
       "wet_skill": 0.9,
       "pace": {
         "quali_pace": 0.535,
-        "race_pace": 0.58
+        "race_pace": 0.576
       },
       "racecraft": {
         "skill_score": 0.635,
@@ -584,10 +584,10 @@
         "dnf_rate": 0.1
       },
       "bayesian": {
-        "rating_mu": 13.96812397445796,
-        "rating_sigma": 1.9969171465722282,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946809",
+        "rating_mu": 13.911688642543043,
+        "rating_sigma": 1.9606135734813708,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968598",
         "season_year": 2026
       }
     },
@@ -596,7 +596,7 @@
       "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.529,
-        "race_pace": 0.663
+        "race_pace": 0.658
       },
       "racecraft": {
         "skill_score": 0.571,
@@ -612,10 +612,10 @@
         "dnf_rate": 0.111
       },
       "bayesian": {
-        "rating_mu": 16.26495770155485,
-        "rating_sigma": 3.888465947881314,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946816",
+        "rating_mu": 15.967299080330715,
+        "rating_sigma": 3.6251586152508732,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968613",
         "season_year": 2026
       }
     },
@@ -624,7 +624,7 @@
       "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.523,
-        "race_pace": 0.541
+        "race_pace": 0.533
       },
       "racecraft": {
         "skill_score": 0.459,
@@ -640,10 +640,10 @@
         "dnf_rate": 0.167
       },
       "bayesian": {
-        "rating_mu": 11.989754484424259,
-        "rating_sigma": 1.9969171465722282,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946811",
+        "rating_mu": 11.951707886306833,
+        "rating_sigma": 1.9606135734813708,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968606",
         "season_year": 2026
       }
     },
@@ -733,7 +733,7 @@
       "wet_skill": 0.7,
       "pace": {
         "quali_pace": 0.585,
-        "race_pace": 0.594
+        "race_pace": 0.585
       },
       "racecraft": {
         "skill_score": 0.687,
@@ -749,10 +749,10 @@
         "dnf_rate": 0.145
       },
       "bayesian": {
-        "rating_mu": 14.113427725803026,
-        "rating_sigma": 1.9969171465722282,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946815",
+        "rating_mu": 14.03218663359355,
+        "rating_sigma": 1.9606135734813708,
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968612",
         "season_year": 2026
       }
     },
@@ -779,8 +779,8 @@
       "bayesian": {
         "rating_mu": 12.821521568575804,
         "rating_sigma": 2.1289463820539525,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946822",
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968621",
         "season_year": 2026
       }
     },
@@ -808,14 +808,14 @@
       "bayesian": {
         "rating_mu": 12.606324363858608,
         "rating_sigma": 1.9969171465722282,
-        "last_session": "Japanese Grand Prix",
-        "last_updated": "2026-04-09T09:33:42.946817",
+        "last_session": "Sprint_Chinese Grand Prix",
+        "last_updated": "2026-04-12T17:23:24.968615",
         "season_year": 2026
       }
     }
   },
-  "version": 9,
-  "last_updated": "2026-04-09T10:01:48.786764",
+  "version": 5,
+  "last_updated": "2026-04-12T17:23:24.968997",
   "extraction_date": "2026-03-30T12:44:57.846556+00:00",
   "carried_over_from": 2025,
   "bayesian_last_updated_year": 2026
