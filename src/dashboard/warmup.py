@@ -27,6 +27,7 @@ from src.dashboard.prediction_checkpointing import (
     prediction_payload_for_session,
     prediction_sections_for_session,
     prediction_targets_for_checkpoint,
+    resolve_prediction_checkpoint_session,
 )
 from src.dashboard.prediction_flow import (
     _derive_race_input_confidence,
@@ -264,8 +265,8 @@ def _resolve_warmup_targets(
 def _checkpoint_sessions(is_sprint: bool) -> tuple[tuple[str, str], ...]:
     """Return checkpoint and FastF1 session bindings for the weekend type."""
     if is_sprint:
-        return (("FP1", "FP1"), ("SQ", "SQ"), ("Sprint", "Sprint"), ("Q", "Q"))
-    return (("FP1", "FP1"), ("FP2", "FP2"), ("FP3", "FP3"), ("Q", "Q"))
+        return (("FP1", "FP1"), ("SQ", "SQ"))
+    return (("FP1", "FP1"), ("FP2", "FP2"), ("FP3", "FP3"))
 
 
 def _resolve_checkpoint_context(
@@ -703,7 +704,10 @@ def run_warmup_precompute_cycle(
                 continue
 
             target_boundary_signature = target_checkpoint_context.boundary_signature
-            target_checkpoint = target_checkpoint_context.checkpoint
+            target_checkpoint = resolve_prediction_checkpoint_session(
+                target_checkpoint_context.checkpoint,
+                is_sprint=target_is_sprint,
+            )
             race_boundaries[target_race] = target_boundary_signature
             summary.target_contexts.append(
                 {

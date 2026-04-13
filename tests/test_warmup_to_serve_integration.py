@@ -47,7 +47,29 @@ def _prediction_store_key(
 
 
 class _IntegrationPredictor:
-    """Minimal predictor that turns an actual qualifying grid into a race payload."""
+    """Minimal predictor that turns a predicted FP3 grid into a stable race payload."""
+
+    def predict_qualifying(
+        self,
+        *,
+        year: int,
+        race_name: str,
+        qualifying_stage: str,
+        n_simulations: int,
+        practice_signal_mode: str,
+        checkpoint_session_name: str,
+    ) -> dict[str, Any]:
+        """Return one deterministic qualifying prediction for the integration path."""
+        del year, race_name, qualifying_stage, n_simulations, practice_signal_mode
+        assert checkpoint_session_name == "FP3"
+        return {
+            "grid": [
+                {"position": 1, "driver": "RUS", "team": "Mercedes"},
+                {"position": 2, "driver": "LEC", "team": "Ferrari"},
+            ],
+            "data_confidence_score": 0.95,
+            "data_source": "FP3 short-stint",
+        }
 
     def predict_race(
         self,
@@ -89,7 +111,7 @@ def test_warmup_cycle_persists_payload_that_dashboard_serves(monkeypatch):
     race_name = "Japanese Grand Prix"
     weather = "dry"
     artifact_hash = "artifact_hash"
-    boundary_signature = "sig_q"
+    boundary_signature = "sig_fp3"
     artifact_versions = {"car_characteristics::2026::car_characteristics": (7, "ts")}
     predictor = _IntegrationPredictor()
 
@@ -97,23 +119,13 @@ def test_warmup_cycle_persists_payload_that_dashboard_serves(monkeypatch):
     prediction_store: dict[tuple[str, str, str, str, str], dict[str, Any]] = {}
     horizon_store: dict[tuple[int, str], dict[str, Any]] = {}
 
-    actual_qualifying_grid = [
-        {"position": 1, "driver": "RUS", "team": "Mercedes"},
-        {"position": 2, "driver": "LEC", "team": "Ferrari"},
-    ]
-
     def _fetch_actual_results(
         year: int,
         race_name: str,
         session_name: str,
     ) -> tuple[list[dict[str, Any]] | None, str]:
-        """Return completed qualifying results and leave the race uncompleted."""
-        del year, race_name
-        session_key = str(session_name).strip().upper()
-        if session_key == "Q":
-            return list(actual_qualifying_grid), "ACTUAL"
-        if session_key == "R":
-            return None, "INCOMPLETE"
+        """Leave Q and R unresolved so the warmup path stays on the FP3 checkpoint."""
+        del year, race_name, session_name
         return None, "INCOMPLETE"
 
     def _load_base_features(**kwargs: Any) -> dict[str, Any] | None:
@@ -218,10 +230,10 @@ def test_warmup_cycle_persists_payload_that_dashboard_serves(monkeypatch):
             boundary_signature=boundary_signature,
         )
     ]
-    assert warmed_prediction["qualifying"]["result_mode"] == "ACTUAL"
+    assert warmed_prediction["qualifying"]["grid_source"] == "PREDICTED"
     assert warmed_prediction["qualifying"]["grid"][0]["driver"] == "RUS"
-    assert warmed_prediction["race"]["grid_source"] == "ACTUAL"
-    assert warmed_prediction["race"]["input_confidence"] == 1.0
+    assert warmed_prediction["race"]["grid_source"] == "PREDICTED"
+    assert warmed_prediction["race"]["input_confidence"] == 0.95
 
     live_prediction_flow.clear_prediction_result_cache()
     progress_messages: list[str] = []
@@ -279,7 +291,7 @@ def test_warmup_cycle_persists_payload_that_dashboard_serves(monkeypatch):
     )
 
     assert output["prediction_results"] == warmed_prediction
-    assert output["boundary_session_name"] == "Q"
+    assert output["boundary_session_name"] == "FP3"
     assert output["precompute_summary"]["ready_races"] == [race_name]
     assert output["prediction_cache_hit"] is False
     assert progress_messages[-1] == "Loaded persisted prediction..."
@@ -293,4 +305,4 @@ def test_warmup_cycle_persists_payload_that_dashboard_serves(monkeypatch):
     assert served_prediction["race"]["finish_order"][0]["position"] == 1
     assert served_prediction["race"]["finish_order"][0]["driver"] == "RUS"
     assert served_prediction["race"]["finish_order"][0]["confidence"] == 78.4
-    assert served_prediction["race"]["input_confidence"] == 1.0
+    assert served_prediction["race"]["input_confidence"] == 0.95

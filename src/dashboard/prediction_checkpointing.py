@@ -18,9 +18,24 @@ from src.utils.accuracy_targets import (
     target_session_name,
     weekend_format_name,
 )
+from src.utils.model_version import get_model_version
 
 PredictionResults = dict[str, Any]
 logger = logging.getLogger(__name__)
+_NON_COMPETITIVE_PREDICTION_CHECKPOINTS = {
+    False: ("PRE", "FP1", "FP2", "FP3"),
+    True: ("PRE", "FP1", "SQ"),
+}
+_CHECKPOINT_ORDER = {
+    "PRE": 0,
+    "FP1": 1,
+    "FP2": 2,
+    "FP3": 3,
+    "SQ": 4,
+    "SPRINT": 5,
+    "Q": 6,
+    "R": 7,
+}
 _TARGET_SECTION_BINDINGS = {
     False: {
         TARGET_MAIN_QUALIFYING: ("qualifying", "grid"),
@@ -33,6 +48,11 @@ _TARGET_SECTION_BINDINGS = {
         TARGET_GRAND_PRIX_RACE: ("main_race", "finish_order"),
     },
 }
+
+
+def allowed_prediction_checkpoints(*, is_sprint: bool) -> tuple[str, ...]:
+    """Return checkpoints that are allowed to inform a fresh prediction."""
+    return _NON_COMPETITIVE_PREDICTION_CHECKPOINTS[bool(is_sprint)]
 
 
 def prediction_payload_for_session(
@@ -49,7 +69,7 @@ def prediction_payload_for_session(
             prediction_results.get("qualifying", {}).get("fp_blend_info", {}),
         )
 
-    session_name_upper = str(session_name).strip().upper()
+    session_name_upper = resolve_prediction_checkpoint_session(session_name, is_sprint=is_sprint)
     sprint_phase_sessions = {"PRE", "FP1", "SQ", "SPRINT"}
     if session_name_upper in sprint_phase_sessions:
         return (
@@ -78,7 +98,7 @@ def prediction_sections_for_session(
             prediction_results.get("race", {}),
         )
 
-    session_name_upper = str(session_name).strip().upper()
+    session_name_upper = resolve_prediction_checkpoint_session(session_name, is_sprint=is_sprint)
     if session_name_upper in {"PRE", "FP1", "SQ", "SPRINT"}:
         return (
             prediction_results.get("sprint_quali", {}),
@@ -91,10 +111,39 @@ def prediction_sections_for_session(
     )
 
 
-def resolve_prediction_checkpoint_session(latest_session: Any) -> str:
-    """Map the latest completed session into the stored checkpoint key."""
+def resolve_prediction_checkpoint_session(
+    latest_session: Any,
+    *,
+    is_sprint: bool,
+) -> str:
+    """Clamp the latest completed session to the last allowed prediction checkpoint."""
     normalized = str(latest_session or "").strip().upper()
-    return normalized if normalized else "PRE"
+    if not normalized:
+        return "PRE"
+
+    latest_order = _CHECKPOINT_ORDER.get(normalized, -1)
+    for checkpoint in reversed(allowed_prediction_checkpoints(is_sprint=is_sprint)):
+        if latest_order >= _CHECKPOINT_ORDER[checkpoint]:
+            return checkpoint
+    return "PRE"
+
+
+def session_is_within_prediction_boundary(
+    *,
+    session_name: str,
+    checkpoint_session: str,
+    is_sprint: bool,
+) -> bool:
+    """Return whether session data is allowed to inform predictions at the checkpoint."""
+    normalized_session = str(session_name or "").strip().upper()
+    resolved_checkpoint = resolve_prediction_checkpoint_session(
+        checkpoint_session,
+        is_sprint=is_sprint,
+    )
+    return _CHECKPOINT_ORDER.get(normalized_session, -1) <= _CHECKPOINT_ORDER.get(
+        resolved_checkpoint,
+        -1,
+    )
 
 
 def prediction_targets_for_checkpoint(
@@ -104,7 +153,10 @@ def prediction_targets_for_checkpoint(
     session_name: str,
 ) -> dict[str, dict[str, Any]]:
     """Collect still-forecastable targets for one checkpoint save."""
-    checkpoint_session = resolve_prediction_checkpoint_session(session_name)
+    checkpoint_session = resolve_prediction_checkpoint_session(
+        session_name,
+        is_sprint=is_sprint,
+    )
     target_predictions: dict[str, dict[str, Any]] = {}
     section_bindings = _TARGET_SECTION_BINDINGS[bool(is_sprint)]
 
@@ -174,6 +226,7 @@ def persist_prediction_checkpoint_summary(
             "weather": str(weather).strip().lower(),
             "is_sprint_weekend": bool(is_sprint),
             "weekend_format": weekend_format_name(is_sprint),
+            "model_version": get_model_version(),
             "generated_at": datetime.now(UTC).isoformat(),
             "source": "dashboard_live_prediction",
         },
@@ -247,13 +300,22 @@ def save_prediction_if_enabled_core(
         ).strip()
     checkpoint_override = str(checkpoint_session_override or "").strip().upper()
     if prediction_boundary_session:
-        checkpoint_session = resolve_prediction_checkpoint_session(prediction_boundary_session)
+        checkpoint_session = resolve_prediction_checkpoint_session(
+            prediction_boundary_session,
+            is_sprint=is_sprint,
+        )
     elif checkpoint_override:
-        checkpoint_session = resolve_prediction_checkpoint_session(checkpoint_override)
+        checkpoint_session = resolve_prediction_checkpoint_session(
+            checkpoint_override,
+            is_sprint=is_sprint,
+        )
     else:
         detector = detector_factory()
         latest_session = detector.get_latest_completed_session(year, race_name, is_sprint)
-        checkpoint_session = resolve_prediction_checkpoint_session(latest_session)
+        checkpoint_session = resolve_prediction_checkpoint_session(
+            latest_session,
+            is_sprint=is_sprint,
+        )
 
     if logger_inst.has_prediction_for_session(year, race_name, checkpoint_session):
         st_module.info(f"Prediction for {checkpoint_session} already saved (max 1 per session)")

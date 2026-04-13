@@ -137,7 +137,7 @@ def test_accuracy_pipeline_skips_reconciliation_on_initial_load_by_default(patch
     assert reconcile_calls == []
 
 
-def test_accuracy_pipeline_excludes_ineligible_target_but_keeps_race_target(patcher):
+def test_accuracy_pipeline_excludes_ineligible_target_but_keeps_allowed_race_target(patcher):
     """A contaminated qualifying target should not block a valid race target from scoring."""
 
     class _Logger:
@@ -152,7 +152,7 @@ def test_accuracy_pipeline_excludes_ineligible_target_but_keeps_race_target(patc
                     "metadata": {
                         "year": 2026,
                         "race_name": "Australian Grand Prix",
-                        "session_name": "Q",
+                        "session_name": "FP3",
                         "weekend_format": "normal",
                     },
                     "qualifying": {

@@ -335,6 +335,6 @@ def test_run_cycle_reconciles_sprint_actuals_and_writes_accuracy_snapshots(patch
     assert summary.checked_events == 1
     assert summary.generated_predictions == []
     assert summary.reconciled_actuals == ["Chinese Grand Prix::5"]
-    assert summary.accuracy_snapshots == 10
+    assert summary.accuracy_snapshots == 7
     assert sorted(set(fetch_calls)) == ["Q", "R", "SQ", "Sprint"]
-    assert len(accuracy_saves) == 10
+    assert len(accuracy_saves) == 7

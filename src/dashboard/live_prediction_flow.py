@@ -222,9 +222,12 @@ def _prediction_sections_for_session(
     )
 
 
-def _resolve_prediction_checkpoint_session(latest_session: Any) -> str:
+def _resolve_prediction_checkpoint_session(latest_session: Any, *, is_sprint: bool) -> str:
     """Map the latest completed session into the stored checkpoint key."""
-    return _prediction_checkpointing.resolve_prediction_checkpoint_session(latest_session)
+    return _prediction_checkpointing.resolve_prediction_checkpoint_session(
+        latest_session,
+        is_sprint=is_sprint,
+    )
 
 
 def prediction_targets_for_checkpoint(

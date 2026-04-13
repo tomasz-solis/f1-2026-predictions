@@ -7,6 +7,8 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 
+from src.utils.model_version import format_model_version_label
+
 from .styles import CUSTOM_CSS
 
 # Brand asset filenames.
@@ -20,7 +22,7 @@ BRAND_TAGLINE = "Motorsport data forecasting and telemetry insights"
 BRAND_DISCLAIMER = "Independent analytics project • not affiliated with any racing series, teams, or governing bodies"
 # Header alignment toggle. Options: "left" or "center".
 BRAND_HEADER_ALIGNMENT = "left"
-BRAND_MODEL_VERSION = "v1.6"
+BRAND_MODEL_VERSION = format_model_version_label()
 BRAND_LAST_UPDATED = "Unavailable"
 ENABLE_PREDICTION_ACCURACY_TAB = True
 NAVIGATION_PAGES = ["Prediction", "Team Comparison"]

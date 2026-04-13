@@ -70,11 +70,11 @@ def _build_normal_weekend_predictor() -> MagicMock:
         ),
         pytest.param(
             "Q",
-            (TARGET_GRAND_PRIX_RACE,),
-            "ACTUAL",
-            "ACTUAL",
-            False,
-            id="q-completed",
+            (TARGET_MAIN_QUALIFYING, TARGET_GRAND_PRIX_RACE),
+            "PREDICTED",
+            "PREDICTED",
+            True,
+            id="q-clamped-to-fp3",
         ),
     ],
 )
@@ -129,11 +129,15 @@ def test_conventional_weekend_checkpoint_matrix_keeps_targets_and_dashboard_flow
     )
 
     assert set(result) == {"qualifying", "race"}
-    assert eligible_target_keys(checkpoint_session, is_sprint=False) == expected_target_keys
-    assert checkpoint_session in target_checkpoint_sequence(TARGET_GRAND_PRIX_RACE, "normal")
-    assert (checkpoint_session in target_checkpoint_sequence(TARGET_MAIN_QUALIFYING, "normal")) is (
-        TARGET_MAIN_QUALIFYING in expected_target_keys
+    resolved_checkpoint = prediction_flow.resolve_prediction_checkpoint_session(
+        checkpoint_session,
+        is_sprint=False,
     )
+    assert eligible_target_keys(resolved_checkpoint, is_sprint=False) == expected_target_keys
+    assert resolved_checkpoint in target_checkpoint_sequence(TARGET_GRAND_PRIX_RACE, "normal")
+    assert (
+        resolved_checkpoint in target_checkpoint_sequence(TARGET_MAIN_QUALIFYING, "normal")
+    ) is (TARGET_MAIN_QUALIFYING in expected_target_keys)
     assert (
         str(result["qualifying"].get("result_mode", "PREDICTED")).upper()
         == expected_qualifying_mode
@@ -142,10 +146,10 @@ def test_conventional_weekend_checkpoint_matrix_keeps_targets_and_dashboard_flow
 
     if expect_predicted_qualifying:
         assert predictor.predict_qualifying.call_count == 1
-        assert grid_refresh_sessions == ["Q"]
+        assert grid_refresh_sessions == []
         assert result["qualifying"]["grid_source"] == "PREDICTED"
         assert predictor.predict_qualifying.call_args.kwargs["checkpoint_session_name"] == (
-            checkpoint_session
+            resolved_checkpoint
         )
         assert predictor.predict_race.call_args.kwargs["qualifying_grid"] == [
             {"driver": "NOR", "team": "McLaren", "position": 1}

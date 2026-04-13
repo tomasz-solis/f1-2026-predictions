@@ -919,12 +919,22 @@ def test_run_warmup_precompute_cycle_returns_locked_when_another_worker_holds_lo
     assert result.reason == "another_worker_holds_lock"
 
 
-def test_compute_base_features_uses_actual_qualifying_section_after_completed_q(patcher):
-    """Warmup base features should stop predicting qualifying once Q is complete."""
+def test_compute_base_features_clamps_completed_q_to_fp3_prediction(patcher):
+    """Warmup base features should ignore completed Q data and keep the FP3 boundary."""
 
     class _Predictor:
+        def __init__(self):
+            self.qualifying_kwargs = None
+
         def predict_qualifying(self, **kwargs):
-            raise AssertionError("predict_qualifying should not run for completed qualifying")
+            self.qualifying_kwargs = kwargs
+            return {
+                "grid": [{"position": 1, "driver": "NOR", "team": "McLaren"}],
+                "data_confidence_score": 0.9,
+                "data_source": "FP3 short-stint",
+            }
+
+    predictor = _Predictor()
 
     patcher.setattr(
         warmup,
@@ -935,6 +945,13 @@ def test_compute_base_features_uses_actual_qualifying_section_after_completed_q(
             else (None, "INCOMPLETE")
         ),
     )
+    patcher.setattr(
+        warmup,
+        "fetch_grid_if_available",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("fetch_grid_if_available should not run after FP3")
+        ),
+    )
 
     result = warmup.compute_base_features(
         2026,
@@ -942,13 +959,15 @@ def test_compute_base_features_uses_actual_qualifying_section_after_completed_q(
         "Q",
         "artifact_hash",
         "boundary_signature",
-        predictor=_Predictor(),
+        predictor=predictor,
         is_sprint=False,
     )
 
-    assert result["qualifying"]["result_mode"] == "ACTUAL"
-    assert result["qualifying"]["grid"][0]["driver"] == "RUS"
-    assert result["race_input_confidence"] == 1.0
+    assert predictor.qualifying_kwargs is not None
+    assert predictor.qualifying_kwargs["checkpoint_session_name"] == "FP3"
+    assert result["qualifying"]["grid_source"] == "PREDICTED"
+    assert result["qualifying"]["grid"][0]["driver"] == "NOR"
+    assert result["race_input_confidence"] == pytest.approx(0.9)
 
 
 def test_compute_base_features_uses_stored_checkpoint_profiles_for_qualifying(patcher):

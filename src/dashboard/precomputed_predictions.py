@@ -12,6 +12,7 @@ from typing import Any
 from src.persistence.config import should_read_db_first, should_write_to_db, should_write_to_file
 from src.persistence.runtime_state_store import RuntimeStateStore
 from src.utils import config_loader
+from src.utils.model_version import get_model_version, stamp_model_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -271,7 +272,7 @@ def save_precomputed_prediction(
         "is_sprint": bool(is_sprint),
         "updated_at": now_iso,
         "prediction_results": prediction_results,
-        "metadata": metadata or {},
+        "metadata": stamp_model_metadata(metadata),
     }
 
     if should_write_to_db():
@@ -400,7 +401,7 @@ def save_precomputed_base_features(
         "is_sprint": bool(is_sprint),
         "updated_at": now_iso,
         "base_features": base_features,
-        "metadata": metadata or {},
+        "metadata": stamp_model_metadata(metadata),
     }
 
     if should_write_to_db():
@@ -633,6 +634,7 @@ def save_precompute_horizon_index(
         "boundary_signature": str(boundary_signature).strip(),
         "anchor_race_name": str(anchor_race_name).strip(),
         "anchor_session_name": str(anchor_session_name).strip().upper(),
+        "model_version": get_model_version(),
         "expected_targets": [str(race).strip() for race in expected_targets if str(race).strip()],
         "ready_races": [str(race).strip() for race in ready_races if str(race).strip()],
         "weather_scenarios": [

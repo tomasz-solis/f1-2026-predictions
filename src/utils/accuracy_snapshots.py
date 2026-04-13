@@ -12,6 +12,7 @@ from src.utils.accuracy_targets import (
     target_label,
     weekend_format_name,
 )
+from src.utils.model_version import resolve_model_version
 
 
 def _normalize_snapshot_race_name(value: Any) -> str:
@@ -71,6 +72,7 @@ def build_accuracy_snapshot_records(
     weekend_format = str(metadata.get("weekend_format", "")).strip().lower()
     if weekend_format not in {"normal", "sprint"}:
         weekend_format = weekend_format_name(is_sprint)
+    model_version = resolve_model_version(metadata)
 
     records: list[dict[str, Any]] = []
     for target_key, metrics in target_metrics.items():
@@ -99,6 +101,7 @@ def build_accuracy_snapshot_records(
                         "predicted_at": metadata.get("predicted_at"),
                         "information_cutoff_at": metadata.get("information_cutoff_at"),
                         "generated_at": datetime.now(UTC).isoformat(),
+                        "model_version": model_version,
                         "source_run_id": metadata.get("run_id"),
                         "eligible": bool(target_payload.get("eligible_at_save", True)),
                         "generated_by": generated_by,

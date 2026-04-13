@@ -6,6 +6,8 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from .prediction_checkpointing import resolve_prediction_checkpoint_session
+
 
 def get_prediction_precompute_settings(
     *,
@@ -128,7 +130,10 @@ def resolve_race_boundary_context(
         is_sprint=is_sprint,
         session_detector=session_detector,
     )
-    checkpoint = str(snapshot.get("latest_elapsed_session") or "PRE").strip().upper() or "PRE"
+    checkpoint = resolve_prediction_checkpoint_session(
+        snapshot.get("latest_elapsed_session"),
+        is_sprint=is_sprint,
+    )
     if not bool(snapshot.get("has_schedule_data")):
         return "", checkpoint
     return boundary_signature_fn(snapshot), checkpoint

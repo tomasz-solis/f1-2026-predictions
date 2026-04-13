@@ -1,6 +1,7 @@
 """Focused tests for retrospective checkpoint reconstruction helpers."""
 
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -12,7 +13,9 @@ from src.utils.checkpoint_reconstruction import (
     build_reconstructed_prediction_results,
     build_snapshot_overlay_car_characteristics,
     load_checkpoint_snapshot_payload,
+    reconstruct_checkpoint_prediction,
 )
+from src.utils.model_version import get_model_version
 
 
 def test_build_snapshot_overlay_car_characteristics_preserves_priors_and_replaces_profiles():
@@ -384,3 +387,169 @@ def test_load_checkpoint_snapshot_payload_falls_back_to_latest_prior_snapshot_fo
 
     assert payload["event_name"] == "Testing 2"
     assert payload["session_name"] == "Testing 2 Day 3"
+
+
+def test_reconstruct_checkpoint_prediction_allows_missing_actuals_for_upcoming_pre(
+    patcher,
+    tmp_path,
+):
+    """Upcoming PRE checkpoints should save cleanly even when no actuals exist yet."""
+
+    class _ArtifactStore:
+        def __init__(self, data_root: str | Path = "data"):
+            self.data_root = Path(data_root)
+            self.saved_artifacts: list[dict[str, object]] = []
+
+        def save_artifact(self, **kwargs):
+            if kwargs["artifact_type"] == "accuracy_snapshot":
+                raise AssertionError("Unscored checkpoints should not write accuracy snapshots")
+            self.saved_artifacts.append(kwargs)
+            return kwargs
+
+    class _PredictionLogger:
+        instances: list["_PredictionLogger"] = []
+
+        def __init__(self, predictions_dir: str = "data/predictions"):
+            self.predictions_dir = Path(predictions_dir)
+            self.artifact_store = _ArtifactStore(data_root=self.predictions_dir.parent)
+            self.update_actuals_called = False
+            _PredictionLogger.instances.append(self)
+
+        def has_prediction_for_session(self, year: int, race_name: str, session_name: str) -> bool:
+            del year, race_name, session_name
+            return False
+
+        def get_all_predictions(self, year: int):
+            del year
+            return []
+
+        def save_prediction(self, **kwargs) -> Path:
+            del kwargs
+            return self.predictions_dir / "2026" / "miami_grand_prix" / "miami_grand_prix_pre.json"
+
+        def update_actuals(self, **kwargs) -> bool:
+            del kwargs
+            self.update_actuals_called = True
+            return True
+
+        def load_prediction(self, year: int, race_name: str, session_name: str):
+            del year, race_name, session_name
+            return {
+                "metadata": {
+                    "year": 2026,
+                    "race_name": "Miami Grand Prix",
+                    "session_name": "PRE",
+                    "predicted_at": "2026-05-01T12:00:00+00:00",
+                    "weather": "dry",
+                    "weekend_format": "normal",
+                },
+                "qualifying": {
+                    "predicted_grid": [{"position": 1, "driver": "NOR", "team": "McLaren"}]
+                },
+                "race": {
+                    "predicted_results": [{"position": 1, "driver": "NOR", "team": "McLaren"}]
+                },
+                "targets": {
+                    "main_qualifying": {
+                        "target_session": "Q",
+                        "predicted_order": [{"position": 1, "driver": "NOR", "team": "McLaren"}],
+                        "eligible_at_save": True,
+                    },
+                    "grand_prix_race": {
+                        "target_session": "R",
+                        "predicted_order": [{"position": 1, "driver": "NOR", "team": "McLaren"}],
+                        "eligible_at_save": True,
+                    },
+                },
+                "actuals": {
+                    "qualifying": None,
+                    "race": None,
+                    "targets": {
+                        "main_qualifying": None,
+                        "grand_prix_race": None,
+                    },
+                },
+            }
+
+    patcher.setattr(
+        "src.utils.checkpoint_reconstruction.ArtifactStore",
+        _ArtifactStore,
+    )
+    patcher.setattr(
+        "src.utils.checkpoint_reconstruction.PredictionLogger",
+        _PredictionLogger,
+    )
+    patcher.setattr(
+        "src.utils.checkpoint_reconstruction.build_reconstructed_prediction_results",
+        lambda **kwargs: (
+            {
+                "qualifying": {
+                    "grid": [{"position": 1, "driver": "NOR", "team": "McLaren"}],
+                    "grid_source": "PREDICTED",
+                    "result_mode": "PREDICTED",
+                    "fp_blend_info": {},
+                },
+                "race": {
+                    "finish_order": [{"position": 1, "driver": "NOR", "team": "McLaren"}],
+                    "grid_source": "PREDICTED",
+                    "result_mode": "PREDICTED",
+                },
+            },
+            False,
+        ),
+    )
+    patcher.setattr(
+        "src.dashboard.prediction_checkpointing.prediction_targets_for_checkpoint",
+        lambda **kwargs: {
+            "main_qualifying": {
+                "target_session": "Q",
+                "predicted_order": [{"position": 1, "driver": "NOR", "team": "McLaren"}],
+                "eligible_at_save": True,
+            },
+            "grand_prix_race": {
+                "target_session": "R",
+                "predicted_order": [{"position": 1, "driver": "NOR", "team": "McLaren"}],
+                "eligible_at_save": True,
+            },
+        },
+    )
+
+    def _raise_missing_actuals(**kwargs):
+        del kwargs
+        raise FileNotFoundError("no saved actuals")
+
+    def _raise_snapshot_build(**kwargs):
+        del kwargs
+        raise AssertionError("Missing-actuals checkpoints should not build accuracy snapshots")
+
+    patcher.setattr(
+        "src.utils.checkpoint_reconstruction.collect_saved_target_actuals",
+        _raise_missing_actuals,
+    )
+    patcher.setattr(
+        "src.utils.checkpoint_reconstruction.compute_information_cutoff_at",
+        lambda **kwargs: "2026-05-01T13:29:59+00:00",
+    )
+    patcher.setattr(
+        "src.utils.checkpoint_reconstruction.build_accuracy_snapshot_records",
+        _raise_snapshot_build,
+    )
+
+    summary = reconstruct_checkpoint_prediction(
+        year=2026,
+        race_name="Miami Grand Prix",
+        checkpoint_session="PRE",
+        data_root=tmp_path,
+        overwrite=True,
+    )
+
+    assert summary.actuals_source == "unavailable"
+    assert summary.snapshot_records_written == 0
+    assert _PredictionLogger.instances[0].update_actuals_called is False
+    assert len(_PredictionLogger.instances[0].artifact_store.saved_artifacts) == 1
+    saved_artifact = _PredictionLogger.instances[0].artifact_store.saved_artifacts[0]
+    assert saved_artifact["artifact_type"] == "prediction_checkpoint"
+    assert saved_artifact["artifact_key"] == "2026::Miami Grand Prix::PRE"
+    assert saved_artifact["version"] == 1
+    assert isinstance(saved_artifact["data"], dict)
+    assert saved_artifact["data"]["metadata"]["model_version"] == get_model_version()

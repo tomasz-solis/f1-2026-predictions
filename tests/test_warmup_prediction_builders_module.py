@@ -5,14 +5,20 @@ import pytest
 from src.dashboard import warmup_prediction_builders
 
 
-def test_compute_base_features_uses_actual_qualifying_for_completed_q():
-    """Base features should stop predicting qualifying once actual results exist."""
+def test_compute_base_features_clamps_completed_q_to_fp3_inputs():
+    """Base features should ignore completed Q data and stay on the FP3 prediction boundary."""
 
     class _Predictor:
-        """Fail loudly if qualifying prediction runs for a completed session."""
+        """Capture the checkpoint passed to qualifying prediction."""
+
+        def __init__(self) -> None:
+            self.qualifying_calls: list[dict[str, object]] = []
 
         def predict_qualifying(self, **kwargs):
-            raise AssertionError(f"predict_qualifying should not run: {kwargs}")
+            self.qualifying_calls.append(dict(kwargs))
+            return {"grid": [{"position": 1, "driver": "NOR", "team": "McLaren"}]}
+
+    predictor = _Predictor()
 
     result = warmup_prediction_builders.compute_base_features(
         2026,
@@ -20,7 +26,7 @@ def test_compute_base_features_uses_actual_qualifying_for_completed_q():
         "Q",
         "artifact_hash",
         "boundary_signature",
-        predictor=_Predictor(),
+        predictor=predictor,
         is_sprint=False,
         get_prediction_precompute_config_fn=lambda: {},
         fetch_actual_competitive_results_if_completed_fn=lambda year, race_name, session_name: (
@@ -34,17 +40,18 @@ def test_compute_base_features_uses_actual_qualifying_for_completed_q():
             "grid": grid,
         },
         fetch_grid_if_available_fn=lambda *args, **kwargs: (_ for _ in ()).throw(
-            AssertionError("fetch_grid_if_available should not run for completed qualifying")
+            AssertionError("fetch_grid_if_available should not run past the FP3 boundary")
         ),
         derive_race_input_confidence_fn=lambda qualifying_payload, grid_source: (
-            1.0 if grid_source == "ACTUAL" else 0.0
+            1.0 if grid_source == "ACTUAL" else 0.45
         ),
         cap_predicted_main_race_input_confidence_fn=lambda *args, **kwargs: 0.0,
     )
 
-    assert result["qualifying"]["result_mode"] == "ACTUAL"
-    assert result["qualifying"]["grid"][0]["driver"] == "RUS"
-    assert result["race_input_confidence"] == 1.0
+    assert predictor.qualifying_calls[0]["checkpoint_session_name"] == "FP3"
+    assert result["qualifying"]["grid_source"] == "PREDICTED"
+    assert result["qualifying"]["grid"][0]["driver"] == "NOR"
+    assert result["race_input_confidence"] == 0.45
 
 
 def test_compute_base_features_keeps_sprint_checkpoint_profile_calls():
@@ -96,14 +103,20 @@ def test_compute_base_features_keeps_sprint_checkpoint_profile_calls():
     assert result["main_race_input_confidence"] == pytest.approx(0.75)
 
 
-def test_compute_base_features_uses_actual_sprint_and_main_qualifying_when_available():
-    """Sprint base features should reuse completed SQ and Q results without predicting."""
+def test_compute_base_features_uses_actual_sq_but_not_actual_q():
+    """Sprint base features may use SQ results but must keep main qualifying on the SQ boundary."""
 
     class _Predictor:
-        """Fail loudly if prediction runs for completed qualifying sessions."""
+        """Capture whether main qualifying still runs from the SQ checkpoint."""
+
+        def __init__(self) -> None:
+            self.qualifying_calls: list[dict[str, object]] = []
 
         def predict_qualifying(self, **kwargs):
-            raise AssertionError(f"predict_qualifying should not run: {kwargs}")
+            self.qualifying_calls.append(dict(kwargs))
+            return {"grid": [{"position": 1, "driver": "PIA", "team": "McLaren"}]}
+
+    predictor = _Predictor()
 
     def _actual_results(year, race_name, session_name):
         del year, race_name
@@ -119,7 +132,7 @@ def test_compute_base_features_uses_actual_sprint_and_main_qualifying_when_avail
         "Q",
         "artifact_hash",
         "boundary_signature",
-        predictor=_Predictor(),
+        predictor=predictor,
         is_sprint=True,
         get_prediction_precompute_config_fn=lambda: {},
         fetch_actual_competitive_results_if_completed_fn=_actual_results,
@@ -139,17 +152,19 @@ def test_compute_base_features_uses_actual_sprint_and_main_qualifying_when_avail
 
     assert result["sprint_quali"]["result_mode"] == "ACTUAL"
     assert result["sprint_quali"]["grid"][0]["driver"] == "NOR"
-    assert result["main_quali"]["result_mode"] == "ACTUAL"
-    assert result["main_quali"]["grid"][0]["driver"] == "RUS"
+    assert [call["qualifying_stage"] for call in predictor.qualifying_calls] == ["main"]
+    assert predictor.qualifying_calls[0]["checkpoint_session_name"] == "SQ"
+    assert result["main_quali"]["grid_source"] == "PREDICTED"
+    assert result["main_quali"]["grid"][0]["driver"] == "PIA"
     assert result["sprint_race_input_confidence"] == 1.0
-    assert result["main_race_input_confidence"] == 1.0
+    assert result["main_race_input_confidence"] == 0.0
 
 
-def test_compute_base_features_uses_actual_grid_when_completed_q_becomes_available():
-    """Normal-weekend base features should convert to ACTUAL once grid fetch returns it."""
+def test_compute_base_features_does_not_refresh_q_grid_after_fp3():
+    """Normal-weekend base features should not pull in Q results once the boundary is FP3."""
 
     class _Predictor:
-        """Return one predicted grid so the grid fetcher can replace it."""
+        """Return one predicted grid that should remain untouched."""
 
         def predict_qualifying(self, **kwargs):
             del kwargs
@@ -173,19 +188,18 @@ def test_compute_base_features_uses_actual_grid_when_completed_q_becomes_availab
             "session_name": session_name,
             "grid": grid,
         },
-        fetch_grid_if_available_fn=lambda year, race_name, session_name, predicted_grid: (
-            [{"position": 1, "driver": "RUS", "team": "Mercedes"}],
-            "ACTUAL",
+        fetch_grid_if_available_fn=lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("fetch_grid_if_available should not run after FP3")
         ),
         derive_race_input_confidence_fn=lambda qualifying_payload, grid_source: (
-            1.0 if grid_source == "ACTUAL" else 0.0
+            1.0 if grid_source == "ACTUAL" else 0.35
         ),
         cap_predicted_main_race_input_confidence_fn=lambda *args, **kwargs: 0.0,
     )
 
-    assert result["qualifying"]["result_mode"] == "ACTUAL"
-    assert result["qualifying"]["grid"][0]["driver"] == "RUS"
-    assert result["race_input_confidence"] == 1.0
+    assert result["qualifying"]["grid_source"] == "PREDICTED"
+    assert result["qualifying"]["grid"][0]["driver"] == "NOR"
+    assert result["race_input_confidence"] == 0.35
 
 
 def test_compute_weather_predictions_rejects_unknown_weather():

@@ -27,8 +27,8 @@ def test_prediction_payload_for_session_uses_sprint_phase_outputs_for_sq():
     assert fp_blend_info == {}
 
 
-def test_prediction_payload_for_session_uses_main_outputs_for_main_sessions():
-    """Sprint late-phase checkpoints should persist main qualifying/race outputs."""
+def test_prediction_payload_for_session_clamps_main_sessions_to_sq_outputs():
+    """Sprint late-phase sessions should still resolve to the SQ checkpoint payload."""
     prediction_results = {
         "sprint_quali": {"grid": [{"position": 1, "driver": "NOR", "team": "McLaren"}]},
         "sprint_race": {"finish_order": [{"position": 1, "driver": "NOR", "team": "McLaren"}]},
@@ -42,8 +42,8 @@ def test_prediction_payload_for_session_uses_main_outputs_for_main_sessions():
         session_name="Q",
     )
 
-    assert qualifying_grid == prediction_results["main_quali"]["grid"]
-    assert race_finish == prediction_results["main_race"]["finish_order"]
+    assert qualifying_grid == prediction_results["sprint_quali"]["grid"]
+    assert race_finish == prediction_results["sprint_race"]["finish_order"]
     assert fp_blend_info == {}
 
 
@@ -155,4 +155,4 @@ def test_save_prediction_prefers_prediction_context_boundary_over_override():
         checkpoint_session_override="SPRINT",
     )
 
-    assert logger_instance.saved_session_name == "Q"
+    assert logger_instance.saved_session_name == "SQ"

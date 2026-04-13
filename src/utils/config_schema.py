@@ -36,6 +36,12 @@ class GridConfig(StrictConfigModel):
     size: int = Field(default=22, ge=2)
 
 
+class ModelConfig(StrictConfigModel):
+    """Model release metadata shared across generated artifacts."""
+
+    version: str = Field(default="2.0", min_length=1)
+
+
 class BayesianConfig(StrictConfigModel):
     """Bayesian model parameters."""
 
@@ -956,6 +962,7 @@ class BaselinePredictorConfig(StrictConfigModel):
 
     paths: PathsConfig = Field(default_factory=PathsConfig)
     grid: GridConfig = Field(default_factory=GridConfig)
+    model: ModelConfig = Field(default_factory=ModelConfig)
     bayesian: BayesianConfig = Field(default_factory=BayesianConfig)
     race: RaceConfig = Field(default_factory=RaceConfig)
     qualifying: QualifyingConfig = Field(default_factory=QualifyingConfig)

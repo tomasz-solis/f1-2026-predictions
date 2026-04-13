@@ -13,6 +13,10 @@ from src.utils.race_input_confidence import (
 from .cache import get_predictor
 from .checkpoint_predictor import build_checkpoint_overlay_predictor
 from .precomputed_predictions import get_prediction_precompute_config
+from .prediction_checkpointing import (
+    resolve_prediction_checkpoint_session,
+    session_is_within_prediction_boundary,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -114,8 +118,7 @@ def _resolve_current_checkpoint_session(
     except Exception:
         latest_session = None
 
-    checkpoint_session = str(latest_session or "").strip().upper()
-    return checkpoint_session or "PRE"
+    return resolve_prediction_checkpoint_session(latest_session, is_sprint=is_sprint)
 
 
 def fetch_actual_competitive_results_if_completed(
@@ -290,19 +293,30 @@ def _resolve_qualifying_section(
     session_name: str,
     qualifying_stage: str,
     checkpoint_session_name: str,
+    is_sprint: bool,
 ) -> tuple[dict[str, Any], list[QualifyingGridEntry], str]:
     """Return actual completed-session results or a predicted qualifying payload."""
-    actual_results, result_source = fetch_actual_competitive_results_if_completed(
-        year=year,
-        race_name=race_name,
-        session_name=session_name,
+    resolved_checkpoint = resolve_prediction_checkpoint_session(
+        checkpoint_session_name,
+        is_sprint=is_sprint,
     )
-    if actual_results is not None:
-        return (
-            build_actual_qualifying_section(actual_results, session_name=session_name),
-            actual_results,
-            result_source,
+    allow_completed_session_results = session_is_within_prediction_boundary(
+        session_name=session_name,
+        checkpoint_session=resolved_checkpoint,
+        is_sprint=is_sprint,
+    )
+    if allow_completed_session_results:
+        actual_results, result_source = fetch_actual_competitive_results_if_completed(
+            year=year,
+            race_name=race_name,
+            session_name=session_name,
         )
+        if actual_results is not None:
+            return (
+                build_actual_qualifying_section(actual_results, session_name=session_name),
+                actual_results,
+                result_source,
+            )
 
     predicted_result = predictor.predict_qualifying(
         year=year,
@@ -310,20 +324,24 @@ def _resolve_qualifying_section(
         qualifying_stage=qualifying_stage,
         n_simulations=_resolve_dashboard_simulation_count("qualifying"),
         practice_signal_mode="stored_profiles",
-        checkpoint_session_name=checkpoint_session_name,
+        checkpoint_session_name=resolved_checkpoint,
     )
-    qualifying_grid, grid_source = fetch_grid_if_available(
-        year,
-        race_name,
-        session_name,
-        predicted_result["grid"],
-    )
-    if grid_source == "ACTUAL":
-        return (
-            build_actual_qualifying_section(qualifying_grid, session_name=session_name),
-            qualifying_grid,
-            grid_source,
+    if allow_completed_session_results:
+        qualifying_grid, grid_source = fetch_grid_if_available(
+            year,
+            race_name,
+            session_name,
+            predicted_result["grid"],
         )
+        if grid_source == "ACTUAL":
+            return (
+                build_actual_qualifying_section(qualifying_grid, session_name=session_name),
+                qualifying_grid,
+                grid_source,
+            )
+    else:
+        qualifying_grid = list(predicted_result.get("grid", []))
+        grid_source = "PREDICTED"
 
     predicted_result["grid_source"] = grid_source
     return predicted_result, qualifying_grid, grid_source
@@ -408,6 +426,10 @@ def run_prediction(
         race_name=race_name,
         is_sprint=is_sprint,
     )
+    checkpoint_session_name = resolve_prediction_checkpoint_session(
+        checkpoint_session_name,
+        is_sprint=is_sprint,
+    )
     predictor = build_checkpoint_overlay_predictor(
         base_predictor=predictor,
         year=year,
@@ -427,6 +449,7 @@ def run_prediction(
             session_name="SQ",
             qualifying_stage="sprint",
             checkpoint_session_name=checkpoint_session_name,
+            is_sprint=True,
         )
         timing["sprint_quali"] = time.time() - sq_start
         results["sprint_quali"] = sq_result
@@ -461,6 +484,7 @@ def run_prediction(
             session_name="Q",
             qualifying_stage="main",
             checkpoint_session_name=checkpoint_session_name,
+            is_sprint=True,
         )
         timing["main_quali"] = time.time() - mq_start
         results["main_quali"] = mq_result
@@ -505,6 +529,7 @@ def run_prediction(
             session_name="Q",
             qualifying_stage="main",
             checkpoint_session_name=checkpoint_session_name,
+            is_sprint=False,
         )
         timing["qualifying"] = time.time() - quali_start
         results["qualifying"] = quali_result

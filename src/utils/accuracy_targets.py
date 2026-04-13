@@ -46,11 +46,11 @@ CHECKPOINT_ORDER = {
 }
 TARGET_CHECKPOINTS = {
     ("normal", TARGET_MAIN_QUALIFYING): ("PRE", "FP1", "FP2", "FP3"),
-    ("normal", TARGET_GRAND_PRIX_RACE): ("PRE", "FP1", "FP2", "FP3", "Q"),
+    ("normal", TARGET_GRAND_PRIX_RACE): ("PRE", "FP1", "FP2", "FP3"),
     ("sprint", TARGET_SPRINT_QUALIFYING): ("PRE", "FP1"),
     ("sprint", TARGET_SPRINT_RACE): ("PRE", "FP1", "SQ"),
-    ("sprint", TARGET_MAIN_QUALIFYING): ("PRE", "FP1", "SQ", "SPRINT"),
-    ("sprint", TARGET_GRAND_PRIX_RACE): ("PRE", "FP1", "SQ", "SPRINT", "Q"),
+    ("sprint", TARGET_MAIN_QUALIFYING): ("PRE", "FP1", "SQ"),
+    ("sprint", TARGET_GRAND_PRIX_RACE): ("PRE", "FP1", "SQ"),
 }
 _EVENT_BOUNDARY_STATE_PATH = Path("data/systems/event_boundary_refresh_state.json")
 
@@ -238,7 +238,18 @@ def resolve_target_eligibility(
     stored_eligible: bool,
     is_sprint: bool,
 ) -> bool:
-    """Combine stored eligibility with timestamp-based contamination checks."""
+    """Combine stored eligibility with checkpoint-policy and timing-based checks."""
+    metadata = prediction_data.get("metadata", {})
+    checkpoint_session = normalize_checkpoint_session(
+        metadata.get("session_name") if isinstance(metadata, dict) else None
+    )
+    weekend_format = weekend_format_name(is_sprint)
+    if checkpoint_session and checkpoint_session not in target_checkpoint_sequence(
+        target_key,
+        weekend_format,
+    ):
+        return False
+
     time_eligible = timing_eligible_target(
         prediction_data,
         target_key=target_key,

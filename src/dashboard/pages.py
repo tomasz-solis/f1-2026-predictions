@@ -778,6 +778,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
 def render_model_insights_page() -> None:
     """Render the model insights page with hyperparameters and learning state."""
     st.header("Model and Learning Runtime")
+    st.caption(f"Active release: {BRAND_MODEL_VERSION}")
     st.markdown(MODEL_INSIGHTS_MARKDOWN)
 
     st.subheader("Key Hyperparameters")

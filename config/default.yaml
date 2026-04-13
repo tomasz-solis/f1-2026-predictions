@@ -13,6 +13,9 @@ paths:
 grid:
   size: 22  # 11 teams x 2 drivers in the 2026 field
 
+model:
+  version: "2.0"
+
 # Bayesian Model Parameters
 bayesian:
   # Process noise injected between races to prevent overconfidence

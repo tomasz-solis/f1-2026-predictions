@@ -596,6 +596,7 @@ def reconstruct_checkpoint_prediction(
         race_n_simulations=race_n_simulations,
     )
     from src.dashboard.prediction_checkpointing import (
+        persist_prediction_checkpoint_summary,
         prediction_targets_for_checkpoint,
     )
 
@@ -661,21 +662,38 @@ def reconstruct_checkpoint_prediction(
             "information_cutoff_at": information_cutoff_at,
         },
     )
-
-    saved_actuals, actuals_source = collect_saved_target_actuals(
-        prediction_logger=prediction_logger,
-        year=year,
-        race_name=race_name,
-        is_sprint=is_sprint,
-    )
-    prediction_logger.update_actuals(
+    persist_prediction_checkpoint_summary(
+        logger_instance=prediction_logger,
+        prediction_results=prediction_results,
         year=year,
         race_name=race_name,
         session_name=checkpoint_session_upper,
-        qualifying_results=saved_actuals.get(qualifying_target) if qualifying_target else None,
-        race_results=saved_actuals.get(race_target) if race_target else None,
-        target_actual_results=cast(dict[str, ActualResultRows | None], saved_actuals),
+        weather=resolved_weather,
+        is_sprint=is_sprint,
+        target_predictions=target_predictions,
     )
+
+    saved_actuals: dict[str, list[dict[str, Any]]] = {}
+    actuals_source = "unavailable"
+    try:
+        saved_actuals, actuals_source = collect_saved_target_actuals(
+            prediction_logger=prediction_logger,
+            year=year,
+            race_name=race_name,
+            is_sprint=is_sprint,
+        )
+    except FileNotFoundError:
+        saved_actuals = {}
+
+    if saved_actuals:
+        prediction_logger.update_actuals(
+            year=year,
+            race_name=race_name,
+            session_name=checkpoint_session_upper,
+            qualifying_results=saved_actuals.get(qualifying_target) if qualifying_target else None,
+            race_results=saved_actuals.get(race_target) if race_target else None,
+            target_actual_results=cast(dict[str, ActualResultRows | None], saved_actuals),
+        )
 
     saved_prediction = prediction_logger.load_prediction(year, race_name, checkpoint_session_upper)
     if saved_prediction is None:
@@ -683,20 +701,22 @@ def reconstruct_checkpoint_prediction(
             f"Could not reload reconstructed prediction for {race_name} {checkpoint_session_upper}"
         )
 
-    metrics_calculator = PredictionMetrics()
-    snapshot_records = build_accuracy_snapshot_records(
-        prediction_data=saved_prediction,
-        is_sprint=is_sprint,
-        metrics_calculator=metrics_calculator,
-        generated_by="checkpoint_reconstruction",
-    )
-    for record in snapshot_records:
-        artifact_store.save_artifact(
-            artifact_type="accuracy_snapshot",
-            artifact_key=record["artifact_key"],
-            data=record["data"],
-            version=1,
+    snapshot_records: list[dict[str, Any]] = []
+    if saved_actuals:
+        metrics_calculator = PredictionMetrics()
+        snapshot_records = build_accuracy_snapshot_records(
+            prediction_data=saved_prediction,
+            is_sprint=is_sprint,
+            metrics_calculator=metrics_calculator,
+            generated_by="checkpoint_reconstruction",
         )
+        for record in snapshot_records:
+            artifact_store.save_artifact(
+                artifact_type="accuracy_snapshot",
+                artifact_key=record["artifact_key"],
+                data=record["data"],
+                version=1,
+            )
 
     return ReconstructionSummary(
         year=year,

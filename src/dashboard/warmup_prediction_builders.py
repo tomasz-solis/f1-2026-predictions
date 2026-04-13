@@ -7,6 +7,11 @@ import time
 from copy import deepcopy
 from typing import Any
 
+from .prediction_checkpointing import (
+    resolve_prediction_checkpoint_session,
+    session_is_within_prediction_boundary,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,11 +47,15 @@ def compute_base_features(
     logger_instance: logging.Logger = logger,
 ) -> dict[str, Any]:
     """Load weather-invariant race inputs once for one race checkpoint."""
+    checkpoint_session = resolve_prediction_checkpoint_session(
+        checkpoint,
+        is_sprint=is_sprint,
+    )
     logger_instance.debug(
         "Computing base features: year=%s race=%s checkpoint=%s artifact_hash=%s boundary=%s sprint=%s",
         int(year),
         str(target_race),
-        str(checkpoint),
+        checkpoint_session,
         str(artifact_hash),
         str(boundary_signature),
         bool(is_sprint),
@@ -56,14 +65,22 @@ def compute_base_features(
     qualifying_n_simulations = int(precompute_settings.get("qualifying_n_simulations", 100))
 
     if is_sprint:
-        sprint_quali_start = time.time()
-        sprint_actual_results, sprint_grid_source = (
-            fetch_actual_competitive_results_if_completed_fn(
-                year=year,
-                race_name=target_race,
-                session_name="SQ",
-            )
+        allow_sq_results = session_is_within_prediction_boundary(
+            session_name="SQ",
+            checkpoint_session=checkpoint_session,
+            is_sprint=True,
         )
+        sprint_quali_start = time.time()
+        if allow_sq_results:
+            sprint_actual_results, sprint_grid_source = (
+                fetch_actual_competitive_results_if_completed_fn(
+                    year=year,
+                    race_name=target_race,
+                    session_name="SQ",
+                )
+            )
+        else:
+            sprint_actual_results, sprint_grid_source = None, "PREDICTED"
         if sprint_actual_results is not None:
             sprint_grid = sprint_actual_results
             sprint_quali_payload = build_actual_qualifying_section_fn(
@@ -77,20 +94,26 @@ def compute_base_features(
                 qualifying_stage="sprint",
                 n_simulations=qualifying_n_simulations,
                 practice_signal_mode="stored_profiles",
-                checkpoint_session_name=checkpoint,
+                checkpoint_session_name=checkpoint_session,
             )
-            sprint_grid, sprint_grid_source = fetch_grid_if_available_fn(
-                year,
-                target_race,
-                "SQ",
-                sprint_quali["grid"],
-            )
-            if sprint_grid_source == "ACTUAL":
-                sprint_quali_payload = build_actual_qualifying_section_fn(
-                    sprint_grid,
-                    session_name="SQ",
+            if allow_sq_results:
+                sprint_grid, sprint_grid_source = fetch_grid_if_available_fn(
+                    year,
+                    target_race,
+                    "SQ",
+                    sprint_quali["grid"],
                 )
+                if sprint_grid_source == "ACTUAL":
+                    sprint_quali_payload = build_actual_qualifying_section_fn(
+                        sprint_grid,
+                        session_name="SQ",
+                    )
+                else:
+                    sprint_quali_payload = deepcopy(sprint_quali)
+                    sprint_quali_payload["grid_source"] = sprint_grid_source
             else:
+                sprint_grid = list(sprint_quali["grid"])
+                sprint_grid_source = "PREDICTED"
                 sprint_quali_payload = deepcopy(sprint_quali)
                 sprint_quali_payload["grid_source"] = sprint_grid_source
         sprint_quali_elapsed = time.time() - sprint_quali_start
@@ -99,12 +122,22 @@ def compute_base_features(
             grid_source=sprint_grid_source,
         )
 
-        main_quali_start = time.time()
-        main_actual_results, main_grid_source = fetch_actual_competitive_results_if_completed_fn(
-            year=year,
-            race_name=target_race,
+        allow_main_quali_results = session_is_within_prediction_boundary(
             session_name="Q",
+            checkpoint_session=checkpoint_session,
+            is_sprint=True,
         )
+        main_quali_start = time.time()
+        if allow_main_quali_results:
+            main_actual_results, main_grid_source = (
+                fetch_actual_competitive_results_if_completed_fn(
+                    year=year,
+                    race_name=target_race,
+                    session_name="Q",
+                )
+            )
+        else:
+            main_actual_results, main_grid_source = None, "PREDICTED"
         if main_actual_results is not None:
             main_grid = main_actual_results
             main_quali_payload = build_actual_qualifying_section_fn(main_grid, session_name="Q")
@@ -115,20 +148,26 @@ def compute_base_features(
                 qualifying_stage="main",
                 n_simulations=qualifying_n_simulations,
                 practice_signal_mode="stored_profiles",
-                checkpoint_session_name=checkpoint,
+                checkpoint_session_name=checkpoint_session,
             )
-            main_grid, main_grid_source = fetch_grid_if_available_fn(
-                year,
-                target_race,
-                "Q",
-                main_quali["grid"],
-            )
-            if main_grid_source == "ACTUAL":
-                main_quali_payload = build_actual_qualifying_section_fn(
-                    main_grid,
-                    session_name="Q",
+            if allow_main_quali_results:
+                main_grid, main_grid_source = fetch_grid_if_available_fn(
+                    year,
+                    target_race,
+                    "Q",
+                    main_quali["grid"],
                 )
+                if main_grid_source == "ACTUAL":
+                    main_quali_payload = build_actual_qualifying_section_fn(
+                        main_grid,
+                        session_name="Q",
+                    )
+                else:
+                    main_quali_payload = deepcopy(main_quali)
+                    main_quali_payload["grid_source"] = main_grid_source
             else:
+                main_grid = list(main_quali["grid"])
+                main_grid_source = "PREDICTED"
                 main_quali_payload = deepcopy(main_quali)
                 main_quali_payload["grid_source"] = main_grid_source
         main_quali_elapsed = time.time() - main_quali_start
@@ -141,7 +180,7 @@ def compute_base_features(
             qualifying_result=main_quali_payload,
             grid_source=main_grid_source,
             is_sprint_weekend=True,
-            boundary_session_name=checkpoint,
+            boundary_session_name=checkpoint_session,
         )
 
         return {
@@ -160,11 +199,19 @@ def compute_base_features(
         }
 
     qualifying_start = time.time()
-    actual_qualifying, grid_source = fetch_actual_competitive_results_if_completed_fn(
-        year=year,
-        race_name=target_race,
+    allow_main_quali_results = session_is_within_prediction_boundary(
         session_name="Q",
+        checkpoint_session=checkpoint_session,
+        is_sprint=False,
     )
+    if allow_main_quali_results:
+        actual_qualifying, grid_source = fetch_actual_competitive_results_if_completed_fn(
+            year=year,
+            race_name=target_race,
+            session_name="Q",
+        )
+    else:
+        actual_qualifying, grid_source = None, "PREDICTED"
     if actual_qualifying is not None:
         qualifying_grid = actual_qualifying
         qualifying_payload = build_actual_qualifying_section_fn(qualifying_grid, session_name="Q")
@@ -175,20 +222,26 @@ def compute_base_features(
             qualifying_stage="main",
             n_simulations=qualifying_n_simulations,
             practice_signal_mode="stored_profiles",
-            checkpoint_session_name=checkpoint,
+            checkpoint_session_name=checkpoint_session,
         )
-        qualifying_grid, grid_source = fetch_grid_if_available_fn(
-            year,
-            target_race,
-            "Q",
-            qualifying["grid"],
-        )
-        if grid_source == "ACTUAL":
-            qualifying_payload = build_actual_qualifying_section_fn(
-                qualifying_grid,
-                session_name="Q",
+        if allow_main_quali_results:
+            qualifying_grid, grid_source = fetch_grid_if_available_fn(
+                year,
+                target_race,
+                "Q",
+                qualifying["grid"],
             )
+            if grid_source == "ACTUAL":
+                qualifying_payload = build_actual_qualifying_section_fn(
+                    qualifying_grid,
+                    session_name="Q",
+                )
+            else:
+                qualifying_payload = deepcopy(qualifying)
+                qualifying_payload["grid_source"] = grid_source
         else:
+            qualifying_grid = list(qualifying["grid"])
+            grid_source = "PREDICTED"
             qualifying_payload = deepcopy(qualifying)
             qualifying_payload["grid_source"] = grid_source
     qualifying_elapsed = time.time() - qualifying_start

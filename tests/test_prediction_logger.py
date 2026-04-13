@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.utils.model_version import get_model_version
 from src.utils.prediction_logger import PredictionLogger
 
 
@@ -98,6 +99,7 @@ def test_save_prediction(temp_predictions_dir, sample_quali_prediction, sample_r
     assert prediction["metadata"]["race_name"] == "Bahrain Grand Prix"
     assert prediction["metadata"]["session_name"] == "FP1"
     assert prediction["metadata"]["weather"] == "dry"
+    assert prediction["metadata"]["model_version"] == get_model_version()
     assert len(prediction["qualifying"]["predicted_grid"]) == 3
     assert len(prediction["race"]["predicted_results"]) == 3
     assert prediction["actuals"]["qualifying"] is None
@@ -455,6 +457,36 @@ def test_get_all_predictions_merges_artifact_and_file_backends(
         ("Australian Grand Prix", "FP2"),
         ("Bahrain Grand Prix", "FP1"),
     }
+
+
+def test_get_all_predictions_does_not_reload_files_when_listing_is_file_backed(
+    temp_predictions_dir,
+    sample_quali_prediction,
+    sample_race_prediction,
+):
+    """File-backed history listing should not walk the same prediction files twice."""
+    logger = PredictionLogger(predictions_dir=temp_predictions_dir)
+
+    logger.save_prediction(
+        year=2026,
+        race_name="Bahrain Grand Prix",
+        session_name="FP1",
+        qualifying_prediction=sample_quali_prediction,
+        race_prediction=sample_race_prediction,
+        weather="dry",
+    )
+
+    def _unexpected_file_reload(year: int) -> list[dict]:
+        del year
+        pytest.fail("file-backed artifact listings should not trigger a second file scan")
+
+    logger._load_predictions_from_files = _unexpected_file_reload  # type: ignore[method-assign]
+
+    predictions = logger.get_all_predictions(2026)
+
+    assert len(predictions) == 1
+    assert predictions[0]["metadata"]["race_name"] == "Bahrain Grand Prix"
+    assert predictions[0]["metadata"]["session_name"] == "FP1"
 
 
 def test_get_all_predictions_deduplicates_checkpoint_identity(temp_predictions_dir):

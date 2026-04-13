@@ -29,6 +29,7 @@ from src.utils.accuracy_targets import (
     target_session_name,
     weekend_format_name,
 )
+from src.utils.model_version import stamp_model_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ class PredictionLogger:
         )
 
         normalized_targets = self._normalize_target_predictions(target_predictions)
-        metadata_payload = {} if metadata is None else dict(metadata)
+        metadata_payload = stamp_model_metadata(metadata)
         if "weekend_format" not in metadata_payload:
             metadata_payload["weekend_format"] = self._infer_weekend_format(
                 session_name=normalized_session_name,
@@ -387,7 +388,8 @@ class PredictionLogger:
                 continue
             predictions.append(payload)
 
-        predictions.extend(self._load_predictions_from_files(target_year))
+        if not self._listing_rows_are_file_backed(artifact_rows):
+            predictions.extend(self._load_predictions_from_files(target_year))
         return self._deduplicate_predictions(predictions)
 
     def reconcile_completed_prediction_actuals(self, year: int) -> int:
@@ -543,6 +545,13 @@ class PredictionLogger:
 
         predictions.sort(key=self._prediction_sort_key)
         return predictions
+
+    @staticmethod
+    def _listing_rows_are_file_backed(rows: list[dict[str, Any]]) -> bool:
+        """Return True when artifact-list rows already came from the file-backed listing path."""
+        if not rows:
+            return False
+        return all(str(row.get("artifact_type", "")).strip() == "prediction" for row in rows)
 
     def _prediction_payload_from_listing_row(self, row: dict[str, Any]) -> dict[str, Any] | None:
         """Extract a validated payload from an artifact listing row."""

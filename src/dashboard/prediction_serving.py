@@ -6,6 +6,8 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from .prediction_checkpointing import resolve_prediction_checkpoint_session
+
 
 def _empty_precompute_summary(targets: list[str]) -> dict[str, Any]:
     """Build the default request-path precompute summary payload."""
@@ -32,10 +34,10 @@ def _resolve_boundary_state(
 ) -> tuple[str, str]:
     """Resolve the live boundary signature and checkpoint label for one request."""
     boundary_signature = str(boundary_refresh.get("boundary_signature", ""))
-    boundary_session_name = str(boundary_refresh.get("latest_elapsed_session") or "PRE").strip()
-    if not boundary_session_name:
-        boundary_session_name = "PRE"
-    boundary_session_name = boundary_session_name.upper()
+    boundary_session_name = resolve_prediction_checkpoint_session(
+        boundary_refresh.get("latest_elapsed_session"),
+        is_sprint=is_sprint,
+    )
 
     if boundary_signature:
         return boundary_signature, boundary_session_name
@@ -51,7 +53,10 @@ def _resolve_boundary_state(
         )
         boundary_signature = resolved_boundary_signature
         if boundary_session_name == "PRE":
-            boundary_session_name = resolved_boundary_session_name
+            boundary_session_name = resolve_prediction_checkpoint_session(
+                resolved_boundary_session_name,
+                is_sprint=is_sprint,
+            )
     except Exception as exc:
         logger.warning(
             "Could not resolve race boundary context for %s %s: %s",

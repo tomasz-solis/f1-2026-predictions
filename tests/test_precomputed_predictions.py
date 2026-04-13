@@ -1,6 +1,7 @@
 """Tests for precomputed prediction persistence helpers."""
 
 from src.dashboard import precomputed_predictions as store
+from src.utils.model_version import get_model_version
 
 
 def test_save_and_load_precompute_horizon_index_file_roundtrip(patcher, tmp_path):
@@ -37,6 +38,7 @@ def test_save_and_load_precompute_horizon_index_file_roundtrip(patcher, tmp_path
     assert loaded["boundary_signature"] == "boundary_sig"
     assert loaded["anchor_race_name"] == "Australian Grand Prix"
     assert loaded["anchor_session_name"] == "FP1"
+    assert loaded["model_version"] == get_model_version()
     assert loaded["ready_races"] == ["Australian Grand Prix", "Chinese Grand Prix"]
     assert loaded["race_boundaries"] == {
         "Australian Grand Prix": "sig_anchor",
@@ -118,6 +120,34 @@ def test_load_precomputed_prediction_preserves_boundary_context(patcher, tmp_pat
     assert loaded["_prediction_context"]["boundary_session_name"] == "Q"
     assert isinstance(loaded["_prediction_context"].get("persisted_updated_at"), str)
     assert loaded["_prediction_context"]["persisted_updated_at"]
+
+
+def test_save_precomputed_prediction_stamps_model_version_in_metadata(patcher, tmp_path):
+    """Precomputed prediction records should retain the active model version."""
+    precompute_path = tmp_path / "precomputed_predictions.json"
+
+    patcher.setattr(store, "_PRECOMPUTED_PREDICTIONS_FILE", precompute_path)
+    patcher.setattr(store, "should_read_db_first", lambda: False)
+    patcher.setattr(store, "should_write_to_db", lambda: False)
+    patcher.setattr(store, "should_write_to_file", lambda: True)
+
+    store.save_precomputed_prediction(
+        year=2026,
+        race_name="Japanese Grand Prix",
+        weather="mixed",
+        artifact_hash="artifact_hash",
+        boundary_signature="sig_fp2",
+        is_sprint=False,
+        prediction_results={"qualifying": {"grid": []}, "race": {"finish_order": []}},
+        metadata={"boundary_session_name": "FP2"},
+    )
+
+    file_state = store._load_file_state()
+    entries = file_state.get("entries", {})
+    payload = next(iter(entries.values()))
+
+    assert payload["metadata"]["boundary_session_name"] == "FP2"
+    assert payload["metadata"]["model_version"] == get_model_version()
 
 
 def test_list_precomputed_race_names_filters_by_year_hash_and_boundary(patcher, tmp_path):
