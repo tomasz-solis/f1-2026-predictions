@@ -2,37 +2,48 @@
 
 The weight schedule blends three team-strength signals:
 
-1. baseline performance,
-2. testing directionality modifier,
-3. current-season performance.
+1. baseline performance
+2. testing directionality modifier
+3. current-season performance
 
-Implementation is in `src/systems/weight_schedule.py` and used by `Baseline2026Predictor`.
+Implementation: `src/systems/weight_schedule.py`, used by `Baseline2026Predictor`.
 
 ## Why This Exists
 
-In regulation-change seasons, old standings can become stale quickly. The schedule shifts trust toward current-season data early.
+In a regulation-change season, last year's championship standings tell you almost
+nothing about this year's car. A team that dominated on the previous rules might
+have gotten the new concept wrong. A midfield team might have nailed it.
 
-## Active Recommended Schedule
+Pre-season testing gives you directional signals — who looks fast, who looks
+fragile — but teams deliberately mask their true pace. Treating testing lap times
+as ground truth is a mistake.
 
-The baseline predictor uses `get_recommended_schedule(is_regulation_change=True)`, which maps to `extreme`.
+The weight schedule handles this by being explicit about which source of evidence
+you trust at each point in the season. At Race 1, you blend all three signals
+because you don't have much else. By Race 3, you're almost entirely running on
+what teams have actually shown in competition. The trust shift is configurable
+and auditable — not hidden inside a model.
 
-Main checkpoints:
+## Active Schedule
 
-- Race 1: `30% baseline`, `20% testing`, `50% current`
-- Race 2: `15% baseline`, `10% testing`, `75% current`
-- Race 3+: `5% baseline`, `0% testing`, `95% current`
+The baseline predictor uses `get_recommended_schedule(is_regulation_change=True)`,
+which maps to `extreme`.
 
-## How Inputs Are Built In Predictor
+| Race | Baseline | Testing | Current |
+|------|----------|---------|---------|
+| 1    | 30%      | 20%     | 50%     |
+| 2    | 15%      | 10%     | 75%     |
+| 3+   | 5%       | 0%      | 95%     |
+
+## How Inputs Are Built
 
 For a given team:
 
-- `baseline`: `overall_performance`
-- `testing_modifier`: track suitability from team directionality vs track profile
-- `current`:
-  - mean of `current_season_performance` if available,
-  - otherwise falls back to `baseline` before races exist
+- `baseline`: `overall_performance` from car characteristics
+- `testing_modifier`: track suitability derived from team directionality vs track profile
+- `current`: mean of `current_season_performance` if race results exist, otherwise falls back to `baseline`
 
-That fallback behavior is important: pre-season `current` is not zero in the active predictor path.
+The pre-season fallback matters: before any races, `current` is not zero. It inherits the baseline value so the blended output stays sensible even at the first race.
 
 ## Example
 
@@ -42,7 +53,7 @@ from src.systems.weight_schedule import calculate_blended_performance
 score = calculate_blended_performance(
     baseline_score=0.85,
     testing_modifier=0.02,
-    current_score=0.85,   # pre-season fallback in active predictor
+    current_score=0.85,   # pre-season: inherits baseline
     race_number=1,
     schedule="extreme",
 )
@@ -50,11 +61,11 @@ score = calculate_blended_performance(
 
 ## Where Race Updates Feed In
 
-`update_from_race` appends new values to `current_season_performance`, which changes the running mean used as `current` in future predictions.
+`update_from_race` appends new values to `current_season_performance`, which
+shifts the running mean used as `current` in future predictions. Baseline and
+testing directionality remain separate and are not overwritten by in-season data.
 
-`overall_performance` and testing directionality remain separate inputs.
-
-## Related Files
+## Related
 
 - `src/systems/weight_schedule.py`
 - `src/predictors/baseline_2026.py`
