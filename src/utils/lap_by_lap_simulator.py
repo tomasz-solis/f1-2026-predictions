@@ -36,6 +36,26 @@ from src.utils.validation_helpers import normalize_weather_key
 logger = logging.getLogger(__name__)
 
 # Internal ratios used to expand the compact overtake model.
+#
+# These were calibrated against 2022-2024 F1 overtaking data using the
+# signals extracted by scripts/extract_overtaking_likelihood.py and then
+# hand-tuned against the 2025 season realism regression tests
+# (tests/test_race_realism_regression.py). They convert the 5 user-facing
+# parameters into the full internal overtake calculation set.
+#
+# The values are intentionally not in config because they are implementation
+# internals of the compact→expanded mapping, not tuning knobs. If the
+# active-aero rules change materially (e.g. post-2026 regulation revision),
+# refit using the calibration notebook in notebooks/archive/.
+#
+# Key invariants each value encodes:
+#   pass_window_ratio (0.67): passing window is 67% of the dirty-air gap window
+#   defense_ratio (1.12):     defending driver gets a 12% effectiveness bonus
+#   race_adv_ratio (0.80):    race advantage signal weighted at 80% of raw pace
+#   track_ease_ratio (0.51):  track overtaking factor contributes ~half weight
+#   pass_probability_sensitivity (0.45): how steeply pass probability rises
+#                             above the threshold — tuned to avoid runaway
+#                             overtaking in race realism tests
 _OVERTAKE_INTERNAL = {
     "pass_window_ratio": 0.67,
     "dirty_air_penalty_base": 0.05,

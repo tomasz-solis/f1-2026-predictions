@@ -363,6 +363,205 @@ def apply_testing_fallback_adjustment(
     return adjusted
 
 
+def _compute_model_strengths(
+    *,
+    lineups: dict[str, list[str]],
+    get_blended_team_strength_fn: Callable[[str, str], float],
+    compute_testing_profile_modifier_fn: Callable[..., tuple[float, bool]],
+    short_profile_weights: dict[str, float],
+    short_profile_scale: float,
+    race_name: str,
+    uses_checkpoint_practice_profiles: bool,
+) -> tuple[dict[str, float], int]:
+    """Compute raw blended model strength for each team, before FP/testing adjustment.
+
+    Returns (model_strengths, teams_with_short_profile) where
+    teams_with_short_profile counts teams that had a valid short-run testing profile.
+    """
+    model_strengths: dict[str, float] = {}
+    teams_with_short_profile = 0
+
+    for team in lineups:
+        model_strength = get_blended_team_strength_fn(team, race_name)
+        short_modifier, has_short_profile = compute_testing_profile_modifier_fn(
+            team=team,
+            profile="short_run",
+            metric_weights=short_profile_weights,
+            scale=short_profile_scale,
+        )
+        if not uses_checkpoint_practice_profiles:
+            model_strength = float(np.clip(model_strength + short_modifier, 0.0, 1.0))
+        if has_short_profile:
+            teams_with_short_profile += 1
+        model_strengths[team] = model_strength
+
+    return model_strengths, teams_with_short_profile
+
+
+def _blend_strengths(
+    *,
+    model_strengths: dict[str, float],
+    fp_performance: dict[str, float] | None,
+    testing_fallback_performance: dict[str, float] | None,
+    uses_checkpoint_practice_profiles: bool,
+    checkpoint_practice_blend_weight: float | None,
+    checkpoint_testing_fallback_performance: dict[str, float] | None,
+    fp_blend_weight: float,
+    practice_like_profile_label: str | None,
+    practice_like_blend_weight: float | None,
+    blend_team_strength_fn: Callable[..., dict[str, float]],
+    apply_testing_fallback_adjustment_fn: Callable[..., dict[str, float]],
+) -> dict[str, float]:
+    """Select and apply the appropriate strength-blending strategy.
+
+    Priority order:
+    1. FP session data available → blend model with FP performance.
+    2. Checkpoint practice profile → blend model with testing fallback data.
+    3. No session data → apply testing-fallback adjustment to model strengths.
+    """
+    if fp_performance is not None:
+        return blend_team_strength_fn(
+            model_strengths,
+            fp_performance,
+            blend_weight=fp_blend_weight,
+        )
+    if uses_checkpoint_practice_profiles:
+        assert checkpoint_practice_blend_weight is not None
+        assert checkpoint_testing_fallback_performance is not None
+        return blend_team_strength_fn(
+            model_strengths,
+            checkpoint_testing_fallback_performance,
+            blend_weight=checkpoint_practice_blend_weight,
+        )
+    return apply_testing_fallback_adjustment_fn(
+        model_strengths=model_strengths,
+        testing_fallback_performance=testing_fallback_performance,
+        practice_like_profile_label=practice_like_profile_label,
+        reference_blend_weight=practice_like_blend_weight,
+    )
+
+
+def _build_driver_record(
+    *,
+    driver_code: str,
+    team: str,
+    team_strength: float,
+    team_drivers: list[str],
+    drivers: dict[str, dict[str, Any]],
+    cfg: Any,
+    grid_size: int,
+    races_completed: int,
+    prediction_year: int | None,
+    uses_checkpoint_practice_profiles: bool,
+    checkpoint_practice_blend_weight: float | None,
+    get_checkpoint_driver_delta_seconds_fn: Callable[[str, str], float | None] | None,
+    get_learned_position_adjustment_fn: Callable[..., float],
+    resolve_effective_experience_tier_fn: Callable[[dict[str, Any], int | None], str],
+    extract_experience_total_races_fn: Callable[[dict[str, Any]], int | None],
+    get_driver_data_or_fallback_fn: Callable[[str, str], dict[str, Any]] | None,
+    default_skill: float,
+) -> dict[str, Any]:
+    """Build the qualifying-strength record for a single driver.
+
+    Resolves driver data, extracts skill/pace signals, applies any checkpoint
+    driver delta, and attaches experience and learning metadata.
+    """
+    driver_data = drivers.get(driver_code)
+    if not driver_data:
+        if callable(get_driver_data_or_fallback_fn):
+            try:
+                driver_data = get_driver_data_or_fallback_fn(driver_code, team)
+            except ValueError:
+                driver_data = {}
+        else:
+            driver_data = {}
+
+    try:
+        skill = float(driver_data.get("racecraft", {}).get("skill_score", default_skill))
+    except (TypeError, ValueError):
+        skill = float(default_skill)
+    skill = float(np.clip(skill, 0.01, 0.99))
+
+    try:
+        raw_quali_pace = float(driver_data.get("pace", {}).get("quali_pace", 0.5))
+    except (TypeError, ValueError):
+        raw_quali_pace = 0.5
+    raw_quali_pace = float(np.clip(raw_quali_pace, 0.01, 0.99))
+
+    bayesian_skill_score = resolve_bayesian_skill_score(driver_data, grid_size=grid_size)
+    quali_pace, bayesian_pace_blend_weight = blend_quali_pace_with_bayesian_form(
+        raw_quali_pace,
+        bayesian_skill_score,
+        races_completed=races_completed,
+        cfg=cfg,
+    )
+
+    if uses_checkpoint_practice_profiles and callable(get_checkpoint_driver_delta_seconds_fn):
+        checkpoint_driver_delta_seconds = get_checkpoint_driver_delta_seconds_fn(team, driver_code)
+        if checkpoint_driver_delta_seconds is not None:
+            assert checkpoint_practice_blend_weight is not None
+            smoothing_seconds = float(
+                cfg.get(
+                    "baseline_predictor.qualifying.checkpoint_driver_profile_smoothing_seconds",
+                    0.35,
+                )
+            )
+            smoothing_seconds = max(1e-6, smoothing_seconds)
+            normalized_delta = float(
+                np.clip(
+                    -float(checkpoint_driver_delta_seconds) / smoothing_seconds,
+                    -1.0,
+                    1.0,
+                )
+            )
+            quali_scale = float(
+                cfg.get("baseline_predictor.qualifying.checkpoint_driver_profile_quali_scale", 0.10)
+            )
+            skill_scale = float(
+                cfg.get("baseline_predictor.qualifying.checkpoint_driver_profile_skill_scale", 0.02)
+            )
+            quali_pace = float(
+                np.clip(
+                    quali_pace
+                    + (normalized_delta * quali_scale * checkpoint_practice_blend_weight),
+                    0.01,
+                    0.99,
+                )
+            )
+            skill = float(
+                np.clip(
+                    skill + (normalized_delta * skill_scale * checkpoint_practice_blend_weight),
+                    0.01,
+                    0.99,
+                )
+            )
+
+    experience_tier = resolve_effective_experience_tier_fn(driver_data, prediction_year)
+    experience_total_races = extract_experience_total_races_fn(driver_data)
+    learned_position_adjustment = get_learned_position_adjustment_fn(
+        team=team,
+        driver=driver_code,
+        teammates=team_drivers,
+        session="qualifying",
+    )
+    wet_skill = float(driver_data.get("wet_skill", 0.70) if isinstance(driver_data, dict) else 0.70)
+
+    return {
+        "driver": driver_code,
+        "team": team,
+        "team_strength": team_strength,
+        "skill": skill,
+        "quali_pace": quali_pace,
+        "raw_quali_pace": raw_quali_pace,
+        "bayesian_skill_score": bayesian_skill_score,
+        "bayesian_pace_blend_weight": bayesian_pace_blend_weight,
+        "experience_tier": experience_tier,
+        "experience_total_races": experience_total_races,
+        "learned_position_adjustment": learned_position_adjustment,
+        "wet_skill": wet_skill,
+    }
+
+
 def build_driver_list_with_strengths_core(
     *,
     lineups: dict[str, list[str]],
@@ -387,11 +586,13 @@ def build_driver_list_with_strengths_core(
     get_driver_data_or_fallback_fn: Callable[[str, str], dict[str, Any]] | None = None,
     get_contextual_races_completed_fn: Callable[[str | None], int] | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
-    """Build driver list with blended team/driver strengths and testing modifiers."""
-    all_drivers: list[dict[str, Any]] = []
-    model_strengths: dict[str, float] = {}
-    teams_with_short_profile = 0
+    """Build driver list with blended team/driver strengths and testing modifiers.
 
+    Delegates to three focused helpers:
+    1. ``_compute_model_strengths`` — raw team strength per team from weight schedule.
+    2. ``_blend_strengths`` — select and apply FP/testing/model-only blending strategy.
+    3. ``_build_driver_record`` — resolve per-driver skill/pace/experience signals.
+    """
     uses_checkpoint_practice_profiles = (
         practice_like_profile_label is not None
         and practice_like_blend_weight is not None
@@ -404,11 +605,15 @@ def build_driver_list_with_strengths_core(
         assert testing_fallback_performance is not None
         checkpoint_practice_blend_weight = float(np.clip(practice_like_blend_weight, 0.0, 1.0))
         checkpoint_testing_fallback_performance = testing_fallback_performance
-    short_profile_scale = cfg.get(
-        "baseline_predictor.qualifying.testing_short_run_modifier_scale", 0.04
+
+    short_profile_scale = float(
+        cfg.get("baseline_predictor.qualifying.testing_short_run_modifier_scale", 0.04)
     )
-    default_skill = cfg.get("baseline_predictor.qualifying.default_skill", 0.5)
-    default_team_strength = cfg.get("baseline_predictor.qualifying.default_team_strength", 0.5)
+    default_skill = float(cfg.get("baseline_predictor.qualifying.default_skill", 0.5))
+    default_team_strength = float(
+        cfg.get("baseline_predictor.qualifying.default_team_strength", 0.5)
+    )
+
     unique_driver_count = len(
         {driver_code for team_drivers in lineups.values() for driver_code in team_drivers}
     )
@@ -418,6 +623,7 @@ def build_driver_list_with_strengths_core(
     except (TypeError, ValueError):
         configured_grid_size_value = unique_driver_count or 22
     grid_size = max(unique_driver_count or 1, configured_grid_size_value)
+
     if callable(get_contextual_races_completed_fn):
         try:
             races_completed = max(0, int(get_contextual_races_completed_fn(race_name)))
@@ -426,154 +632,53 @@ def build_driver_list_with_strengths_core(
     else:
         races_completed = 0
 
-    for team in lineups:
-        model_strength = get_blended_team_strength_fn(team, race_name)
-        short_modifier, has_short_profile = compute_testing_profile_modifier_fn(
-            team=team,
-            profile="short_run",
-            metric_weights=short_profile_weights,
-            scale=short_profile_scale,
-        )
-        if not uses_checkpoint_practice_profiles:
-            model_strength = np.clip(model_strength + short_modifier, 0.0, 1.0)
-        if has_short_profile:
-            teams_with_short_profile += 1
-        model_strengths[team] = model_strength
+    model_strengths, teams_with_short_profile = _compute_model_strengths(
+        lineups=lineups,
+        get_blended_team_strength_fn=get_blended_team_strength_fn,
+        compute_testing_profile_modifier_fn=compute_testing_profile_modifier_fn,
+        short_profile_weights=short_profile_weights,
+        short_profile_scale=short_profile_scale,
+        race_name=race_name,
+        uses_checkpoint_practice_profiles=uses_checkpoint_practice_profiles,
+    )
 
-    if fp_performance is not None:
-        blended_strengths = blend_team_strength_fn(
-            model_strengths,
-            fp_performance,
-            blend_weight=fp_blend_weight,
-        )
-    elif uses_checkpoint_practice_profiles:
-        assert checkpoint_practice_blend_weight is not None
-        assert checkpoint_testing_fallback_performance is not None
-        blended_strengths = blend_team_strength_fn(
-            model_strengths,
-            checkpoint_testing_fallback_performance,
-            blend_weight=checkpoint_practice_blend_weight,
-        )
-    else:
-        blended_strengths = apply_testing_fallback_adjustment_fn(
-            model_strengths=model_strengths,
-            testing_fallback_performance=testing_fallback_performance,
-            practice_like_profile_label=practice_like_profile_label,
-            reference_blend_weight=practice_like_blend_weight,
-        )
+    blended_strengths = _blend_strengths(
+        model_strengths=model_strengths,
+        fp_performance=fp_performance,
+        testing_fallback_performance=testing_fallback_performance,
+        uses_checkpoint_practice_profiles=uses_checkpoint_practice_profiles,
+        checkpoint_practice_blend_weight=checkpoint_practice_blend_weight,
+        checkpoint_testing_fallback_performance=checkpoint_testing_fallback_performance,
+        fp_blend_weight=fp_blend_weight,
+        practice_like_profile_label=practice_like_profile_label,
+        practice_like_blend_weight=practice_like_blend_weight,
+        blend_team_strength_fn=blend_team_strength_fn,
+        apply_testing_fallback_adjustment_fn=apply_testing_fallback_adjustment_fn,
+    )
 
+    all_drivers: list[dict[str, Any]] = []
     for team, team_drivers in lineups.items():
         team_strength = blended_strengths.get(team, default_team_strength)
         for driver_code in team_drivers:
-            driver_data = drivers.get(driver_code)
-            if not driver_data:
-                if callable(get_driver_data_or_fallback_fn):
-                    try:
-                        driver_data = get_driver_data_or_fallback_fn(driver_code, team)
-                    except ValueError:
-                        driver_data = {}
-                else:
-                    driver_data = {}
-            try:
-                skill = float(driver_data.get("racecraft", {}).get("skill_score", default_skill))
-            except (TypeError, ValueError):
-                skill = float(default_skill)
-            skill = float(np.clip(skill, 0.01, 0.99))
-
-            try:
-                raw_quali_pace = float(driver_data.get("pace", {}).get("quali_pace", 0.5))
-            except (TypeError, ValueError):
-                raw_quali_pace = 0.5
-            raw_quali_pace = float(np.clip(raw_quali_pace, 0.01, 0.99))
-
-            bayesian_skill_score = resolve_bayesian_skill_score(
-                driver_data,
-                grid_size=grid_size,
-            )
-            quali_pace, bayesian_pace_blend_weight = blend_quali_pace_with_bayesian_form(
-                raw_quali_pace,
-                bayesian_skill_score,
-                races_completed=races_completed,
-                cfg=cfg,
-            )
-            if uses_checkpoint_practice_profiles and callable(
-                get_checkpoint_driver_delta_seconds_fn
-            ):
-                checkpoint_driver_delta_seconds = get_checkpoint_driver_delta_seconds_fn(
-                    team,
-                    driver_code,
-                )
-                if checkpoint_driver_delta_seconds is not None:
-                    assert checkpoint_practice_blend_weight is not None
-                    smoothing_seconds = float(
-                        cfg.get(
-                            "baseline_predictor.qualifying.checkpoint_driver_profile_smoothing_seconds",
-                            0.35,
-                        )
-                    )
-                    smoothing_seconds = max(1e-6, smoothing_seconds)
-                    normalized_checkpoint_delta = float(
-                        np.clip(
-                            -float(checkpoint_driver_delta_seconds) / smoothing_seconds,
-                            -1.0,
-                            1.0,
-                        )
-                    )
-                    checkpoint_weight = checkpoint_practice_blend_weight
-                    quali_scale = float(
-                        cfg.get(
-                            "baseline_predictor.qualifying.checkpoint_driver_profile_quali_scale",
-                            0.10,
-                        )
-                    )
-                    skill_scale = float(
-                        cfg.get(
-                            "baseline_predictor.qualifying.checkpoint_driver_profile_skill_scale",
-                            0.02,
-                        )
-                    )
-                    quali_pace = float(
-                        np.clip(
-                            quali_pace
-                            + (normalized_checkpoint_delta * quali_scale * checkpoint_weight),
-                            0.01,
-                            0.99,
-                        )
-                    )
-                    skill = float(
-                        np.clip(
-                            skill + (normalized_checkpoint_delta * skill_scale * checkpoint_weight),
-                            0.01,
-                            0.99,
-                        )
-                    )
-            experience_tier = resolve_effective_experience_tier_fn(driver_data, prediction_year)
-            experience_total_races = extract_experience_total_races_fn(driver_data)
-            learned_position_adjustment = get_learned_position_adjustment_fn(
+            record = _build_driver_record(
+                driver_code=driver_code,
                 team=team,
-                driver=driver_code,
-                teammates=team_drivers,
-                session="qualifying",
+                team_strength=team_strength,
+                team_drivers=team_drivers,
+                drivers=drivers,
+                cfg=cfg,
+                grid_size=grid_size,
+                races_completed=races_completed,
+                prediction_year=prediction_year,
+                uses_checkpoint_practice_profiles=uses_checkpoint_practice_profiles,
+                checkpoint_practice_blend_weight=checkpoint_practice_blend_weight,
+                get_checkpoint_driver_delta_seconds_fn=get_checkpoint_driver_delta_seconds_fn,
+                get_learned_position_adjustment_fn=get_learned_position_adjustment_fn,
+                resolve_effective_experience_tier_fn=resolve_effective_experience_tier_fn,
+                extract_experience_total_races_fn=extract_experience_total_races_fn,
+                get_driver_data_or_fallback_fn=get_driver_data_or_fallback_fn,
+                default_skill=default_skill,
             )
-
-            wet_skill = float(
-                driver_data.get("wet_skill", 0.70) if isinstance(driver_data, dict) else 0.70
-            )
-            all_drivers.append(
-                {
-                    "driver": driver_code,
-                    "team": team,
-                    "team_strength": team_strength,
-                    "skill": skill,
-                    "quali_pace": quali_pace,
-                    "raw_quali_pace": raw_quali_pace,
-                    "bayesian_skill_score": bayesian_skill_score,
-                    "bayesian_pace_blend_weight": bayesian_pace_blend_weight,
-                    "experience_tier": experience_tier,
-                    "experience_total_races": experience_total_races,
-                    "learned_position_adjustment": learned_position_adjustment,
-                    "wet_skill": wet_skill,
-                }
-            )
+            all_drivers.append(record)
 
     return all_drivers, teams_with_short_profile

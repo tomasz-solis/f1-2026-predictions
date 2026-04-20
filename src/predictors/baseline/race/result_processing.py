@@ -127,6 +127,35 @@ def apply_low_confidence_interval_floor(
         row["p95"] = p95 + add_upper
 
 
+def apply_learned_interval_radius(
+    *,
+    finish_order: list[dict[str, Any]],
+    learned_interval_radius: float,
+    field_size: int,
+) -> None:
+    """Apply a learned residual-radius floor to published finish intervals."""
+    target_half_width = int(np.ceil(max(0.0, learned_interval_radius)))
+    if target_half_width <= 0 or field_size <= 1:
+        return
+
+    for row in finish_order:
+        try:
+            center = int(row.get("median_position", row.get("position", field_size)))
+            p5 = int(row.get("p5", center))
+            p95 = int(row.get("p95", center))
+        except (TypeError, ValueError):
+            continue
+
+        center = max(1, min(center, field_size))
+        lower = max(1, min(p5, p95, field_size))
+        upper = max(lower, min(max(p5, p95), field_size))
+        current_half_width = max(center - lower, upper - center)
+        required_half_width = max(current_half_width, target_half_width)
+
+        row["p5"] = max(1, center - required_half_width)
+        row["p95"] = min(field_size, center + required_half_width)
+
+
 def apply_hypothetical_points_floor(
     *,
     info: dict[str, Any],
@@ -434,6 +463,7 @@ def build_finish_order(
     race_params: dict[str, Any],
     weather_feature_modifiers: dict[str, float],
     get_learned_position_adjustment: Any,
+    learned_interval_radius: float,
     enforce_non_increasing: Any,
     base_seed: int,
 ) -> list[dict[str, Any]]:
@@ -636,6 +666,11 @@ def build_finish_order(
         for row, smoothed in zip(finish_order, smoothed_values, strict=True):
             row["podium_probability"] = round(float(np.clip(smoothed, 0.0, 100.0)), 1)
 
+    apply_learned_interval_radius(
+        finish_order=finish_order,
+        learned_interval_radius=learned_interval_radius,
+        field_size=max(1, field_size),
+    )
     apply_low_confidence_interval_floor(
         finish_order=finish_order,
         input_confidence=input_confidence,

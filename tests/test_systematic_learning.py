@@ -12,18 +12,74 @@ def _sample_prediction_record() -> dict:
         },
         "qualifying": {
             "predicted_grid": [
-                {"position": 1, "driver": "HAD", "team": "Red Bull Racing"},
-                {"position": 2, "driver": "VER", "team": "Red Bull Racing"},
-                {"position": 3, "driver": "NOR", "team": "McLaren"},
-                {"position": 4, "driver": "PIA", "team": "McLaren"},
+                {
+                    "position": 1,
+                    "median_position": 1,
+                    "p5": 1,
+                    "p95": 1,
+                    "driver": "HAD",
+                    "team": "Red Bull Racing",
+                },
+                {
+                    "position": 2,
+                    "median_position": 2,
+                    "p5": 2,
+                    "p95": 2,
+                    "driver": "VER",
+                    "team": "Red Bull Racing",
+                },
+                {
+                    "position": 3,
+                    "median_position": 3,
+                    "p5": 3,
+                    "p95": 3,
+                    "driver": "NOR",
+                    "team": "McLaren",
+                },
+                {
+                    "position": 4,
+                    "median_position": 4,
+                    "p5": 4,
+                    "p95": 4,
+                    "driver": "PIA",
+                    "team": "McLaren",
+                },
             ]
         },
         "race": {
             "predicted_results": [
-                {"position": 1, "driver": "NOR", "team": "McLaren"},
-                {"position": 2, "driver": "PIA", "team": "McLaren"},
-                {"position": 3, "driver": "VER", "team": "Red Bull Racing"},
-                {"position": 4, "driver": "HAD", "team": "Red Bull Racing"},
+                {
+                    "position": 1,
+                    "median_position": 1,
+                    "p5": 1,
+                    "p95": 1,
+                    "driver": "NOR",
+                    "team": "McLaren",
+                },
+                {
+                    "position": 2,
+                    "median_position": 2,
+                    "p5": 2,
+                    "p95": 2,
+                    "driver": "PIA",
+                    "team": "McLaren",
+                },
+                {
+                    "position": 3,
+                    "median_position": 3,
+                    "p5": 3,
+                    "p95": 3,
+                    "driver": "VER",
+                    "team": "Red Bull Racing",
+                },
+                {
+                    "position": 4,
+                    "median_position": 4,
+                    "p5": 4,
+                    "p95": 4,
+                    "driver": "HAD",
+                    "team": "Red Bull Racing",
+                },
             ]
         },
         "actuals": {
@@ -88,6 +144,33 @@ def test_update_from_prediction_record_no_actuals_no_updates(tmp_path):
     assert summary["sessions_updated"] == 0
     assert summary["driver_updates"] == 0
     assert summary["pair_updates"] == 0
+
+
+def test_update_from_prediction_record_learns_interval_radius_from_residuals(tmp_path):
+    state_file = tmp_path / "learning_state.json"
+    system = SystematicLearningSystem(state_file=state_file)
+
+    summary = system.update_from_prediction_record(_sample_prediction_record())
+
+    qualifying_summary = system.get_interval_calibration_summary(
+        "qualifying",
+        min_samples=1,
+        target_coverage=0.90,
+        max_adjustment=5.0,
+    )
+    race_summary = system.get_interval_calibration_summary(
+        "race",
+        min_samples=1,
+        target_coverage=0.90,
+        max_adjustment=5.0,
+    )
+
+    assert summary["interval_samples"] == 8
+    assert qualifying_summary["sample_count"] == 4.0
+    assert qualifying_summary["empirical_coverage"] == 0.25
+    assert qualifying_summary["learned_radius"] >= 1.0
+    assert race_summary["sample_count"] == 4.0
+    assert race_summary["learned_radius"] >= 1.0
 
 
 def test_update_from_prediction_record_skips_retrospective_predictions(tmp_path):

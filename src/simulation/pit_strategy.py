@@ -16,6 +16,7 @@ import numpy as np
 from src.simulation.strategy_optimizer import calculate_pit_timing_bias_laps
 from src.types.prediction_types import PitStrategy
 from src.utils import config_loader
+from src.utils.prediction_context import get_config_value
 
 logger = logging.getLogger(__name__)
 
@@ -51,23 +52,31 @@ def generate_pit_strategy(
         - stint_lengths: List[int] (laps per stint)
     """
     # Load config parameters
-    high_stress_2stop_prob = config_loader.get(
-        "baseline_predictor.race.tire_strategy.stop_probability.high_stress_2stop", 0.80
+    high_stress_2stop_prob = get_config_value(
+        "baseline_predictor.race.tire_strategy.stop_probability.high_stress_2stop",
+        0.80,
+        config=config_loader,
     )
-    med_stress_1stop_prob = config_loader.get(
+    med_stress_1stop_prob = get_config_value(
         "baseline_predictor.race.tire_strategy.stop_probability.medium_stress_1stop",
         0.90,
+        config=config_loader,
     )
-    low_stress_1stop_prob = config_loader.get(
+    low_stress_1stop_prob = get_config_value(
         "baseline_predictor.race.tire_strategy.stop_probability.low_stress_1stop",
         0.95,
+        config=config_loader,
     )
 
-    high_stress_threshold = config_loader.get(
-        "baseline_predictor.compound_selection.high_stress_threshold", 3.5
+    high_stress_threshold = get_config_value(
+        "baseline_predictor.compound_selection.high_stress_threshold",
+        3.5,
+        config=config_loader,
     )
-    low_stress_threshold = config_loader.get(
-        "baseline_predictor.compound_selection.low_stress_threshold", 2.5
+    low_stress_threshold = get_config_value(
+        "baseline_predictor.compound_selection.low_stress_threshold",
+        2.5,
+        config=config_loader,
     )
 
     # Decide number of stops based on tire stress
@@ -147,31 +156,49 @@ def _sample_pit_laps(
 ) -> list[int]:
     """Sample pit lap numbers from realistic windows."""
     # Load pit windows from config
-    one_stop_window = config_loader.get(
-        "baseline_predictor.race.tire_strategy.windows.one_stop", [23, 37]
+    one_stop_window = get_config_value(
+        "baseline_predictor.race.tire_strategy.windows.one_stop",
+        [23, 37],
+        config=config_loader,
     )
-    two_stop_first = config_loader.get(
-        "baseline_predictor.race.tire_strategy.windows.two_stop_first", [15, 25]
+    two_stop_first = get_config_value(
+        "baseline_predictor.race.tire_strategy.windows.two_stop_first",
+        [15, 25],
+        config=config_loader,
     )
-    two_stop_second = config_loader.get(
-        "baseline_predictor.race.tire_strategy.windows.two_stop_second", [35, 45]
+    two_stop_second = get_config_value(
+        "baseline_predictor.race.tire_strategy.windows.two_stop_second",
+        [35, 45],
+        config=config_loader,
     )
 
     # Load variance config
-    one_stop_variance = config_loader.get(
-        "baseline_predictor.race.strategy_constraints.pit_lap_variance.one_stop", 3.0
+    one_stop_variance = get_config_value(
+        "baseline_predictor.race.strategy_constraints.pit_lap_variance.one_stop",
+        3.0,
+        config=config_loader,
     )
-    two_stop_variance = config_loader.get(
-        "baseline_predictor.race.strategy_constraints.pit_lap_variance.two_stop", 2.0
+    two_stop_variance = get_config_value(
+        "baseline_predictor.race.strategy_constraints.pit_lap_variance.two_stop",
+        2.0,
+        config=config_loader,
     )
 
     # Load safety margins
-    min_pit_lap = config_loader.get("baseline_predictor.race.strategy_constraints.min_pit_lap", 5)
-    max_pit_lap_from_end = config_loader.get(
-        "baseline_predictor.race.strategy_constraints.max_pit_lap_from_end", 5
+    min_pit_lap = get_config_value(
+        "baseline_predictor.race.strategy_constraints.min_pit_lap",
+        5,
+        config=config_loader,
     )
-    min_laps_between_stops = config_loader.get(
-        "baseline_predictor.race.strategy_constraints.min_laps_between_stops", 8
+    max_pit_lap_from_end = get_config_value(
+        "baseline_predictor.race.strategy_constraints.max_pit_lap_from_end",
+        5,
+        config=config_loader,
+    )
+    min_laps_between_stops = get_config_value(
+        "baseline_predictor.race.strategy_constraints.min_laps_between_stops",
+        8,
+        config=config_loader,
     )
 
     # Scale windows proportionally to race distance (default config assumes 60 laps)
@@ -267,11 +294,15 @@ def _sample_compound_sequence(
         available = available_compounds
 
     # Adjust preferences based on tire stress
-    high_stress_threshold = config_loader.get(
-        "baseline_predictor.compound_selection.high_stress_threshold", 3.5
+    high_stress_threshold = get_config_value(
+        "baseline_predictor.compound_selection.high_stress_threshold",
+        3.5,
+        config=config_loader,
     )
-    low_stress_threshold = config_loader.get(
-        "baseline_predictor.compound_selection.low_stress_threshold", 2.5
+    low_stress_threshold = get_config_value(
+        "baseline_predictor.compound_selection.low_stress_threshold",
+        2.5,
+        config=config_loader,
     )
 
     has_intermediate = "INTERMEDIATE" in available
@@ -321,8 +352,10 @@ def _sample_compound_sequence(
         return sequence
 
     # Monte Carlo: configurable optimality ratio (for realism)
-    optimality_ratio = config_loader.get(
-        "baseline_predictor.race.strategy_constraints.strategy_optimality", 0.60
+    optimality_ratio = get_config_value(
+        "baseline_predictor.race.strategy_constraints.strategy_optimality",
+        0.60,
+        config=config_loader,
     )
 
     if rng.random() < optimality_ratio:
@@ -377,9 +410,15 @@ def validate_strategy(
 ) -> bool:
     """Validate strategy satisfies FIA rules and physical constraints."""
     # Load safety margins
-    min_pit_lap = config_loader.get("baseline_predictor.race.strategy_constraints.min_pit_lap", 5)
-    max_pit_lap_from_end = config_loader.get(
-        "baseline_predictor.race.strategy_constraints.max_pit_lap_from_end", 5
+    min_pit_lap = get_config_value(
+        "baseline_predictor.race.strategy_constraints.min_pit_lap",
+        5,
+        config=config_loader,
+    )
+    max_pit_lap_from_end = get_config_value(
+        "baseline_predictor.race.strategy_constraints.max_pit_lap_from_end",
+        5,
+        config=config_loader,
     )
 
     # Check required fields

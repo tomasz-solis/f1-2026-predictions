@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from src.predictors.baseline_2026 import Baseline2026Predictor
+from src.utils.prediction_context import build_historical_prediction_context
 
 GOLDEN_DIR = Path("data/test")
 REFERENCE_REGRESSION_ENV = sys.platform == "darwin" and sys.version_info[:2] == (3, 11)
@@ -17,6 +18,18 @@ REFERENCE_REGRESSION_ENV = sys.platform == "darwin" and sys.version_info[:2] == 
 def _build_test_predictor() -> Baseline2026Predictor:
     """Create the deterministic predictor used for golden fixtures."""
     return Baseline2026Predictor(seed=42)
+
+
+def _historical_context(race_name: str, session_name: str) -> dict[str, Any]:
+    """Build deterministic historical context kwargs for regression predictions."""
+    return {
+        "prediction_context": build_historical_prediction_context(
+            year=2026,
+            race_name=race_name,
+            target_session_name=session_name,
+            seed=42,
+        )
+    }
 
 
 def _normalize_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -87,7 +100,12 @@ def _assert_cross_environment_regression(
 def _qualifying_payload() -> dict[str, Any]:
     """Build the fixed-seed qualifying payload used for regression checks."""
     predictor = _build_test_predictor()
-    result = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=40)
+    result = predictor.predict_qualifying(
+        2026,
+        "Australian Grand Prix",
+        n_simulations=40,
+        **_historical_context("Australian Grand Prix", "Q"),
+    )
     return {
         "seed": 42,
         "year": 2026,
@@ -100,12 +118,18 @@ def _qualifying_payload() -> dict[str, Any]:
 def _race_payload() -> dict[str, Any]:
     """Build the fixed-seed race payload used for regression checks."""
     predictor = _build_test_predictor()
-    qualifying = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=40)
+    qualifying = predictor.predict_qualifying(
+        2026,
+        "Australian Grand Prix",
+        n_simulations=40,
+        **_historical_context("Australian Grand Prix", "Q"),
+    )
     result = predictor.predict_race(
         qualifying["grid"],
         weather="dry",
         race_name="Australian Grand Prix",
         n_simulations=40,
+        **_historical_context("Australian Grand Prix", "R"),
     )
     return {
         "seed": 42,
@@ -125,6 +149,7 @@ def _sprint_qualifying_payload() -> dict[str, Any]:
         "Chinese Grand Prix",
         n_simulations=40,
         qualifying_stage="sprint",
+        **_historical_context("Chinese Grand Prix", "SQ"),
     )
     return {
         "seed": 42,
@@ -144,12 +169,14 @@ def _sprint_race_payload() -> dict[str, Any]:
         "Chinese Grand Prix",
         n_simulations=40,
         qualifying_stage="sprint",
+        **_historical_context("Chinese Grand Prix", "SQ"),
     )
     result = predictor.predict_sprint_race(
         sprint_qualifying["grid"],
         weather="dry",
         race_name="Chinese Grand Prix",
         n_simulations=40,
+        **_historical_context("Chinese Grand Prix", "SPRINT"),
     )
     return {
         "seed": 42,
@@ -169,6 +196,7 @@ def _china_main_qualifying_payload() -> dict[str, Any]:
         "Chinese Grand Prix",
         n_simulations=40,
         qualifying_stage="main",
+        **_historical_context("Chinese Grand Prix", "Q"),
     )
     return {
         "seed": 42,
@@ -188,12 +216,14 @@ def _china_main_race_payload() -> dict[str, Any]:
         "Chinese Grand Prix",
         n_simulations=40,
         qualifying_stage="main",
+        **_historical_context("Chinese Grand Prix", "Q"),
     )
     result = predictor.predict_race(
         main_qualifying["grid"],
         weather="dry",
         race_name="Chinese Grand Prix",
         n_simulations=40,
+        **_historical_context("Chinese Grand Prix", "R"),
     )
     return {
         "seed": 42,

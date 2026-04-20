@@ -1031,6 +1031,17 @@ def test_predict_race_applies_learned_position_adjustment():
             )
             return 2.0 if driver == "A" else -1.5
 
+        def get_interval_radius(
+            self,
+            *,
+            session,
+            min_samples,
+            target_coverage,
+            max_adjustment,
+        ):
+            _ = (session, min_samples, target_coverage, max_adjustment)
+            return 2.0
+
     class _Config:
         def get(self, key, default=None):
             overrides = {
@@ -1039,6 +1050,9 @@ def test_predict_race_applies_learned_position_adjustment():
                 "baseline_predictor.race.grid_anchor.track_scale": 0.0,
                 "baseline_predictor.race.grid_anchor.min": 0.4,
                 "baseline_predictor.race.grid_anchor.sprint_min": 0.4,
+                "learning.interval_min_samples": 1,
+                "learning.interval_target_coverage": 0.9,
+                "learning.interval_max_adjustment": 4.0,
             }
             return overrides.get(key, default)
 
@@ -1148,6 +1162,10 @@ def test_predict_race_applies_learned_position_adjustment():
     by_position = sorted(result["finish_order"], key=lambda row: row["position"])
     assert by_position[0]["driver"] == "A"
     assert by_position[1]["driver"] == "B"
+    assert by_position[0]["p5"] == 1
+    assert by_position[0]["p95"] == 2
+    assert by_position[1]["p5"] == 1
+    assert by_position[1]["p95"] == 2
 
 
 @pytest.mark.parametrize(

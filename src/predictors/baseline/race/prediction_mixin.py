@@ -22,6 +22,7 @@ from src.utils.lap_by_lap_simulator import (
     aggregate_simulation_results,
     simulate_race_lap_by_lap,
 )
+from src.utils.prediction_context import PredictionContext, activate_prediction_runtime
 from src.utils.validation_helpers import validate_enum, validate_positive_int
 
 from .race_simulation import RaceSimulationDeps, predict_race_core
@@ -130,49 +131,80 @@ class BaselineRacePredictionMixin:
             logger.debug("Could not load learned race adjustment for %s: %s", driver, exc)
             return 0.0
 
+    def _get_learned_interval_radius(self, *, session: str = "race") -> float:
+        """Return learned interval radius floor from systematic calibration state."""
+        calibration_system = getattr(self, "calibration_system", None)
+        if calibration_system is None:
+            return 0.0
+
+        getter = getattr(calibration_system, "get_interval_radius", None)
+        if not callable(getter):
+            return 0.0
+
+        cfg = getattr(self, "config", config_loader)
+        min_samples = int(cfg.get("learning.interval_min_samples", 20))
+        target_coverage = float(cfg.get("learning.interval_target_coverage", 0.90))
+        max_adjustment = float(cfg.get("learning.interval_max_adjustment", 4.0))
+
+        try:
+            return float(
+                getter(
+                    session=session,
+                    min_samples=max(1, min_samples),
+                    target_coverage=target_coverage,
+                    max_adjustment=max_adjustment,
+                )
+            )
+        except Exception as exc:
+            logger.debug("Could not load learned race interval radius: %s", exc)
+            return 0.0
+
     def predict_race(
         self,
         qualifying_grid: list[QualifyingGridEntry],
         weather: str = "dry",
         race_name: str | None = None,
-        n_simulations: int = 50,
+        n_simulations: int = 300,
         is_sprint: bool = False,
         race_compound: str = "MEDIUM",
         year: int | None = None,
         input_confidence: float | None = None,
+        prediction_context: PredictionContext | None = None,
     ) -> dict[str, Any]:
         """Predict race result using lap-by-lap Monte Carlo simulation with tire deg and pit stops."""
-        validate_enum(weather, "weather", ["dry", "rain", "mixed"])
-        validate_positive_int(n_simulations, "n_simulations", min_val=1)
         cfg = getattr(self, "config", config_loader)
-        validated_grid = validate_qualifying_grid(qualifying_grid)
-        return predict_race_core(
-            validated_grid=validated_grid,
-            weather=weather,
-            race_name=race_name,
-            n_simulations=n_simulations,
-            is_sprint=is_sprint,
-            race_compound=race_compound,
-            input_confidence=input_confidence,
-            year=year
-            if year is not None
-            else int(getattr(self, "season_year", getattr(self, "year", 2026))),
-            cfg=cfg,
-            base_seed=int(getattr(self, "seed", 42)),
-            deps=RaceSimulationDeps(
-                load_race_params=self._load_race_params,
-                prepare_driver_info_with_compounds=self._prepare_driver_info_with_compounds,
-                get_learned_position_adjustment=self._get_learned_position_adjustment,
-                enforce_non_increasing=self._enforce_non_increasing,
-                load_track_specific_params=load_track_specific_params,
-                get_tire_stress_score=get_tire_stress_score,
-                get_available_compounds=get_available_compounds,
-                resolve_track_temperature_c=resolve_track_temperature_c,
-                resolve_track_temperature_profile=resolve_track_temperature_profile,
-                resolve_non_competitive_weather_features=resolve_non_competitive_weather_features,
-                resolve_race_distance_laps=resolve_race_distance_laps,
-                generate_pit_strategy=generate_pit_strategy,
-                simulate_race_lap_by_lap=simulate_race_lap_by_lap,
-                aggregate_simulation_results=aggregate_simulation_results,
-            ),
-        )
+        with activate_prediction_runtime(config=cfg, prediction_context=prediction_context):
+            validate_enum(weather, "weather", ["dry", "rain", "mixed"])
+            validate_positive_int(n_simulations, "n_simulations", min_val=1)
+            validated_grid = validate_qualifying_grid(qualifying_grid)
+            return predict_race_core(
+                validated_grid=validated_grid,
+                weather=weather,
+                race_name=race_name,
+                n_simulations=n_simulations,
+                is_sprint=is_sprint,
+                race_compound=race_compound,
+                input_confidence=input_confidence,
+                year=year
+                if year is not None
+                else int(getattr(self, "season_year", getattr(self, "year", 2026))),
+                cfg=cfg,
+                base_seed=int(getattr(self, "seed", 42)),
+                deps=RaceSimulationDeps(
+                    load_race_params=self._load_race_params,
+                    prepare_driver_info_with_compounds=self._prepare_driver_info_with_compounds,
+                    get_learned_position_adjustment=self._get_learned_position_adjustment,
+                    get_learned_interval_radius=self._get_learned_interval_radius,
+                    enforce_non_increasing=self._enforce_non_increasing,
+                    load_track_specific_params=load_track_specific_params,
+                    get_tire_stress_score=get_tire_stress_score,
+                    get_available_compounds=get_available_compounds,
+                    resolve_track_temperature_c=resolve_track_temperature_c,
+                    resolve_track_temperature_profile=resolve_track_temperature_profile,
+                    resolve_non_competitive_weather_features=resolve_non_competitive_weather_features,
+                    resolve_race_distance_laps=resolve_race_distance_laps,
+                    generate_pit_strategy=generate_pit_strategy,
+                    simulate_race_lap_by_lap=simulate_race_lap_by_lap,
+                    aggregate_simulation_results=aggregate_simulation_results,
+                ),
+            )

@@ -35,6 +35,7 @@ class SystematicLearningSystem:
                 "last_updated": None,
                 "driver_position_error": {"qualifying": {}, "race": {}},
                 "teammate_gap_error": {"qualifying": {}, "race": {}},
+                "interval_residual_history": {"qualifying": [], "race": []},
                 "event_history": [],
             },
         }
@@ -83,6 +84,17 @@ class SystematicLearningSystem:
             adaptive["teammate_gap_error"] = teammate_error
         teammate_error.setdefault("qualifying", {})
         teammate_error.setdefault("race", {})
+
+        interval_history = adaptive.setdefault(
+            "interval_residual_history",
+            {"qualifying": [], "race": []},
+        )
+        if not isinstance(interval_history, dict):
+            interval_history = {"qualifying": [], "race": []}
+            adaptive["interval_residual_history"] = interval_history
+        for session_name in ("qualifying", "race"):
+            if not isinstance(interval_history.get(session_name), list):
+                interval_history[session_name] = []
 
         if not isinstance(adaptive.get("event_history"), list):
             adaptive["event_history"] = []
@@ -140,6 +152,16 @@ class SystematicLearningSystem:
         if isinstance(normalized, str) and normalized.strip():
             return normalized.strip()
         return None
+
+    @staticmethod
+    def _coerce_position(value: Any) -> int | None:
+        """Convert stored position-like values into integers when possible."""
+        try:
+            if value is None:
+                return None
+            return int(value)
+        except (TypeError, ValueError):
+            return None
 
     @staticmethod
     def _parse_timestamp(value: Any) -> datetime | None:
@@ -302,6 +324,77 @@ class SystematicLearningSystem:
             "mae": round(mae, 4),
         }
 
+    def _update_interval_residual_history(
+        self,
+        *,
+        session: str,
+        predicted: list[dict[str, Any]],
+        actual: list[dict[str, Any]],
+        history_limit: int,
+    ) -> int:
+        """Persist interval residuals so later predictions can calibrate their bands.
+
+        Each stored row represents one driver-session outcome with:
+        - residual: absolute miss from the predicted center
+        - half_width: half-width of the published p5-p95 interval
+        - covered: whether the actual finish landed inside that interval
+        """
+        if not predicted or not actual:
+            return 0
+
+        predicted_intervals: dict[str, dict[str, int]] = {}
+        for row in predicted:
+            driver_code = self._normalize_driver_code(row.get("driver"))
+            center = self._coerce_position(row.get("median_position", row.get("position")))
+            p5 = self._coerce_position(row.get("p5"))
+            p95 = self._coerce_position(row.get("p95"))
+            if driver_code is None or center is None or p5 is None or p95 is None:
+                continue
+            lower = min(p5, p95)
+            upper = max(p5, p95)
+            predicted_intervals[driver_code] = {
+                "center": center,
+                "lower": lower,
+                "upper": upper,
+            }
+
+        if not predicted_intervals:
+            return 0
+
+        actual_positions: dict[str, int] = {}
+        for row in actual:
+            driver_code = self._normalize_driver_code(row.get("driver"))
+            position = self._coerce_position(row.get("position"))
+            if driver_code is None or position is None:
+                continue
+            actual_positions[driver_code] = position
+
+        common_drivers = sorted(set(predicted_intervals).intersection(actual_positions))
+        if not common_drivers:
+            return 0
+
+        calibration = self.state["adaptive_calibration"]
+        interval_history = calibration["interval_residual_history"].setdefault(session, [])
+
+        for driver_code in common_drivers:
+            interval_row = predicted_intervals[driver_code]
+            actual_position = actual_positions[driver_code]
+            center = interval_row["center"]
+            lower = interval_row["lower"]
+            upper = interval_row["upper"]
+            interval_history.append(
+                {
+                    "residual": float(abs(center - actual_position)),
+                    "half_width": float(max(center - lower, upper - center)),
+                    "covered": bool(lower <= actual_position <= upper),
+                }
+            )
+
+        if len(interval_history) > history_limit:
+            calibration["interval_residual_history"][session] = interval_history[-history_limit:]
+
+        return len(common_drivers)
+
     def update_from_prediction_record(
         self,
         prediction_data: dict[str, Any],
@@ -327,24 +420,35 @@ class SystematicLearningSystem:
         actual_race = actuals.get("race") or []
 
         updates: list[dict[str, Any]] = []
+        interval_history_limit = max(500, history_limit * 20)
         if actual_quali:
-            updates.append(
-                self._update_session_errors(
-                    session="qualifying",
-                    predicted=predicted_quali,
-                    actual=actual_quali,
-                    alpha=alpha,
-                )
+            qualifying_update = self._update_session_errors(
+                session="qualifying",
+                predicted=predicted_quali,
+                actual=actual_quali,
+                alpha=alpha,
             )
+            qualifying_update["interval_samples"] = self._update_interval_residual_history(
+                session="qualifying",
+                predicted=predicted_quali,
+                actual=actual_quali,
+                history_limit=interval_history_limit,
+            )
+            updates.append(qualifying_update)
         if actual_race:
-            updates.append(
-                self._update_session_errors(
-                    session="race",
-                    predicted=predicted_race,
-                    actual=actual_race,
-                    alpha=alpha,
-                )
+            race_update = self._update_session_errors(
+                session="race",
+                predicted=predicted_race,
+                actual=actual_race,
+                alpha=alpha,
             )
+            race_update["interval_samples"] = self._update_interval_residual_history(
+                session="race",
+                predicted=predicted_race,
+                actual=actual_race,
+                history_limit=interval_history_limit,
+            )
+            updates.append(race_update)
 
         metadata = prediction_data.get("metadata", {})
         event_entry = {
@@ -365,11 +469,13 @@ class SystematicLearningSystem:
 
         total_driver_updates = sum(item.get("drivers_updated", 0) for item in updates)
         total_pair_updates = sum(item.get("pairs_updated", 0) for item in updates)
+        total_interval_samples = sum(item.get("interval_samples", 0) for item in updates)
 
         return {
             "sessions_updated": len(updates),
             "driver_updates": total_driver_updates,
             "pair_updates": total_pair_updates,
+            "interval_samples": total_interval_samples,
             "details": updates,
             "skipped": False,
             "skip_reason": None,
@@ -482,3 +588,71 @@ class SystematicLearningSystem:
         )
         combined = driver_adj + teammate_adj
         return self._clip(combined, -max_adjustment, max_adjustment)
+
+    def get_interval_calibration_summary(
+        self,
+        session: str,
+        *,
+        min_samples: int = 20,
+        target_coverage: float = 0.90,
+        max_adjustment: float = 4.0,
+    ) -> dict[str, float]:
+        """Summarize learned interval calibration for one session type.
+
+        The published p5-p95 ranges remain model-derived, but this summary exposes
+        an empirical residual radius that can be used as a conformal-style floor
+        when the historical intervals have been too tight.
+        """
+        calibration = self.state.get("adaptive_calibration", {})
+        interval_history = (calibration.get("interval_residual_history") or {}).get(session) or []
+        rows = [row for row in interval_history if isinstance(row, dict)]
+
+        residuals = []
+        half_widths = []
+        hits = 0.0
+        for row in rows:
+            try:
+                residuals.append(float(row.get("residual", 0.0)))
+                half_widths.append(float(row.get("half_width", 0.0)))
+                hits += 1.0 if bool(row.get("covered")) else 0.0
+            except (TypeError, ValueError):
+                continue
+
+        sample_count = len(residuals)
+        learned_radius = 0.0
+        clipped_target_coverage = float(np.clip(target_coverage, 0.0, 1.0))
+        if sample_count >= max(1, min_samples):
+            learned_radius = self._clip(
+                float(np.quantile(residuals, clipped_target_coverage)),
+                0.0,
+                max_adjustment,
+            )
+
+        empirical_coverage = (hits / sample_count) if sample_count else 0.0
+        mean_half_width = float(np.mean(half_widths)) if half_widths else 0.0
+        mean_residual = float(np.mean(residuals)) if residuals else 0.0
+        return {
+            "sample_count": float(sample_count),
+            "empirical_coverage": float(empirical_coverage),
+            "target_coverage": clipped_target_coverage,
+            "mean_half_width": mean_half_width,
+            "mean_residual": mean_residual,
+            "learned_radius": float(learned_radius),
+        }
+
+    def get_interval_radius(
+        self,
+        session: str,
+        *,
+        min_samples: int = 20,
+        target_coverage: float = 0.90,
+        max_adjustment: float = 4.0,
+    ) -> float:
+        """Return the learned conformal-style residual radius for one session."""
+        summary = self.get_interval_calibration_summary(
+            session,
+            min_samples=min_samples,
+            target_coverage=target_coverage,
+            max_adjustment=max_adjustment,
+        )
+        return float(summary["learned_radius"])

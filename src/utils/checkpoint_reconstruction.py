@@ -26,6 +26,7 @@ from src.utils.car_snapshot_history import (
     snapshot_sort_timestamp,
     sort_snapshot_payloads,
 )
+from src.utils.prediction_context import build_historical_prediction_context
 from src.utils.prediction_logger import ActualResultRows, PredictionLogger
 from src.utils.prediction_metrics import PredictionMetrics
 from src.utils.race_input_confidence import (
@@ -373,6 +374,11 @@ def build_reconstructed_prediction_results(
                 qualifying_stage="sprint",
                 practice_signal_mode="stored_profiles",
                 checkpoint_session_name=checkpoint_session_upper,
+                prediction_context=build_historical_prediction_context(
+                    year=year,
+                    race_name=race_name,
+                    target_session_name="SQ",
+                ),
             )
         )
         sprint_input_confidence = _derive_race_input_confidence(
@@ -386,6 +392,11 @@ def build_reconstructed_prediction_results(
                 race_name=race_name,
                 n_simulations=race_runs,
                 input_confidence=sprint_input_confidence,
+                prediction_context=build_historical_prediction_context(
+                    year=year,
+                    race_name=race_name,
+                    target_session_name="SPRINT",
+                ),
             ),
             input_confidence=sprint_input_confidence,
         )
@@ -397,6 +408,11 @@ def build_reconstructed_prediction_results(
                 qualifying_stage="main",
                 practice_signal_mode="stored_profiles",
                 checkpoint_session_name=checkpoint_session_upper,
+                prediction_context=build_historical_prediction_context(
+                    year=year,
+                    race_name=race_name,
+                    target_session_name="Q",
+                ),
             )
         )
         main_race_input_confidence = _derive_race_input_confidence(
@@ -418,6 +434,11 @@ def build_reconstructed_prediction_results(
                 n_simulations=race_runs,
                 year=year,
                 input_confidence=main_race_input_confidence,
+                prediction_context=build_historical_prediction_context(
+                    year=year,
+                    race_name=race_name,
+                    target_session_name="R",
+                ),
             ),
             input_confidence=main_race_input_confidence,
         )
@@ -436,6 +457,11 @@ def build_reconstructed_prediction_results(
                 qualifying_stage="main",
                 practice_signal_mode="stored_profiles",
                 checkpoint_session_name=checkpoint_session_upper,
+                prediction_context=build_historical_prediction_context(
+                    year=year,
+                    race_name=race_name,
+                    target_session_name="Q",
+                ),
             )
         )
         race_input_confidence = _derive_race_input_confidence(
@@ -450,6 +476,11 @@ def build_reconstructed_prediction_results(
                 n_simulations=race_runs,
                 year=year,
                 input_confidence=race_input_confidence,
+                prediction_context=build_historical_prediction_context(
+                    year=year,
+                    race_name=race_name,
+                    target_session_name="R",
+                ),
             ),
             input_confidence=race_input_confidence,
         )

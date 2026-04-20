@@ -39,6 +39,7 @@ class RaceSimulationDeps:
         tuple[dict[str, Any], int],
     ]
     get_learned_position_adjustment: Callable[..., float]
+    get_learned_interval_radius: Callable[..., float]
     enforce_non_increasing: Callable[[list[float]], list[float]]
     load_track_specific_params: Callable[..., dict[str, Any]]
     get_tire_stress_score: Callable[..., float]
@@ -409,6 +410,7 @@ def predict_race_core(
         race_params=race_params,
         weather_feature_modifiers=weather_feature_modifiers,
         get_learned_position_adjustment=deps.get_learned_position_adjustment,
+        learned_interval_radius=float(deps.get_learned_interval_radius(session="race")),
         enforce_non_increasing=deps.enforce_non_increasing,
         base_seed=base_seed,
     )

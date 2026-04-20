@@ -216,7 +216,7 @@ def calculate_order_mae(
             error = abs(predicted_order[team] - actual_order[team])
             errors.append(error)
 
-    return np.mean(errors) if errors else None
+    return float(np.mean(errors)) if errors else None
 
 
 def test_session_as_predictor_fixed(

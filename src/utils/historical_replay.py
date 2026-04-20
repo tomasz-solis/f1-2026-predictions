@@ -42,6 +42,7 @@ from src.utils.checkpoint_reconstruction import compute_information_cutoff_at
 from src.utils.config_loader import Config
 from src.utils.grid_validation import validate_qualifying_grid
 from src.utils.lineups import get_lineups
+from src.utils.prediction_context import build_historical_prediction_context
 from src.utils.prediction_logger import ActualResultRows, PredictionLogger
 from src.utils.prediction_metrics import PredictionMetrics
 from src.utils.race_input_confidence import (
@@ -306,6 +307,11 @@ def _resolve_qualifying_section_for_replay(
         n_simulations=_resolve_simulation_count("qualifying"),
         practice_signal_mode="stored_profiles",
         checkpoint_session_name=checkpoint_session,
+        prediction_context=build_historical_prediction_context(
+            year=year,
+            race_name=race_name,
+            target_session_name=target_session,
+        ),
     )
     section = deepcopy(section)
     section["grid_source"] = "PREDICTED"
@@ -349,6 +355,11 @@ def _resolve_race_section_for_replay(
             race_name=race_name,
             n_simulations=_resolve_simulation_count("race"),
             input_confidence=input_confidence,
+            prediction_context=build_historical_prediction_context(
+                year=year,
+                race_name=race_name,
+                target_session_name=target_session,
+            ),
         )
     else:
         section = predictor.predict_race(
@@ -358,6 +369,11 @@ def _resolve_race_section_for_replay(
             n_simulations=_resolve_simulation_count("race"),
             year=year,
             input_confidence=input_confidence,
+            prediction_context=build_historical_prediction_context(
+                year=year,
+                race_name=race_name,
+                target_session_name=target_session,
+            ),
         )
     section = deepcopy(section)
     section["grid_source"] = qualifying_grid_source

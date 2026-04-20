@@ -294,6 +294,50 @@ def test_load_data_missing_track_file_sets_empty_tracks(tmp_path, patcher, sampl
     assert predictor.tracks == {}
 
 
+def test_load_data_supplements_missing_track_layout_fields_from_cache(
+    tmp_path, patcher, sample_payloads
+):
+    car, drivers, tracks = sample_payloads
+    for track_payload in tracks["tracks"].values():
+        if isinstance(track_payload, dict):
+            for field_name in (
+                "straights_pct",
+                "slow_corners_pct",
+                "medium_corners_pct",
+                "high_corners_pct",
+            ):
+                track_payload.pop(field_name, None)
+
+    data_dir = tmp_path / "processed"
+    _write_baseline_files(data_dir, car, drivers, tracks)
+    cache_file = data_dir / "track_characteristics" / "track_profiles_cache.json"
+    cache_file.write_text(
+        json.dumps(
+            {
+                "Bahrain Grand Prix": {
+                    "straights_pct": 46.8,
+                    "slow_corners_pct": 2.5,
+                    "medium_corners_pct": 25.4,
+                    "high_corners_pct": 25.3,
+                }
+            }
+        )
+    )
+
+    predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_track_characteristics", _noop_schema_validator)
+    patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
+
+    predictor.load_data()
+
+    assert predictor.tracks["Bahrain Grand Prix"]["straights_pct"] == pytest.approx(46.8)
+    assert predictor.tracks["Bahrain Grand Prix"]["slow_corners_pct"] == pytest.approx(2.5)
+    assert predictor.tracks["Bahrain Grand Prix"]["medium_corners_pct"] == pytest.approx(25.4)
+    assert predictor.tracks["Bahrain Grand Prix"]["high_corners_pct"] == pytest.approx(25.3)
+
+
 def test_load_data_uses_season_scoped_driver_fallback_file(tmp_path, patcher, sample_payloads):
     car, drivers, tracks = sample_payloads
     car_2027 = {**car, "year": 2027}
@@ -673,6 +717,69 @@ def test_get_current_season_observations_prefers_full_saved_actual_history_over_
     car["data_freshness"] = "LIVE_UPDATED"
     car["races_completed"] = 2
     car["teams"]["McLaren"]["current_season_performance"] = [0.86]
+    data_dir = tmp_path / "processed"
+    _write_baseline_files(data_dir, car, drivers, tracks)
+
+    _write_prediction_file(
+        tmp_path / "predictions",
+        year=2026,
+        race_name="Australian Grand Prix",
+        session_name="FP3",
+        predicted_at="2026-03-01T09:00:00+00:00",
+        actual_targets={
+            "main_qualifying": [
+                {"position": 1, "driver": "NOR", "team": "McLaren"},
+                {"position": 2, "driver": "PIA", "team": "McLaren"},
+                {"position": 5, "driver": "RUS", "team": "Mercedes"},
+                {"position": 6, "driver": "ANT", "team": "Mercedes"},
+            ]
+        },
+    )
+    _write_prediction_file(
+        tmp_path / "predictions",
+        year=2026,
+        race_name="Chinese Grand Prix",
+        session_name="SQ",
+        predicted_at="2026-03-08T09:00:00+00:00",
+        actual_targets={
+            "main_qualifying": [
+                {"position": 7, "driver": "NOR", "team": "McLaren"},
+                {"position": 8, "driver": "PIA", "team": "McLaren"},
+                {"position": 1, "driver": "RUS", "team": "Mercedes"},
+                {"position": 2, "driver": "ANT", "team": "Mercedes"},
+            ]
+        },
+    )
+
+    _patch_schedule_rows(
+        patcher,
+        [
+            ("Australian Grand Prix", "conventional"),
+            ("Chinese Grand Prix", "sprint"),
+            ("Japanese Grand Prix", "conventional"),
+        ],
+    )
+    predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", _noop_schema_validator)
+    patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
+
+    predictor.load_data()
+
+    assert predictor._get_current_season_observations(
+        team_name="McLaren",
+        team_data=predictor.teams["McLaren"],
+        race_name="Japanese Grand Prix",
+    ) == pytest.approx([1.0, 0.0])
+
+
+def test_get_current_season_observations_prefers_equally_complete_saved_actual_history(
+    tmp_path, patcher, sample_payloads
+):
+    car, drivers, tracks = sample_payloads
+    car["data_freshness"] = "LIVE_UPDATED"
+    car["races_completed"] = 2
+    car["teams"]["McLaren"]["current_season_performance"] = [0.86, 0.14]
     data_dir = tmp_path / "processed"
     _write_baseline_files(data_dir, car, drivers, tracks)
 

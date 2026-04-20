@@ -163,6 +163,9 @@ class LearningConfig(StrictConfigModel):
     driver_error_scale: float = Field(default=0.18, ge=0.0)
     teammate_gap_scale: float = Field(default=0.10, ge=0.0)
     max_adjustment: float = Field(default=2.5, ge=0.0)
+    interval_min_samples: int = Field(default=20, ge=1)
+    interval_target_coverage: float = Field(default=0.90, ge=0.0, le=1.0)
+    interval_max_adjustment: float = Field(default=4.0, ge=0.0)
 
 
 class TrackDefaultsConfig(StrictConfigModel):
@@ -353,8 +356,9 @@ class BaselineQualifyingConfig(StrictConfigModel):
     testing_fallback_teammate_guard_enabled: bool = True
     testing_fallback_driver_signal_shrink: float = Field(default=0.02, ge=0.0)
     testing_fallback_driver_offset_cap_multiplier: float = Field(default=1.33, ge=0.0)
-    testing_fallback_team_weight_multiplier: float = Field(default=0.92, ge=0.0)
-    testing_fallback_skill_weight_multiplier: float = Field(default=1.08, ge=0.0)
+    testing_fallback_team_weight_multiplier: float = Field(default=1.10, ge=0.0)
+    testing_fallback_skill_weight_multiplier: float = Field(default=0.90, ge=0.0)
+    testing_fallback_team_compression_multiplier: float = Field(default=1.25, ge=0.0)
     testing_fallback_experience_shrink: ExperienceFloatMapConfig = Field(
         default_factory=lambda: ExperienceFloatMapConfig(
             rookie=0.22,

@@ -36,6 +36,19 @@ class _Predictor(BaselineQualifyingMixin):
         self.config = _ConfigStub()
 
 
+class _IntervalCalibrationStub:
+    def get_interval_radius(
+        self,
+        *,
+        session: str,
+        min_samples: int,
+        target_coverage: float,
+        max_adjustment: float,
+    ) -> float:
+        _ = (session, min_samples, target_coverage, max_adjustment)
+        return 2.0
+
+
 def test_weekend_data_confidence_increases_with_session_maturity():
     predictor = _Predictor()
 
@@ -102,3 +115,26 @@ def test_aggregate_grid_confidence_gets_weekend_stage_boost():
     high_avg_conf = np.mean([entry["confidence"] for entry in high_conf_grid])
 
     assert high_avg_conf > low_avg_conf
+
+
+def test_aggregate_grid_applies_learned_interval_radius_floor():
+    predictor = _Predictor()
+    predictor.calibration_system = _IntervalCalibrationStub()
+    position_records = {
+        "VER": [1, 1, 1, 2, 1, 1],
+        "NOR": [2, 2, 2, 1, 2, 2],
+    }
+    all_drivers = [
+        {"driver": "VER", "team": "Red Bull Racing"},
+        {"driver": "NOR", "team": "McLaren"},
+    ]
+
+    grid = predictor._aggregate_grid_results(
+        position_records, all_drivers, data_confidence_score=0.9
+    )
+    by_driver = {entry["driver"]: entry for entry in grid}
+
+    assert by_driver["VER"]["p5"] == 1
+    assert by_driver["VER"]["p95"] == 2
+    assert by_driver["NOR"]["p5"] <= 1
+    assert by_driver["NOR"]["p95"] == 2

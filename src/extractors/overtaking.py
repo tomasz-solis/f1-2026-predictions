@@ -97,7 +97,7 @@ def calculate_overtaking_likelihood(years: list[int] | None = None) -> dict[str,
     if years is None:
         years = [2024, 2025]
 
-    overtaking_data = {}
+    overtaking_data: dict[str, list[dict[str, Any]]] = {}
 
     logger.info("Extracting overtaking data from races...")
 

@@ -12,6 +12,7 @@ import numpy as np
 from fastf1.exceptions import DataNotLoadedError
 
 from src.utils import config_loader
+from src.utils.prediction_context import get_config_value, get_prediction_reference_now
 from src.utils.track_overtaking import get_track_overtaking_baseline
 
 logger = logging.getLogger(__name__)
@@ -110,6 +111,11 @@ _TRACK_ERRORS = (
 _COERCE_ERRORS = (AttributeError, TypeError, ValueError)
 
 
+def _cfg_get(key: str, default: Any = None) -> Any:
+    """Read config with prediction-time overrides while preserving test patch points."""
+    return get_config_value(key, default, config=config_loader)
+
+
 def _coerce_float(value: object) -> float | None:
     """Best-effort float coercion for mypy-friendly dict[str, object] payloads."""
     try:
@@ -157,7 +163,7 @@ def _pirelli_candidate_years(year: int) -> list[int]:
 
 def _resolve_track_characteristics_path(year: int) -> Path | None:
     """Resolve season-aware track characteristics file with conservative fallback."""
-    processed_root = Path(config_loader.get("paths.processed", "data/processed"))
+    processed_root = Path(_cfg_get("paths.processed", "data/processed"))
     candidates = [int(year)]
     if year > 0:
         candidates.append(int(year) - 1)
@@ -188,10 +194,10 @@ def _default_track_temperature_c(weather: str) -> float:
     """Return fallback track temperature from config by weather bucket."""
     weather_key = str(weather or "dry").strip().lower()
     if weather_key == "rain":
-        return float(config_loader.get("baseline_predictor.race.track_temperature.rain_c", 23.0))
+        return float(_cfg_get("baseline_predictor.race.track_temperature.rain_c", 23.0))
     if weather_key == "mixed":
-        return float(config_loader.get("baseline_predictor.race.track_temperature.mixed_c", 29.0))
-    return float(config_loader.get("baseline_predictor.race.track_temperature.dry_c", 36.0))
+        return float(_cfg_get("baseline_predictor.race.track_temperature.mixed_c", 29.0))
+    return float(_cfg_get("baseline_predictor.race.track_temperature.dry_c", 36.0))
 
 
 def _coerce_utc_datetime(value: object) -> datetime | None:
@@ -279,14 +285,14 @@ def _weather_metric_median(weather_data: object, metric_token: str) -> float | N
 
 def _clamp_track_temperature_c(track_temp_c: float) -> float:
     """Clamp track temperature to a realistic range."""
-    min_temp_c = float(config_loader.get("baseline_predictor.race.track_temperature.min_c", 5.0))
-    max_temp_c = float(config_loader.get("baseline_predictor.race.track_temperature.max_c", 65.0))
+    min_temp_c = float(_cfg_get("baseline_predictor.race.track_temperature.min_c", 5.0))
+    max_temp_c = float(_cfg_get("baseline_predictor.race.track_temperature.max_c", 65.0))
     return float(max(min_temp_c, min(max_temp_c, float(track_temp_c))))
 
 
 def _resolve_session_temperature_blend_weight(session_name: str) -> float:
     """Resolve blend weight for session signal vs race-weather fallback baseline."""
-    configured_default = config_loader.get(
+    configured_default = _cfg_get(
         "baseline_predictor.race.track_temperature.blend.session_weight",
         _DEFAULT_TEMPERATURE_SESSION_BLEND_WEIGHT,
     )
@@ -295,7 +301,7 @@ def _resolve_session_temperature_blend_weight(session_name: str) -> float:
     except (TypeError, ValueError):
         default_weight = _DEFAULT_TEMPERATURE_SESSION_BLEND_WEIGHT
 
-    configured_by_session = config_loader.get(
+    configured_by_session = _cfg_get(
         "baseline_predictor.race.track_temperature.blend.session_weight_by_session",
         {},
     )
@@ -409,7 +415,7 @@ def _load_session_temperature_signal(
     if air_temp_c is None:
         return None
     offset_c = float(
-        config_loader.get("baseline_predictor.race.track_temperature.air_to_track_offset_c", 9.0)
+        _cfg_get("baseline_predictor.race.track_temperature.air_to_track_offset_c", 9.0)
     )
     return {
         "session_track_temperature_c": _clamp_track_temperature_c(air_temp_c + offset_c),
@@ -511,9 +517,7 @@ def _load_session_weather_features(
     air_temp_c = _weather_metric_median(weather_data, "airtemp")
     if track_temp_c is None and air_temp_c is not None:
         offset_c = float(
-            config_loader.get(
-                "baseline_predictor.race.track_temperature.air_to_track_offset_c", 9.0
-            )
+            _cfg_get("baseline_predictor.race.track_temperature.air_to_track_offset_c", 9.0)
         )
         track_temp_c = air_temp_c + offset_c
 
@@ -582,7 +586,7 @@ def _normalize_overtaking_difficulty(
 
         baseline = get_track_overtaking_baseline(
             race_name,
-            default=float(config_loader.get("track_defaults.overtaking_difficulty", 0.5)),
+            default=float(_cfg_get("track_defaults.overtaking_difficulty", 0.5)),
         )
         logger.info(
             "Overtaking difficulty for %s appears under-scaled (%.3f); using baseline %.2f",
@@ -614,29 +618,29 @@ def _blend_overtaking_with_transition_prior(
 
     prior = get_track_overtaking_baseline(
         race_name,
-        default=float(config_loader.get("track_defaults.overtaking_difficulty", 0.5)),
+        default=float(_cfg_get("track_defaults.overtaking_difficulty", 0.5)),
     )
 
     min_weight = float(
-        config_loader.get(
+        _cfg_get(
             "baseline_predictor.race.overtaking_transition.min_observed_weight",
             0.12,
         )
     )
     max_weight = float(
-        config_loader.get(
+        _cfg_get(
             "baseline_predictor.race.overtaking_transition.max_observed_weight",
             0.65,
         )
     )
     races_to_full = int(
-        config_loader.get(
+        _cfg_get(
             "baseline_predictor.race.overtaking_transition.races_to_full_weight",
             8,
         )
     )
     max_delta = float(
-        config_loader.get(
+        _cfg_get(
             "baseline_predictor.race.overtaking_transition.max_delta_from_prior",
             0.25,
         )
@@ -757,9 +761,7 @@ def get_tire_stress_score(race_name: str | None = None, year: int = 2026) -> flo
     Defaults to 3.0 (medium stress) if data missing.
     """
     if not race_name:
-        return config_loader.get(
-            "baseline_predictor.compound_selection.default_stress_fallback", 3.0
-        )
+        return _cfg_get("baseline_predictor.compound_selection.default_stress_fallback", 3.0)
 
     pirelli_path = _resolve_pirelli_path(year)
     if pirelli_path is None:
@@ -767,9 +769,7 @@ def get_tire_stress_score(race_name: str | None = None, year: int = 2026) -> flo
             "Pirelli data file not found for year %s (or fallbacks). Using default stress (3.0).",
             year,
         )
-        return config_loader.get(
-            "baseline_predictor.compound_selection.default_stress_fallback", 3.0
-        )
+        return _cfg_get("baseline_predictor.compound_selection.default_stress_fallback", 3.0)
 
     try:
         with open(pirelli_path) as f:
@@ -798,7 +798,7 @@ def get_tire_stress_score(race_name: str | None = None, year: int = 2026) -> flo
         logger.error("Error loading Pirelli data: %s. Using default stress (3.0).", e)
 
     # Fallback to config default
-    return config_loader.get("baseline_predictor.compound_selection.default_stress_fallback", 3.0)
+    return _cfg_get("baseline_predictor.compound_selection.default_stress_fallback", 3.0)
 
 
 def get_available_compounds(race_name: str | None = None, weather: str = "dry") -> list[str]:
@@ -859,10 +859,8 @@ def resolve_track_temperature_profile(
         )
 
     session_priority = _SPRINT_TEMP_PRIORITY if is_sprint else _CONVENTIONAL_TEMP_PRIORITY
-    now_utc = datetime.now(UTC)
-    blend_enabled = bool(
-        config_loader.get("baseline_predictor.race.track_temperature.blend.enabled", True)
-    )
+    now_utc = get_prediction_reference_now()
+    blend_enabled = bool(_cfg_get("baseline_predictor.race.track_temperature.blend.enabled", True))
 
     for session_name in session_priority:
         if not _session_scheduled_end_passed(event, session_name, now_utc):
@@ -997,7 +995,7 @@ def resolve_non_competitive_weather_features(
     session_priority = (
         _SPRINT_NON_COMPETITIVE_PRIORITY if is_sprint else _CONVENTIONAL_NON_COMPETITIVE_PRIORITY
     )
-    now_utc = datetime.now(UTC)
+    now_utc = get_prediction_reference_now()
     for session_name in session_priority:
         if not _session_scheduled_end_passed(event, session_name, now_utc):
             continue

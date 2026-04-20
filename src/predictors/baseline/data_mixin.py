@@ -56,6 +56,12 @@ from src.utils.schema_validation import (
 )
 
 logger = logging.getLogger("src.predictors.baseline_2026")
+_TRACK_LAYOUT_FIELDS = (
+    "straights_pct",
+    "slow_corners_pct",
+    "medium_corners_pct",
+    "high_corners_pct",
+)
 
 
 class BaselineDataMixin:
@@ -372,7 +378,14 @@ class BaselineDataMixin:
         team_data: dict[str, object],
         race_name: str | None,
     ) -> list[float]:
-        """Return race-context-aware current-season observations for one team."""
+        """Return race-context-aware current-season observations for one team.
+
+        When canonical saved actuals cover the same number of prior races as the
+        live-updated series, prefer the saved actuals. They are reconstructed
+        from classified results and qualifying/race targets, so they are less
+        brittle than the telemetry-derived live team series for early-season
+        snapshots.
+        """
         target_year = int(getattr(self, "season_year", getattr(self, "year", 2026)))
         live_observations = sanitize_performance_observations(
             team_data.get("current_season_performance")
@@ -390,11 +403,11 @@ class BaselineDataMixin:
 
         if live_observations:
             if prior_race_limit is None:
-                if len(saved_actual_observations) > len(live_observations):
+                if len(saved_actual_observations) >= len(live_observations):
                     return saved_actual_observations
                 return live_observations
             limited_live_observations = live_observations[:prior_race_limit]
-            if len(saved_actual_observations) > len(limited_live_observations):
+            if len(saved_actual_observations) >= len(limited_live_observations):
                 return saved_actual_observations
             return limited_live_observations
 
@@ -453,20 +466,21 @@ class BaselineDataMixin:
         )
         return float(np.clip(stabilized_score, 0.0, 1.0))
 
-    def load_data(self) -> None:
-        """Load season data and driver characteristics with schema validation."""
-        target_year = int(getattr(self, "season_year", 2026))
-        # Use injected artifact store or create new one
-        store = getattr(self, "artifact_store", None) or ArtifactStore(data_root=self.data_dir)
+    def _load_team_characteristics(
+        self,
+        store: ArtifactStore,
+        target_year: int,
+    ) -> dict:
+        """Load, validate, and return the raw car-characteristics payload.
 
-        # Load and validate season car characteristics
+        Tries the artifact store first, falls back to the file on disk.
+        Raises ValueError if schema validation fails.
+        """
         data = store.load_artifact(
             artifact_type="car_characteristics",
             artifact_key=f"{target_year}::car_characteristics",
         )
-
         if not data:
-            # Fallback to file for backward compatibility
             logger.warning("Could not load car characteristics from DB, falling back to file")
             car_file = (
                 self.data_dir / "car_characteristics" / f"{target_year}_car_characteristics.json"
@@ -474,42 +488,46 @@ class BaselineDataMixin:
             with open(car_file) as f:
                 data = json.load(f)
 
-        # Validate team characteristics before using
         try:
             validate_team_characteristics(data, expected_year=target_year)
         except ValueError as e:
             logger.error("Failed to load team characteristics: %s", e)
             raise
+        return data
 
+    def _apply_team_payload(self, data: dict, target_year: int) -> int:
+        """Set self.teams and self.car_characteristics_snapshot from validated payload.
+
+        Returns the resolved races_completed count after contextual fallback.
+        """
         raw_teams = data.get("teams", {})
         if not isinstance(raw_teams, dict):
             raise ValueError("Team characteristics payload is missing a valid `teams` mapping")
         self.teams = canonicalize_team_payload_keys(raw_teams)
+
         checkpoint_snapshot = data.get("checkpoint_snapshot", {})
         self.car_characteristics_snapshot = (
             checkpoint_snapshot if isinstance(checkpoint_snapshot, dict) else {}
         )
 
-        # Check data freshness and warn if stale
         data_freshness = data.get("data_freshness", "UNKNOWN")
-        races_completed = data.get("races_completed", 0)
-        data.get("last_updated")
-
+        races_completed_raw = data.get("races_completed", 0)
         if data_freshness == "BASELINE_PRESEASON":
             logger.warning(
                 "Using pre-season baseline data; team performance remains uncertain until races complete."
             )
         elif data_freshness == "LIVE_UPDATED":
-            logger.info("Using live-updated data from %s race(s)", races_completed)
+            logger.info("Using live-updated data from %s race(s)", races_completed_raw)
         else:
             logger.warning(
                 "Data freshness unknown (%s); predictions may be outdated", data_freshness
             )
 
         try:
-            races_completed_value = int(races_completed)
+            races_completed_value = int(races_completed_raw)
         except (TypeError, ValueError):
             races_completed_value = 0
+
         races_completed = self._resolve_saved_actual_races_completed(
             target_year=target_year,
             data_freshness=str(data_freshness),
@@ -520,15 +538,25 @@ class BaselineDataMixin:
                 "Pre-season payload will use contextual saved-actual fallback from %s completed race(s).",
                 races_completed,
             )
+        return races_completed
 
-        # Load and validate driver characteristics
+    def _load_driver_characteristics(
+        self,
+        store: ArtifactStore,
+        target_year: int,
+    ) -> dict:
+        """Load, clean, validate, and return the driver-characteristics payload.
+
+        Tries the artifact store first, then walks file fallback paths.
+        Strips legacy Bayesian fields from older artifacts before validation.
+        Raises FileNotFoundError when no file fallback exists.
+        Raises ValueError if schema validation fails.
+        """
         driver_data = store.load_artifact(
             artifact_type="driver_characteristics",
             artifact_key=f"{target_year}::driver_characteristics",
         )
-
         if not driver_data:
-            # Fallback to file for backward compatibility
             logger.warning("Could not load driver characteristics from DB, falling back to file")
             driver_data = None
             for driver_file in driver_characteristics_fallback_paths(self.data_dir, target_year):
@@ -549,8 +577,6 @@ class BaselineDataMixin:
                 )
 
         # Strip legacy bayesian fields that older artifacts may contain.
-        # The updater already does this on the write path, but artifacts
-        # persisted before that cleanup was added still carry stale keys.
         from src.utils.schema_validation import strip_legacy_bayesian_fields
 
         drivers_section = driver_data.get("drivers") if isinstance(driver_data, dict) else None
@@ -562,33 +588,39 @@ class BaselineDataMixin:
                     stripped,
                 )
 
-        # Validate driver characteristics before using
         try:
             validate_driver_characteristics(driver_data, expected_year=target_year)
         except ValueError as e:
             logger.error("Failed to load driver characteristics: %s", e)
             raise
 
-        # ERROR DETECTION: Check for extraction bugs (does NOT correct)
         from src.utils.driver_validation import validate_driver_data
 
         errors = validate_driver_data(driver_data["drivers"])
         if errors:
             logger.warning(
-                "Driver data has %s validation errors. Consider re-running extraction: python scripts/extract_driver_characteristics.py --years 2023,2024,2025,2026",
+                "Driver data has %s validation errors. Consider re-running extraction: "
+                "python scripts/extract_driver_characteristics.py --years 2023,2024,2025,2026",
                 len(errors),
             )
 
-        self.drivers = driver_data["drivers"]
+        return driver_data
 
-        # Load track characteristics for weight schedule system
+    def _load_track_characteristics(
+        self,
+        store: ArtifactStore,
+        target_year: int,
+    ) -> dict:
+        """Load, validate, and return the track-characteristics payload.
+
+        Returns an empty dict when no track file exists (non-fatal).
+        Raises ValueError if a file is found but fails schema validation.
+        """
         track_data = store.load_artifact(
             artifact_type="track_characteristics",
             artifact_key=f"{target_year}::track_characteristics",
         )
-
         if not track_data:
-            # Fallback to file for backward compatibility
             logger.warning("Could not load track characteristics from DB, falling back to file")
             track_file = (
                 self.data_dir
@@ -600,7 +632,7 @@ class BaselineDataMixin:
                     track_data = json.load(f)
             except FileNotFoundError:
                 logger.warning("Track characteristics not found")
-                track_data = {}
+                return {}
 
         if track_data:
             try:
@@ -609,13 +641,89 @@ class BaselineDataMixin:
                 logger.error("Failed to load track characteristics: %s", e)
                 raise
 
-        self.tracks = track_data.get("tracks", {})
+        return self._supplement_track_layout_fields(track_data)
+
+    def _supplement_track_layout_fields(self, track_data: dict) -> dict:
+        """Fill missing layout-mix fields from the extracted track-profile cache.
+
+        The committed 2026 track-characteristics payload carries race-strategy
+        metadata such as pit-loss and overtaking, while the extracted
+        ``track_profiles_cache.json`` carries the layout percentages used by the
+        car directionality model. Keep both sources in sync at load time so the
+        team-strength path does not silently lose track-suitability inputs.
+        """
+        tracks_payload = track_data.get("tracks")
+        if not isinstance(track_data, dict) or not isinstance(tracks_payload, dict):
+            return track_data
+
+        cache_file = self.data_dir / "track_characteristics" / "track_profiles_cache.json"
+        if not cache_file.exists():
+            return track_data
+
+        try:
+            with open(cache_file) as handle:
+                cache_payload = json.load(handle)
+        except (OSError, TypeError, ValueError) as exc:
+            logger.debug("Could not read track profile cache %s: %s", cache_file, exc)
+            return track_data
+
+        if not isinstance(cache_payload, dict):
+            return track_data
+
+        supplemented = 0
+        for race_name, track_profile in tracks_payload.items():
+            if not isinstance(track_profile, dict):
+                continue
+            cache_profile = cache_payload.get(race_name)
+            if not isinstance(cache_profile, dict):
+                continue
+
+            for field_name in _TRACK_LAYOUT_FIELDS:
+                if field_name in track_profile:
+                    continue
+                raw_value = cache_profile.get(field_name)
+                if not isinstance(raw_value, int | float | str):
+                    continue
+                try:
+                    track_profile[field_name] = float(raw_value)
+                except (TypeError, ValueError):
+                    continue
+                supplemented += 1
+
+        if supplemented > 0:
+            logger.info(
+                "Supplemented %s missing track layout field(s) from %s",
+                supplemented,
+                cache_file,
+            )
+
+        return track_data
+
+    def load_data(self) -> None:
+        """Load season data from the artifact store and apply it to this predictor.
+
+        Delegates to three focused loaders, each following the same pattern:
+        try the artifact store → fall back to file → validate schema → apply.
+
+        Sets self.teams, self.drivers, self.tracks, self.races_completed,
+        self.car_characteristics_snapshot, and self.year.
+        """
+        target_year = int(getattr(self, "season_year", 2026))
+        store = getattr(self, "artifact_store", None) or ArtifactStore(data_root=self.data_dir)
+
+        team_payload = self._load_team_characteristics(store, target_year)
+        races_completed = self._apply_team_payload(team_payload, target_year)
+
+        driver_payload = self._load_driver_characteristics(store, target_year)
+        self.drivers = driver_payload["drivers"]
+
+        track_payload = self._load_track_characteristics(store, target_year)
+        self.tracks = track_payload.get("tracks", {})
         if self.tracks:
             logger.info("Loaded track characteristics for %s circuits", len(self.tracks))
 
-        # Store races completed and year for weight schedule (from car characteristics)
         self.races_completed = races_completed
-        self.year = data.get("year", target_year)
+        self.year = team_payload.get("year", target_year)
 
     def _resolve_team_data(self, team: str) -> dict:
         """Resolve team payload using alias-aware mapping before fallback."""

@@ -4,7 +4,7 @@ import logging
 import os
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -13,10 +13,14 @@ import fastf1 as ff1
 import pandas as pd
 from fastf1.exceptions import DataNotLoadedError
 
-from src.utils import config_loader
 from src.utils.fp_blending_flow import blend_available_sessions, build_session_priority
 from src.utils.fp_blending_flow import (
     extract_team_performance_from_laps as _extract_team_performance_from_laps,
+)
+from src.utils.prediction_context import (
+    get_config_value,
+    get_prediction_reference_now,
+    get_session_freshness_age,
 )
 from src.utils.team_mapping import map_team_to_characteristics
 
@@ -424,11 +428,11 @@ def get_fp_team_performance(
         # Enforce data freshness via config (default one week).
         if max_data_age_hours is None:
             max_data_age_hours = float(
-                config_loader.get("baseline_predictor.qualifying.max_session_age_hours", 168.0)
+                get_config_value("baseline_predictor.qualifying.max_session_age_hours", 168.0)
             )
 
         if hasattr(session, "date") and session.date:
-            session_age = datetime.now(tz=session.date.tzinfo) - session.date
+            session_age = get_session_freshness_age(session.date)
             if session_age > timedelta(hours=max_data_age_hours):
                 logger.warning(
                     "%s for %s is %sh old (max %sh) - rejecting stale data",
@@ -450,16 +454,16 @@ def get_fp_team_performance(
             )
             return None, None, FPDataError.WET_SESSION
         min_long_run_laps = int(
-            config_loader.get("baseline_predictor.race.weekend_long_run_min_laps", 12)
+            get_config_value("baseline_predictor.race.weekend_long_run_min_laps", 12)
         )
-        preferred_short_run_compound = config_loader.get(
+        preferred_short_run_compound = get_config_value(
             "baseline_predictor.qualifying.preferred_short_run_compound", "SOFT"
         )
-        long_run_outlier_threshold = config_loader.get(
+        long_run_outlier_threshold = get_config_value(
             "baseline_predictor.race.long_run_outlier_threshold", 1.5
         )
         long_run_trim_ends = bool(
-            config_loader.get("baseline_predictor.race.long_run_trim_ends", True)
+            get_config_value("baseline_predictor.race.long_run_trim_ends", True)
         )
 
         # Reject red-flagged/truncated sessions (<10 total laps)
@@ -584,7 +588,7 @@ def get_best_fp_performance_with_session_laps(
     except _FASTF1_ERRORS:
         event = None
 
-    now_utc = datetime.now(UTC)
+    now_utc = get_prediction_reference_now()
     errors_encountered = []
     available_sessions: list[dict[str, Any]] = []
     session_laps_by_code: dict[str, pd.DataFrame | None] = {}

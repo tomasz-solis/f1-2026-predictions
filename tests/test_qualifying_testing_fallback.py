@@ -11,6 +11,7 @@ import src.predictors.baseline.qualifying_mixin as qualifying_module
 from src.predictors.baseline.data_mixin import BaselineDataMixin
 from src.predictors.baseline.qualifying_mixin import BaselineQualifyingMixin
 from src.predictors.baseline.qualifying_preparation import resolve_bayesian_skill_score
+from src.predictors.baseline.qualifying_simulation import _build_quali_sim_config
 from src.predictors.baseline_2026 import Baseline2026Predictor
 
 
@@ -148,6 +149,41 @@ def test_predict_qualifying_uses_testing_short_run_fallback():
     assert strengths["Team A"] == pytest.approx(0.55)
     assert strengths["Team B"] == pytest.approx(0.45)
     assert all("experience_total_races" in driver for driver in captured["all_drivers"])
+
+
+def test_testing_fallback_sim_config_restores_team_weight_and_spread():
+    """Testing-fallback config should stay more car-led than a neutral 50/50 split."""
+    neutral_predictor = DummyQualifyingPredictor(
+        {
+            "baseline_predictor.qualifying.testing_fallback_team_weight_multiplier": 1.0,
+            "baseline_predictor.qualifying.testing_fallback_skill_weight_multiplier": 1.0,
+            "baseline_predictor.qualifying.testing_fallback_team_compression_multiplier": 1.0,
+        }
+    )
+    tuned_predictor = DummyQualifyingPredictor(
+        {
+            "baseline_predictor.qualifying.testing_fallback_team_weight_multiplier": 1.10,
+            "baseline_predictor.qualifying.testing_fallback_skill_weight_multiplier": 0.90,
+            "baseline_predictor.qualifying.testing_fallback_team_compression_multiplier": 1.25,
+        }
+    )
+
+    neutral_cfg = _build_quali_sim_config(
+        cfg=neutral_predictor.config,
+        is_sprint=False,
+        has_practice_data=False,
+        has_testing_fallback_data=True,
+    )
+    tuned_cfg = _build_quali_sim_config(
+        cfg=tuned_predictor.config,
+        is_sprint=False,
+        has_practice_data=False,
+        has_testing_fallback_data=True,
+    )
+
+    assert tuned_cfg.team_weight > neutral_cfg.team_weight
+    assert tuned_cfg.skill_weight < neutral_cfg.skill_weight
+    assert tuned_cfg.team_strength_compression > neutral_cfg.team_strength_compression
 
 
 def test_predict_qualifying_blends_bayesian_form_into_quali_pace():

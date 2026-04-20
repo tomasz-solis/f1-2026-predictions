@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from src.predictors.baseline_2026 import Baseline2026Predictor
+from src.utils.prediction_context import build_historical_prediction_context
 
 
 class TestBaseline2026Integration:
@@ -66,23 +67,29 @@ class TestBaseline2026Integration:
             assert 0 <= entry["podium_probability"] <= 100
             assert 0 <= entry["dnf_probability"] <= 0.35
 
-    def test_monte_carlo_stability(self, predictor):
-        """Test that multiple simulations produce stable results."""
-        # Run prediction twice with same inputs
-        result1 = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=50)
-        result2 = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=50)
+    def test_fixed_seed_historical_prediction_is_repeatable(self, predictor):
+        """Historical qualifying replay should be deterministic for the same seed."""
+        context = build_historical_prediction_context(
+            year=2026,
+            race_name="Australian Grand Prix",
+            target_session_name="Q",
+            seed=42,
+        )
 
-        # Extract positions
-        pos1 = {entry["driver"]: entry["position"] for entry in result1["grid"]}
-        pos2 = {entry["driver"]: entry["position"] for entry in result2["grid"]}
+        result1 = predictor.predict_qualifying(
+            2026,
+            "Australian Grand Prix",
+            n_simulations=50,
+            prediction_context=context,
+        )
+        result2 = predictor.predict_qualifying(
+            2026,
+            "Australian Grand Prix",
+            n_simulations=50,
+            prediction_context=context,
+        )
 
-        # Check positions are similar (allowing for Monte Carlo variance)
-        differences = []
-        for driver in pos1:
-            differences.append(abs(pos1[driver] - pos2[driver]))
-
-        # Mean position difference should be small (< 3 positions)
-        assert np.mean(differences) < 3.0
+        assert result1["grid"] == result2["grid"]
 
     def test_team_hierarchy_respected(self, predictor):
         """Test that blended team strength still shows up in Australia qualifying."""
@@ -245,14 +252,8 @@ class TestBaseline2026EdgeCases:
         """Test handling of invalid race name."""
         predictor = Baseline2026Predictor()
 
-        # Should not crash, but may have lower confidence or fallback behavior
-        try:
-            result = predictor.predict_qualifying(2026, "Invalid Grand Prix", n_simulations=10)
-            # If it doesn't raise, check it returns valid data
-            assert "grid" in result
-        except Exception:
-            # If it raises, that's also acceptable behavior
-            pass
+        with pytest.raises(ValueError):
+            predictor.predict_qualifying(2026, "Invalid Grand Prix", n_simulations=10)
 
     def test_predict_qualifying_raises_when_weekend_type_is_unknown(self, patcher):
         """Predict qualifying should raise when weekend format cannot be resolved."""

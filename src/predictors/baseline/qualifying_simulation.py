@@ -503,6 +503,16 @@ def _apply_data_source_multipliers(
             fallback_skill_weight=0.48,
         )
 
+        weights["team_strength_compression"] *= float(
+            cfg.get(
+                "baseline_predictor.qualifying.testing_fallback_team_compression_multiplier",
+                1.25,
+            )
+        )
+        weights["team_strength_compression"] = float(
+            np.clip(weights["team_strength_compression"], 0.20, 1.0)
+        )
+
         weights["driver_offset_cap"] *= float(
             cfg.get(
                 "baseline_predictor.qualifying.testing_fallback_driver_offset_cap_multiplier",

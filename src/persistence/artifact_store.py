@@ -14,6 +14,8 @@ from typing import Any, cast
 
 from postgrest.exceptions import APIError
 
+from src.utils.data_paths import resolve_data_root
+
 from .config import (
     get_storage_mode,
     should_read_db_first,
@@ -35,7 +37,7 @@ class ArtifactStore:
 
     def __init__(self, data_root: str | Path = "data"):
         """Initialize artifact store with data_root for file-based storage."""
-        self.data_root = Path(data_root)
+        self.data_root = resolve_data_root(data_root)
         self.storage_mode = get_storage_mode()
         logger.info("ArtifactStore initialized with mode: %s", self.storage_mode)
 

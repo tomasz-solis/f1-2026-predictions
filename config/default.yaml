@@ -124,6 +124,12 @@ learning:
   driver_error_scale: 0.18
   teammate_gap_scale: 0.10
   max_adjustment: 2.5
+  # Interval calibration uses completed prediction residuals to apply a
+  # conformal-style half-width floor when the published p5-p95 bands have been
+  # empirically too tight.
+  interval_min_samples: 20
+  interval_target_coverage: 0.90
+  interval_max_adjustment: 4.0
 
 # Track Characteristics
 track_defaults:
@@ -274,12 +280,15 @@ baseline_predictor:
     # Keeps early-weekend teammate flips possible, but requires stronger signal.
     testing_fallback_teammate_guard_enabled: true
     # Pre-weekend fallback can get too tidy when the only live signal is a stored
-    # team profile. Keep the car anchor, but leave enough weekend spread for the
-    # field to mix rather than falling into clean teammate ladders.
+    # team profile. Keep the car anchor stronger than the driver signal so PRE
+    # forecasts do not let a hot midfield driver profile overwhelm a clearly
+    # faster car, while still leaving enough weekend spread for the field to mix
+    # rather than falling into clean teammate ladders.
     testing_fallback_driver_signal_shrink: 0.02
     testing_fallback_driver_offset_cap_multiplier: 1.33
-    testing_fallback_team_weight_multiplier: 0.92
-    testing_fallback_skill_weight_multiplier: 1.08
+    testing_fallback_team_weight_multiplier: 1.10
+    testing_fallback_skill_weight_multiplier: 0.90
+    testing_fallback_team_compression_multiplier: 1.25
     testing_fallback_experience_shrink:
       rookie: 0.22
       second_year: 0.14
@@ -576,6 +585,15 @@ baseline_predictor:
       clean_air_bonus: 0.05            # 5% better tire life for leaders (P1-P5)
 
       # Tire cliff: beyond max age, degradation accelerates sharply
+      # Max ages calibrated against 2022-2024 Pirelli tyre data (18-inch era).
+      # SOFT 24, MEDIUM 34, HARD 42 represent median cliff onset observed across
+      # tracks with average-to-high thermal stress. High-deg circuits (Bahrain,
+      # Spain) hit the cliff earlier; low-deg circuits (Monaco) later. Per-circuit
+      # compound data in car_characteristics overrides these when enough laps exist.
+      # cliff_multiplier: 2.8 — degradation rate multiplies by this factor beyond
+      # max age. Calibrated to produce ~1–3s pace loss per lap in the cliff zone,
+      # consistent with observed F1 radio calls and strategy decisions when teams
+      # are clearly managing tyres past their window.
       compound_max_age:
         SOFT: 24                       # laps before cliff onset
         MEDIUM: 34                     # laps before cliff onset

@@ -9,16 +9,25 @@ import logging
 import random
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import fastf1
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
+from src.analysis.model_evaluation import compute_calibration_metrics
 from src.data.actual_results_fetcher import fetch_actual_session_results
 from src.data.track_data_loader import KNOWN_MAIN_RACE_LAPS
+from src.utils.prediction_context import PredictionContext, build_historical_prediction_context
 from src.utils.prediction_metrics import PredictionMetrics
+from src.utils.weekend import get_weekend_type
 
 logger = logging.getLogger(__name__)
+
+EvaluationMode = Literal["historical", "live"]
+LearningMode = Literal["adaptive", "static"]
+_TRACK_CHARACTERISTICS_DIR = (
+    Path(__file__).resolve().parents[2] / "data" / "processed" / "track_characteristics"
+)
 
 
 class NestedDictConfig:
@@ -251,8 +260,16 @@ def warm_fastf1_results_cache(
     return reports
 
 
-def _normalize_ranked_entries(entries: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Normalize result rows to include required fields for metric computation."""
+def _normalize_ranked_entries(
+    entries: Iterable[dict[str, Any]],
+    *,
+    preserve_interval_fields: bool = False,
+) -> list[dict[str, Any]]:
+    """Normalize result rows to include stable ranking fields.
+
+    When ``preserve_interval_fields`` is true, the returned rows also keep the
+    optional interval metadata needed by adaptive calibration replay.
+    """
     normalized: list[dict[str, Any]] = []
     for index, row in enumerate(entries, start=1):
         position = row.get("position", index)
@@ -260,19 +277,93 @@ def _normalize_ranked_entries(entries: Iterable[dict[str, Any]]) -> list[dict[st
             position_int = int(position)
         except (TypeError, ValueError):
             position_int = index
-        normalized.append(
-            {
-                "position": position_int,
-                "driver": str(row.get("driver", "")),
-                "team": str(row.get("team", "")),
-            }
-        )
+        normalized_row = {
+            "position": position_int,
+            "driver": str(row.get("driver", "")),
+            "team": str(row.get("team", "")),
+        }
+        if preserve_interval_fields:
+            for key in ("median_position", "p5", "p95"):
+                value = row.get(key)
+                if value is None:
+                    continue
+                try:
+                    normalized_row[key] = int(value)
+                except (TypeError, ValueError):
+                    continue
+        normalized.append(normalized_row)
     return normalized
 
 
 def _top_n_entries(entries: Iterable[dict[str, Any]], *, n: int = 10) -> list[dict[str, Any]]:
     """Return the first ``n`` normalized rows for human-readable backtest output."""
     return _normalize_ranked_entries(list(entries))[:n]
+
+
+def _coerce_float(value: object) -> float | None:
+    """Convert a scalar value to ``float`` when possible."""
+    if not isinstance(value, int | float | str):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _load_track_metadata_map(year: int) -> dict[str, dict[str, Any]]:
+    """Load local track metadata used for segmented backtest diagnostics."""
+    candidate_years = [int(year)]
+    if int(year) != 2026:
+        candidate_years.append(2026)
+
+    for candidate_year in candidate_years:
+        path = _TRACK_CHARACTERISTICS_DIR / f"{candidate_year}_track_characteristics.json"
+        if not path.exists():
+            continue
+        try:
+            with open(path) as handle:
+                payload = json.load(handle)
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning("Could not read track metadata from %s: %s", path, exc)
+            continue
+
+        tracks = payload.get("tracks", {})
+        if isinstance(tracks, dict):
+            return {
+                str(track_name): track_payload
+                for track_name, track_payload in tracks.items()
+                if isinstance(track_payload, dict)
+            }
+
+    return {}
+
+
+def _resolve_backtest_race_metadata(
+    *,
+    year: int,
+    race_name: str,
+    weather: str,
+) -> dict[str, Any]:
+    """Resolve stable race metadata for review-friendly segmented summaries."""
+    weekend_format = "unknown"
+    try:
+        weekend_type = get_weekend_type(year, race_name)
+        weekend_format = "sprint" if weekend_type == "sprint" else "normal"
+    except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+        logger.debug("Could not resolve weekend format for %s %s: %s", year, race_name, exc)
+
+    track_payload = _load_track_metadata_map(year).get(race_name, {})
+    track_type = str(track_payload.get("type", "unknown") or "unknown").strip().lower()
+    track_overtaking = _coerce_float(track_payload.get("overtaking_difficulty"))
+    safety_car_probability = _coerce_float(track_payload.get("safety_car_prob"))
+
+    return {
+        "weather": str(weather or "unknown").strip().lower() or "unknown",
+        "weekend_format": weekend_format,
+        "track_type": track_type or "unknown",
+        "track_overtaking_difficulty": track_overtaking,
+        "safety_car_probability": safety_car_probability,
+    }
 
 
 def _compute_ranked_metrics(
@@ -294,6 +385,134 @@ def _compute_ranked_metrics(
     }
 
 
+def _compute_interval_metrics(
+    predicted_entries: Iterable[dict[str, Any]],
+    actual_entries: Iterable[dict[str, Any]],
+) -> dict[str, Any]:
+    """Measure empirical coverage for any rows that carry p5-p95 intervals."""
+    actual_positions_by_driver: dict[str, int] = {}
+    for row in actual_entries:
+        driver_code = str(row.get("driver", "")).strip()
+        raw_position: object = row.get("position")
+        if not isinstance(raw_position, int | float | str):
+            continue
+        try:
+            position = int(raw_position)
+        except (TypeError, ValueError):
+            continue
+        if driver_code:
+            actual_positions_by_driver[driver_code] = position
+
+    confidence_bands: list[tuple[float, float]] = []
+    aligned_actual_positions: list[int] = []
+    interval_hits = 0
+
+    for row in predicted_entries:
+        driver_code = str(row.get("driver", "")).strip()
+        if not driver_code or driver_code not in actual_positions_by_driver:
+            continue
+
+        lower = _coerce_float(row.get("p5"))
+        upper = _coerce_float(row.get("p95"))
+        if lower is None or upper is None:
+            continue
+
+        actual_position = actual_positions_by_driver[driver_code]
+        lower_bound = min(lower, upper)
+        upper_bound = max(lower, upper)
+        confidence_bands.append((lower_bound, upper_bound))
+        aligned_actual_positions.append(actual_position)
+        if lower_bound <= actual_position <= upper_bound:
+            interval_hits += 1
+
+    calibration = compute_calibration_metrics(confidence_bands, aligned_actual_positions)
+    interval_count = int(calibration["interval_count"])
+    if interval_count == 0:
+        return {
+            "interval_count": 0,
+            "interval_hits": 0,
+            "empirical_coverage": None,
+            "nominal_coverage": None,
+            "calibration_error": None,
+            "mean_interval_width": None,
+            "average_miss_distance": None,
+        }
+
+    return {
+        "interval_count": interval_count,
+        "interval_hits": interval_hits,
+        "empirical_coverage": float(calibration["empirical_coverage"]),
+        "nominal_coverage": float(calibration["nominal_coverage"]),
+        "calibration_error": float(calibration["calibration_error"]),
+        "mean_interval_width": float(calibration["mean_interval_width"]),
+        "average_miss_distance": float(calibration["average_miss_distance"]),
+    }
+
+
+def _resolve_prediction_context(
+    *,
+    evaluation_mode: EvaluationMode,
+    year: int,
+    race_name: str,
+    session_name: str,
+    seed: int | None,
+) -> PredictionContext | None:
+    """Resolve prediction context for one backtest session."""
+    if evaluation_mode != "historical":
+        return None
+    return build_historical_prediction_context(
+        year=year,
+        race_name=race_name,
+        target_session_name=session_name,
+        seed=seed,
+    )
+
+
+def _build_backtest_prediction_record(
+    *,
+    year: int,
+    race_name: str,
+    qualifying_prediction: dict[str, Any],
+    race_prediction: dict[str, Any],
+    qualifying_actual: list[dict[str, Any]],
+    race_actual: list[dict[str, Any]],
+    race_context: PredictionContext | None,
+) -> dict[str, Any]:
+    """Build prediction-record payload compatible with adaptive learning updates."""
+    if race_context is not None:
+        predicted_at = race_context.reference_now().isoformat()
+    else:
+        predicted_at = None
+
+    return {
+        "metadata": {
+            "run_id": f"backtest:{year}:{race_name}",
+            "race_name": race_name,
+            "session_name": "R",
+            "source": "backtest",
+            "generated_by": "season_backtest",
+            "predicted_at": predicted_at,
+            "information_cutoff_at": predicted_at,
+        },
+        "qualifying": {
+            "predicted_grid": _normalize_ranked_entries(
+                qualifying_prediction.get("grid", []),
+                preserve_interval_fields=True,
+            ),
+        },
+        "race": {
+            "predicted_results": _normalize_ranked_entries(
+                race_prediction.get("finish_order", []),
+                preserve_interval_fields=True,
+            ),
+        },
+        "actuals": {
+            "qualifying": _normalize_ranked_entries(qualifying_actual),
+            "race": _normalize_ranked_entries(race_actual),
+        },
+    }
+
+
 def run_single_race_backtest(
     *,
     predictor: Any,
@@ -302,9 +521,16 @@ def run_single_race_backtest(
     weather: str,
     qualifying_simulations: int,
     race_simulations: int,
+    evaluation_mode: EvaluationMode = "historical",
+    learning_mode: LearningMode = "adaptive",
     results_fetcher: Any = fetch_actual_session_results,
 ) -> dict[str, Any]:
     """Execute one race backtest and return metric payload or skip reason."""
+    race_metadata = _resolve_backtest_race_metadata(
+        year=year,
+        race_name=race_name,
+        weather=weather,
+    )
     qualifying_actual = results_fetcher(year, race_name, "Q")
     race_actual = results_fetcher(year, race_name, "R")
 
@@ -312,21 +538,56 @@ def run_single_race_backtest(
         return {
             "race_name": race_name,
             "status": "skipped",
+            **race_metadata,
             "reason": "missing_actual_results",
         }
 
     try:
-        qualifying_prediction = predictor.predict_qualifying(
+        predictor_seed = getattr(predictor, "seed", None)
+        qualifying_context = _resolve_prediction_context(
+            evaluation_mode=evaluation_mode,
             year=year,
             race_name=race_name,
-            n_simulations=qualifying_simulations,
+            session_name="Q",
+            seed=(int(predictor_seed) if isinstance(predictor_seed, int) else None),
         )
-        race_prediction = predictor.predict_race(
-            qualifying_grid=qualifying_prediction["grid"],
-            weather=weather,
+        race_context = _resolve_prediction_context(
+            evaluation_mode=evaluation_mode,
+            year=year,
             race_name=race_name,
-            n_simulations=race_simulations,
+            session_name="R",
+            seed=(int(predictor_seed) if isinstance(predictor_seed, int) else None),
         )
+        try:
+            qualifying_prediction = predictor.predict_qualifying(
+                year=year,
+                race_name=race_name,
+                n_simulations=qualifying_simulations,
+                prediction_context=qualifying_context,
+            )
+        except TypeError:
+            qualifying_prediction = predictor.predict_qualifying(
+                year=year,
+                race_name=race_name,
+                n_simulations=qualifying_simulations,
+            )
+
+        try:
+            race_prediction = predictor.predict_race(
+                qualifying_grid=qualifying_prediction["grid"],
+                weather=weather,
+                race_name=race_name,
+                n_simulations=race_simulations,
+                year=year,
+                prediction_context=race_context,
+            )
+        except TypeError:
+            race_prediction = predictor.predict_race(
+                qualifying_grid=qualifying_prediction["grid"],
+                weather=weather,
+                race_name=race_name,
+                n_simulations=race_simulations,
+            )
         qualifying_metrics = _compute_ranked_metrics(
             qualifying_prediction["grid"],
             qualifying_actual,
@@ -335,12 +596,51 @@ def run_single_race_backtest(
             race_prediction["finish_order"],
             race_actual,
         )
+        qualifying_interval_metrics = _compute_interval_metrics(
+            qualifying_prediction["grid"],
+            qualifying_actual,
+        )
+        race_interval_metrics = _compute_interval_metrics(
+            race_prediction["finish_order"],
+            race_actual,
+        )
+        learning_summary: dict[str, Any] | None = None
+        if learning_mode == "adaptive":
+            learning_system = getattr(predictor, "calibration_system", None)
+            update_fn = getattr(learning_system, "update_from_prediction_record", None)
+            if callable(update_fn):
+                prediction_record = _build_backtest_prediction_record(
+                    year=year,
+                    race_name=race_name,
+                    qualifying_prediction=qualifying_prediction,
+                    race_prediction=race_prediction,
+                    qualifying_actual=list(qualifying_actual),
+                    race_actual=list(race_actual),
+                    race_context=race_context,
+                )
+                learning_summary = update_fn(prediction_record)
 
         return {
             "race_name": race_name,
             "status": "ok",
+            "evaluation_mode": evaluation_mode,
+            "learning_mode": learning_mode,
+            **race_metadata,
             "qualifying_mae": qualifying_metrics["mae"],
             "qualifying_exact_accuracy": qualifying_metrics["exact_accuracy"],
+            "qualifying_interval_count": qualifying_interval_metrics["interval_count"],
+            "qualifying_interval_hits": qualifying_interval_metrics["interval_hits"],
+            "qualifying_interval_empirical_coverage": qualifying_interval_metrics[
+                "empirical_coverage"
+            ],
+            "qualifying_interval_nominal_coverage": qualifying_interval_metrics["nominal_coverage"],
+            "qualifying_interval_calibration_error": qualifying_interval_metrics[
+                "calibration_error"
+            ],
+            "qualifying_interval_width_mean": qualifying_interval_metrics["mean_interval_width"],
+            "qualifying_interval_average_miss_distance": qualifying_interval_metrics[
+                "average_miss_distance"
+            ],
             "qualifying_predicted_top10": _top_n_entries(qualifying_prediction["grid"]),
             "qualifying_actual_top10": _top_n_entries(qualifying_actual),
             "race_mae": race_metrics["mae"],
@@ -348,14 +648,25 @@ def run_single_race_backtest(
             "race_within_3": race_metrics["within_3"],
             "top3_accuracy": race_metrics["top3_accuracy"],
             "winner_correct": race_metrics["winner_correct"],
+            "race_interval_count": race_interval_metrics["interval_count"],
+            "race_interval_hits": race_interval_metrics["interval_hits"],
+            "race_interval_empirical_coverage": race_interval_metrics["empirical_coverage"],
+            "race_interval_nominal_coverage": race_interval_metrics["nominal_coverage"],
+            "race_interval_calibration_error": race_interval_metrics["calibration_error"],
+            "race_interval_width_mean": race_interval_metrics["mean_interval_width"],
+            "race_interval_average_miss_distance": race_interval_metrics["average_miss_distance"],
             "race_predicted_top10": _top_n_entries(race_prediction["finish_order"]),
             "race_actual_top10": _top_n_entries(race_actual),
+            "adaptive_learning": learning_summary,
         }
     except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
         logger.warning("Backtest failed for %s: %s", race_name, exc)
         return {
             "race_name": race_name,
             "status": "skipped",
+            "evaluation_mode": evaluation_mode,
+            "learning_mode": learning_mode,
+            **race_metadata,
             "reason": f"prediction_error:{type(exc).__name__}",
         }
 
@@ -471,7 +782,154 @@ def aggregate_race_metrics(race_results: list[dict[str, Any]]) -> dict[str, Any]
             "winner_accuracy_percent": winner_accuracy,
         }
     )
+
+    for session_prefix in ("qualifying", "race"):
+        interval_rows = [
+            row for row in successful if int(row.get(f"{session_prefix}_interval_count") or 0) > 0
+        ]
+        if not interval_rows:
+            continue
+
+        total_count = sum(
+            int(row.get(f"{session_prefix}_interval_count") or 0) for row in interval_rows
+        )
+        total_hits = sum(
+            int(row.get(f"{session_prefix}_interval_hits") or 0) for row in interval_rows
+        )
+        if total_count <= 0:
+            continue
+
+        width_numerator = sum(
+            int(row.get(f"{session_prefix}_interval_count") or 0)
+            * float(row.get(f"{session_prefix}_interval_width_mean") or 0.0)
+            for row in interval_rows
+        )
+        miss_distance_numerator = sum(
+            int(row.get(f"{session_prefix}_interval_count") or 0)
+            * float(row.get(f"{session_prefix}_interval_average_miss_distance") or 0.0)
+            for row in interval_rows
+        )
+        empirical_coverage = total_hits / total_count
+        nominal_coverage = 0.90
+        summary.update(
+            {
+                f"{session_prefix}_interval_races": len(interval_rows),
+                f"{session_prefix}_interval_count": total_count,
+                f"{session_prefix}_interval_empirical_coverage": empirical_coverage,
+                f"{session_prefix}_interval_nominal_coverage": nominal_coverage,
+                f"{session_prefix}_interval_calibration_error": (
+                    empirical_coverage - nominal_coverage
+                ),
+                f"{session_prefix}_interval_width_mean": width_numerator / total_count,
+                f"{session_prefix}_interval_average_miss_distance": (
+                    miss_distance_numerator / total_count
+                ),
+            }
+        )
     return summary
+
+
+def build_segment_breakdown(
+    race_results: list[dict[str, Any]],
+) -> dict[str, dict[str, dict[str, Any]]]:
+    """Aggregate successful backtest rows by key review segments.
+
+    The output is shaped for machine-readable artifacts and reviewer-facing
+    markdown. Each bucket reuses ``aggregate_race_metrics`` so segment views
+    stay consistent with the season-wide summary.
+    """
+    successful = [row for row in race_results if row.get("status") == "ok"]
+    if not successful:
+        return {}
+
+    breakdown: dict[str, dict[str, dict[str, Any]]] = {}
+    for dimension in ("weekend_format", "track_type", "weather"):
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for row in successful:
+            bucket_name = str(row.get(dimension, "unknown") or "unknown").strip().lower()
+            grouped.setdefault(bucket_name or "unknown", []).append(row)
+
+        breakdown[dimension] = {}
+        for bucket_name, rows in sorted(grouped.items()):
+            breakdown[dimension][bucket_name] = {
+                "events": len(rows),
+                **aggregate_race_metrics(rows),
+            }
+
+    return breakdown
+
+
+def _summarize_bucket_frequency(
+    rows: list[dict[str, Any]],
+    *,
+    key: str,
+) -> list[dict[str, Any]]:
+    """Count how often a label appears in a set of race rows."""
+    counts: dict[str, int] = {}
+    for row in rows:
+        label = str(row.get(key, "unknown") or "unknown").strip().lower() or "unknown"
+        counts[label] = counts.get(label, 0) + 1
+    return [
+        {"label": label, "count": count}
+        for label, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    ]
+
+
+def _compact_error_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Extract the high-signal fields for one backtest error-analysis row."""
+    return {
+        "race_name": row.get("race_name"),
+        "weekend_format": row.get("weekend_format"),
+        "track_type": row.get("track_type"),
+        "weather": row.get("weather"),
+        "qualifying_mae": row.get("qualifying_mae"),
+        "race_mae": row.get("race_mae"),
+        "top3_accuracy": row.get("top3_accuracy"),
+        "winner_correct": row.get("winner_correct"),
+    }
+
+
+def build_error_analysis(race_results: list[dict[str, Any]]) -> dict[str, Any]:
+    """Highlight the hardest weekends and repeat miss patterns from a backtest."""
+    successful = [row for row in race_results if row.get("status") == "ok"]
+    if not successful:
+        return {
+            "races_evaluated": 0,
+            "worst_race_events": [],
+            "worst_qualifying_events": [],
+            "winner_miss_events": [],
+            "worst_race_track_types": [],
+            "worst_race_weekend_formats": [],
+        }
+
+    worst_race_events = sorted(
+        successful,
+        key=lambda row: float(row.get("race_mae") or 0.0),
+        reverse=True,
+    )[:5]
+    worst_qualifying_events = sorted(
+        successful,
+        key=lambda row: float(row.get("qualifying_mae") or 0.0),
+        reverse=True,
+    )[:5]
+    winner_miss_events = [row for row in successful if row.get("winner_correct") is False]
+    winner_miss_events = sorted(
+        winner_miss_events,
+        key=lambda row: float(row.get("race_mae") or 0.0),
+        reverse=True,
+    )[:5]
+
+    return {
+        "races_evaluated": len(successful),
+        "worst_race_events": [_compact_error_row(row) for row in worst_race_events],
+        "worst_qualifying_events": [_compact_error_row(row) for row in worst_qualifying_events],
+        "winner_miss_events": [_compact_error_row(row) for row in winner_miss_events],
+        "worst_race_track_types": _summarize_bucket_frequency(worst_race_events, key="track_type"),
+        "worst_race_weekend_formats": _summarize_bucket_frequency(
+            worst_race_events,
+            key="weekend_format",
+        ),
+    }
 
 
 def build_overlap_comparison(
@@ -547,32 +1005,86 @@ def split_train_test_results(
     race_results: list[dict[str, Any]],
     train_fraction: float = 0.7,
     seed: int = 42,
+    strategy: Literal["temporal", "random"] = "temporal",
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Split successful race results into train/test slices for overfitting checks."""
+    """Split successful race results into train/test slices for generalization checks.
+
+    The default strategy is ``temporal``: the first ``train_fraction`` of races
+    (in the order they appear in ``race_results``) become the training set and
+    the remainder become the test set. This is the correct default for a
+    predictor that learns from completed races, because shuffling leaks future
+    state into the training fold.
+
+    ``random`` replicates the original shuffle behaviour and is provided only
+    for comparison. It is NOT appropriate for evaluating a learning system that
+    consumes races in calendar order — use it only to measure how much the
+    choice of split strategy changes the reported metrics.
+
+    Args:
+        race_results: Full list of per-race result dicts as returned by
+            ``run_single_race_backtest``. Only rows with ``status == "ok"``
+            are included in either split.
+        train_fraction: Fraction of successful races assigned to the training
+            split. Clamped to [0.1, 0.9].
+        seed: Random seed used only when ``strategy="random"``. Ignored for
+            temporal splits.
+        strategy: ``"temporal"`` (default) preserves calendar order;
+            ``"random"`` shuffles before splitting.
+
+    Returns:
+        Tuple of (train_rows, test_rows) where each element is a list of
+        race-result dicts.
+    """
     successful = [row for row in race_results if row.get("status") == "ok"]
     if len(successful) <= 1:
         return successful, []
 
     clamped_fraction = min(max(train_fraction, 0.1), 0.9)
-    shuffled = successful.copy()
-    random.Random(seed).shuffle(shuffled)
 
-    train_size = int(round(len(shuffled) * clamped_fraction))
-    train_size = max(1, min(train_size, len(shuffled) - 1))
+    if strategy == "random":
+        ordered = successful.copy()
+        random.Random(seed).shuffle(ordered)
+    elif strategy == "temporal":
+        # race_results arrives in calendar order from the harness; preserve it.
+        # Shuffling would leak future race outcomes into the training fold for a
+        # predictor that updates its internal state (EMA errors, teammate gaps)
+        # after each completed race.
+        ordered = list(successful)
+    else:
+        raise ValueError(f"Unknown split strategy: {strategy!r}. Choose 'temporal' or 'random'.")
 
-    return shuffled[:train_size], shuffled[train_size:]
+    train_size = int(round(len(ordered) * clamped_fraction))
+    train_size = max(1, min(train_size, len(ordered) - 1))
+
+    return ordered[:train_size], ordered[train_size:]
 
 
 def summarize_generalization(
     race_results: list[dict[str, Any]],
     train_fraction: float = 0.7,
     seed: int = 42,
+    strategy: Literal["temporal", "random"] = "temporal",
 ) -> dict[str, Any]:
-    """Return train/test summary plus generalization gap."""
+    """Return train/test metric summaries and the generalization gap.
+
+    Args:
+        race_results: Per-race result dicts from the backtest harness.
+        train_fraction: Fraction of completed races used for training.
+        seed: Random seed, passed through to ``split_train_test_results``;
+            only used when ``strategy="random"``.
+        strategy: Split strategy passed to ``split_train_test_results``.
+            Use the default ``"temporal"`` for all production evaluations.
+
+    Returns:
+        Dict with keys ``train``, ``test`` (each an ``aggregate_race_metrics``
+        payload) and ``generalization_gap_race_mae`` (test MAE minus train MAE;
+        positive means worse on unseen races).
+    """
     train_rows, test_rows = split_train_test_results(
         race_results=race_results,
         train_fraction=train_fraction,
         seed=seed,
+        strategy=strategy,
     )
 
     train_summary = aggregate_race_metrics(train_rows)
@@ -588,6 +1100,7 @@ def summarize_generalization(
     return {
         "train": train_summary,
         "test": test_summary,
+        "split_strategy": strategy,
         "generalization_gap_race_mae": gap,
     }
 
