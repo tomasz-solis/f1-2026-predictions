@@ -37,3 +37,6 @@ precommit-install: ensure-venv
 
 precommit: ensure-venv
 	$(VENV_BIN)/pre-commit run --all-files
+
+evaluation-report: ensure-venv
+	$(VENV_BIN)/python scripts/generate_evaluation_report.py --year 2026
