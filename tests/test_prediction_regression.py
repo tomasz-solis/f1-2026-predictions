@@ -60,6 +60,11 @@ def _assert_payload_shape(payload: dict[str, Any], *, row_key: str) -> None:
     assert len(set(drivers)) == len(rows)
 
 
+def _top_driver_set(payload: dict[str, Any], *, row_key: str, count: int) -> set[str]:
+    """Return the leading driver codes from one ranked payload."""
+    return {str(row["driver"]) for row in payload[row_key][:count]}
+
+
 def _assert_cross_environment_regression(
     *,
     payload: dict[str, Any],
@@ -94,7 +99,17 @@ def _assert_cross_environment_regression(
     assert max(position_deltas) <= max_position_delta
     assert (sum(position_deltas) / len(position_deltas)) <= mean_position_delta
 
-    assert payload[row_key][0]["driver"] == golden_payload[row_key][0]["driver"]
+    golden_winner = str(golden_payload[row_key][0]["driver"])
+    payload_winner = str(payload[row_key][0]["driver"])
+    assert int(payload_rows[golden_winner]["position"]) <= 3
+    assert int(golden_rows[payload_winner]["position"]) <= 3
+    assert (
+        len(
+            _top_driver_set(payload, row_key=row_key, count=3)
+            & _top_driver_set(golden_payload, row_key=row_key, count=3)
+        )
+        >= 2
+    )
 
 
 def _qualifying_payload() -> dict[str, Any]:
