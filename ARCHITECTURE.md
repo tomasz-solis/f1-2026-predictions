@@ -43,7 +43,7 @@ flowchart TD
     I --> K["src/dashboard/prediction_flow.py"]
     I --> L["src/dashboard/precomputed_predictions.py"]
     K --> M["src/utils/session_detector.py"]
-    K --> N["src/utils/actual_results_fetcher.py"]
+    K --> N["src/data/actual_results_fetcher.py"]
     K --> O["src/utils/fastf1_resilience.py"]
     K --> P["Baseline2026Predictor"]
     P --> P1["baseline/data_mixin.py"]

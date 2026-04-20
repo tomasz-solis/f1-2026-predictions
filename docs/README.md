@@ -25,6 +25,13 @@ Automatic vs manual updates during dashboard use and cache behavior.
 ### `PREDICTION_TRACKING.md`
 Session-based prediction storage, attaching actual results, and accuracy metrics.
 
+### `../reports/backtest_2025/REVIEW_PACKET.md`
+Canonical historical backtest summary with adaptive-vs-static comparison,
+baseline overlap, and experiment ranking output.
+
+### `MODEL_ERROR_ANALYSIS.md`
+Companion diagnostic focused on worst weekends, repeat miss drivers, and failure patterns.
+
 ### `COMPOUND_ANALYSIS.md`
 Tire compound performance collection, dynamic selection, and race prediction adjustments.
 

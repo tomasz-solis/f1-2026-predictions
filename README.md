@@ -83,7 +83,7 @@ blended team strength (weight schedule)
   → session pace blend from available FP/sprint sessions
   → confidence-scaled blend weight (more data = more session trust)
   → combine team + driver skill
-  → Monte Carlo simulations (50 runs)
+  → Monte Carlo simulations (300 runs)
   → median grid position + confidence band
 ```
 
@@ -99,7 +99,7 @@ If no session data exists, qualifying runs model-only.
 qualifying grid (actual or predicted)
   → per-driver compound strengths from session history
   → Monte Carlo pit strategy generation
-  → lap-by-lap simulation (50 runs)
+  → lap-by-lap simulation (300 runs)
     → tire degradation (compound-specific slopes)
     → fuel load effect
     → traffic-position correction (front: +5% tire life, back: -5%)
@@ -147,6 +147,28 @@ sprint race) and per checkpoint.
 
 Current season metrics are stored in Supabase and surfaced in the **Prediction
 Accuracy** dashboard tab.
+
+The evaluation script writes a fuller review bundle to
+[`docs/MODEL_CALIBRATION.md`](docs/MODEL_CALIBRATION.md) and
+[`docs/MODEL_ERROR_ANALYSIS.md`](docs/MODEL_ERROR_ANALYSIS.md):
+
+The live predictor also keeps residual history from completed events so it can
+apply a learned minimum interval radius when recent Monte Carlo bands have been
+too tight.
+
+- **Calibration** — do the p5–p95 Monte Carlo intervals cover ~90% of actual outcomes?
+- **Segment breakdowns** — where does accuracy shift by weekend format, weather, and track type?
+- **Systematic bias** — which drivers or teams does the model consistently get wrong
+  in the same direction across multiple races?
+- **Baseline comparison** — does it beat a naive previous-race classifier on MAE and
+  rank correlation?
+- **Error analysis** — which weekends and drivers keep showing up among the biggest misses?
+
+To regenerate after new races complete:
+
+```bash
+make evaluation-report
+```
 
 ---
 
@@ -210,8 +232,12 @@ make test-live-fastf1
 Backtesting against 2025 season data:
 
 ```bash
-python scripts/backtest_2025_season.py --year 2025 --max-races 6
+python scripts/backtest_2025_season.py --year 2025 --max-races 6 --evaluation-mode historical --learning-mode both
 ```
+
+Reviewer-facing artifacts land in `reports/backtest_2025/`:
+`evaluation_packet.json`, `REVIEW_PACKET.md`, per-experiment summaries, and
+recommendation output for ablations.
 
 ---
 
@@ -219,6 +245,10 @@ python scripts/backtest_2025_season.py --year 2025 --max-races 6
 
 - `ARCHITECTURE.md` — component map and data flow
 - `CONFIGURATION.md` — all tunable parameters
+- `LIMITATIONS.md` — known model boundaries, assumptions, and what would fix them
+- `docs/MODEL_CALIBRATION.md` — calibration, bias, and baseline comparison (auto-generated)
+- `docs/MODEL_ERROR_ANALYSIS.md` — worst weekends, repeat misses, and failure patterns
+- `reports/backtest_2025/REVIEW_PACKET.md` — reproducible historical evaluation bundle summary
 - `docs/WEIGHT_SCHEDULE_GUIDE.md` — signal blending and trust progression
 - `docs/FP_BLENDING_SYSTEM.md` — session blend mechanics
 - `docs/COMPOUND_ANALYSIS.md` — tire compound performance system
