@@ -22,13 +22,16 @@ import fastf1
 # Add project root to path when run as a script.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.persistence.artifact_store import ArtifactStore
 from src.predictors import Baseline2026Predictor
 from src.utils.backtesting import (
     NestedDictConfig,
     aggregate_race_metrics,
     apply_config_overrides,
     build_checked_backtest_summary,
+    build_error_analysis,
     build_overlap_comparison,
+    build_segment_breakdown,
     get_races_for_year,
     load_config_dict,
     parse_experiment_spec,
@@ -56,6 +59,14 @@ def _parse_races_arg(raw_races: str | None) -> list[str]:
     if not raw_races:
         return []
     return [race.strip() for race in raw_races.split(",") if race.strip()]
+
+
+def _expand_learning_modes(raw_mode: str) -> list[str]:
+    """Expand CLI learning-mode selection into concrete run labels."""
+    normalized = str(raw_mode).strip().lower()
+    if normalized == "both":
+        return ["static", "adaptive"]
+    return [normalized]
 
 
 def _emit_markdown_recommendations(
@@ -105,6 +116,344 @@ def _emit_markdown_recommendations(
             f"gap={item['generalization_gap_race_mae']} | "
             f"improvement={item['test_race_mae_improvement_vs_baseline']}"
         )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines))
+
+
+def _fmt_metric(value: Any, decimals: int = 3) -> str:
+    """Format numeric review metrics consistently."""
+    if value is None:
+        return "n/a"
+    try:
+        return f"{float(value):.{decimals}f}"
+    except (TypeError, ValueError):
+        return "n/a"
+
+
+def _describe_signed_delta(
+    value: Any,
+    *,
+    positive_label: str,
+    negative_label: str,
+    decimals: int = 3,
+) -> str | None:
+    """Render a signed metric delta in plain language."""
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+
+    magnitude = _fmt_metric(abs(numeric), decimals)
+    if numeric > 0:
+        return f"{positive_label} `{magnitude}`"
+    if numeric < 0:
+        return f"{negative_label} `{magnitude}`"
+    return f"matched exactly (`{magnitude}` delta)"
+
+
+def _select_segment_extreme(
+    segment_breakdown: dict[str, dict[str, dict[str, Any]]],
+    *,
+    metric_key: str,
+    prefer_lowest: bool,
+) -> dict[str, Any] | None:
+    """Pick the strongest or weakest segment bucket from aggregated backtest slices."""
+    candidates: list[dict[str, Any]] = []
+    for dimension, buckets in segment_breakdown.items():
+        for bucket_name, summary in buckets.items():
+            metric_value = summary.get(metric_key)
+            events = int(summary.get("events", 0) or 0)
+            if metric_value is None or events == 0:
+                continue
+            candidates.append(
+                {
+                    "dimension": dimension,
+                    "bucket": bucket_name,
+                    "metric_value": float(metric_value),
+                    "events": events,
+                }
+            )
+
+    if not candidates:
+        return None
+
+    def _sort_key(item: dict[str, Any]) -> tuple[float, int, str, str]:
+        return (
+            item["metric_value"],
+            -item["events"],
+            item["dimension"],
+            item["bucket"],
+        )
+
+    return min(candidates, key=_sort_key) if prefer_lowest else max(candidates, key=_sort_key)
+
+
+def _build_learning_mode_comparison(
+    adaptive_report: dict[str, Any],
+    static_report: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Compare adaptive and static baselines in reviewer-friendly units."""
+    if not isinstance(static_report, dict):
+        return None
+
+    adaptive_summary = adaptive_report.get("summary", {})
+    static_summary = static_report.get("summary", {})
+
+    def _delta(lower_is_better_key: str) -> float | None:
+        adaptive_value = adaptive_summary.get(lower_is_better_key)
+        static_value = static_summary.get(lower_is_better_key)
+        if adaptive_value is None or static_value is None:
+            return None
+        return float(static_value) - float(adaptive_value)
+
+    def _lift(higher_is_better_key: str) -> float | None:
+        adaptive_value = adaptive_summary.get(higher_is_better_key)
+        static_value = static_summary.get(higher_is_better_key)
+        if adaptive_value is None or static_value is None:
+            return None
+        return float(adaptive_value) - float(static_value)
+
+    return {
+        "adaptive_name": adaptive_report.get("name"),
+        "static_name": static_report.get("name"),
+        "race_mae_improvement": _delta("race_mae_mean"),
+        "qualifying_mae_improvement": _delta("qualifying_mae_mean"),
+        "top3_accuracy_delta": _lift("top3_accuracy_mean"),
+        "winner_accuracy_delta": _lift("winner_accuracy_percent"),
+    }
+
+
+def _build_reviewer_takeaways(packet: dict[str, Any]) -> list[str]:
+    """Convert the main bundle metrics into short reviewer-facing takeaways."""
+    takeaways: list[str] = []
+    canonical_summary = (packet.get("canonical_model") or {}).get("summary", {})
+    overlap = packet.get("overlap_comparison", {})
+    learning_delta = packet.get("adaptive_vs_static_comparison")
+    segment_breakdown = packet.get("canonical_segment_breakdown", {})
+    recommended = packet.get("recommended_experiments", [])
+
+    race_mae = canonical_summary.get("race_mae_mean")
+    top3_accuracy = canonical_summary.get("top3_accuracy_mean")
+    if race_mae is not None and top3_accuracy is not None:
+        takeaways.append(
+            "Canonical adaptive model averaged "
+            f"`{_fmt_metric(race_mae)}` race MAE with `{_fmt_metric(top3_accuracy, 1)}%` top-3 accuracy."
+        )
+
+    race_mae_improvement = overlap.get("race_mae_improvement")
+    if race_mae_improvement is not None:
+        overlap_text = _describe_signed_delta(
+            race_mae_improvement,
+            positive_label="beat the naive previous-race baseline on overlap race MAE by",
+            negative_label="trailed the naive previous-race baseline by",
+        )
+        if overlap_text is not None:
+            takeaways.append(
+                f"Against the naive previous-race baseline, the canonical model {overlap_text} on shared weekends."
+            )
+
+    if isinstance(learning_delta, dict) and learning_delta.get("race_mae_improvement") is not None:
+        learning_text = _describe_signed_delta(
+            learning_delta.get("race_mae_improvement"),
+            positive_label="improved race MAE versus the static replay by",
+            negative_label="hurt race MAE versus the static replay by",
+        )
+        if learning_text is not None:
+            takeaways.append(f"Adaptive learning {learning_text}.")
+
+    strongest_segment = _select_segment_extreme(
+        segment_breakdown,
+        metric_key="race_mae_mean",
+        prefer_lowest=True,
+    )
+    weakest_segment = _select_segment_extreme(
+        segment_breakdown,
+        metric_key="race_mae_mean",
+        prefer_lowest=False,
+    )
+    if strongest_segment is not None and weakest_segment is not None:
+        takeaways.append(
+            "Best segment: "
+            f"`{strongest_segment['dimension']}={strongest_segment['bucket']}` "
+            f"at race MAE `{_fmt_metric(strongest_segment['metric_value'])}`; "
+            "weakest segment: "
+            f"`{weakest_segment['dimension']}={weakest_segment['bucket']}` "
+            f"at `{_fmt_metric(weakest_segment['metric_value'])}`."
+        )
+
+    if recommended:
+        takeaways.append(
+            f"`{len(recommended)}` ablation experiment(s) cleared the generalization guardrails."
+        )
+    else:
+        takeaways.append("No ablation beat the adaptive baseline cleanly enough to recommend.")
+
+    return takeaways
+
+
+def _emit_review_packet_markdown(output_path: Path, packet: dict[str, Any]) -> None:
+    """Write a compact reviewer-facing summary of the latest backtest bundle."""
+    canonical = packet.get("canonical_model", {})
+    canonical_summary = canonical.get("summary", {})
+    generalization = canonical.get("generalization", {})
+    overlap = packet.get("overlap_comparison", {})
+    static_baseline = packet.get("static_baseline")
+    learning_delta = packet.get("adaptive_vs_static_comparison")
+    segment_breakdown = packet.get("canonical_segment_breakdown", {})
+    error_analysis = packet.get("canonical_error_analysis", {})
+    reviewer_takeaways = packet.get("reviewer_takeaways", [])
+    recommended_experiments = packet.get("recommended_experiments", [])
+
+    lines = [
+        "# Review Packet",
+        "",
+        f"- Season: `{packet.get('season')}`",
+        f"- Evaluation mode: `{packet.get('evaluation_mode')}`",
+        f"- Canonical model: `{canonical.get('name', 'unknown')}`",
+        f"- Race MAE: `{canonical_summary.get('race_mae_mean')}`",
+        f"- Qualifying MAE: `{canonical_summary.get('qualifying_mae_mean')}`",
+        f"- Top-3 accuracy: `{canonical_summary.get('top3_accuracy_mean')}`",
+        f"- Winner accuracy: `{canonical_summary.get('winner_accuracy_percent')}`",
+        f"- Generalization gap (race MAE): `{generalization.get('generalization_gap_race_mae')}`",
+        f"- Weather assumption: `{packet.get('weather')}`",
+        "",
+    ]
+
+    if reviewer_takeaways:
+        lines.extend(["## Plain-Language Takeaways", ""])
+        for takeaway in reviewer_takeaways:
+            lines.append(f"- {takeaway}")
+        lines.append("")
+
+    lines.extend(
+        [
+            "## Baselines",
+            "",
+        ]
+    )
+    overlap_text = _describe_signed_delta(
+        overlap.get("race_mae_improvement"),
+        positive_label="Model beat naive overlap race MAE by",
+        negative_label="Model trailed naive overlap race MAE by",
+    )
+    if overlap_text is not None:
+        lines.append(f"- {overlap_text}")
+
+    if isinstance(static_baseline, dict):
+        static_summary = static_baseline.get("summary", {})
+        lines.append(
+            f"- Static baseline race MAE: `{static_summary.get('race_mae_mean')}` "
+            f"({static_baseline.get('name')})"
+        )
+
+    if isinstance(learning_delta, dict):
+        learning_text = _describe_signed_delta(
+            learning_delta.get("race_mae_improvement"),
+            positive_label="Adaptive vs static race MAE improvement",
+            negative_label="Adaptive vs static race MAE regression",
+        )
+        lines.extend(
+            [
+                f"- {learning_text}"
+                if learning_text is not None
+                else "- Adaptive vs static race MAE delta: `n/a`",
+                (
+                    "- Adaptive vs static top-3 delta: "
+                    f"`{_fmt_metric(learning_delta.get('top3_accuracy_delta'), 1)}` percentage points"
+                ),
+            ]
+        )
+
+    interval_lines: list[str] = []
+    for session_label, prefix in (("Qualifying", "qualifying"), ("Race", "race")):
+        interval_count = canonical_summary.get(f"{prefix}_interval_count")
+        if not interval_count:
+            continue
+        races_with_data = canonical_summary.get(f"{prefix}_interval_races")
+        empirical_coverage = canonical_summary.get(f"{prefix}_interval_empirical_coverage")
+        nominal_coverage = canonical_summary.get(f"{prefix}_interval_nominal_coverage")
+        interval_width = canonical_summary.get(f"{prefix}_interval_width_mean")
+        calibration_error = canonical_summary.get(f"{prefix}_interval_calibration_error")
+        interval_lines.append(
+            "- "
+            f"{session_label}: coverage `{_fmt_metric(float(empirical_coverage) * 100.0, 1)}%` "
+            f"vs target `{_fmt_metric(float(nominal_coverage) * 100.0, 1)}%` across "
+            f"`{int(interval_count)}` driver-session intervals from "
+            f"`{int(races_with_data or 0)}` race(s); mean width "
+            f"`{_fmt_metric(interval_width)}`; calibration error "
+            f"`{_fmt_metric(float(calibration_error) * 100.0, 1)}`pp."
+        )
+    if interval_lines:
+        lines.extend(["", "## Interval Calibration", "", *interval_lines, ""])
+
+    if segment_breakdown:
+        lines.extend(["", "## Segment Breakdown", ""])
+        for dimension, buckets in sorted(segment_breakdown.items()):
+            lines.extend(
+                [
+                    f"### {dimension.replace('_', ' ').title()}",
+                    "",
+                    "| Bucket | Events | Race MAE | Top-3 accuracy | Winner accuracy |",
+                    "|---|---|---|---|---|",
+                ]
+            )
+            for bucket_name, summary in sorted(buckets.items()):
+                lines.append(
+                    f"| {bucket_name} | {summary.get('events', 0)} | "
+                    f"{_fmt_metric(summary.get('race_mae_mean'))} | "
+                    f"{_fmt_metric(summary.get('top3_accuracy_mean'), 1)}% | "
+                    f"{_fmt_metric(summary.get('winner_accuracy_percent'), 1)}% |"
+                )
+            lines.append("")
+
+    if error_analysis:
+        lines.extend(["## Error Analysis", ""])
+        worst_races = error_analysis.get("worst_race_events", [])
+        if worst_races:
+            lines.append("Worst race weekends by MAE:")
+            for row in worst_races[:3]:
+                lines.append(
+                    "- "
+                    f"{row.get('race_name')} "
+                    f"(`{row.get('track_type')}`, `{row.get('weekend_format')}`, `{row.get('weather')}`) "
+                    f"race_mae={_fmt_metric(row.get('race_mae'))}"
+                )
+            lines.append("")
+
+        winner_misses = error_analysis.get("winner_miss_events", [])
+        if winner_misses:
+            lines.append("Winner misses:")
+            for row in winner_misses[:3]:
+                lines.append(
+                    "- "
+                    f"{row.get('race_name')} "
+                    f"(race_mae={_fmt_metric(row.get('race_mae'))}, "
+                    f"top3={_fmt_metric(row.get('top3_accuracy'), 1)}%)"
+                )
+            lines.append("")
+
+    if recommended_experiments:
+        lines.extend(["## Recommended Ablations", ""])
+        for item in recommended_experiments:
+            lines.append(
+                "- "
+                f"{item.get('name')} | "
+                f"test_mae={_fmt_metric(item.get('test_race_mae'))} | "
+                f"improvement={_fmt_metric(item.get('test_race_mae_improvement_vs_baseline'))} | "
+                f"gap={_fmt_metric(item.get('generalization_gap_race_mae'))}"
+            )
+        lines.append("")
+
+    lines.extend(
+        [
+            "## Artifacts",
+            "",
+            "- `evaluation_packet.json` — machine-readable summary for review and CI",
+            "- `recommendations.md` — experiment ranking and selection notes",
+            "- `experiment_comparison.csv` — all experiment summaries in one table",
+        ]
+    )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines))
@@ -217,6 +566,20 @@ def main() -> int:
         help="Directory for summary outputs",
     )
     parser.add_argument(
+        "--evaluation-mode",
+        type=str,
+        default="historical",
+        choices=["historical", "live"],
+        help="Use historical cutoff timing or current live timing during backtest replay",
+    )
+    parser.add_argument(
+        "--learning-mode",
+        type=str,
+        default="both",
+        choices=["adaptive", "static", "both"],
+        help="Replay adaptive learning updates, keep weights static, or write both reports",
+    )
+    parser.add_argument(
         "--checked-summary-path",
         type=str,
         default=None,
@@ -314,71 +677,102 @@ def main() -> int:
         seen_names.add(sanitized)
         experiment_specs.append((sanitized, overrides))
 
+    learning_modes = _expand_learning_modes(args.learning_mode)
     reports: list[dict[str, Any]] = []
-    for name, overrides in experiment_specs:
-        logger.info(f"Experiment '{name}' overrides={overrides}")
-        merged_config = apply_config_overrides(base_config, overrides)
-        predictor = Baseline2026Predictor(seed=args.seed, config=NestedDictConfig(merged_config))
-
-        race_results: list[dict[str, Any]] = []
-        for index, race_name in enumerate(races, start=1):
-            row = run_single_race_backtest(
-                predictor=predictor,
-                year=args.year,
-                race_name=race_name,
-                weather=args.weather,
-                qualifying_simulations=args.quali_sims,
-                race_simulations=args.race_sims,
+    for base_name, overrides in experiment_specs:
+        for learning_mode in learning_modes:
+            name = base_name if len(learning_modes) == 1 else f"{base_name}_{learning_mode}"
+            logger.info(
+                "Experiment '%s' mode=%s evaluation=%s overrides=%s",
+                name,
+                learning_mode,
+                args.evaluation_mode,
+                overrides,
             )
-            race_results.append(row)
-            if row["status"] == "ok":
-                logger.info(
-                    f"[{name}] {index}/{len(races)} {race_name}: "
-                    f"race_mae={row['race_mae']:.3f}, top3={row['top3_accuracy']:.1f}%"
+            merged_config = apply_config_overrides(base_config, overrides)
+            artifact_store = ArtifactStore(data_root=output_dir / "_backtest_runtime" / name)
+            predictor = Baseline2026Predictor(
+                seed=args.seed,
+                config=NestedDictConfig(merged_config),
+                artifact_store=artifact_store,
+            )
+            reset_learning_state = getattr(
+                getattr(predictor, "calibration_system", None),
+                "reset_state",
+                None,
+            )
+            if callable(reset_learning_state):
+                reset_learning_state(season=args.year)
+
+            race_results: list[dict[str, Any]] = []
+            for index, race_name in enumerate(races, start=1):
+                row = run_single_race_backtest(
+                    predictor=predictor,
+                    year=args.year,
+                    race_name=race_name,
+                    weather=args.weather,
+                    qualifying_simulations=args.quali_sims,
+                    race_simulations=args.race_sims,
+                    evaluation_mode=args.evaluation_mode,
+                    learning_mode=learning_mode,
                 )
-            else:
-                logger.info(
-                    f"[{name}] {index}/{len(races)} {race_name}: skipped ({row.get('reason')})"
-                )
+                race_results.append(row)
+                if row["status"] == "ok":
+                    logger.info(
+                        f"[{name}] {index}/{len(races)} {race_name}: "
+                        f"race_mae={row['race_mae']:.3f}, top3={row['top3_accuracy']:.1f}%"
+                    )
+                else:
+                    logger.info(
+                        f"[{name}] {index}/{len(races)} {race_name}: skipped ({row.get('reason')})"
+                    )
 
-        summary = aggregate_race_metrics(race_results)
-        generalization = summarize_generalization(
-            race_results,
-            train_fraction=args.train_fraction,
-            seed=args.seed,
-        )
+            summary = aggregate_race_metrics(race_results)
+            generalization = summarize_generalization(
+                race_results,
+                train_fraction=args.train_fraction,
+                seed=args.seed,
+            )
 
-        report = {
-            "name": name,
-            "overrides": overrides,
-            "summary": summary,
-            "generalization": generalization,
-            "race_results": race_results,
-        }
-        reports.append(report)
+            report = {
+                "name": name,
+                "base_name": base_name,
+                "learning_mode": learning_mode,
+                "evaluation_mode": args.evaluation_mode,
+                "overrides": overrides,
+                "summary": summary,
+                "generalization": generalization,
+                "race_results": race_results,
+            }
+            reports.append(report)
 
-        experiment_dir = output_dir / name
-        write_json(experiment_dir / "summary.json", report)
-        write_csv(
-            experiment_dir / "race_results.csv",
-            race_results,
-            columns=[
-                "race_name",
-                "status",
-                "reason",
-                "qualifying_mae",
-                "qualifying_exact_accuracy",
-                "race_mae",
-                "race_exact_accuracy",
-                "race_within_3",
-                "top3_accuracy",
-                "winner_correct",
-            ],
-        )
-        write_json(experiment_dir / "race_results_detailed.json", {"races": race_results})
+            experiment_dir = output_dir / name
+            write_json(experiment_dir / "summary.json", report)
+            write_csv(
+                experiment_dir / "race_results.csv",
+                race_results,
+                columns=[
+                    "race_name",
+                    "status",
+                    "evaluation_mode",
+                    "learning_mode",
+                    "reason",
+                    "qualifying_mae",
+                    "qualifying_exact_accuracy",
+                    "race_mae",
+                    "race_exact_accuracy",
+                    "race_within_3",
+                    "top3_accuracy",
+                    "winner_correct",
+                ],
+            )
+            write_json(experiment_dir / "race_results_detailed.json", {"races": race_results})
 
+    ranking_candidates = [report for report in reports if report.get("learning_mode") == "adaptive"]
+    if not ranking_candidates:
+        ranking_candidates = reports
     ranked = rank_experiments_for_generalization(
-        reports,
+        ranking_candidates,
         min_test_race_mae_improvement=args.min_test_improvement,
         max_generalization_gap=args.max_generalization_gap,
     )
@@ -390,6 +784,9 @@ def main() -> int:
         comparison_rows.append(
             {
                 "name": report["name"],
+                "base_name": report.get("base_name"),
+                "learning_mode": report.get("learning_mode"),
+                "evaluation_mode": report.get("evaluation_mode"),
                 "overrides": report["overrides"],
                 "races_evaluated": summary.get("races_evaluated"),
                 "race_mae_mean": summary.get("race_mae_mean"),
@@ -406,6 +803,9 @@ def main() -> int:
         comparison_rows,
         columns=[
             "name",
+            "base_name",
+            "learning_mode",
+            "evaluation_mode",
             "overrides",
             "races_evaluated",
             "race_mae_mean",
@@ -418,7 +818,17 @@ def main() -> int:
     )
     write_json(output_dir / "experiment_rankings.json", {"rankings": ranked})
 
-    baseline = next((item for item in reports if item["name"] == "baseline"), reports[0])
+    baseline = next(
+        (
+            item
+            for item in reports
+            if item.get("base_name") == "baseline" and item.get("learning_mode") == "adaptive"
+        ),
+        next(
+            (item for item in reports if item.get("base_name") == "baseline"),
+            reports[0],
+        ),
+    )
     naive_report = run_previous_race_naive_backtest(year=args.year, race_names=races)
     overlap_comparison = build_overlap_comparison(
         model_race_results=baseline.get("race_results", []),
@@ -435,6 +845,39 @@ def main() -> int:
         reports_dir=str(output_dir),
     )
     write_json(checked_summary_path, checked_summary)
+
+    static_baseline = next(
+        (
+            item
+            for item in reports
+            if item.get("base_name") == "baseline" and item.get("learning_mode") == "static"
+        ),
+        None,
+    )
+    canonical_segment_breakdown = build_segment_breakdown(baseline.get("race_results", []))
+    canonical_error_analysis = build_error_analysis(baseline.get("race_results", []))
+    recommended_experiments = [item for item in ranked if item.get("recommended")]
+    adaptive_vs_static_comparison = _build_learning_mode_comparison(baseline, static_baseline)
+    evaluation_packet = {
+        "season": int(args.year),
+        "seed": int(args.seed),
+        "weather": args.weather,
+        "evaluation_mode": args.evaluation_mode,
+        "canonical_model": baseline,
+        "static_baseline": static_baseline,
+        "adaptive_vs_static_comparison": adaptive_vs_static_comparison,
+        "naive_previous_race_baseline": naive_report,
+        "overlap_comparison": overlap_comparison,
+        "canonical_segment_breakdown": canonical_segment_breakdown,
+        "canonical_error_analysis": canonical_error_analysis,
+        "recommended_experiments": recommended_experiments,
+        "rankings": ranked,
+        "experiments": comparison_rows,
+        "checked_summary_path": str(checked_summary_path),
+    }
+    evaluation_packet["reviewer_takeaways"] = _build_reviewer_takeaways(evaluation_packet)
+    write_json(output_dir / "evaluation_packet.json", evaluation_packet)
+    _emit_review_packet_markdown(output_dir / "REVIEW_PACKET.md", evaluation_packet)
 
     baseline_test_mae = baseline.get("generalization", {}).get("test", {}).get("race_mae_mean")
     _emit_markdown_recommendations(

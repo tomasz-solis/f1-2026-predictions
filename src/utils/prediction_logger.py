@@ -29,6 +29,7 @@ from src.utils.accuracy_targets import (
     target_session_name,
     weekend_format_name,
 )
+from src.utils.data_paths import resolve_repo_data_path
 from src.utils.model_version import stamp_model_metadata
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ class PredictionLogger:
 
     def __init__(self, predictions_dir: str = "data/predictions"):
         """Create a prediction logger rooted at the given predictions directory."""
-        self.predictions_dir = Path(predictions_dir)
+        self.predictions_dir = resolve_repo_data_path(predictions_dir)
         self.predictions_dir.mkdir(parents=True, exist_ok=True)
 
         data_root = self.predictions_dir.parent
@@ -120,6 +121,13 @@ class PredictionLogger:
                         "team": result["team"],
                         "expected_time": result.get("expected_time"),
                         "confidence": result.get("confidence"),
+                        # p5/p95 are the 5th and 95th percentile finish positions
+                        # across Monte Carlo simulations. Together they form a
+                        # nominal 90% prediction interval that calibration analysis
+                        # can test for empirical coverage. None when position_records
+                        # are unavailable (e.g. loaded from older saved artifacts).
+                        "p5": result.get("p5"),
+                        "p95": result.get("p95"),
                     }
                     for i, result in enumerate(qualifying_prediction)
                 ]

@@ -191,3 +191,71 @@ def test_compute_improvement_over_baseline_handles_empty_events():
     assert summary["events_compared"] == 0
     assert summary["model_metrics"] == {}
     assert summary["baseline_metrics"] == {}
+
+
+# ---------------------------------------------------------------------------
+# build_confidence_bands tests
+# ---------------------------------------------------------------------------
+
+from src.analysis.model_evaluation import build_confidence_bands  # noqa: E402
+
+
+def test_build_confidence_bands_extracts_p5_p95():
+    """Entries with p5/p95 should produce matching (lower, upper) tuples."""
+    grid = [
+        {"driver": "VER", "team": "Red Bull Racing", "position": 1, "p5": 1, "p95": 3},
+        {"driver": "NOR", "team": "McLaren", "position": 2, "p5": 1, "p95": 4},
+        {"driver": "LEC", "team": "Ferrari", "position": 3, "p5": 2, "p95": 6},
+    ]
+    bands = build_confidence_bands(grid)
+
+    assert len(bands) == 3
+    assert bands[0] == (1.0, 3.0)
+    assert bands[1] == (1.0, 4.0)
+    assert bands[2] == (2.0, 6.0)
+
+
+def test_build_confidence_bands_skips_entries_without_p5_p95():
+    """Entries missing p5 or p95 (legacy artifacts) must be silently skipped."""
+    grid = [
+        {"driver": "VER", "team": "Red Bull Racing", "position": 1, "p5": 1, "p95": 3},
+        {"driver": "NOR", "team": "McLaren", "position": 2},  # no band data
+        {"driver": "LEC", "team": "Ferrari", "position": 3, "p5": 2, "p95": 6},
+    ]
+    bands = build_confidence_bands(grid)
+
+    assert len(bands) == 2
+    assert bands[0] == (1.0, 3.0)
+    assert bands[1] == (2.0, 6.0)
+
+
+def test_build_confidence_bands_empty_grid():
+    """Empty grid should return empty list without raising."""
+    assert build_confidence_bands([]) == []
+
+
+def test_build_confidence_bands_all_missing():
+    """Grid where no entry has p5/p95 should return empty list."""
+    grid = [
+        {"driver": "VER", "position": 1, "confidence": 55.0},
+        {"driver": "NOR", "position": 2, "confidence": 48.0},
+    ]
+    assert build_confidence_bands(grid) == []
+
+
+def test_build_confidence_bands_integrates_with_calibration_metrics():
+    """Bands from build_confidence_bands should feed directly into compute_calibration_metrics."""
+    grid = [
+        {"driver": "VER", "position": 1, "p5": 1, "p95": 3},
+        {"driver": "NOR", "position": 2, "p5": 1, "p95": 4},
+        {"driver": "LEC", "position": 3, "p5": 2, "p95": 6},
+    ]
+    # All actuals fall inside the predicted bands
+    actual_positions = [2, 3, 4]
+
+    bands = build_confidence_bands(grid)
+    calibration = compute_calibration_metrics(bands, actual_positions)
+
+    assert calibration["interval_count"] == 3.0
+    assert calibration["empirical_coverage"] == pytest.approx(1.0)  # all in band
+    assert calibration["calibration_error"] == pytest.approx(0.1)  # 1.0 - 0.9

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
+
+from src.utils.data_paths import resolve_repo_data_path
 
 TARGET_MAIN_QUALIFYING = "main_qualifying"
 TARGET_GRAND_PRIX_RACE = "grand_prix_race"
@@ -52,7 +53,9 @@ TARGET_CHECKPOINTS = {
     ("sprint", TARGET_MAIN_QUALIFYING): ("PRE", "FP1", "SQ"),
     ("sprint", TARGET_GRAND_PRIX_RACE): ("PRE", "FP1", "SQ"),
 }
-_EVENT_BOUNDARY_STATE_PATH = Path("data/systems/event_boundary_refresh_state.json")
+_EVENT_BOUNDARY_STATE_PATH = resolve_repo_data_path(
+    "data/systems/event_boundary_refresh_state.json"
+)
 
 
 def normalize_checkpoint_session(session_name: str | None) -> str:

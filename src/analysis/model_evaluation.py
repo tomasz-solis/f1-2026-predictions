@@ -16,6 +16,29 @@ import numpy as np
 from scipy.stats import kendalltau, spearmanr
 
 
+def build_confidence_bands(
+    predicted_grid: list[dict[str, Any]],
+) -> list[tuple[float, float]]:
+    """Extract (p5, p95) position intervals from a saved qualifying grid.
+
+    Each entry in ``predicted_grid`` may carry ``p5`` and ``p95`` keys
+    populated when the prediction was saved. Entries missing these keys
+    (older artifacts saved before the field was added) are skipped, so
+    the returned list may be shorter than the input.
+
+    Returns a list of (lower, upper) tuples in the same driver order as
+    ``predicted_grid``, suitable for passing to ``compute_calibration_metrics``.
+    """
+    bands: list[tuple[float, float]] = []
+    for entry in predicted_grid:
+        p5 = entry.get("p5")
+        p95 = entry.get("p95")
+        if p5 is None or p95 is None:
+            continue
+        bands.append((float(p5), float(p95)))
+    return bands
+
+
 def _coerce_ranked_rows(rows: Sequence[str | dict[str, Any]]) -> list[dict[str, Any]]:
     """Normalize ranking inputs into ``driver/team/position`` rows."""
     normalized: list[dict[str, Any]] = []
