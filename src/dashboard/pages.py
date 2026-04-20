@@ -10,6 +10,7 @@ from typing import Any
 import fastf1
 import streamlit as st
 
+from src.utils.data_paths import resolve_repo_data_path
 from src.utils.weekend import get_schedule_rows, is_sprint_weekend
 
 from . import prediction_horizon as _prediction_horizon
@@ -18,6 +19,7 @@ from . import team_comparison as _team_comparison
 from .accuracy_view import (
     METRIC_OPTIONS,
     render_overall_accuracy_metrics,
+    render_saved_prediction_viewer,
     render_saved_predictions_summary,
     render_target_sections,
 )
@@ -63,8 +65,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_SEASON = 2026
 _MIN_SELECTABLE_SEASON = 2024
 _FASTF1_CACHE_DIRS = (
-    Path("data/raw/.fastf1_cache"),
-    Path("data/raw/.fastf1_cache_testing"),
+    resolve_repo_data_path("data/raw/.fastf1_cache"),
+    resolve_repo_data_path("data/raw/.fastf1_cache_testing"),
 )
 _NON_DISTINCT_RACE_TOKENS = {"grand", "prix", "gp"}
 
@@ -263,15 +265,19 @@ def _latest_dashboard_refresh_timestamp(year: int) -> datetime | None:
         compute_artifact_hash_fn=compute_artifact_hash,
         load_precompute_horizon_index_fn=load_precompute_horizon_index,
         refresh_paths=(
-            Path(f"data/processed/car_characteristics/{season_year}_car_characteristics.json"),
-            Path(f"data/processed/track_characteristics/{season_year}_track_characteristics.json"),
-            Path(
+            resolve_repo_data_path(
+                f"data/processed/car_characteristics/{season_year}_car_characteristics.json"
+            ),
+            resolve_repo_data_path(
+                f"data/processed/track_characteristics/{season_year}_track_characteristics.json"
+            ),
+            resolve_repo_data_path(
                 f"data/processed/driver_characteristics/{season_year}_driver_characteristics.json"
             ),
-            Path("data/processed/driver_characteristics.json"),
-            Path("data/systems/practice_characteristics_state.json"),
-            Path("data/systems/precompute_horizon_index.json"),
-            Path("data/systems/precomputed_predictions.json"),
+            resolve_repo_data_path("data/processed/driver_characteristics.json"),
+            resolve_repo_data_path("data/systems/practice_characteristics_state.json"),
+            resolve_repo_data_path("data/systems/precompute_horizon_index.json"),
+            resolve_repo_data_path("data/systems/precomputed_predictions.json"),
         ),
         logger=logger,
     )
@@ -893,6 +899,40 @@ def render_prediction_accuracy_page() -> None:
     render_saved_predictions_summary(pipeline.prediction_status_rows)
 
 
+def render_checkpoint_viewer_page() -> None:
+    """Render a dedicated browser for saved checkpoint artifacts."""
+    st.header("Checkpoint Viewer")
+
+    from .accuracy import AccuracyPipeline
+
+    selected_season = _get_selected_season()
+    season_options = _available_seasons()
+    if selected_season not in season_options:
+        season_options = [selected_season, *season_options]
+    season_index = season_options.index(selected_season)
+
+    selected_season = int(
+        st.selectbox(
+            "Season",
+            options=season_options,
+            index=season_index,
+            key="selected_season",
+            help="Choose which season's saved checkpoints to browse.",
+        )
+    )
+    _set_selected_season(selected_season)
+
+    st.caption("Browse saved race weekends and open each checkpoint without the accuracy charts.")
+
+    pipeline = AccuracyPipeline(year=selected_season)
+    if not pipeline.all_predictions:
+        st.info("No saved checkpoints yet.")
+        return
+
+    st.success(f"Found {len(pipeline.all_predictions)} saved checkpoint artifact(s)")
+    render_saved_prediction_viewer(pipeline.all_predictions, season_year=selected_season)
+
+
 def render_contact_page() -> None:
     """Render the contact page."""
     st.header("Contact")
@@ -914,6 +954,8 @@ def render_page(page: str, enable_logging: bool) -> None:
         render_team_comparison_page()
     elif page == "Prediction Accuracy" and ENABLE_PREDICTION_ACCURACY_TAB:
         render_prediction_accuracy_page()
+    elif page == "Checkpoint Viewer" and ENABLE_PREDICTION_ACCURACY_TAB:
+        render_checkpoint_viewer_page()
     elif page in {"Contact", "About"}:
         render_contact_page()
     else:

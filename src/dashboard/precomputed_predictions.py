@@ -6,21 +6,25 @@ import json
 import logging
 from datetime import UTC, datetime
 from hashlib import sha1
-from pathlib import Path
 from typing import Any
 
 from src.persistence.config import should_read_db_first, should_write_to_db, should_write_to_file
 from src.persistence.runtime_state_store import RuntimeStateStore
 from src.utils import config_loader
+from src.utils.data_paths import resolve_repo_data_path
 from src.utils.model_version import get_model_version, stamp_model_metadata
 
 logger = logging.getLogger(__name__)
 
-_PRECOMPUTED_PREDICTIONS_FILE = Path("data/systems/precomputed_predictions.json")
+_PRECOMPUTED_PREDICTIONS_FILE = resolve_repo_data_path("data/systems/precomputed_predictions.json")
 _STATE_NAMESPACE_PRECOMPUTED_PREDICTIONS = "precomputed_predictions"
-_PRECOMPUTED_BASE_FEATURES_FILE = Path("data/systems/precomputed_base_features.json")
+_PRECOMPUTED_BASE_FEATURES_FILE = resolve_repo_data_path(
+    "data/systems/precomputed_base_features.json"
+)
 _STATE_NAMESPACE_PRECOMPUTED_BASE_FEATURES = "precomputed_prediction_base_features"
-_PRECOMPUTE_HORIZON_INDEX_FILE = Path("data/systems/precompute_horizon_index.json")
+_PRECOMPUTE_HORIZON_INDEX_FILE = resolve_repo_data_path(
+    "data/systems/precompute_horizon_index.json"
+)
 _STATE_NAMESPACE_PRECOMPUTE_HORIZON_INDEX = "prediction_precompute_horizon_index"
 _DEFAULT_MAX_FILE_ENTRIES = 2048
 _DEFAULT_PRECOMPUTE_HORIZON_RACES = 3

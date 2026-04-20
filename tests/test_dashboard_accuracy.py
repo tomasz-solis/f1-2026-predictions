@@ -10,6 +10,8 @@ from src.dashboard.accuracy_view import (
     build_progression_checkpoint_state,
     build_progression_line_series,
     build_progression_series,
+    build_saved_prediction_browser_rows,
+    build_saved_prediction_view_model,
     build_target_metric_cards,
 )
 from src.utils.accuracy_snapshots import accuracy_snapshot_artifact_key
@@ -25,6 +27,215 @@ def test_accuracy_snapshot_artifact_key_normalizes_checkpoint_identity():
     )
 
     assert artifact_key == "2026::Chinese Grand Prix::FP1::grand_prix_race"
+
+
+def test_build_saved_prediction_browser_rows_orders_checkpoints_within_race():
+    """Saved-checkpoint selectors should keep race order while sorting checkpoints naturally."""
+    predictions = [
+        {
+            "metadata": {
+                "race_name": "Australian Grand Prix",
+                "session_name": "FP3",
+                "weekend_format": "normal",
+                "predicted_at": "2026-03-14T01:00:00+00:00",
+                "information_cutoff_at": "2026-03-14T00:59:59+00:00",
+            }
+        },
+        {
+            "metadata": {
+                "race_name": "Australian Grand Prix",
+                "session_name": "PRE",
+                "weekend_format": "normal",
+                "predicted_at": "2026-03-13T01:00:00+00:00",
+                "information_cutoff_at": "2026-03-13T00:59:59+00:00",
+            }
+        },
+        {
+            "metadata": {
+                "race_name": "Chinese Grand Prix",
+                "session_name": "FP1",
+                "weekend_format": "sprint",
+                "predicted_at": "2026-03-20T01:00:00+00:00",
+                "information_cutoff_at": "2026-03-20T00:59:59+00:00",
+            }
+        },
+    ]
+
+    rows = build_saved_prediction_browser_rows(predictions)
+
+    assert [(row["race_name"], row["checkpoint_session"]) for row in rows] == [
+        ("Australian Grand Prix", "PRE"),
+        ("Australian Grand Prix", "FP3"),
+        ("Chinese Grand Prix", "FP1"),
+    ]
+    assert rows[0]["predicted_at_label"] == "2026-03-13 01:00 UTC"
+    assert rows[0]["checkpoint_option_label"] == "PRE"
+    assert "UTC" not in rows[1]["checkpoint_option_label"]
+
+
+def test_build_saved_prediction_browser_rows_orders_races_by_round_number(patcher):
+    """Saved races should follow season order instead of artifact insertion order."""
+    patcher.setattr(
+        "src.dashboard.accuracy_view.get_schedule_rows",
+        lambda year: (
+            ("Australian Grand Prix", "conventional"),
+            ("Chinese Grand Prix", "sprint"),
+            ("Japanese Grand Prix", "conventional"),
+            ("Miami Grand Prix", "sprint"),
+        )
+        if year == 2026
+        else tuple(),
+    )
+    predictions = [
+        {
+            "metadata": {
+                "year": 2026,
+                "race_name": "Miami Grand Prix",
+                "session_name": "PRE",
+                "weekend_format": "sprint",
+            }
+        },
+        {
+            "metadata": {
+                "year": 2026,
+                "race_name": "Australian Grand Prix",
+                "session_name": "PRE",
+                "weekend_format": "normal",
+            }
+        },
+        {
+            "metadata": {
+                "year": 2026,
+                "race_name": "Japanese Grand Prix",
+                "session_name": "PRE",
+                "weekend_format": "normal",
+            }
+        },
+    ]
+
+    rows = build_saved_prediction_browser_rows(predictions)
+
+    assert [row["race_name"] for row in rows] == [
+        "Australian Grand Prix",
+        "Japanese Grand Prix",
+        "Miami Grand Prix",
+    ]
+    assert [row["round_number"] for row in rows] == [1, 3, 4]
+    assert rows[0]["race_option_label"] == "Round 1 | Australian Grand Prix"
+    assert rows[2]["race_option_label"] == "Round 4 | Miami Grand Prix"
+
+
+def test_build_saved_prediction_browser_rows_disambiguates_duplicate_checkpoints():
+    """Duplicate checkpoint saves should stay selectable without exposing timestamps."""
+    predictions = [
+        {
+            "metadata": {
+                "race_name": "Australian Grand Prix",
+                "session_name": "FP3",
+                "weekend_format": "normal",
+                "predicted_at": "2026-03-14T01:00:00+00:00",
+            }
+        },
+        {
+            "metadata": {
+                "race_name": "Australian Grand Prix",
+                "session_name": "FP3",
+                "weekend_format": "normal",
+                "predicted_at": "2026-03-14T02:00:00+00:00",
+            }
+        },
+    ]
+
+    rows = build_saved_prediction_browser_rows(predictions)
+
+    assert [row["checkpoint_option_label"] for row in rows] == ["FP3 (1)", "FP3 (2)"]
+    assert len({row["checkpoint_option_value"] for row in rows}) == 2
+
+
+def test_build_saved_prediction_view_model_uses_top_level_targets_for_sprint_payloads():
+    """Saved sprint checkpoints should render the correct top-level qualifying and race pair."""
+    prediction = {
+        "metadata": {
+            "race_name": "Chinese Grand Prix",
+            "session_name": "SQ",
+            "weekend_format": "sprint",
+            "weather": "dry",
+            "predicted_at": "2026-03-21T08:00:00+00:00",
+            "information_cutoff_at": "2026-03-21T07:59:59+00:00",
+            "source": "historical_replay",
+            "top_level_qualifying_target": "main_qualifying",
+            "top_level_race_target": "grand_prix_race",
+            "top_level_qualifying_result_mode": "PREDICTED",
+            "top_level_race_result_mode": "PREDICTED",
+            "top_level_qualifying_grid_source": "PREDICTED",
+            "top_level_race_grid_source": "PREDICTED",
+        },
+        "qualifying": {
+            "predicted_grid": [
+                {"position": 1, "driver": "NOR", "team": "McLaren", "confidence": 61.0}
+            ]
+        },
+        "race": {
+            "predicted_results": [
+                {"position": 1, "driver": "NOR", "team": "McLaren", "confidence": 58.0}
+            ]
+        },
+        "targets": {
+            "main_qualifying": {
+                "target_session": "Q",
+                "predicted_order": [
+                    {"position": 1, "driver": "NOR", "team": "McLaren", "confidence": 61.0}
+                ],
+                "eligible_at_save": True,
+            },
+            "grand_prix_race": {
+                "target_session": "R",
+                "predicted_order": [
+                    {
+                        "position": 1,
+                        "driver": "NOR",
+                        "team": "McLaren",
+                        "confidence": 58.0,
+                        "position_blend_score": 1.82,
+                        "p5": 1,
+                        "p95": 4,
+                        "podium_probability": 67.0,
+                        "dnf_probability": 0.04,
+                    }
+                ],
+                "eligible_at_save": True,
+                "mean_confidence": 58.0,
+            },
+        },
+        "actuals": {
+            "targets": {"grand_prix_race": [{"position": 1, "driver": "NOR", "team": "McLaren"}]}
+        },
+    }
+
+    view_model = build_saved_prediction_view_model(prediction)
+
+    assert view_model["qualifying_title"] == "Main Qualifying Checkpoint"
+    assert view_model["race_title"] == "Grand Prix Race Checkpoint"
+    assert view_model["qualifying_result"]["data_source"] == "Saved checkpoint (SQ)"
+    assert view_model["race_result"]["starting_session_name"] == "Q"
+    assert view_model["race_result"]["finish_order"][0]["podium_probability"] == 67.0
+    assert view_model["race_result"]["finish_order"][0]["p95"] == 4
+    assert view_model["target_status_rows"] == [
+        {
+            "target_key": "main_qualifying",
+            "label": "Main Qualifying",
+            "session_name": "Q",
+            "eligible_at_save": True,
+            "has_actuals": False,
+        },
+        {
+            "target_key": "grand_prix_race",
+            "label": "Grand Prix Race",
+            "session_name": "R",
+            "eligible_at_save": True,
+            "has_actuals": True,
+        },
+    ]
 
 
 def test_accuracy_pipeline_prefers_persisted_snapshots(patcher):

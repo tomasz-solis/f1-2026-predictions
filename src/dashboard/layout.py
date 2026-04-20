@@ -28,6 +28,7 @@ ENABLE_PREDICTION_ACCURACY_TAB = True
 NAVIGATION_PAGES = ["Prediction", "Team Comparison"]
 if ENABLE_PREDICTION_ACCURACY_TAB:
     NAVIGATION_PAGES.append("Prediction Accuracy")
+    NAVIGATION_PAGES.append("Checkpoint Viewer")
 NAVIGATION_PAGES.extend(["Model & Learning", "Contact"])
 
 # Backwards-compatible alias used by tests and external imports.

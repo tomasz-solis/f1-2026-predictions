@@ -162,6 +162,44 @@ def test_render_race_result_warns_on_high_dnf(patcher):
     assert any("High DNF risk" in msg for msg in markdown_messages)
 
 
+def test_render_race_result_handles_saved_checkpoint_payload_without_optional_columns(patcher):
+    """Saved checkpoint race rows should render even without live-only simulation fields."""
+    calls = _stub_streamlit(patcher)
+
+    df = pd.DataFrame(
+        [
+            {
+                "position": 1,
+                "driver": "VER",
+                "team": "Red Bull Racing",
+                "confidence": 63.4,
+                "dnf_risk": 0.04,
+            },
+            {
+                "position": 2,
+                "driver": "NOR",
+                "team": "McLaren",
+                "confidence": 60.2,
+                "dnf_risk": 0.07,
+            },
+            {
+                "position": 3,
+                "driver": "LEC",
+                "team": "Ferrari",
+                "confidence": 58.0,
+                "dnf_risk": 0.10,
+            },
+        ]
+    )
+
+    rendering._render_race_result(df)
+
+    captions = [value for kind, value in calls if kind == "caption"]
+    markdown_blocks = [value for kind, value in calls if kind == "markdown" and "<table" in value]
+    assert any("Rows are ranked by projected finishing order" in text for text in captions)
+    assert markdown_blocks
+
+
 def test_render_race_result_explains_sorting_and_interval(patcher):
     calls = _stub_streamlit(patcher)
 

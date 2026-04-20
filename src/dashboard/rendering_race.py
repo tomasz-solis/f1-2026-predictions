@@ -498,16 +498,22 @@ def _style_race_table(df_display: pd.DataFrame):
             ]
         )
         .map(color_position, subset=["Pos"])
-        .map(color_dnf_risk, subset=["DNF Risk %"])
-        .format(
-            {
-                "Expected Pos": "{:.2f}",
-                "Confidence %": "{:.1f}",
-                "Podium %": "{:.1f}",
-                "DNF Risk %": "{:.1f}",
-            }
-        )
     )
+    if "DNF Risk %" in df_display.columns:
+        styled_df = styled_df.map(color_dnf_risk, subset=["DNF Risk %"])
+
+    format_map = {
+        column: template
+        for column, template in {
+            "Expected Pos": "{:.2f}",
+            "Confidence %": "{:.1f}",
+            "Podium %": "{:.1f}",
+            "DNF Risk %": "{:.1f}",
+        }.items()
+        if column in df_display.columns
+    }
+    if format_map:
+        styled_df = styled_df.format(format_map)
     if "Expected Pos" in df_display.columns:
         styled_df = styled_df.map(highlight_expected_position, subset=["Expected Pos"])
 
@@ -522,9 +528,23 @@ def _style_race_table(df_display: pd.DataFrame):
 def _render_race_result(df: pd.DataFrame) -> None:
     """Render race prediction table and summary cards."""
     race_df = df.copy()
-    race_df["confidence"] = race_df["confidence"].round(1)
-    race_df["podium_probability"] = race_df["podium_probability"].round(1)
-    race_df["dnf_probability"] = (race_df["dnf_probability"] * 100).round(1)
+    has_confidence = "confidence" in race_df.columns
+    has_podium_probability = "podium_probability" in race_df.columns
+    has_dnf_probability = "dnf_probability" in race_df.columns
+    if not has_dnf_probability and "dnf_risk" in race_df.columns:
+        race_df["dnf_probability"] = race_df["dnf_risk"]
+        has_dnf_probability = True
+    if has_confidence:
+        race_df["confidence"] = pd.to_numeric(race_df["confidence"], errors="coerce").round(1)
+    if has_podium_probability:
+        race_df["podium_probability"] = pd.to_numeric(
+            race_df["podium_probability"],
+            errors="coerce",
+        ).round(1)
+    if has_dnf_probability:
+        race_df["dnf_probability"] = (
+            pd.to_numeric(race_df["dnf_probability"], errors="coerce") * 100
+        ).round(1)
     has_expected_position = "position_blend_score" in race_df.columns
     if has_expected_position:
         race_df["expected_position"] = race_df["position_blend_score"].astype(float).round(2)
@@ -536,8 +556,10 @@ def _render_race_result(df: pd.DataFrame) -> None:
     input_confidence = race_df.attrs.get("input_confidence")
 
     warnings: list[str] = []
-    mean_confidence = float(race_df["confidence"].mean()) if not race_df.empty else 0.0
-    if mean_confidence < 56.0:
+    mean_confidence = (
+        float(race_df["confidence"].mean()) if has_confidence and not race_df.empty else None
+    )
+    if isinstance(mean_confidence, float) and mean_confidence < 56.0:
         warnings.append(
             f"Low confidence run: mean confidence is {mean_confidence:.1f}%. "
             "Use this as a rough order; it should move as more weekend data comes in."
@@ -559,11 +581,12 @@ def _render_race_result(df: pd.DataFrame) -> None:
                 f"(median span: {median_width:.1f})."
             )
 
-    high_dnf = race_df[race_df["dnf_probability"] > 20]
-    if not high_dnf.empty:
-        warnings.append(
-            f"High DNF risk ({len(high_dnf)} drivers): {', '.join(high_dnf['driver'].values)}"
-        )
+    if has_dnf_probability:
+        high_dnf = race_df[race_df["dnf_probability"] > 20]
+        if not high_dnf.empty:
+            warnings.append(
+                f"High DNF risk ({len(high_dnf)} drivers): {', '.join(high_dnf['driver'].values)}"
+            )
     team_cluster_warning = _build_team_clustering_warning(
         race_df,
         mean_confidence=mean_confidence,
@@ -573,17 +596,28 @@ def _render_race_result(df: pd.DataFrame) -> None:
 
     _render_collapsible_warnings(warnings, title="Race warnings")
 
-    st.caption(
-        "Rows are ranked by expected finishing position across the full simulation "
-        "distribution, not by Confidence% or Podium%."
-    )
-    st.caption(
-        "Key signal: `Expected Pos` (lower is better). Use `90% Pos Range` to judge uncertainty."
-    )
-    st.caption(
-        "`90% Pos Range` shows where a driver lands in 90% of simulations (P5 to P95). "
-        "Equal Podium% values are normal because podium probabilities are monotonic-smoothed."
-    )
+    if has_expected_position:
+        primary_caption = (
+            "Rows are ranked by expected finishing position across the full simulation "
+            "distribution, not by Confidence% or Podium%."
+            if has_podium_probability
+            else "Rows are ranked by expected finishing position across the full simulation "
+            "distribution, not by Confidence%."
+        )
+    else:
+        primary_caption = (
+            "Rows are ranked by projected finishing order from the selected checkpoint."
+        )
+    st.caption(primary_caption)
+    if has_expected_position:
+        st.caption(
+            "Key signal: `Expected Pos` (lower is better). Use `90% Pos Range` to judge uncertainty."
+        )
+    if has_ci:
+        ci_caption = "`90% Pos Range` shows where a driver lands in 90% of simulations (P5 to P95)."
+        if has_podium_probability:
+            ci_caption += " Equal Podium% values are normal because podium probabilities are monotonic-smoothed."
+        st.caption(ci_caption)
 
     display_cols = ["position", "driver", "team"]
     display_names = ["Pos", "Driver", "Team"]
@@ -593,8 +627,15 @@ def _render_race_result(df: pd.DataFrame) -> None:
     if has_ci:
         display_cols.append("ci_range")
         display_names.append("90% Pos Range")
-    display_cols += ["podium_probability", "dnf_probability", "confidence"]
-    display_names += ["Podium %", "DNF Risk %", "Confidence %"]
+    if has_podium_probability:
+        display_cols.append("podium_probability")
+        display_names.append("Podium %")
+    if has_dnf_probability:
+        display_cols.append("dnf_probability")
+        display_names.append("DNF Risk %")
+    if has_confidence:
+        display_cols.append("confidence")
+        display_names.append("Confidence %")
 
     df_display = race_df[display_cols].copy()
     df_display.columns = display_names
@@ -614,6 +655,8 @@ def _render_race_result(df: pd.DataFrame) -> None:
                 "value": str(podium_row["driver"]),
                 "meta": (
                     f"{podium_row['team']} • {float(podium_row['confidence']):.1f}% confidence"
+                    if has_confidence and pd.notna(podium_row.get("confidence"))
+                    else str(podium_row["team"])
                 ),
                 "tone": "accent" if position == 1 else "neutral",
             }

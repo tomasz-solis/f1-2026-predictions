@@ -51,7 +51,7 @@ def test_get_file_timestamps_reports_existing_and_missing_files(patcher):
     }
     patcher.setattr(
         cache,
-        "Path",
+        "resolve_repo_data_path",
         lambda file_path: _FakePath(file_path, existing_files),
     )
 

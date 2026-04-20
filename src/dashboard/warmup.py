@@ -549,6 +549,392 @@ def _runtime_state_record_exists(namespace: str, state_key: str) -> bool:
 _verify_runtime_state_record = _runtime_state_record_exists
 
 
+@dataclass
+class _WarmupRunState:
+    """Mutable state shared across the stages of one warmup cycle.
+
+    Passed by reference into each stage function so they can update the
+    summary, accumulate race-boundary data, and share computed intermediates
+    (artifact hash, predictor, weather coverage) without a long parameter list.
+    """
+
+    year: int
+    run_now: datetime
+    dry_run: bool
+    db_verification_enabled: bool
+    settings: dict[str, Any]
+    weather_scenarios: list[str]
+    targets: WarmupTargets
+    checkpoint_context: CheckpointContext
+    detector: Any  # SessionDetector — avoid circular import type
+    summary: WarmupSummary
+
+    # Populated during the compute stage
+    artifact_hash: str = ""
+    predictor: Any = None
+    race_boundaries: dict[str, str] = field(default_factory=dict)
+    race_weather_coverage: dict[str, set[str]] = field(default_factory=dict)
+    max_file_entries: int = 2048
+
+
+def _stage_refresh_practice(ctx: _WarmupRunState) -> None:
+    """Stage 1: pull any completed FP sessions and update car characteristics."""
+    if ctx.dry_run:
+        return
+
+    practice_update = _refresh_anchor_practice_characteristics(
+        year=ctx.year,
+        targets=ctx.targets,
+        session_detector=ctx.detector,
+    )
+    ctx.summary.practice_updated = bool(practice_update.get("updated"))
+    completed_sessions = practice_update.get("completed_fp_sessions", [])
+    if isinstance(completed_sessions, list):
+        ctx.summary.practice_completed_sessions = [
+            str(s).strip() for s in completed_sessions if str(s).strip()
+        ]
+    ctx.summary.practice_teams_updated = int(practice_update.get("teams_updated", 0) or 0)
+    retried_events = practice_update.get("retried_events", [])
+    if isinstance(retried_events, list):
+        ctx.summary.practice_retried_events = [
+            str(e).strip() for e in retried_events if str(e).strip()
+        ]
+
+
+def _stage_load_predictor(ctx: _WarmupRunState) -> None:
+    """Stage 2: resolve artifact hash and load the baseline predictor."""
+    artifact_versions = get_artifact_versions(year=ctx.year)
+    ctx.artifact_hash = compute_artifact_hash(artifact_versions)
+    ctx.predictor = _load_predictor(artifact_versions, year=ctx.year)
+    ctx.max_file_entries = max(16, int(ctx.settings.get("max_file_entries", 2048)))
+    ctx.race_weather_coverage = {
+        race_name: set() for race_name in ctx.summary.target_races if race_name
+    }
+
+
+def _resolve_race_checkpoint(
+    ctx: _WarmupRunState,
+    target_race: str,
+    target_is_sprint: bool,
+) -> tuple[str, str] | None:
+    """Resolve boundary signature and checkpoint session for one race target.
+
+    Returns (target_boundary_signature, target_checkpoint) or None when the
+    race is not yet ready to warm.
+    """
+    if target_race == ctx.targets.anchor_race_name:
+        target_checkpoint_context = ctx.checkpoint_context
+    else:
+        target_checkpoint_context = _resolve_checkpoint_context(
+            year=ctx.year,
+            race_name=target_race,
+            is_sprint=target_is_sprint,
+            now_utc=ctx.run_now,
+            session_detector=ctx.detector,
+        )
+
+    if not target_checkpoint_context.checkpoint_ready:
+        logger.info(
+            "Warmup skipped race target due to checkpoint readiness: "
+            "race=%s expected=%s ready=%s reason=%s",
+            target_race,
+            target_checkpoint_context.expected_checkpoint,
+            target_checkpoint_context.latest_ready_checkpoint,
+            target_checkpoint_context.reason,
+        )
+        return None
+
+    target_boundary_signature = target_checkpoint_context.boundary_signature
+    target_checkpoint = resolve_prediction_checkpoint_session(
+        target_checkpoint_context.checkpoint,
+        is_sprint=target_is_sprint,
+    )
+    return target_boundary_signature, target_checkpoint
+
+
+def _ensure_base_features(
+    ctx: _WarmupRunState,
+    target_race: str,
+    target_is_sprint: bool,
+    target_checkpoint: str,
+    target_boundary_signature: str,
+    lazy_predictor: Any,
+) -> dict[str, Any] | None:
+    """Load or compute base features for one race target.
+
+    Returns the base-features dict or None when computation failed (error
+    already recorded on ctx.summary).
+    """
+    base_features = load_precomputed_base_features(
+        year=ctx.year,
+        race_name=target_race,
+        checkpoint=target_checkpoint,
+        artifact_hash=ctx.artifact_hash,
+        boundary_signature=target_boundary_signature,
+    )
+
+    if base_features is not None:
+        ctx.summary.base_reused += 1
+        return base_features
+
+    if ctx.dry_run:
+        ctx.summary.base_generated += 1
+        return {"is_sprint": bool(target_is_sprint), "timing": {}}
+
+    try:
+        base_features = compute_base_features(
+            ctx.year,
+            target_race,
+            target_checkpoint,
+            ctx.artifact_hash,
+            target_boundary_signature,
+            predictor=lazy_predictor,
+            is_sprint=target_is_sprint,
+        )
+        save_precomputed_base_features(
+            year=ctx.year,
+            race_name=target_race,
+            checkpoint=target_checkpoint,
+            artifact_hash=ctx.artifact_hash,
+            boundary_signature=target_boundary_signature,
+            is_sprint=target_is_sprint,
+            base_features=base_features,
+            metadata={
+                "source_race_name": ctx.targets.anchor_race_name,
+                "boundary_session_name": target_checkpoint,
+            },
+            max_file_entries=ctx.max_file_entries,
+        )
+        if ctx.db_verification_enabled:
+            base_state_key = build_precomputed_base_features_key(
+                year=ctx.year,
+                race_name=target_race,
+                checkpoint=target_checkpoint,
+                artifact_hash=ctx.artifact_hash,
+                boundary_signature=target_boundary_signature,
+            )
+            if not _runtime_state_record_exists(
+                _STATE_NAMESPACE_PRECOMPUTED_BASE_FEATURES, base_state_key
+            ):
+                ctx.summary.db_verification_warnings.append(
+                    f"Base-feature write could not be verified in DB for "
+                    f"{target_race} ({target_checkpoint})."
+                )
+        ctx.summary.base_generated += 1
+        return base_features
+    except _WARMUP_ERRORS as exc:
+        error_message = f"{target_race} [base_features]: {exc}"
+        ctx.summary.errors.append(error_message)
+        logger.warning("Warmup base-feature compute failed: %s", error_message)
+        return None
+
+
+def _process_weather_scenario(
+    ctx: _WarmupRunState,
+    target_race: str,
+    target_is_sprint: bool,
+    target_checkpoint: str,
+    target_boundary_signature: str,
+    target_weather: str,
+    base_features: dict[str, Any],
+    lazy_predictor: Any,
+) -> None:
+    """Generate or reuse one (race, weather) prediction and log it."""
+    persisted = load_precomputed_prediction(
+        year=ctx.year,
+        race_name=target_race,
+        weather=target_weather,
+        artifact_hash=ctx.artifact_hash,
+        boundary_signature=target_boundary_signature,
+    )
+    if persisted is not None:
+        ctx.summary.predictions_reused += 1
+        ctx.race_weather_coverage.setdefault(target_race, set()).add(target_weather)
+        prediction_results = persisted
+    elif ctx.dry_run:
+        ctx.summary.predictions_generated += 1
+        ctx.race_weather_coverage.setdefault(target_race, set()).add(target_weather)
+        return
+    else:
+        try:
+            prediction_results = compute_weather_predictions(
+                base_features,
+                target_weather,
+                predictor=lazy_predictor,
+                year=ctx.year,
+                target_race=target_race,
+            )
+            save_precomputed_prediction(
+                year=ctx.year,
+                race_name=target_race,
+                weather=target_weather,
+                artifact_hash=ctx.artifact_hash,
+                boundary_signature=target_boundary_signature,
+                is_sprint=target_is_sprint,
+                prediction_results=prediction_results,
+                metadata={
+                    "source_race_name": ctx.targets.anchor_race_name,
+                    "boundary_session_name": target_checkpoint,
+                    "computed_from_base_features": True,
+                },
+                max_file_entries=ctx.max_file_entries,
+            )
+            if ctx.db_verification_enabled:
+                prediction_state_key = build_precomputed_prediction_key(
+                    year=ctx.year,
+                    race_name=target_race,
+                    weather=target_weather,
+                    artifact_hash=ctx.artifact_hash,
+                    boundary_signature=target_boundary_signature,
+                )
+                if not _runtime_state_record_exists(
+                    _STATE_NAMESPACE_PRECOMPUTED_PREDICTIONS, prediction_state_key
+                ):
+                    ctx.summary.db_verification_warnings.append(
+                        f"Prediction write could not be verified in DB for "
+                        f"{target_race} [{target_weather}]."
+                    )
+            ctx.summary.predictions_generated += 1
+            ctx.race_weather_coverage.setdefault(target_race, set()).add(target_weather)
+        except _WARMUP_ERRORS as exc:
+            error_message = f"{target_race} [{target_weather}]: {exc}"
+            ctx.summary.errors.append(error_message)
+            logger.warning("Warmup weather precompute failed: %s", error_message)
+            return
+
+    try:
+        _save_warmup_prediction_to_logger(
+            year=ctx.year,
+            race_name=target_race,
+            checkpoint_session=target_checkpoint,
+            weather=target_weather,
+            is_sprint=target_is_sprint,
+            prediction_results=prediction_results,
+        )
+    except _WARMUP_ERRORS as exc:
+        logger.warning(
+            "Could not save warmup prediction to PredictionLogger for %s %s %s: %s",
+            ctx.year,
+            target_race,
+            target_checkpoint,
+            exc,
+        )
+
+
+def _stage_compute_predictions(ctx: _WarmupRunState) -> None:
+    """Stage 3: for each target race, build base features then generate per-weather predictions."""
+    for target_race in ctx.summary.target_races:
+        try:
+            target_is_sprint = bool(is_sprint_weekend(ctx.year, target_race))
+        except ValueError as exc:
+            error_message = (
+                f"{target_race} [weekend_format]: could not determine weekend format: {exc}"
+            )
+            ctx.summary.errors.append(error_message)
+            logger.warning(
+                "Warmup skipped race target due to unknown weekend format (%s %s): %s",
+                ctx.year,
+                target_race,
+                exc,
+            )
+            continue
+
+        resolved = _resolve_race_checkpoint(ctx, target_race, target_is_sprint)
+        if resolved is None:
+            continue
+        target_boundary_signature, target_checkpoint = resolved
+
+        ctx.race_boundaries[target_race] = target_boundary_signature
+        ctx.summary.target_contexts.append(
+            {
+                "race_name": target_race,
+                "is_sprint": bool(target_is_sprint),
+                "checkpoint": target_checkpoint,
+                "boundary_signature": target_boundary_signature,
+            }
+        )
+
+        # Build lazy predictor to avoid constructing it when cache hits remove the need
+        _target_predictor: Any = None
+
+        def _lazy_predictor(
+            _race=target_race,
+            _checkpoint=target_checkpoint,
+            _sprint=target_is_sprint,
+        ) -> Any:
+            nonlocal _target_predictor
+            if _target_predictor is None:
+                _target_predictor = build_checkpoint_overlay_predictor(
+                    base_predictor=ctx.predictor,
+                    year=ctx.year,
+                    race_name=_race,
+                    checkpoint_session=_checkpoint,
+                    is_sprint=_sprint,
+                )
+            return _target_predictor
+
+        base_features = _ensure_base_features(
+            ctx,
+            target_race,
+            target_is_sprint,
+            target_checkpoint,
+            target_boundary_signature,
+            _lazy_predictor(),
+        )
+        if base_features is None:
+            continue
+
+        for target_weather in ctx.weather_scenarios:
+            _process_weather_scenario(
+                ctx,
+                target_race,
+                target_is_sprint,
+                target_checkpoint,
+                target_boundary_signature,
+                target_weather,
+                base_features,
+                _lazy_predictor(),
+            )
+
+
+def _stage_save_horizon_index(ctx: _WarmupRunState) -> None:
+    """Stage 4: persist the horizon index and mark ready races."""
+    expected_weather = set(ctx.weather_scenarios)
+    ctx.summary.ready_races = [
+        race_name
+        for race_name in ctx.summary.target_races
+        if expected_weather.issubset(ctx.race_weather_coverage.get(race_name, set()))
+    ]
+
+    if ctx.dry_run:
+        return
+
+    try:
+        save_precompute_horizon_index(
+            year=ctx.year,
+            artifact_hash=ctx.artifact_hash,
+            boundary_signature=ctx.checkpoint_context.boundary_signature,
+            anchor_race_name=ctx.targets.anchor_race_name,
+            anchor_session_name=ctx.checkpoint_context.checkpoint,
+            expected_targets=ctx.summary.target_races,
+            ready_races=ctx.summary.ready_races,
+            weather_scenarios=ctx.weather_scenarios,
+            race_boundaries=ctx.race_boundaries,
+        )
+        if ctx.db_verification_enabled:
+            horizon_state_key = f"{ctx.year}::{str(ctx.artifact_hash).strip()}"
+            if not _runtime_state_record_exists(
+                _STATE_NAMESPACE_PRECOMPUTE_HORIZON_INDEX, horizon_state_key
+            ):
+                ctx.summary.db_verification_warnings.append(
+                    "Horizon-index write could not be verified in DB."
+                )
+    except _WARMUP_ERRORS as exc:
+        error_message = f"horizon_index: {exc}"
+        ctx.summary.errors.append(error_message)
+        logger.warning("Could not persist warmup horizon index: %s", exc)
+
+
 def run_warmup_precompute_cycle(
     year: int,
     *,
@@ -556,7 +942,23 @@ def run_warmup_precompute_cycle(
     dry_run: bool = False,
     verify_db_writes: bool = True,
 ) -> WarmupSummary:
-    """Run one warmup cycle."""
+    """Run one warmup precompute cycle.
+
+    Delegates to five stage functions in order:
+
+    1. ``_stage_refresh_practice`` — pull completed FP sessions and update
+       car characteristics for the anchor race.
+    2. ``_stage_load_predictor`` — resolve artifact hash and load the baseline
+       predictor.
+    3. ``_stage_compute_predictions`` — for each target race, ensure base
+       features exist then generate per-weather predictions.
+    4. ``_stage_save_horizon_index`` — persist the horizon index and mark
+       which races have full weather coverage.
+
+    Each stage reads and writes shared state through a ``_WarmupRunState``
+    instance. The lock is acquired before stage 1 and released in the finally
+    block regardless of outcome.
+    """
     run_now = now_utc or datetime.now(UTC)
     summary = WarmupSummary(year=int(year), status="success", dry_run=bool(dry_run))
 
@@ -567,18 +969,14 @@ def run_warmup_precompute_cycle(
         )
 
     settings_raw = get_prediction_precompute_config()
-    settings = settings_raw if isinstance(settings_raw, dict) else {}
+    settings: dict[str, Any] = settings_raw if isinstance(settings_raw, dict) else {}
     horizon_races = max(1, int(settings.get("horizon_races", _DEFAULT_HORIZON_RACES)))
     weather_scenarios = _normalize_weather_scenarios(
         settings.get("weather_scenarios", list(_DEFAULT_WEATHER_SCENARIOS))
     )
     summary.weather_scenarios = list(weather_scenarios)
 
-    targets = _resolve_warmup_targets(
-        int(year),
-        now_utc=run_now,
-        horizon_races=horizon_races,
-    )
+    targets = _resolve_warmup_targets(int(year), now_utc=run_now, horizon_races=horizon_races)
     if targets is None:
         summary.status = "nothing_to_do"
         summary.reason = "no_upcoming_races"
@@ -624,9 +1022,7 @@ def run_warmup_precompute_cycle(
     lock_acquired = True
     if should_write_to_db():
         lock_acquired = state_store.acquire_lock(
-            lock_key,
-            lock_owner,
-            ttl_seconds=_WARMUP_LOCK_TTL_SECONDS,
+            lock_key, lock_owner, ttl_seconds=_WARMUP_LOCK_TTL_SECONDS
         )
         if not lock_acquired:
             summary.status = "locked"
@@ -634,290 +1030,24 @@ def run_warmup_precompute_cycle(
             logger.info("Warmup skipped: lock already held for key=%s", lock_key)
             return summary
 
+    ctx = _WarmupRunState(
+        year=int(year),
+        run_now=run_now,
+        dry_run=bool(dry_run),
+        db_verification_enabled=db_verification_enabled,
+        settings=settings,
+        weather_scenarios=weather_scenarios,
+        targets=targets,
+        checkpoint_context=checkpoint_context,
+        detector=detector,
+        summary=summary,
+    )
+
     try:
-        if not dry_run:
-            practice_update = _refresh_anchor_practice_characteristics(
-                year=int(year),
-                targets=targets,
-                session_detector=detector,
-            )
-            summary.practice_updated = bool(practice_update.get("updated"))
-            completed_sessions = practice_update.get("completed_fp_sessions", [])
-            if isinstance(completed_sessions, list):
-                summary.practice_completed_sessions = [
-                    str(session).strip() for session in completed_sessions if str(session).strip()
-                ]
-            summary.practice_teams_updated = int(practice_update.get("teams_updated", 0) or 0)
-            retried_events = practice_update.get("retried_events", [])
-            if isinstance(retried_events, list):
-                summary.practice_retried_events = [
-                    str(event_name).strip()
-                    for event_name in retried_events
-                    if str(event_name).strip()
-                ]
-
-        artifact_versions = get_artifact_versions(year=int(year))
-        artifact_hash = compute_artifact_hash(artifact_versions)
-        predictor = _load_predictor(artifact_versions, year=int(year))
-        max_file_entries = max(16, int(settings.get("max_file_entries", 2048)))
-        boundary_signature = checkpoint_context.boundary_signature
-        race_boundaries: dict[str, str] = {}
-
-        race_weather_coverage: dict[str, set[str]] = {
-            race_name: set() for race_name in summary.target_races if race_name
-        }
-        for target_race in summary.target_races:
-            try:
-                target_is_sprint = bool(is_sprint_weekend(int(year), target_race))
-            except ValueError as exc:
-                error_message = (
-                    f"{target_race} [weekend_format]: could not determine weekend format: {exc}"
-                )
-                summary.errors.append(error_message)
-                logger.warning(
-                    "Warmup skipped race target due to unknown weekend format (%s %s): %s",
-                    int(year),
-                    target_race,
-                    exc,
-                )
-                continue
-
-            if target_race == targets.anchor_race_name:
-                target_checkpoint_context = checkpoint_context
-            else:
-                target_checkpoint_context = _resolve_checkpoint_context(
-                    year=int(year),
-                    race_name=target_race,
-                    is_sprint=target_is_sprint,
-                    now_utc=run_now,
-                    session_detector=detector,
-                )
-
-            if not target_checkpoint_context.checkpoint_ready:
-                logger.info(
-                    "Warmup skipped race target due to checkpoint readiness: race=%s expected=%s ready=%s reason=%s",
-                    target_race,
-                    target_checkpoint_context.expected_checkpoint,
-                    target_checkpoint_context.latest_ready_checkpoint,
-                    target_checkpoint_context.reason,
-                )
-                continue
-
-            target_boundary_signature = target_checkpoint_context.boundary_signature
-            target_checkpoint = resolve_prediction_checkpoint_session(
-                target_checkpoint_context.checkpoint,
-                is_sprint=target_is_sprint,
-            )
-            race_boundaries[target_race] = target_boundary_signature
-            summary.target_contexts.append(
-                {
-                    "race_name": target_race,
-                    "is_sprint": bool(target_is_sprint),
-                    "checkpoint": target_checkpoint,
-                    "boundary_signature": target_boundary_signature,
-                }
-            )
-            target_predictor: Any | None = None
-
-            def _resolve_target_predictor(
-                *,
-                race_name: str = target_race,
-                checkpoint_name: str = target_checkpoint,
-                is_sprint_flag: bool = target_is_sprint,
-            ) -> Any:
-                """Build one checkpoint-aware predictor lazily for this target race."""
-                nonlocal target_predictor
-                if target_predictor is None:
-                    target_predictor = build_checkpoint_overlay_predictor(
-                        base_predictor=predictor,
-                        year=int(year),
-                        race_name=race_name,
-                        checkpoint_session=checkpoint_name,
-                        is_sprint=is_sprint_flag,
-                    )
-                return target_predictor
-
-            base_features = load_precomputed_base_features(
-                year=int(year),
-                race_name=target_race,
-                checkpoint=target_checkpoint,
-                artifact_hash=artifact_hash,
-                boundary_signature=target_boundary_signature,
-            )
-            if base_features is None:
-                if dry_run:
-                    summary.base_generated += 1
-                    base_features = {
-                        "is_sprint": bool(target_is_sprint),
-                        "timing": {},
-                    }
-                else:
-                    try:
-                        base_features = compute_base_features(
-                            int(year),
-                            target_race,
-                            target_checkpoint,
-                            artifact_hash,
-                            target_boundary_signature,
-                            predictor=_resolve_target_predictor(),
-                            is_sprint=target_is_sprint,
-                        )
-                        save_precomputed_base_features(
-                            year=int(year),
-                            race_name=target_race,
-                            checkpoint=target_checkpoint,
-                            artifact_hash=artifact_hash,
-                            boundary_signature=target_boundary_signature,
-                            is_sprint=target_is_sprint,
-                            base_features=base_features,
-                            metadata={
-                                "source_race_name": targets.anchor_race_name,
-                                "boundary_session_name": target_checkpoint,
-                            },
-                            max_file_entries=max_file_entries,
-                        )
-                        if db_verification_enabled:
-                            base_state_key = build_precomputed_base_features_key(
-                                year=int(year),
-                                race_name=target_race,
-                                checkpoint=target_checkpoint,
-                                artifact_hash=artifact_hash,
-                                boundary_signature=target_boundary_signature,
-                            )
-                            verified = _runtime_state_record_exists(
-                                _STATE_NAMESPACE_PRECOMPUTED_BASE_FEATURES,
-                                base_state_key,
-                            )
-                            if not verified:
-                                summary.db_verification_warnings.append(
-                                    f"Base-feature write could not be verified in DB for {target_race} ({target_checkpoint})."
-                                )
-                        summary.base_generated += 1
-                    except _WARMUP_ERRORS as exc:
-                        error_message = f"{target_race} [base_features]: {exc}"
-                        summary.errors.append(error_message)
-                        logger.warning("Warmup base-feature compute failed: %s", error_message)
-                        continue
-            else:
-                summary.base_reused += 1
-
-            for target_weather in weather_scenarios:
-                persisted_prediction = load_precomputed_prediction(
-                    year=int(year),
-                    race_name=target_race,
-                    weather=target_weather,
-                    artifact_hash=artifact_hash,
-                    boundary_signature=target_boundary_signature,
-                )
-                if persisted_prediction is not None:
-                    summary.predictions_reused += 1
-                    race_weather_coverage.setdefault(target_race, set()).add(target_weather)
-                    prediction_results = persisted_prediction
-                else:
-                    if dry_run:
-                        summary.predictions_generated += 1
-                        race_weather_coverage.setdefault(target_race, set()).add(target_weather)
-                        continue
-
-                    try:
-                        prediction_results = compute_weather_predictions(
-                            base_features,
-                            target_weather,
-                            predictor=_resolve_target_predictor(),
-                            year=int(year),
-                            target_race=target_race,
-                        )
-                        save_precomputed_prediction(
-                            year=int(year),
-                            race_name=target_race,
-                            weather=target_weather,
-                            artifact_hash=artifact_hash,
-                            boundary_signature=target_boundary_signature,
-                            is_sprint=target_is_sprint,
-                            prediction_results=prediction_results,
-                            metadata={
-                                "source_race_name": targets.anchor_race_name,
-                                "boundary_session_name": target_checkpoint,
-                                "computed_from_base_features": True,
-                            },
-                            max_file_entries=max_file_entries,
-                        )
-                        if db_verification_enabled:
-                            prediction_state_key = build_precomputed_prediction_key(
-                                year=int(year),
-                                race_name=target_race,
-                                weather=target_weather,
-                                artifact_hash=artifact_hash,
-                                boundary_signature=target_boundary_signature,
-                            )
-                            verified = _runtime_state_record_exists(
-                                _STATE_NAMESPACE_PRECOMPUTED_PREDICTIONS,
-                                prediction_state_key,
-                            )
-                            if not verified:
-                                summary.db_verification_warnings.append(
-                                    f"Prediction write could not be verified in DB for {target_race} [{target_weather}]."
-                                )
-                        summary.predictions_generated += 1
-                        race_weather_coverage.setdefault(target_race, set()).add(target_weather)
-                    except _WARMUP_ERRORS as exc:
-                        error_message = f"{target_race} [{target_weather}]: {exc}"
-                        summary.errors.append(error_message)
-                        logger.warning("Warmup weather precompute failed: %s", error_message)
-                        continue
-
-                try:
-                    _save_warmup_prediction_to_logger(
-                        year=int(year),
-                        race_name=target_race,
-                        checkpoint_session=target_checkpoint,
-                        weather=target_weather,
-                        is_sprint=target_is_sprint,
-                        prediction_results=prediction_results,
-                    )
-                except _WARMUP_ERRORS as exc:
-                    logger.warning(
-                        "Could not save warmup prediction to PredictionLogger for %s %s %s: %s",
-                        int(year),
-                        target_race,
-                        target_checkpoint,
-                        exc,
-                    )
-
-        expected_weather = set(weather_scenarios)
-        summary.ready_races = [
-            race_name
-            for race_name in summary.target_races
-            if expected_weather.issubset(race_weather_coverage.get(race_name, set()))
-        ]
-
-        if not dry_run:
-            try:
-                save_precompute_horizon_index(
-                    year=int(year),
-                    artifact_hash=artifact_hash,
-                    boundary_signature=boundary_signature,
-                    anchor_race_name=targets.anchor_race_name,
-                    anchor_session_name=checkpoint_context.checkpoint,
-                    expected_targets=summary.target_races,
-                    ready_races=summary.ready_races,
-                    weather_scenarios=weather_scenarios,
-                    race_boundaries=race_boundaries,
-                )
-                if db_verification_enabled:
-                    horizon_state_key = f"{int(year)}::{str(artifact_hash).strip()}"
-                    verified = _runtime_state_record_exists(
-                        _STATE_NAMESPACE_PRECOMPUTE_HORIZON_INDEX,
-                        horizon_state_key,
-                    )
-                    if not verified:
-                        summary.db_verification_warnings.append(
-                            "Horizon-index write could not be verified in DB."
-                        )
-            except _WARMUP_ERRORS as exc:
-                error_message = f"horizon_index: {exc}"
-                summary.errors.append(error_message)
-                logger.warning("Could not persist warmup horizon index: %s", exc)
+        _stage_refresh_practice(ctx)
+        _stage_load_predictor(ctx)
+        _stage_compute_predictions(ctx)
+        _stage_save_horizon_index(ctx)
 
         if summary.errors:
             summary.status = "partial_success"

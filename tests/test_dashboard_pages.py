@@ -940,6 +940,7 @@ def test_render_page_routes_by_selected_tab(patcher):
     patcher.setattr(pages, "render_model_insights_page", lambda: called.append("insights"))
     patcher.setattr(pages, "render_team_comparison_page", lambda: called.append("comparison"))
     patcher.setattr(pages, "render_prediction_accuracy_page", lambda: called.append("accuracy"))
+    patcher.setattr(pages, "render_checkpoint_viewer_page", lambda: called.append("checkpoints"))
     patcher.setattr(pages, "render_contact_page", lambda: called.append("contact"))
 
     pages.render_page("Prediction", enable_logging=True)
@@ -948,6 +949,7 @@ def test_render_page_routes_by_selected_tab(patcher):
     pages.render_page("Model Insights", enable_logging=False)
     pages.render_page("Team Comparison", enable_logging=False)
     pages.render_page("Prediction Accuracy", enable_logging=False)
+    pages.render_page("Checkpoint Viewer", enable_logging=False)
     pages.render_page("Contact", enable_logging=False)
     pages.render_page("About", enable_logging=False)
     pages.render_page("Other", enable_logging=False)
@@ -959,6 +961,7 @@ def test_render_page_routes_by_selected_tab(patcher):
         "insights",
         "comparison",
         "accuracy",
+        "checkpoints",
         "contact",
         "contact",
         "live",

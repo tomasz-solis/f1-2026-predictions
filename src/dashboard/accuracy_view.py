@@ -2,17 +2,27 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 import plotly.graph_objects as go
 import streamlit as st
 
 from src.dashboard.accuracy import SeasonAccuracySummary, TargetAccuracySummary
+from src.dashboard.rendering import display_prediction_result
 from src.utils.accuracy_targets import (
+    CHECKPOINT_ORDER,
     PRIMARY_TARGET_KEYS,
     SECONDARY_SPRINT_TARGET_KEYS,
+    explicit_target_actuals,
+    explicit_target_predictions,
+    sanitize_prediction_rows,
+    synthesize_legacy_actuals,
+    synthesize_legacy_targets,
     target_checkpoint_sequence,
+    target_label,
 )
+from src.utils.weekend import get_schedule_rows
 
 METRIC_OPTIONS = {
     "overall_mae": "Overall MAE",
@@ -95,6 +105,450 @@ def render_saved_predictions_summary(status_rows: list[dict[str, Any]]) -> None:
             f"**{race_name}** ({checkpoint_session}, {weekend_format}) "
             f"- {status_text} - {targets_text}"
         )
+
+
+def build_saved_prediction_browser_rows(
+    predictions: list[dict[str, Any]],
+    *,
+    season_year: int | None = None,
+) -> list[dict[str, Any]]:
+    """Normalize saved predictions into deterministic selector rows."""
+    resolved_season_year = _resolve_saved_prediction_season_year(
+        predictions,
+        season_year=season_year,
+    )
+    schedule_rounds = _build_saved_prediction_round_map(resolved_season_year)
+    race_order: dict[str, int] = {}
+    rows: list[dict[str, Any]] = []
+    for prediction_index, prediction in enumerate(predictions):
+        metadata = prediction.get("metadata", {})
+        if not isinstance(metadata, dict):
+            continue
+
+        race_name = str(metadata.get("race_name", "")).strip()
+        checkpoint_session = str(metadata.get("session_name", "")).strip().upper()
+        if not race_name or not checkpoint_session:
+            continue
+
+        race_order.setdefault(race_name, len(race_order))
+        round_number = schedule_rounds.get(_normalize_saved_race_name(race_name))
+        weekend_format = str(metadata.get("weekend_format", "")).strip().lower()
+        if weekend_format not in {"normal", "sprint"}:
+            weekend_format = "sprint" if _saved_prediction_is_sprint(prediction) else "normal"
+
+        predicted_at = _parse_saved_timestamp(metadata.get("predicted_at"))
+        information_cutoff_at = _parse_saved_timestamp(metadata.get("information_cutoff_at"))
+        rows.append(
+            {
+                "race_name": race_name,
+                "checkpoint_session": checkpoint_session,
+                "weekend_format": weekend_format,
+                "weather": str(metadata.get("weather", "")).strip().lower(),
+                "predicted_at": predicted_at,
+                "predicted_at_label": _format_saved_timestamp(predicted_at),
+                "information_cutoff_at": information_cutoff_at,
+                "information_cutoff_label": _format_saved_timestamp(information_cutoff_at),
+                "prediction": prediction,
+                "checkpoint_option_value": str(prediction_index),
+                "round_number": round_number,
+                "_race_order": race_order[race_name],
+            }
+        )
+
+    rows.sort(
+        key=lambda row: (
+            row.get("round_number") is None,
+            int(row.get("round_number") or row.get("_race_order", 0)),
+            CHECKPOINT_ORDER.get(str(row.get("checkpoint_session", "")), 99),
+            row.get("predicted_at", datetime.min.replace(tzinfo=UTC)),
+        )
+    )
+    duplicate_counts: dict[tuple[str, str], int] = {}
+    for row in rows:
+        duplicate_key = (
+            str(row.get("race_name", "")).strip(),
+            str(row.get("checkpoint_session", "")).strip().upper(),
+        )
+        duplicate_counts[duplicate_key] = duplicate_counts.get(duplicate_key, 0) + 1
+
+    duplicate_seen: dict[tuple[str, str], int] = {}
+    for row in rows:
+        duplicate_key = (
+            str(row.get("race_name", "")).strip(),
+            str(row.get("checkpoint_session", "")).strip().upper(),
+        )
+        duplicate_seen[duplicate_key] = duplicate_seen.get(duplicate_key, 0) + 1
+        row["checkpoint_option_label"] = _saved_checkpoint_option_label(
+            row,
+            duplicate_index=duplicate_seen[duplicate_key],
+            duplicate_count=duplicate_counts[duplicate_key],
+        )
+        row["race_option_label"] = _saved_race_option_label(
+            str(row.get("race_name", "")).strip(),
+            round_number=row.get("round_number"),
+        )
+        row.pop("_race_order", None)
+    return rows
+
+
+def build_saved_prediction_view_model(prediction: dict[str, Any]) -> dict[str, Any]:
+    """Adapt one saved checkpoint artifact into display payloads."""
+    metadata = prediction.get("metadata", {})
+    if not isinstance(metadata, dict):
+        metadata = {}
+
+    checkpoint_session = str(metadata.get("session_name", "")).strip().upper() or "UNKNOWN"
+    qualifying_target_key = str(metadata.get("top_level_qualifying_target", "")).strip()
+    race_target_key = str(metadata.get("top_level_race_target", "")).strip()
+
+    target_predictions = explicit_target_predictions(prediction)
+    is_sprint = _saved_prediction_is_sprint(prediction)
+    if not target_predictions:
+        target_predictions = synthesize_legacy_targets(prediction, is_sprint=is_sprint)
+    target_actuals = explicit_target_actuals(prediction)
+    if not target_actuals:
+        target_actuals = synthesize_legacy_actuals(prediction, is_sprint=is_sprint)
+
+    qualifying_target = target_predictions.get(qualifying_target_key, {})
+    race_target = target_predictions.get(race_target_key, {})
+    qualifying_rows = sanitize_prediction_rows(
+        qualifying_target.get("predicted_order")
+        if isinstance(qualifying_target, dict)
+        else (prediction.get("qualifying") or {}).get("predicted_grid")
+    )
+    if not qualifying_rows:
+        qualifying_rows = sanitize_prediction_rows(
+            (prediction.get("qualifying") or {}).get("predicted_grid")
+        )
+
+    race_rows = sanitize_prediction_rows(
+        race_target.get("predicted_order")
+        if isinstance(race_target, dict)
+        else (prediction.get("race") or {}).get("predicted_results")
+    )
+    if not race_rows:
+        race_rows = sanitize_prediction_rows(
+            (prediction.get("race") or {}).get("predicted_results")
+        )
+
+    qualifying_title = _saved_prediction_section_title(
+        qualifying_target_key,
+        default_title="Qualifying Checkpoint",
+    )
+    race_title = _saved_prediction_section_title(
+        race_target_key,
+        default_title="Race Checkpoint",
+    )
+
+    qualifying_result: dict[str, Any] | None = None
+    if qualifying_rows:
+        qualifying_result = {
+            "grid": qualifying_rows,
+            "result_mode": str(metadata.get("top_level_qualifying_result_mode", "PREDICTED"))
+            .strip()
+            .upper(),
+            "grid_source": str(metadata.get("top_level_qualifying_grid_source", "PREDICTED"))
+            .strip()
+            .upper(),
+            "data_source": f"Saved checkpoint ({checkpoint_session})",
+            "fp_blend_info": (
+                qualifying_target.get("fp_blend_info")
+                if isinstance(qualifying_target.get("fp_blend_info"), dict)
+                else {}
+            ),
+        }
+
+    race_result: dict[str, Any] | None = None
+    if race_rows:
+        race_result = {
+            "finish_order": race_rows,
+            "result_mode": str(metadata.get("top_level_race_result_mode", "PREDICTED"))
+            .strip()
+            .upper(),
+            "grid_source": str(metadata.get("top_level_race_grid_source", "PREDICTED"))
+            .strip()
+            .upper(),
+            "data_source": f"Saved checkpoint ({checkpoint_session})",
+            "starting_grid": qualifying_rows,
+            "starting_session_name": str(
+                qualifying_target.get("target_session")
+                or metadata.get("top_level_qualifying_session")
+                or "Q"
+            )
+            .strip()
+            .upper(),
+            "input_confidence": race_target.get("mean_confidence"),
+        }
+
+    target_status_rows: list[dict[str, Any]] = []
+    for target_key, payload in target_predictions.items():
+        if not isinstance(payload, dict):
+            continue
+        target_status_rows.append(
+            {
+                "target_key": target_key,
+                "label": target_label(target_key),
+                "session_name": str(payload.get("target_session", "")).strip().upper(),
+                "eligible_at_save": bool(payload.get("eligible_at_save", True)),
+                "has_actuals": bool(target_actuals.get(target_key)),
+            }
+        )
+    target_status_rows.sort(
+        key=lambda row: (
+            CHECKPOINT_ORDER.get(str(row.get("session_name", "")), 99),
+            str(row.get("label", "")),
+        )
+    )
+
+    weekend_format = str(metadata.get("weekend_format", "")).strip().lower()
+    if weekend_format not in {"normal", "sprint"}:
+        weekend_format = "sprint" if is_sprint else "normal"
+
+    return {
+        "checkpoint_session": checkpoint_session,
+        "weekend_format": weekend_format,
+        "weather": str(metadata.get("weather", "")).strip().lower(),
+        "predicted_at": _format_saved_timestamp(
+            _parse_saved_timestamp(metadata.get("predicted_at"))
+        ),
+        "information_cutoff_at": _format_saved_timestamp(
+            _parse_saved_timestamp(metadata.get("information_cutoff_at"))
+        ),
+        "source": str(metadata.get("source", "")).strip(),
+        "qualifying_title": qualifying_title,
+        "qualifying_result": qualifying_result,
+        "race_title": race_title,
+        "race_result": race_result,
+        "target_status_rows": target_status_rows,
+    }
+
+
+def render_saved_prediction_viewer(
+    predictions: list[dict[str, Any]],
+    *,
+    season_year: int | None = None,
+) -> None:
+    """Render a browsable viewer for saved checkpoint artifacts."""
+    st.subheader("Checkpoint Viewer")
+
+    rows = build_saved_prediction_browser_rows(predictions, season_year=season_year)
+    if not rows:
+        st.info("No saved checkpoints yet.")
+        return
+
+    race_names: list[str] = []
+    race_labels: dict[str, str] = {}
+    for row in rows:
+        race_name = str(row.get("race_name", "")).strip()
+        if race_name and race_name not in race_names:
+            race_names.append(race_name)
+            race_labels[race_name] = str(row.get("race_option_label", race_name))
+
+    selected_race = st.selectbox(
+        "Saved race",
+        options=race_names,
+        index=max(0, len(race_names) - 1),
+        key="saved_prediction_viewer_race",
+        format_func=lambda race: race_labels.get(race, race),
+        help="Browse one saved race weekend and inspect each checkpoint artifact.",
+    )
+    race_rows = [row for row in rows if row.get("race_name") == selected_race]
+    checkpoint_options = [str(row.get("checkpoint_option_value", "")) for row in race_rows]
+    checkpoint_labels = {
+        str(row.get("checkpoint_option_value", "")): str(row.get("checkpoint_option_label", ""))
+        for row in race_rows
+    }
+    selected_checkpoint = st.selectbox(
+        "Saved checkpoint",
+        options=checkpoint_options,
+        index=max(0, len(checkpoint_options) - 1),
+        key=f"saved_prediction_viewer_checkpoint_{selected_race}",
+        format_func=lambda checkpoint: checkpoint_labels.get(checkpoint, checkpoint),
+        help="Choose the historical cut-off you want to inspect.",
+    )
+
+    selected_row = next(
+        (
+            row
+            for row in race_rows
+            if str(row.get("checkpoint_option_value", "")) == selected_checkpoint
+        ),
+        None,
+    )
+    if selected_row is None:
+        st.warning("Could not load the selected checkpoint.")
+        return
+
+    view_model = build_saved_prediction_view_model(selected_row["prediction"])
+    metadata_bits = [
+        _saved_round_caption(selected_row.get("round_number")),
+        f"Weekend: {str(view_model.get('weekend_format', 'unknown')).title()}",
+        f"Weather: {str(view_model.get('weather', 'unknown')).upper()}",
+    ]
+    metadata_bits = [bit for bit in metadata_bits if bit]
+    source = str(view_model.get("source", "")).strip()
+    if source:
+        metadata_bits.append(f"Source: {source}")
+    st.caption(" | ".join(metadata_bits))
+
+    target_status_rows = view_model.get("target_status_rows", [])
+    if isinstance(target_status_rows, list) and target_status_rows:
+        st.markdown("**Tracked targets**")
+        for row in target_status_rows:
+            if not isinstance(row, dict):
+                continue
+            eligibility_text = (
+                "scoreable at save time"
+                if bool(row.get("eligible_at_save", True))
+                else "saved for inspection, excluded from scoring"
+            )
+            actuals_text = "actuals attached" if bool(row.get("has_actuals")) else "actuals pending"
+            st.write(
+                f"{row.get('label', 'Target')} ({row.get('session_name', '')}): "
+                f"{eligibility_text}; {actuals_text}."
+            )
+
+    qualifying_result = view_model.get("qualifying_result")
+    if isinstance(qualifying_result, dict):
+        display_prediction_result(
+            qualifying_result,
+            str(view_model.get("qualifying_title", "Qualifying Checkpoint")),
+            False,
+        )
+
+    race_result = view_model.get("race_result")
+    if isinstance(race_result, dict):
+        display_prediction_result(
+            race_result,
+            str(view_model.get("race_title", "Race Checkpoint")),
+            True,
+        )
+
+
+def _saved_prediction_is_sprint(prediction: dict[str, Any]) -> bool:
+    """Infer whether a saved checkpoint belongs to a sprint weekend."""
+    metadata = prediction.get("metadata", {})
+    weekend_format = str(metadata.get("weekend_format", "")).strip().lower()
+    if weekend_format in {"normal", "sprint"}:
+        return weekend_format == "sprint"
+
+    targets = prediction.get("targets", {})
+    if isinstance(targets, dict) and any("sprint" in str(key) for key in targets):
+        return True
+
+    checkpoint_session = str(metadata.get("session_name", "")).strip().upper()
+    return checkpoint_session in {"SQ", "SPRINT"}
+
+
+def _saved_prediction_section_title(target_key: str, *, default_title: str) -> str:
+    """Return a human-readable section title for one saved target."""
+    normalized_target = str(target_key).strip()
+    if not normalized_target:
+        return default_title
+    return f"{target_label(normalized_target)} Checkpoint"
+
+
+def _saved_checkpoint_option_label(
+    row: dict[str, Any],
+    *,
+    duplicate_index: int = 1,
+    duplicate_count: int = 1,
+) -> str:
+    """Build the clean checkpoint label shown in the saved-prediction selector."""
+    checkpoint_session = str(row.get("checkpoint_session", "")).strip().upper()
+    if duplicate_count <= 1:
+        return checkpoint_session
+    return f"{checkpoint_session} ({duplicate_index})"
+
+
+def _saved_race_option_label(race_name: str, *, round_number: Any) -> str:
+    """Build the race label shown in the saved-race selector."""
+    if isinstance(round_number, int) and round_number > 0:
+        return f"Round {round_number} | {race_name}"
+    return race_name
+
+
+def _saved_round_caption(round_number: Any) -> str:
+    """Return the short round caption shown above one checkpoint view."""
+    if isinstance(round_number, int) and round_number > 0:
+        return f"Round: {round_number}"
+    return ""
+
+
+def _resolve_saved_prediction_season_year(
+    predictions: list[dict[str, Any]],
+    *,
+    season_year: int | None,
+) -> int | None:
+    """Resolve the season year used for schedule-aware checkpoint ordering."""
+    if season_year is not None:
+        return int(season_year)
+
+    resolved_years: set[int] = set()
+    for prediction in predictions:
+        metadata = prediction.get("metadata", {})
+        if not isinstance(metadata, dict):
+            continue
+        raw_year = metadata.get("year")
+        if not isinstance(raw_year, int | float | str):
+            continue
+        try:
+            resolved_years.add(int(raw_year))
+        except (TypeError, ValueError):
+            continue
+
+    if len(resolved_years) == 1:
+        return next(iter(resolved_years))
+    return None
+
+
+def _build_saved_prediction_round_map(season_year: int | None) -> dict[str, int]:
+    """Map normalized race names to season round numbers when schedule data exists."""
+    if season_year is None:
+        return {}
+
+    try:
+        schedule_rows = get_schedule_rows(season_year)
+    except Exception:
+        return {}
+
+    round_map: dict[str, int] = {}
+    for round_number, schedule_row in enumerate(schedule_rows, start=1):
+        if not isinstance(schedule_row, tuple) or not schedule_row:
+            continue
+        race_name = str(schedule_row[0]).strip()
+        if not race_name:
+            continue
+        round_map[_normalize_saved_race_name(race_name)] = round_number
+    return round_map
+
+
+def _normalize_saved_race_name(race_name: str) -> str:
+    """Normalize one race name for case-insensitive schedule lookups."""
+    return str(race_name).strip().lower()
+
+
+def _parse_saved_timestamp(value: Any) -> datetime:
+    """Parse one stored timestamp into UTC with a stable minimum fallback."""
+    if not isinstance(value, str):
+        return datetime.min.replace(tzinfo=UTC)
+    candidate = value.strip()
+    if not candidate:
+        return datetime.min.replace(tzinfo=UTC)
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        return datetime.min.replace(tzinfo=UTC)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _format_saved_timestamp(value: datetime) -> str:
+    """Return a compact UTC timestamp label for saved artifacts."""
+    if value == datetime.min.replace(tzinfo=UTC):
+        return "Unknown"
+    return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
 
 def _render_metric_card(

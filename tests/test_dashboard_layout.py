@@ -149,6 +149,7 @@ def test_navigation_pages_match_dashboard_order():
     expected_pages = ["Prediction", "Team Comparison"]
     if layout.ENABLE_PREDICTION_ACCURACY_TAB:
         expected_pages.append("Prediction Accuracy")
+        expected_pages.append("Checkpoint Viewer")
     expected_pages.extend(["Model & Learning", "Contact"])
 
     assert layout.NAVIGATION_PAGES == expected_pages

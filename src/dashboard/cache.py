@@ -2,16 +2,16 @@
 
 import hashlib
 import logging
-from pathlib import Path
 
 import fastf1
 import streamlit as st
 
 from src.persistence.artifact_store import ArtifactStore
 from src.persistence.config import should_read_db_first
+from src.utils.data_paths import resolve_repo_data_path
 
 logger = logging.getLogger(__name__)
-_FASTF1_CACHE_DIR = Path("data/raw/.fastf1_cache")
+_FASTF1_CACHE_DIR = resolve_repo_data_path("data/raw/.fastf1_cache")
 _DEFAULT_SEASON = 2026
 _PREDICTION_CODE_FINGERPRINT_FILES = [
     "src/dashboard/checkpoint_predictor.py",
@@ -121,7 +121,7 @@ def _get_file_timestamps(
 
     timestamps: dict[str, tuple[int, str]] = {}
     for file in files:
-        path = Path(file)
+        path = resolve_repo_data_path(file)
         if path.exists():
             try:
                 raw = path.read_bytes()

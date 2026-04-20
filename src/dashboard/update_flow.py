@@ -4,7 +4,6 @@ import hashlib
 import json
 import logging
 from datetime import UTC, datetime
-from pathlib import Path
 from uuid import uuid4
 
 import fastf1
@@ -12,10 +11,15 @@ import streamlit as st
 
 from src.persistence.config import should_read_db_first, should_write_to_db, should_write_to_file
 from src.persistence.runtime_state_store import RuntimeStateStore
+from src.utils.data_paths import resolve_repo_data_path
 from src.utils.operational_observability import record_alert, record_counter
 
-_PRACTICE_UPDATE_STATE_FILE = Path("data/systems/practice_characteristics_state.json")
-_EVENT_BOUNDARY_STATE_FILE = Path("data/systems/event_boundary_refresh_state.json")
+_PRACTICE_UPDATE_STATE_FILE = resolve_repo_data_path(
+    "data/systems/practice_characteristics_state.json"
+)
+_EVENT_BOUNDARY_STATE_FILE = resolve_repo_data_path(
+    "data/systems/event_boundary_refresh_state.json"
+)
 _CONVENTIONAL_BOUNDARY_SESSIONS = ("FP1", "FP2", "FP3", "Q", "R")
 _SPRINT_BOUNDARY_SESSIONS = ("FP1", "SQ", "Sprint", "Q", "R")
 _STATE_NAMESPACE_EVENT_BOUNDARY = "event_boundary_refresh"
