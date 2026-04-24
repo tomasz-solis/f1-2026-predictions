@@ -1,0 +1,239 @@
+{
+  "year": 2025,
+  "generated_from": "Historical averages from 2022-2024",
+  "generated_at": "2026-04-21T11:13:27.564019",
+  "data_freshness": "BASELINE_PRESEASON",
+  "tracks": {
+    "Bahrain Grand Prix": {
+      "pit_stop_loss": 25.0,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.57,
+      "overtaking_avg_changes_per_lap": 3.8,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Saudi Arabian Grand Prix": {
+      "pit_stop_loss": 21.5,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.81,
+      "overtaking_avg_changes_per_lap": 2.21,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Australian Grand Prix": {
+      "pit_stop_loss": 18.3,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.72,
+      "overtaking_avg_changes_per_lap": 2.81,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Emilia Romagna Grand Prix": {
+      "pit_stop_loss": 29.8,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.87,
+      "overtaking_avg_changes_per_lap": 1.82,
+      "overtaking_years_analyzed": 2,
+      "overtaking_observed_races": 0,
+      "type": "permanent",
+      "has_sprint": true
+    },
+    "Miami Grand Prix": {
+      "pit_stop_loss": 21.5,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.67,
+      "overtaking_avg_changes_per_lap": 3.14,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Spanish Grand Prix": {
+      "pit_stop_loss": 22.5,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.51,
+      "overtaking_avg_changes_per_lap": 4.2,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Monaco Grand Prix": {
+      "pit_stop_loss": 25.3,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.95,
+      "overtaking_avg_changes_per_lap": 1.12,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "street"
+    },
+    "Azerbaijan Grand Prix": {
+      "pit_stop_loss": 21.2,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.73,
+      "overtaking_avg_changes_per_lap": 2.73,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Canadian Grand Prix": {
+      "pit_stop_loss": 24.3,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.8,
+      "overtaking_avg_changes_per_lap": 2.28,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "British Grand Prix": {
+      "pit_stop_loss": 29.0,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.76,
+      "overtaking_avg_changes_per_lap": 2.53,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Austrian Grand Prix": {
+      "pit_stop_loss": 21.8,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.63,
+      "overtaking_avg_changes_per_lap": 3.38,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent",
+      "has_sprint": true
+    },
+    "French Grand Prix": {
+      "pit_stop_loss": 22.0,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.81,
+      "overtaking_avg_changes_per_lap": 2.22,
+      "overtaking_years_analyzed": 1,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Hungarian Grand Prix": {
+      "pit_stop_loss": 22.0,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.65,
+      "overtaking_avg_changes_per_lap": 3.27,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Belgian Grand Prix": {
+      "pit_stop_loss": 23.2,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.36,
+      "overtaking_avg_changes_per_lap": 5.15,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Dutch Grand Prix": {
+      "pit_stop_loss": 20.4,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.68,
+      "overtaking_avg_changes_per_lap": 3.11,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Italian Grand Prix": {
+      "pit_stop_loss": 24.5,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.55,
+      "overtaking_avg_changes_per_lap": 3.9,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Singapore Grand Prix": {
+      "pit_stop_loss": 29.5,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.81,
+      "overtaking_avg_changes_per_lap": 2.2,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Japanese Grand Prix": {
+      "pit_stop_loss": 23.9,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.59,
+      "overtaking_avg_changes_per_lap": 3.68,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "United States Grand Prix": {
+      "pit_stop_loss": 24.4,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.56,
+      "overtaking_avg_changes_per_lap": 3.83,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Mexico City Grand Prix": {
+      "pit_stop_loss": 23.0,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.8,
+      "overtaking_avg_changes_per_lap": 2.32,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "S\u00e3o Paulo Grand Prix": {
+      "pit_stop_loss": 24.1,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.73,
+      "overtaking_avg_changes_per_lap": 2.75,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent",
+      "has_sprint": true
+    },
+    "Abu Dhabi Grand Prix": {
+      "pit_stop_loss": 22.1,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.55,
+      "overtaking_avg_changes_per_lap": 3.9,
+      "overtaking_years_analyzed": 3,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Qatar Grand Prix": {
+      "pit_stop_loss": 28.6,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.56,
+      "overtaking_avg_changes_per_lap": 3.86,
+      "overtaking_years_analyzed": 2,
+      "overtaking_observed_races": 0,
+      "type": "permanent",
+      "has_sprint": true
+    },
+    "Las Vegas Grand Prix": {
+      "pit_stop_loss": 21.6,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.31,
+      "overtaking_avg_changes_per_lap": 5.49,
+      "overtaking_years_analyzed": 2,
+      "overtaking_observed_races": 0,
+      "type": "permanent"
+    },
+    "Chinese Grand Prix": {
+      "pit_stop_loss": 22.8,
+      "safety_car_prob": 0.3,
+      "overtaking_difficulty": 0.46,
+      "overtaking_avg_changes_per_lap": 4.53,
+      "overtaking_years_analyzed": 1,
+      "overtaking_observed_races": 0,
+      "type": "permanent",
+      "has_sprint": true
+    }
+  },
+  "note": "Preseason 2025 prior built from track-history window 2022-2024. Used for historical replay without target-season race leakage."
+}

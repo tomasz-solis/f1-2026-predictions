@@ -1,0 +1,919 @@
+{
+  "extraction_date": "2026-04-21T09:15:54.350509+00:00",
+  "years": [
+    2022,
+    2023,
+    2024
+  ],
+  "method": "global_teammate_network_ranking",
+  "last_updated": "2026-04-21T09:15:54.350509+00:00",
+  "bayesian_last_updated_year": 2026,
+  "drivers": {
+    "HAM": {
+      "name": "Lewis Hamilton",
+      "wet_skill": 0.9,
+      "pace": {
+        "quali_pace": 0.671,
+        "race_pace": 0.611
+      },
+      "racecraft": {
+        "skill_score": 0.645,
+        "overtaking_skill": 0.723
+      },
+      "experience": {
+        "years_of_experience": 17,
+        "debut_year": 2007,
+        "total_races": 68,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.088
+      },
+      "bayesian": {
+        "rating_mu": 13.255,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "SAR": {
+      "name": "Logan Sargeant",
+      "wet_skill": 0.65,
+      "pace": {
+        "quali_pace": 0.505,
+        "race_pace": 0.488
+      },
+      "racecraft": {
+        "skill_score": 0.515,
+        "overtaking_skill": 0.547
+      },
+      "experience": {
+        "years_of_experience": 1,
+        "debut_year": 2023,
+        "total_races": 36,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.25
+      },
+      "bayesian": {
+        "rating_mu": 10.785,
+        "rating_sigma": 2.9,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "LAW": {
+      "name": "Liam Lawson",
+      "wet_skill": 0.7,
+      "pace": {
+        "quali_pace": 0.618,
+        "race_pace": 0.578
+      },
+      "racecraft": {
+        "skill_score": 0.598,
+        "overtaking_skill": 0.649
+      },
+      "experience": {
+        "years_of_experience": 1,
+        "debut_year": 2023,
+        "total_races": 11,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.091
+      },
+      "bayesian": {
+        "rating_mu": 12.362,
+        "rating_sigma": 2.9,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "LEC": {
+      "name": "Charles Leclerc",
+      "wet_skill": 0.75,
+      "pace": {
+        "quali_pace": 0.638,
+        "race_pace": 0.689
+      },
+      "racecraft": {
+        "skill_score": 0.722,
+        "overtaking_skill": 0.688
+      },
+      "experience": {
+        "years_of_experience": 6,
+        "debut_year": 2018,
+        "total_races": 68,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.088
+      },
+      "bayesian": {
+        "rating_mu": 14.718,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "PER": {
+      "name": "Sergio Perez",
+      "wet_skill": 0.7,
+      "pace": {
+        "quali_pace": 0.495,
+        "race_pace": 0.432
+      },
+      "racecraft": {
+        "skill_score": 0.466,
+        "overtaking_skill": 0.547
+      },
+      "experience": {
+        "years_of_experience": 13,
+        "debut_year": 2011,
+        "total_races": 68,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.147
+      },
+      "bayesian": {
+        "rating_mu": 9.854,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "SAI": {
+      "name": "Carlos Sainz",
+      "wet_skill": 0.75,
+      "pace": {
+        "quali_pace": 0.703,
+        "race_pace": 0.648
+      },
+      "racecraft": {
+        "skill_score": 0.652,
+        "overtaking_skill": 0.709
+      },
+      "experience": {
+        "years_of_experience": 9,
+        "debut_year": 2015,
+        "total_races": 67,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.164
+      },
+      "bayesian": {
+        "rating_mu": 13.388,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "ZHO": {
+      "name": "Guanyu Zhou",
+      "wet_skill": 0.65,
+      "pace": {
+        "quali_pace": 0.673,
+        "race_pace": 0.7
+      },
+      "racecraft": {
+        "skill_score": 0.673,
+        "overtaking_skill": 0.633
+      },
+      "experience": {
+        "years_of_experience": 2,
+        "debut_year": 2022,
+        "total_races": 68,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.118
+      },
+      "bayesian": {
+        "rating_mu": 13.787,
+        "rating_sigma": 2.7,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "BOT": {
+      "name": "Valtteri Bottas",
+      "wet_skill": 0.7,
+      "pace": {
+        "quali_pace": 0.663,
+        "race_pace": 0.629
+      },
+      "racecraft": {
+        "skill_score": 0.61,
+        "overtaking_skill": 0.635
+      },
+      "experience": {
+        "years_of_experience": 11,
+        "debut_year": 2013,
+        "total_races": 68,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.147
+      },
+      "bayesian": {
+        "rating_mu": 12.59,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "LAT": {
+      "name": "LAT",
+      "wet_skill": 0.7,
+      "pace": {
+        "quali_pace": 0.508,
+        "race_pace": 0.461
+      },
+      "racecraft": {
+        "skill_score": 0.488,
+        "overtaking_skill": 0.55
+      },
+      "experience": {
+        "years_of_experience": 1,
+        "debut_year": 2023,
+        "total_races": 22,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.182
+      },
+      "bayesian": {
+        "rating_mu": 10.272,
+        "rating_sigma": 2.9,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "MSC": {
+      "name": "MSC",
+      "wet_skill": 0.7,
+      "pace": {
+        "quali_pace": 0.784,
+        "race_pace": 0.783
+      },
+      "racecraft": {
+        "skill_score": 0.766,
+        "overtaking_skill": 0.751
+      },
+      "experience": {
+        "years_of_experience": 1,
+        "debut_year": 2023,
+        "total_races": 22,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.091
+      },
+      "bayesian": {
+        "rating_mu": 15.554,
+        "rating_sigma": 2.9,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "PIA": {
+      "name": "Oscar Piastri",
+      "wet_skill": 0.7,
+      "pace": {
+        "quali_pace": 0.582,
+        "race_pace": 0.542
+      },
+      "racecraft": {
+        "skill_score": 0.57,
+        "overtaking_skill": 0.624
+      },
+      "experience": {
+        "years_of_experience": 1,
+        "debut_year": 2023,
+        "total_races": 46,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.065
+      },
+      "bayesian": {
+        "rating_mu": 11.83,
+        "rating_sigma": 2.9,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "ALO": {
+      "name": "Fernando Alonso",
+      "wet_skill": 0.85,
+      "pace": {
+        "quali_pace": 0.731,
+        "race_pace": 0.713
+      },
+      "racecraft": {
+        "skill_score": 0.682,
+        "overtaking_skill": 0.685
+      },
+      "experience": {
+        "years_of_experience": 23,
+        "debut_year": 2001,
+        "total_races": 68,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.074
+      },
+      "bayesian": {
+        "rating_mu": 13.958,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "OCO": {
+      "name": "Esteban Ocon",
+      "wet_skill": 0.7,
+      "pace": {
+        "quali_pace": 0.614,
+        "race_pace": 0.674
+      },
+      "racecraft": {
+        "skill_score": 0.707,
+        "overtaking_skill": 0.664
+      },
+      "experience": {
+        "years_of_experience": 8,
+        "debut_year": 2016,
+        "total_races": 67,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.149
+      },
+      "bayesian": {
+        "rating_mu": 14.433,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "VET": {
+      "name": "VET",
+      "wet_skill": 0.7,
+      "pace": {
+        "quali_pace": 0.674,
+        "race_pace": 0.656
+      },
+      "racecraft": {
+        "skill_score": 0.634,
+        "overtaking_skill": 0.641
+      },
+      "experience": {
+        "years_of_experience": 1,
+        "debut_year": 2023,
+        "total_races": 20,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.15
+      },
+      "bayesian": {
+        "rating_mu": 13.046,
+        "rating_sigma": 2.9,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "COL": {
+      "name": "Franco Colapinto",
+      "wet_skill": 0.65,
+      "pace": {
+        "quali_pace": 0.718,
+        "race_pace": 0.666
+      },
+      "racecraft": {
+        "skill_score": 0.643,
+        "overtaking_skill": 0.685
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2024,
+        "total_races": 9,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.333
+      },
+      "bayesian": {
+        "rating_mu": 13.217,
+        "rating_sigma": 2.9,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "DEV": {
+      "name": "Nyck de Vries",
+      "wet_skill": 0.7,
+      "pace": {
+        "quali_pace": 0.478,
+        "race_pace": 0.476
+      },
+      "racecraft": {
+        "skill_score": 0.507,
+        "overtaking_skill": 0.526
+      },
+      "experience": {
+        "years_of_experience": 2,
+        "debut_year": 2022,
+        "total_races": 11,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.182
+      },
+      "bayesian": {
+        "rating_mu": 10.633,
+        "rating_sigma": 2.7,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "GAS": {
+      "name": "Pierre Gasly",
+      "wet_skill": 0.75,
+      "pace": {
+        "quali_pace": 0.759,
+        "race_pace": 0.77
+      },
+      "racecraft": {
+        "skill_score": 0.741,
+        "overtaking_skill": 0.716
+      },
+      "experience": {
+        "years_of_experience": 7,
+        "debut_year": 2017,
+        "total_races": 68,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.118
+      },
+      "bayesian": {
+        "rating_mu": 15.079,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "NOR": {
+      "name": "Lando Norris",
+      "wet_skill": 0.8,
+      "pace": {
+        "quali_pace": 0.795,
+        "race_pace": 0.821
+      },
+      "racecraft": {
+        "skill_score": 0.803,
+        "overtaking_skill": 0.752
+      },
+      "experience": {
+        "years_of_experience": 5,
+        "debut_year": 2019,
+        "total_races": 68,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.044
+      },
+      "bayesian": {
+        "rating_mu": 16.257,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "VER": {
+      "name": "Max Verstappen",
+      "wet_skill": 0.9,
+      "pace": {
+        "quali_pace": 0.834,
+        "race_pace": 0.833
+      },
+      "racecraft": {
+        "skill_score": 0.833,
+        "overtaking_skill": 0.809
+      },
+      "experience": {
+        "years_of_experience": 9,
+        "debut_year": 2015,
+        "total_races": 68,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.03
+      },
+      "bayesian": {
+        "rating_mu": 16.827,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "ALB": {
+      "name": "Alexander Albon",
+      "wet_skill": 0.75,
+      "pace": {
+        "quali_pace": 0.823,
+        "race_pace": 0.831
+      },
+      "racecraft": {
+        "skill_score": 0.825,
+        "overtaking_skill": 0.78
+      },
+      "experience": {
+        "years_of_experience": 5,
+        "debut_year": 2019,
+        "total_races": 67,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.209
+      },
+      "bayesian": {
+        "rating_mu": 16.675,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "MAG": {
+      "name": "Kevin Magnussen",
+      "wet_skill": 0.7,
+      "pace": {
+        "quali_pace": 0.583,
+        "race_pace": 0.535
+      },
+      "racecraft": {
+        "skill_score": 0.57,
+        "overtaking_skill": 0.634
+      },
+      "experience": {
+        "years_of_experience": 10,
+        "debut_year": 2014,
+        "total_races": 66,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.152
+      },
+      "bayesian": {
+        "rating_mu": 11.83,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "HUL": {
+      "name": "Nico Hulkenberg",
+      "wet_skill": 0.7,
+      "pace": {
+        "quali_pace": 0.715,
+        "race_pace": 0.776
+      },
+      "racecraft": {
+        "skill_score": 0.746,
+        "overtaking_skill": 0.669
+      },
+      "experience": {
+        "years_of_experience": 14,
+        "debut_year": 2010,
+        "total_races": 48,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.104
+      },
+      "bayesian": {
+        "rating_mu": 15.174,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "RUS": {
+      "name": "George Russell",
+      "wet_skill": 0.8,
+      "pace": {
+        "quali_pace": 0.666,
+        "race_pace": 0.72
+      },
+      "racecraft": {
+        "skill_score": 0.753,
+        "overtaking_skill": 0.716
+      },
+      "experience": {
+        "years_of_experience": 5,
+        "debut_year": 2019,
+        "total_races": 68,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.118
+      },
+      "bayesian": {
+        "rating_mu": 15.307,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "RIC": {
+      "name": "Daniel Ricciardo",
+      "wet_skill": 0.75,
+      "pace": {
+        "quali_pace": 0.617,
+        "race_pace": 0.586
+      },
+      "racecraft": {
+        "skill_score": 0.609,
+        "overtaking_skill": 0.652
+      },
+      "experience": {
+        "years_of_experience": 13,
+        "debut_year": 2011,
+        "total_races": 47,
+        "tier": "veteran"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.085
+      },
+      "bayesian": {
+        "rating_mu": 12.571,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "TSU": {
+      "name": "Yuki Tsunoda",
+      "wet_skill": 0.6,
+      "pace": {
+        "quali_pace": 0.664,
+        "race_pace": 0.694
+      },
+      "racecraft": {
+        "skill_score": 0.67,
+        "overtaking_skill": 0.629
+      },
+      "experience": {
+        "years_of_experience": 3,
+        "debut_year": 2021,
+        "total_races": 68,
+        "tier": "developing"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.147
+      },
+      "bayesian": {
+        "rating_mu": 13.73,
+        "rating_sigma": 2.7,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "STR": {
+      "name": "Lance Stroll",
+      "wet_skill": 0.6,
+      "pace": {
+        "quali_pace": 0.614,
+        "race_pace": 0.593
+      },
+      "racecraft": {
+        "skill_score": 0.626,
+        "overtaking_skill": 0.664
+      },
+      "experience": {
+        "years_of_experience": 7,
+        "debut_year": 2017,
+        "total_races": 68,
+        "tier": "established"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.132
+      },
+      "bayesian": {
+        "rating_mu": 12.894,
+        "rating_sigma": 2.5,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "ANT": {
+      "name": "Kimi Antonelli",
+      "wet_skill": 0.7,
+      "pace": {
+        "quali_pace": 0.62,
+        "race_pace": 0.62
+      },
+      "racecraft": {
+        "skill_score": 0.62,
+        "overtaking_skill": 0.62
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 0,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.03
+      },
+      "prior_source": "team_based_prior",
+      "bayesian": {
+        "rating_mu": 12.78,
+        "rating_sigma": 3.2,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "HAD": {
+      "name": "Isack Hadjar",
+      "wet_skill": 0.65,
+      "pace": {
+        "quali_pace": 0.62,
+        "race_pace": 0.62
+      },
+      "racecraft": {
+        "skill_score": 0.62,
+        "overtaking_skill": 0.62
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 0,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.03
+      },
+      "prior_source": "team_based_prior",
+      "bayesian": {
+        "rating_mu": 12.78,
+        "rating_sigma": 3.2,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "DOO": {
+      "name": "Jack Doohan",
+      "wet_skill": 0.7,
+      "pace": {
+        "quali_pace": 0.62,
+        "race_pace": 0.62
+      },
+      "racecraft": {
+        "skill_score": 0.62,
+        "overtaking_skill": 0.62
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 0,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.03
+      },
+      "prior_source": "team_based_prior",
+      "bayesian": {
+        "rating_mu": 12.78,
+        "rating_sigma": 3.2,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "BOR": {
+      "name": "Gabriel Bortoleto",
+      "wet_skill": 0.65,
+      "pace": {
+        "quali_pace": 0.62,
+        "race_pace": 0.62
+      },
+      "racecraft": {
+        "skill_score": 0.62,
+        "overtaking_skill": 0.62
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 0,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.03
+      },
+      "prior_source": "team_based_prior",
+      "bayesian": {
+        "rating_mu": 12.78,
+        "rating_sigma": 3.2,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    },
+    "BEA": {
+      "name": "Oliver Bearman",
+      "wet_skill": 0.7,
+      "pace": {
+        "quali_pace": 0.62,
+        "race_pace": 0.62
+      },
+      "racecraft": {
+        "skill_score": 0.62,
+        "overtaking_skill": 0.62
+      },
+      "experience": {
+        "years_of_experience": 0,
+        "debut_year": 2025,
+        "total_races": 0,
+        "tier": "rookie"
+      },
+      "dnf_risk": {
+        "dnf_rate": 0.03
+      },
+      "prior_source": "team_based_prior",
+      "bayesian": {
+        "rating_mu": 12.78,
+        "rating_sigma": 3.2,
+        "sessions_observed": 0,
+        "seeded_from": "extraction_prior",
+        "last_updated": null,
+        "season_year": 2025
+      }
+    }
+  },
+  "year": 2025,
+  "note": "Preseason 2025 prior built from driver form from seasons 2022, 2023, 2024. Used for historical replay without target-season race leakage."
+}
