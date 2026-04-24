@@ -201,7 +201,9 @@ def test_run_warmup_precompute_cycle_refreshes_practice_before_hashing(patcher):
     patcher.setattr(
         warmup,
         "compute_artifact_hash",
-        lambda versions: f"artifact_hash_v{versions['car_characteristics::2026::car_characteristics'][0]}",
+        lambda versions: (
+            f"artifact_hash_v{versions['car_characteristics::2026::car_characteristics'][0]}"
+        ),
     )
     patcher.setattr(warmup, "_load_predictor", lambda artifact_versions, year: object())
     patcher.setattr(warmup, "load_precomputed_base_features", lambda **kwargs: None)

@@ -462,8 +462,9 @@ def test_execute_live_prediction_pipeline_skips_request_path_mutations(patcher):
             clear_fastf1_race_cache_fn=lambda year, race_name: mutation_calls.__setitem__(
                 "clear_fastf1", mutation_calls["clear_fastf1"] + 1
             ),
-            auto_update_if_needed_fn=lambda force_recheck=False,
-            year=2026: mutation_calls.__setitem__("race_update", mutation_calls["race_update"] + 1),
+            auto_update_if_needed_fn=lambda force_recheck=False, year=2026: (
+                mutation_calls.__setitem__("race_update", mutation_calls["race_update"] + 1)
+            ),
             auto_update_practice_characteristics_if_needed_fn=(
                 lambda year, race_name, is_sprint, force_recheck=False, session_detector=None: (
                     mutation_calls.__setitem__(

@@ -78,13 +78,15 @@ def test_build_saved_prediction_browser_rows_orders_races_by_round_number(patche
     patcher.setattr(
         "src.dashboard.accuracy_view.get_schedule_rows",
         lambda year: (
-            ("Australian Grand Prix", "conventional"),
-            ("Chinese Grand Prix", "sprint"),
-            ("Japanese Grand Prix", "conventional"),
-            ("Miami Grand Prix", "sprint"),
-        )
-        if year == 2026
-        else tuple(),
+            (
+                ("Australian Grand Prix", "conventional"),
+                ("Chinese Grand Prix", "sprint"),
+                ("Japanese Grand Prix", "conventional"),
+                ("Miami Grand Prix", "sprint"),
+            )
+            if year == 2026
+            else tuple()
+        ),
     )
     predictions = [
         {
