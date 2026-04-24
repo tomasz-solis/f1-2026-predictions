@@ -22,13 +22,16 @@ class DriverRaceInfo(TypedDict):
     team: str
     grid_pos: int
     team_strength: float
+    team_uncertainty: NotRequired[float]
     team_strength_by_compound: NotRequired[dict[str, float]]
     tire_deg_by_compound: NotRequired[dict[str, float]]
     skill: float
     race_advantage: float
+    race_residual_adjustment: NotRequired[float]
     overtaking_skill: float
     defensive_skill: float
     dnf_probability: float
+    season_races_completed: NotRequired[int]
     wet_skill: NotRequired[float]
     current_lineup_team: NotRequired[str]
     raw_skill: NotRequired[float]

@@ -40,6 +40,8 @@ class RaceSimulationDeps:
     ]
     get_learned_position_adjustment: Callable[..., float]
     get_learned_interval_radius: Callable[..., float]
+    apply_race_residual_model: Callable[..., dict[str, float]] | None
+    get_conformal_interval_radius: Callable[..., float] | None
     enforce_non_increasing: Callable[[list[float]], list[float]]
     load_track_specific_params: Callable[..., dict[str, Any]]
     get_tire_stress_score: Callable[..., float]
@@ -166,6 +168,7 @@ def predict_race_core(
     deps: RaceSimulationDeps,
 ) -> dict[str, Any]:
     """Run the full race prediction flow with injectable dependencies."""
+    from src.models.conformal_calibration import resolve_race_data_regime
     from src.utils.validation_helpers import normalize_weather_key
 
     weather = normalize_weather_key(weather)
@@ -254,6 +257,29 @@ def predict_race_core(
     driver_info_map, teams_with_long_profile = deps.prepare_driver_info_with_compounds(
         validated_grid, race_name
     )
+    confidence_values = [
+        float(row["confidence"]) / 100.0
+        for row in validated_grid
+        if isinstance(row.get("confidence"), int | float)
+    ]
+    mean_grid_confidence = (
+        float(sum(confidence_values) / len(confidence_values)) if confidence_values else None
+    )
+    data_regime = resolve_race_data_regime(
+        input_confidence=input_confidence,
+        mean_grid_confidence=mean_grid_confidence,
+    )
+    race_residual_adjustments: dict[str, float] = {}
+    if callable(deps.apply_race_residual_model):
+        race_residual_adjustments = deps.apply_race_residual_model(
+            driver_info_map=driver_info_map,
+            qualifying_grid=validated_grid,
+            race_name=race_name,
+            weather=weather,
+            input_confidence=input_confidence,
+            is_sprint=is_sprint,
+            year=year,
+        )
     grid_uncertainty_profile = _prepare_grid_uncertainty_profile(
         validated_grid=validated_grid,
         input_confidence=input_confidence,
@@ -410,17 +436,32 @@ def predict_race_core(
         race_params=race_params,
         weather_feature_modifiers=weather_feature_modifiers,
         get_learned_position_adjustment=deps.get_learned_position_adjustment,
-        learned_interval_radius=float(deps.get_learned_interval_radius(session="race")),
+        learned_interval_radius=max(
+            float(deps.get_learned_interval_radius(session="race")),
+            float(
+                deps.get_conformal_interval_radius(session="race", regime=data_regime)
+                if callable(deps.get_conformal_interval_radius)
+                else 0.0
+            ),
+        ),
         enforce_non_increasing=deps.enforce_non_increasing,
         base_seed=base_seed,
     )
 
     return {
         "finish_order": finish_order,
+        "data_regime": data_regime,
         "characteristics_profile_used": "long_run",
         "teams_with_characteristics_profile": teams_with_long_profile,
         "compound_strategies": aggregated["compound_strategy_distribution"],
         "pit_lap_distribution": aggregated["pit_lap_distribution"],
         "track_temperature_context": track_temperature_context,
         "weather_feature_context": weather_feature_context,
+        "race_residual_model_used": bool(race_residual_adjustments),
+        "race_residual_mean_abs_adjustment": round(
+            float(np.mean([abs(value) for value in race_residual_adjustments.values()]))
+            if race_residual_adjustments
+            else 0.0,
+            4,
+        ),
     }

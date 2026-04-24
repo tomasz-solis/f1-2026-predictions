@@ -136,3 +136,121 @@ def test_race_learning_uses_top_level_learning_config():
         "teammate_gap_scale": 0.05,
         "max_adjustment": 1.7,
     }
+
+
+def test_qualifying_learning_caps_min_samples_to_available_races():
+    captured: dict[str, float | int | str | list[str]] = {}
+
+    class _CalibrationStub:
+        def get_combined_position_adjustment(
+            self,
+            *,
+            team,
+            driver,
+            teammates,
+            session,
+            min_samples,
+            driver_error_scale,
+            teammate_gap_scale,
+            max_adjustment,
+        ):
+            captured.update(
+                {
+                    "team": team,
+                    "driver": driver,
+                    "teammates": teammates,
+                    "session": session,
+                    "min_samples": min_samples,
+                    "driver_error_scale": driver_error_scale,
+                    "teammate_gap_scale": teammate_gap_scale,
+                    "max_adjustment": max_adjustment,
+                }
+            )
+            return 0.0
+
+    class _Config:
+        def get(self, key, default=None):
+            overrides = {
+                "learning.min_samples": 3,
+                "learning.driver_error_scale": 0.21,
+                "learning.teammate_gap_scale": 0.07,
+                "learning.max_adjustment": 1.9,
+            }
+            return overrides.get(key, default)
+
+    class _Predictor(BaselineQualifyingMixin):
+        def __init__(self):
+            self.calibration_system = _CalibrationStub()
+            self.config = _Config()
+
+    predictor = _Predictor()
+    assert (
+        predictor._get_learned_position_adjustment(
+            team="Mercedes",
+            driver="ANT",
+            teammates=["RUS", "ANT"],
+            session="qualifying",
+            races_completed=1,
+        )
+        == 0.0
+    )
+    assert captured["min_samples"] == 1
+
+
+def test_race_learning_caps_min_samples_to_available_races():
+    captured: dict[str, float | int | str | list[str]] = {}
+
+    class _CalibrationStub:
+        def get_combined_position_adjustment(
+            self,
+            *,
+            team,
+            driver,
+            teammates,
+            session,
+            min_samples,
+            driver_error_scale,
+            teammate_gap_scale,
+            max_adjustment,
+        ):
+            captured.update(
+                {
+                    "team": team,
+                    "driver": driver,
+                    "teammates": teammates,
+                    "session": session,
+                    "min_samples": min_samples,
+                    "driver_error_scale": driver_error_scale,
+                    "teammate_gap_scale": teammate_gap_scale,
+                    "max_adjustment": max_adjustment,
+                }
+            )
+            return 0.0
+
+    class _Config:
+        def get(self, key, default=None):
+            overrides = {
+                "learning.min_samples": 4,
+                "learning.driver_error_scale": 0.11,
+                "learning.teammate_gap_scale": 0.05,
+                "learning.max_adjustment": 1.7,
+            }
+            return overrides.get(key, default)
+
+    class _Predictor(BaselineRacePredictionMixin):
+        def __init__(self):
+            self.calibration_system = _CalibrationStub()
+            self.config = _Config()
+
+    predictor = _Predictor()
+    assert (
+        predictor._get_learned_position_adjustment(
+            team="Mercedes",
+            driver="ANT",
+            teammates=["RUS", "ANT"],
+            session="race",
+            races_completed=2,
+        )
+        == 0.0
+    )
+    assert captured["min_samples"] == 2

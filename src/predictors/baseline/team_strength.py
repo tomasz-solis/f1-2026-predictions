@@ -15,6 +15,69 @@ from src.utils.team_mapping import map_team_to_characteristics
 
 logger = logging.getLogger("src.predictors.baseline_2026")
 
+_LEGACY_2026_STANDINGS_SEED_ANCHORS = {
+    "McLaren": 0.85,
+    "Mercedes": 0.75,
+    "Red Bull Racing": 0.74,
+    "Ferrari": 0.70,
+    "Williams": 0.55,
+    "RB": 0.48,
+    "Aston Martin": 0.47,
+    "Haas F1 Team": 0.43,
+    "Alpine": 0.40,
+    "Audi": 0.38,
+    "Sauber": 0.38,
+    "Cadillac F1": 0.35,
+}
+
+
+def _coerce_unit_interval(value: object) -> float | None:
+    """Return a bounded float when a payload value is a valid unit-interval number."""
+    if not isinstance(value, int | float | str):
+        return None
+    try:
+        numeric_value = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(numeric_value):
+        return None
+    return float(np.clip(numeric_value, 0.0, 1.0))
+
+
+def _looks_like_legacy_2026_standings_seed(team_data: Mapping[str, object]) -> bool:
+    """Return whether a team payload looks like the old 2025-seeded 2026 file."""
+    note = str(team_data.get("note") or "").lower()
+    return "2025 p" in note and "2026" in note and "seed" in note
+
+
+def resolve_preseason_baseline(
+    team_data: Mapping[str, object],
+    *,
+    team_name: str | None = None,
+    season_year: int | None = None,
+) -> float:
+    """Return the original season anchor before live race updates are applied.
+
+    Runtime team strength blends a slow preseason anchor with current-season
+    observations. If the updater has already moved ``overall_performance``
+    toward early race results, using that same value as the anchor would count
+    a tiny live sample twice.
+    """
+    preseason_baseline = _coerce_unit_interval(team_data.get("preseason_overall_performance"))
+    if preseason_baseline is not None:
+        return preseason_baseline
+
+    if season_year == 2026 and team_name and _looks_like_legacy_2026_standings_seed(team_data):
+        mapped_team = map_team_to_characteristics(
+            team_name,
+            known_teams=set(_LEGACY_2026_STANDINGS_SEED_ANCHORS),
+        )
+        if mapped_team in _LEGACY_2026_STANDINGS_SEED_ANCHORS:
+            return _LEGACY_2026_STANDINGS_SEED_ANCHORS[mapped_team]
+
+    overall_performance = _coerce_unit_interval(team_data.get("overall_performance"))
+    return 0.5 if overall_performance is None else overall_performance
+
 
 def resolve_team_data(*, teams: Mapping[str, object], team: str) -> dict[str, Any]:
     """Resolve team payload using alias-aware mapping before falling back to empty."""
@@ -77,7 +140,11 @@ def get_blended_team_strength(
     """Blend baseline, track suitability, and current form into one team score."""
     team_data = context._resolve_team_data(team)
 
-    baseline = team_data.get("overall_performance", 0.5)
+    baseline = resolve_preseason_baseline(
+        team_data,
+        team_name=team,
+        season_year=int(getattr(context, "season_year", getattr(context, "year", 2026))),
+    )
     testing_modifier = context.calculate_track_suitability(team, race_name)
     testing_score = float(np.clip(baseline + testing_modifier, 0.0, 1.0))
     current = context._get_current_season_score(

@@ -165,7 +165,7 @@ class LearningConfig(StrictConfigModel):
     max_adjustment: float = Field(default=2.5, ge=0.0)
     interval_min_samples: int = Field(default=20, ge=1)
     interval_target_coverage: float = Field(default=0.90, ge=0.0, le=1.0)
-    interval_max_adjustment: float = Field(default=4.0, ge=0.0)
+    interval_max_adjustment: float = Field(default=6.0, ge=0.0)
 
 
 class TrackDefaultsConfig(StrictConfigModel):
@@ -250,6 +250,49 @@ class BaselineQualifyingDataConfidenceConfig(StrictConfigModel):
     model_only: float = Field(default=0.25, ge=0.0, le=1.0)
     testing_fallback: float = Field(default=0.45, ge=0.0, le=1.0)
     sprint_race: float = Field(default=0.70, ge=0.0, le=1.0)
+
+
+class QualifyingResidualModelConfig(StrictConfigModel):
+    """Artifact-backed qualifying residual settings."""
+
+    enabled: bool = False
+    artifact_path: str = Field(
+        default="data/processed/model_artifacts/qualifying_residual/qualifying_residual_model.pkl"
+    )
+    clip_positions: float = Field(default=2.0, ge=0.0)
+    allow_with_testing_seed: bool = False
+
+
+class RaceResidualModelConfig(StrictConfigModel):
+    """Artifact-backed race residual settings."""
+
+    enabled: bool = False
+    artifact_path: str = Field(
+        default="data/processed/model_artifacts/race_residual/race_residual_model.pkl"
+    )
+    clip_positions_gained: float = Field(default=2.5, ge=0.0)
+    positions_to_race_advantage_scale: float = Field(default=0.05, ge=0.0)
+    allow_with_testing_seed: bool = False
+
+
+class ConformalCalibrationConfig(StrictConfigModel):
+    """Artifact-backed conformal interval settings."""
+
+    enabled: bool = False
+    artifact_path: str = Field(
+        default="data/processed/model_artifacts/conformal_calibration/conformal_calibration.json"
+    )
+    min_samples: int = Field(default=20, ge=1)
+
+
+class EarlySeasonTeamUncertaintyConfig(StrictConfigModel):
+    """How preseason team uncertainty should fade through the opening races."""
+
+    activation_floor: float = Field(default=0.22, ge=0.0, le=1.0)
+    scale: float = Field(default=0.22, gt=0.0)
+    decay_races: int = Field(default=3, ge=1)
+    interval_positions_scale: float = Field(default=2.0, ge=0.0)
+    confidence_penalty_scale: float = Field(default=6.0, ge=0.0)
 
 
 class BaselineQualifyingConfig(StrictConfigModel):
@@ -418,11 +461,17 @@ class BaselineQualifyingConfig(StrictConfigModel):
     session_confidence_scale: float = Field(default=10.0, ge=0.0)
     confidence_cap: int = Field(default=60, ge=1)
     confidence_min: int = Field(default=40, ge=1)
+    early_season_team_uncertainty: EarlySeasonTeamUncertaintyConfig = Field(
+        default_factory=EarlySeasonTeamUncertaintyConfig
+    )
     default_skill: float = Field(default=0.5, ge=0.0, le=1.0)
     default_team_strength: float = Field(default=0.5, ge=0.0, le=1.0)
     enable_driver_fp_adjustment: bool = True
     driver_fp_adjustment_scale: float = Field(default=0.10, ge=0.0)
     driver_fp_adjustment_smoothing: float = Field(default=0.5, ge=0.0)
+    qualifying_residual_model: QualifyingResidualModelConfig = Field(
+        default_factory=QualifyingResidualModelConfig
+    )
 
 
 class CompoundSelectionConfig(StrictConfigModel):
@@ -886,6 +935,9 @@ class BaselineRaceConfig(StrictConfigModel):
     testing_modifier_clip_range: list[float] = Field(default_factory=lambda: [-0.04, 0.04])
     min_laps_for_compound_data: int = Field(default=10, ge=1)
     team_uncertainty_dnf_multiplier: float = Field(default=0.20, ge=0.0)
+    early_season_team_uncertainty: EarlySeasonTeamUncertaintyConfig = Field(
+        default_factory=EarlySeasonTeamUncertaintyConfig
+    )
     defensive_skill_weights: DefensiveSkillWeightsConfig = Field(
         default_factory=DefensiveSkillWeightsConfig
     )
@@ -918,6 +970,7 @@ class BaselineRaceConfig(StrictConfigModel):
     strategy_constraints: StrategyConstraintsConfig = Field(
         default_factory=StrategyConstraintsConfig
     )
+    race_residual_model: RaceResidualModelConfig = Field(default_factory=RaceResidualModelConfig)
 
 
 class PracticeCaptureConfig(StrictConfigModel):
@@ -948,6 +1001,9 @@ class BaselinePredictorSectionConfig(StrictConfigModel):
     qualifying: BaselineQualifyingConfig = Field(default_factory=BaselineQualifyingConfig)
     compound_selection: CompoundSelectionConfig = Field(default_factory=CompoundSelectionConfig)
     race: BaselineRaceConfig = Field(default_factory=BaselineRaceConfig)
+    conformal_calibration: ConformalCalibrationConfig = Field(
+        default_factory=ConformalCalibrationConfig
+    )
     practice_capture: PracticeCaptureConfig = Field(default_factory=PracticeCaptureConfig)
     compound_blend_weights: CompoundBlendWeightsConfig = Field(
         default_factory=CompoundBlendWeightsConfig

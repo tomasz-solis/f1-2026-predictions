@@ -7,12 +7,11 @@ the points-paying weekends start, that gamesmanship drops away fast. By races
 two and three the true competitive order is usually much clearer than it was in
 February, even if the exact gaps are still moving.
 
-These schedules were tuned against the 2021 to 2022 reset because that is the
-closest recent example of the field being forced onto genuinely new machinery.
+These schedules lean most on reset years, especially 2022 and the older 2014
+power-unit reset, because ordinary carryover seasons are a poor guide for 2026.
 The aggressive schedules reflect the same racing logic for 2026: keep a small
 anchor from preseason and prior-year form, but let live race evidence take over
-before the model gets stuck defending a story that the track has already
-disproved.
+without treating the first few weekends as a finished truth.
 """
 
 import logging
@@ -65,9 +64,9 @@ SCHEDULES = {
         5: (0.05, 0.00, 0.95),
     },
     "extreme": {
-        # Selected as the production schedule for 2026 based on a grid search
-        # across the 2021→2022 regulation reset — the only comparable recent
-        # season where every team's historical baseline became unreliable at once.
+        # Selected from reset-year experiments around the 2021→2022 rules shift.
+        # 2014 is also a useful conceptual analog, but this repo does not always
+        # have 2014-grade telemetry available in the local cache.
         # Achieved 0.809 Spearman correlation between predicted and actual
         # constructor order at Race 1-3, versus 0.807 for "insane" (next best).
         #

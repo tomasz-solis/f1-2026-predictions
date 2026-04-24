@@ -10,8 +10,8 @@ Implementation: `src/systems/weight_schedule.py`, used by `Baseline2026Predictor
 
 ## Why This Exists
 
-In a regulation-change season, last year's championship standings tell you almost
-nothing about this year's car. A team that dominated on the previous rules might
+In a regulation-change season, last year's championship standings are a weak
+anchor, not a season template. A team that dominated on the previous rules might
 have gotten the new concept wrong. A midfield team might have nailed it.
 
 Pre-season testing gives you directional signals — who looks fast, who looks
@@ -24,16 +24,22 @@ because you don't have much else. By Race 3, you're almost entirely running on
 what teams have actually shown in competition. The trust shift is configurable
 and auditable — not hidden inside a model.
 
+For 2026 analysis, treat 2022 and 2014 as the closest regulation-reset analogs.
+Use 2025 as a carryover sanity check only; it should not be the representative
+season for promotion decisions.
+
 ## Active Schedule
 
-The baseline predictor uses `get_recommended_schedule(is_regulation_change=True)`,
-which maps to `extreme`.
+The runtime config currently sets `baseline_predictor.team_strength_schedule` to
+`rapid_adaptive`. That keeps early learning fast without making three completed
+weekends act like the whole 2026 order is settled.
 
 | Race | Baseline | Testing | Current |
 |------|----------|---------|---------|
-| 1    | 30%      | 20%     | 50%     |
-| 2    | 15%      | 10%     | 75%     |
-| 3+   | 5%       | 0%      | 95%     |
+| 1    | 35%      | 20%     | 45%     |
+| 2    | 20%      | 10%     | 70%     |
+| 3    | 8%       | 5%      | 87%     |
+| 4+   | 5%       | 0%      | 95%     |
 
 ## How Inputs Are Built
 

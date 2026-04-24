@@ -446,6 +446,7 @@ def _build_driver_record(
     driver_code: str,
     team: str,
     team_strength: float,
+    team_uncertainty: float,
     team_drivers: list[str],
     drivers: dict[str, dict[str, Any]],
     cfg: Any,
@@ -543,6 +544,7 @@ def _build_driver_record(
         driver=driver_code,
         teammates=team_drivers,
         session="qualifying",
+        races_completed=races_completed,
     )
     wet_skill = float(driver_data.get("wet_skill", 0.70) if isinstance(driver_data, dict) else 0.70)
 
@@ -550,6 +552,7 @@ def _build_driver_record(
         "driver": driver_code,
         "team": team,
         "team_strength": team_strength,
+        "team_uncertainty": float(np.clip(team_uncertainty, 0.0, 1.0)),
         "skill": skill,
         "quali_pace": quali_pace,
         "raw_quali_pace": raw_quali_pace,
@@ -558,6 +561,7 @@ def _build_driver_record(
         "experience_tier": experience_tier,
         "experience_total_races": experience_total_races,
         "learned_position_adjustment": learned_position_adjustment,
+        "season_races_completed": races_completed,
         "wet_skill": wet_skill,
     }
 
@@ -585,6 +589,7 @@ def build_driver_list_with_strengths_core(
     get_checkpoint_driver_delta_seconds_fn: Callable[[str, str], float | None] | None = None,
     get_driver_data_or_fallback_fn: Callable[[str, str], dict[str, Any]] | None = None,
     get_contextual_races_completed_fn: Callable[[str | None], int] | None = None,
+    get_team_uncertainty_fn: Callable[[str], float] | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     """Build driver list with blended team/driver strengths and testing modifiers.
 
@@ -659,11 +664,19 @@ def build_driver_list_with_strengths_core(
     all_drivers: list[dict[str, Any]] = []
     for team, team_drivers in lineups.items():
         team_strength = blended_strengths.get(team, default_team_strength)
+        if callable(get_team_uncertainty_fn):
+            try:
+                team_uncertainty = float(get_team_uncertainty_fn(team))
+            except Exception:
+                team_uncertainty = 0.30
+        else:
+            team_uncertainty = 0.30
         for driver_code in team_drivers:
             record = _build_driver_record(
                 driver_code=driver_code,
                 team=team,
                 team_strength=team_strength,
+                team_uncertainty=team_uncertainty,
                 team_drivers=team_drivers,
                 drivers=drivers,
                 cfg=cfg,

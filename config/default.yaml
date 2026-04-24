@@ -129,7 +129,7 @@ learning:
   # empirically too tight.
   interval_min_samples: 20
   interval_target_coverage: 0.90
-  interval_max_adjustment: 4.0
+  interval_max_adjustment: 6.0
 
 # Track Characteristics
 track_defaults:
@@ -343,6 +343,12 @@ baseline_predictor:
     # Confidence / fallback defaults
     confidence_cap: 60
     confidence_min: 40
+    early_season_team_uncertainty:
+      activation_floor: 0.22
+      scale: 0.20
+      decay_races: 3
+      interval_positions_scale: 2.0
+      confidence_penalty_scale: 6.0
     default_skill: 0.5
     default_team_strength: 0.5
 
@@ -350,6 +356,11 @@ baseline_predictor:
     enable_driver_fp_adjustment: true
     driver_fp_adjustment_scale: 0.10
     driver_fp_adjustment_smoothing: 0.5
+    qualifying_residual_model:
+      enabled: false
+      artifact_path: data/processed/model_artifacts/qualifying_residual/qualifying_residual_model.pkl
+      clip_positions: 2.0
+      allow_with_testing_seed: false
 
   # Compound selection parameters
   compound_selection:
@@ -483,6 +494,12 @@ baseline_predictor:
 
     # DNF and defensive-skill calibration
     team_uncertainty_dnf_multiplier: 0.20
+    early_season_team_uncertainty:
+      activation_floor: 0.22
+      scale: 0.20
+      decay_races: 3
+      interval_positions_scale: 2.5
+      confidence_penalty_scale: 5.0
     defensive_skill_weights:
       overtaking_component: 0.65
       skill_component: 0.35
@@ -726,6 +743,17 @@ baseline_predictor:
         two_stop: 2.0                  # ±2 lap variance for 2-stop windows
 
       strategy_optimality: 0.60        # 60% optimal, 40% suboptimal (realism)
+    race_residual_model:
+      enabled: false
+      artifact_path: data/processed/model_artifacts/race_residual/race_residual_model.pkl
+      clip_positions_gained: 2.5
+      positions_to_race_advantage_scale: 0.05
+      allow_with_testing_seed: false
+
+  conformal_calibration:
+    enabled: false
+    artifact_path: data/processed/model_artifacts/conformal_calibration/conformal_calibration.json
+    min_samples: 20
 
   # Dashboard auto-capture settings for completed FP sessions
   practice_capture:

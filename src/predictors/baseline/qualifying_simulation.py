@@ -309,6 +309,9 @@ def _score_single_driver_in_simulation(
     score += float(driver_info.get("learned_position_adjustment", 0.0)) * (
         sim_cfg.effective_learning_scale
     )
+    score += float(driver_info.get("qualifying_residual_adjustment", 0.0)) * (
+        sim_cfg.effective_learning_scale
+    )
     score += weekend_form_offset
     score += wet_skill_adjustment
     score += _compute_teammate_anchor_adjustment(
@@ -321,6 +324,97 @@ def _score_single_driver_in_simulation(
     score += float(rng.normal(0, sim_cfg.teammate_setup_std))
     score += float(rng.normal(0, sim_cfg.noise_std))
     return float(score)
+
+
+def build_deterministic_qualifying_ranking(
+    *,
+    all_drivers: list[dict[str, Any]],
+    is_sprint: bool,
+    has_practice_data: bool,
+    has_testing_fallback_data: bool,
+    cfg: Any,
+    weather: str = "dry",
+) -> list[dict[str, Any]]:
+    """Build a noise-free baseline qualifying ranking from the runtime driver list.
+
+    This is used by the residual-model training path so it can learn how far the
+    deterministic pre-simulation hierarchy tends to miss actual qualifying.
+    """
+    sim_cfg = _build_quali_sim_config(
+        cfg=cfg,
+        is_sprint=is_sprint,
+        has_practice_data=has_practice_data,
+        has_testing_fallback_data=has_testing_fallback_data,
+    )
+    sim_cfg = dataclasses.replace(sim_cfg, noise_std=0.0, teammate_setup_std=0.0)
+
+    wet_skill_weight = float(cfg.get("baseline_predictor.qualifying.wet_skill_weight", 0.18))
+    if is_sprint:
+        sprint_wet_scale = float(
+            cfg.get("baseline_predictor.qualifying.sprint_wet_skill_scale", 0.75)
+        )
+        wet_skill_weight *= sprint_wet_scale
+    wet_skill_neutral = float(cfg.get("baseline_predictor.qualifying.wet_skill_neutral", 0.70))
+    mixed_wet_blend = float(cfg.get("baseline_predictor.mixed_wet_blend", 0.50))
+
+    driver_weight_sum = sim_cfg.driver_quali_pace_weight + sim_cfg.driver_skill_weight
+    team_driver_signal_means: dict[str, float] = {}
+    team_counts: dict[str, int] = {}
+    for driver_info in all_drivers:
+        driver_signal = (
+            (float(driver_info["quali_pace"]) * sim_cfg.driver_quali_pace_weight)
+            + (float(driver_info["skill"]) * sim_cfg.driver_skill_weight)
+        ) / driver_weight_sum
+        team_name = str(driver_info["team"])
+        team_driver_signal_means[team_name] = (
+            team_driver_signal_means.get(team_name, 0.0) + driver_signal
+        )
+        team_counts[team_name] = team_counts.get(team_name, 0) + 1
+    for team_name, total_signal in team_driver_signal_means.items():
+        team_driver_signal_means[team_name] = total_signal / max(1, team_counts.get(team_name, 1))
+
+    scored_rows: list[dict[str, Any]] = []
+    for driver_info in all_drivers:
+        raw_driver_signal = (
+            (float(driver_info["quali_pace"]) * sim_cfg.driver_quali_pace_weight)
+            + (float(driver_info["skill"]) * sim_cfg.driver_skill_weight)
+        ) / driver_weight_sum
+        regularized_signal, gap_cap = _compute_regularized_driver_signal(
+            driver_info=driver_info,
+            raw_driver_signal=raw_driver_signal,
+            team_driver_signal_means=team_driver_signal_means,
+            sim_cfg=sim_cfg,
+        )
+        wet_adj = _compute_wet_skill_adjustment(
+            driver_info,
+            weather=weather,
+            wet_skill_weight=wet_skill_weight,
+            wet_skill_neutral=wet_skill_neutral,
+            mixed_wet_blend=mixed_wet_blend,
+        )
+        baseline_score = _score_single_driver_in_simulation(
+            driver_info=driver_info,
+            raw_driver_signal=raw_driver_signal,
+            regularized_signal=regularized_signal,
+            gap_cap=gap_cap,
+            team_driver_signal_means=team_driver_signal_means,
+            sim_cfg=sim_cfg,
+            weekend_form_offset=0.0,
+            wet_skill_adjustment=wet_adj,
+            rng=np.random.default_rng(0),
+        )
+        scored_rows.append(
+            {
+                "driver": driver_info["driver"],
+                "team": driver_info["team"],
+                "baseline_score": float(baseline_score),
+            }
+        )
+
+    scored_rows.sort(key=lambda item: float(item["baseline_score"]), reverse=True)
+    for index, row in enumerate(scored_rows, start=1):
+        row["baseline_position"] = int(index)
+    return scored_rows
 
 
 @dataclass(frozen=True)

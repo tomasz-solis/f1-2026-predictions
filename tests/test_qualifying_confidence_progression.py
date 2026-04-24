@@ -18,6 +18,11 @@ class _ConfigStub:
             "baseline_predictor.qualifying.confidence_std_multiplier": 5.0,
             "baseline_predictor.qualifying.confidence_cap": 60,
             "baseline_predictor.qualifying.confidence_min": 40,
+            "baseline_predictor.qualifying.early_season_team_uncertainty.activation_floor": 0.22,
+            "baseline_predictor.qualifying.early_season_team_uncertainty.scale": 0.20,
+            "baseline_predictor.qualifying.early_season_team_uncertainty.decay_races": 3,
+            "baseline_predictor.qualifying.early_season_team_uncertainty.interval_positions_scale": 2.0,
+            "baseline_predictor.qualifying.early_season_team_uncertainty.confidence_penalty_scale": 6.0,
             "baseline_predictor.qualifying.data_confidence.model_only": 0.25,
             "baseline_predictor.qualifying.data_confidence.testing_fallback": 0.45,
             "baseline_predictor.qualifying.data_confidence.sprint_race": 0.70,
@@ -138,3 +143,62 @@ def test_aggregate_grid_applies_learned_interval_radius_floor():
     assert by_driver["VER"]["p95"] == 2
     assert by_driver["NOR"]["p5"] <= 1
     assert by_driver["NOR"]["p95"] == 2
+
+
+def test_aggregate_grid_uses_team_uncertainty_to_widen_opening_weekends():
+    predictor = _Predictor()
+    position_records = {
+        "VER": [1, 1, 1, 1, 1, 1],
+        "NOR": [2, 2, 2, 2, 2, 2],
+        "PIA": [3, 3, 3, 3, 3, 3],
+        "RUS": [4, 4, 4, 4, 4, 4],
+    }
+    early_drivers = [
+        {
+            "driver": "VER",
+            "team": "Red Bull Racing",
+            "team_uncertainty": 0.42,
+            "season_races_completed": 0,
+        },
+        {"driver": "NOR", "team": "McLaren", "team_uncertainty": 0.42, "season_races_completed": 0},
+        {"driver": "PIA", "team": "McLaren", "team_uncertainty": 0.42, "season_races_completed": 0},
+        {
+            "driver": "RUS",
+            "team": "Mercedes",
+            "team_uncertainty": 0.42,
+            "season_races_completed": 0,
+        },
+    ]
+    late_drivers = [
+        {
+            "driver": "VER",
+            "team": "Red Bull Racing",
+            "team_uncertainty": 0.42,
+            "season_races_completed": 4,
+        },
+        {"driver": "NOR", "team": "McLaren", "team_uncertainty": 0.42, "season_races_completed": 4},
+        {"driver": "PIA", "team": "McLaren", "team_uncertainty": 0.42, "season_races_completed": 4},
+        {
+            "driver": "RUS",
+            "team": "Mercedes",
+            "team_uncertainty": 0.42,
+            "season_races_completed": 4,
+        },
+    ]
+
+    early_grid = predictor._aggregate_grid_results(
+        position_records,
+        early_drivers,
+        data_confidence_score=0.45,
+    )
+    late_grid = predictor._aggregate_grid_results(
+        position_records,
+        late_drivers,
+        data_confidence_score=0.45,
+    )
+
+    early_by_driver = {entry["driver"]: entry for entry in early_grid}
+    late_by_driver = {entry["driver"]: entry for entry in late_grid}
+
+    assert early_by_driver["VER"]["p95"] > late_by_driver["VER"]["p95"]
+    assert early_by_driver["NOR"]["confidence"] < late_by_driver["NOR"]["confidence"]

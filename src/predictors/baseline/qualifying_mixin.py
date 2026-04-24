@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
+from collections.abc import Mapping
 from hashlib import sha256
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from src.predictors.baseline.early_season_uncertainty import (
+    resolve_early_season_confidence_penalty,
+    resolve_early_season_interval_extension,
+    resolve_effective_learning_min_samples,
+)
 from src.types.prediction_types import QualifyingGridEntry
 from src.utils import config_loader
 from src.utils.fp_blending import (
@@ -38,7 +46,11 @@ from .qualifying_preparation import (
 from .qualifying_preparation import (
     resolve_effective_experience_tier as _resolve_effective_experience_tier_impl,
 )
-from .qualifying_simulation import run_qualifying_simulations
+from .qualifying_simulation import (
+    build_deterministic_qualifying_ranking,
+    run_qualifying_simulations,
+)
+from .team_strength import resolve_team_data as resolve_team_data_helper
 
 logger = logging.getLogger("src.predictors.baseline_2026")
 
@@ -331,6 +343,7 @@ class BaselineQualifyingMixin:
         driver: str,
         teammates: list[str],
         session: str = "qualifying",
+        races_completed: int | None = None,
     ) -> float:
         """Return learned position adjustment from systematic calibration state."""
         calibration_system = getattr(self, "calibration_system", None)
@@ -342,11 +355,15 @@ class BaselineQualifyingMixin:
             return 0.0
 
         cfg = getattr(self, "config", config_loader)
-        min_samples = int(
+        configured_min_samples = int(
             cfg.get(
                 "learning.min_samples",
                 cfg.get("baseline_predictor.learning.min_samples", 1),
             )
+        )
+        min_samples = resolve_effective_learning_min_samples(
+            configured_min_samples=configured_min_samples,
+            races_completed=races_completed,
         )
         driver_error_scale = float(
             cfg.get(
@@ -397,7 +414,7 @@ class BaselineQualifyingMixin:
         cfg = getattr(self, "config", config_loader)
         min_samples = int(cfg.get("learning.interval_min_samples", 20))
         target_coverage = float(cfg.get("learning.interval_target_coverage", 0.90))
-        max_adjustment = float(cfg.get("learning.interval_max_adjustment", 4.0))
+        max_adjustment = float(cfg.get("learning.interval_max_adjustment", 6.0))
 
         try:
             return float(
@@ -411,6 +428,226 @@ class BaselineQualifyingMixin:
         except Exception as exc:
             logger.debug("Could not load learned qualifying interval radius: %s", exc)
             return 0.0
+
+    def _load_qualifying_residual_model(self) -> Any | None:
+        """Load the persisted qualifying residual model when enabled."""
+        cfg = getattr(self, "config", config_loader)
+        enabled = bool(
+            cfg.get("baseline_predictor.qualifying.qualifying_residual_model.enabled", False)
+        )
+        if not enabled:
+            return None
+        uses_testing_seed = getattr(self, "_uses_testing_model_team_seed", None)
+        if callable(uses_testing_seed) and uses_testing_seed():
+            allow_with_testing_seed = bool(
+                cfg.get(
+                    "baseline_predictor.qualifying.qualifying_residual_model.allow_with_testing_seed",
+                    False,
+                )
+            )
+            if not allow_with_testing_seed:
+                logger.info(
+                    "Skipping qualifying residual model because the active team seed is testing_model."
+                )
+                return None
+
+        cached = getattr(self, "_qualifying_residual_model_cache", None)
+        if cached is not None:
+            return cached
+
+        from src.models.qualifying_residual_model import load_qualifying_residual_model
+
+        resolver = getattr(self, "_resolve_predictions_data_root", None)
+        data_root = resolver() if callable(resolver) else Path("data")
+        artifact_path = cfg.get(
+            "baseline_predictor.qualifying.qualifying_residual_model.artifact_path",
+            str(
+                Path(data_root)
+                / "processed"
+                / "model_artifacts"
+                / "qualifying_residual"
+                / "qualifying_residual_model.pkl"
+            ),
+        )
+        loaded = load_qualifying_residual_model(artifact_path)
+        self._qualifying_residual_model_cache = loaded
+        return loaded
+
+    def _load_conformal_calibration_artifact(self) -> Any | None:
+        """Load the persisted conformal artifact when enabled."""
+        cfg = getattr(self, "config", config_loader)
+        enabled = bool(cfg.get("baseline_predictor.conformal_calibration.enabled", False))
+        if not enabled:
+            return None
+
+        cached = getattr(self, "_conformal_calibration_artifact_cache", None)
+        if cached is not None:
+            return cached
+
+        from src.models.conformal_calibration import load_conformal_calibration_artifact
+
+        resolver = getattr(self, "_resolve_predictions_data_root", None)
+        data_root = resolver() if callable(resolver) else Path("data")
+        artifact_path = cfg.get(
+            "baseline_predictor.conformal_calibration.artifact_path",
+            str(
+                Path(data_root)
+                / "processed"
+                / "model_artifacts"
+                / "conformal_calibration"
+                / "conformal_calibration.json"
+            ),
+        )
+        loaded = load_conformal_calibration_artifact(artifact_path)
+        self._conformal_calibration_artifact_cache = loaded
+        return loaded
+
+    def _prepare_qualifying_prediction_inputs(
+        self,
+        *,
+        year: int,
+        race_name: str,
+        qualifying_stage: str,
+        practice_signal_mode: str,
+        checkpoint_session_name: str | None,
+        weather: str,
+    ) -> dict[str, Any]:
+        """Prepare one complete qualifying feature context before simulation."""
+        cfg = getattr(self, "config", config_loader)
+        is_sprint = is_sprint_weekend(year, race_name)
+        lineups = get_lineups(year, race_name)
+
+        normalized_practice_signal_mode = str(practice_signal_mode).strip().lower()
+        if normalized_practice_signal_mode == "stored_profiles":
+            session_name = None
+            fp_performance = None
+            session_laps = None
+            session_laps_by_type: dict[str, Any] = {}
+        else:
+            session_name, fp_performance, session_laps, session_laps_by_type = (
+                get_best_fp_performance_with_session_laps(
+                    year=year,
+                    race_name=race_name,
+                    is_sprint=is_sprint,
+                    qualifying_stage=qualifying_stage,
+                )
+            )
+
+        if session_laps is not None:
+            self._update_compound_characteristics_from_session(
+                session_laps, race_name, year, is_sprint
+            )
+
+        short_profile_weights = self._get_testing_profile_weights(
+            "short_run",
+            _DEFAULT_TESTING_SHORT_RUN_WEIGHTS,
+        )
+        testing_fallback_performance = None
+        if normalized_practice_signal_mode == "stored_profiles" or (
+            session_name is None and fp_performance is None
+        ):
+            testing_fallback_performance = self._build_testing_short_run_fallback(
+                lineups=lineups,
+                metric_weights=short_profile_weights,
+                checkpoint_session_name=checkpoint_session_name,
+                qualifying_stage=qualifying_stage,
+            )
+        testing_fallback_used = testing_fallback_performance is not None
+        confidence_session_name = session_name
+        weekend_snapshot_session_name = None
+        if normalized_practice_signal_mode == "stored_profiles" and testing_fallback_used:
+            weekend_snapshot_session_name = self._resolve_weekend_snapshot_session_name(
+                race_name=race_name
+            )
+            confidence_session_name = self._checkpoint_profile_confidence_label(
+                weekend_snapshot_session_name
+            )
+        data_confidence_score = self._resolve_data_confidence_score(
+            confidence_session_name,
+            testing_fallback_used=testing_fallback_used,
+        )
+        effective_fp_blend_weight = self._resolve_fp_blend_weight(data_confidence_score)
+        practice_like_stored_profiles = weekend_snapshot_session_name is not None
+        if practice_like_stored_profiles:
+            effective_fp_blend_weight = self._adjust_stored_checkpoint_blend_weight(
+                effective_fp_blend_weight
+            )
+
+        all_drivers, teams_with_short_profile = self._build_driver_list_with_strengths(
+            lineups,
+            fp_performance,
+            testing_fallback_performance,
+            (confidence_session_name if practice_like_stored_profiles else None),
+            (effective_fp_blend_weight if practice_like_stored_profiles else None),
+            race_name,
+            is_sprint,
+            effective_fp_blend_weight,
+            prediction_year=year,
+        )
+
+        driver_fp_modifiers: dict[str, float] = {}
+        if cfg.get("baseline_predictor.qualifying.enable_driver_fp_adjustment", True) and (
+            normalized_practice_signal_mode != "stored_profiles"
+        ):
+            from src.utils.driver_fp_adjustment import calculate_driver_fp_modifiers
+
+            fp_session_types = ["FP1"] if is_sprint else ["FP1", "FP2", "FP3"]
+            modifier_scale = cfg.get(
+                "baseline_predictor.qualifying.driver_fp_adjustment_scale", 0.10
+            )
+            smoothing_seconds = cfg.get(
+                "baseline_predictor.qualifying.driver_fp_adjustment_smoothing", 0.50
+            )
+            driver_fp_modifiers = calculate_driver_fp_modifiers(
+                year=year,
+                race_name=race_name,
+                session_types=fp_session_types,
+                scale=modifier_scale,
+                smoothing_seconds=smoothing_seconds,
+                preloaded_session_laps=session_laps_by_type,
+            )
+            for driver_info in all_drivers:
+                fp_modifier = driver_fp_modifiers.get(driver_info["driver"], 0.0)
+                if fp_modifier == 0.0:
+                    continue
+                driver_info["skill"] = np.clip(driver_info["skill"] + fp_modifier, 0.01, 0.99)
+
+        from src.models.conformal_calibration import resolve_qualifying_data_regime
+
+        data_source_mode = resolve_qualifying_data_regime(
+            practice_like_stored_profiles=practice_like_stored_profiles,
+            session_name=session_name,
+            testing_fallback_used=testing_fallback_used,
+        )
+
+        checkpoint_label = str(checkpoint_session_name or "").strip().upper()
+        if session_name is not None:
+            data_source = session_name
+        elif testing_fallback_used:
+            if normalized_practice_signal_mode == "stored_profiles" and checkpoint_label:
+                data_source = self._stored_profile_data_source_label(checkpoint_session_name)
+            else:
+                data_source = "Testing short-run profile blend (no weekend practice data)"
+        else:
+            data_source = "Model-only (no practice/testing data)"
+
+        return {
+            "all_drivers": all_drivers,
+            "checkpoint_label": checkpoint_label,
+            "data_confidence_score": float(data_confidence_score),
+            "data_source": data_source,
+            "data_source_mode": data_source_mode,
+            "driver_fp_modifiers": driver_fp_modifiers,
+            "effective_fp_blend_weight": float(effective_fp_blend_weight),
+            "has_practice_like_data": bool(
+                session_name is not None or practice_like_stored_profiles
+            ),
+            "is_sprint": bool(is_sprint),
+            "normalized_practice_signal_mode": normalized_practice_signal_mode,
+            "practice_like_stored_profiles": bool(practice_like_stored_profiles),
+            "teams_with_short_profile": teams_with_short_profile,
+            "testing_fallback_used": bool(testing_fallback_used),
+        }
 
     def _build_driver_list_with_strengths(
         self,
@@ -458,6 +695,12 @@ class BaselineQualifyingMixin:
                 "_get_contextual_races_completed",
                 None,
             ),
+            get_team_uncertainty_fn=lambda team: float(
+                resolve_team_data_helper(teams=getattr(self, "teams", {}), team=team).get(
+                    "uncertainty",
+                    0.30,
+                )
+            ),
         )
 
     def _run_qualifying_simulations(
@@ -490,6 +733,7 @@ class BaselineQualifyingMixin:
         all_drivers: list[dict],
         *,
         data_confidence_score: float | None = None,
+        data_regime: str | None = None,
     ) -> list[QualifyingGridEntry]:
         """Aggregate simulation results into final grid with confidence intervals."""
         cfg = getattr(self, "config", config_loader)
@@ -505,7 +749,21 @@ class BaselineQualifyingMixin:
         confidence_min = cfg.get("baseline_predictor.qualifying.confidence_min", 40)
         field_size = max(1, len(all_drivers))
         learned_interval_radius = self._get_learned_interval_radius(session="qualifying")
-        learned_interval_positions = int(np.ceil(max(0.0, learned_interval_radius)))
+        conformal_interval_radius = 0.0
+        conformal_artifact = self._load_conformal_calibration_artifact()
+        if conformal_artifact is not None and data_regime is not None:
+            try:
+                conformal_interval_radius = float(
+                    conformal_artifact.get_radius(
+                        session="qualifying",
+                        regime=str(data_regime),
+                    )
+                )
+            except (AttributeError, TypeError, ValueError):
+                conformal_interval_radius = 0.0
+        learned_interval_positions = int(
+            np.ceil(max(0.0, learned_interval_radius, conformal_interval_radius))
+        )
 
         for driver_info in all_drivers:
             positions = position_records[driver_info["driver"]]
@@ -516,6 +774,15 @@ class BaselineQualifyingMixin:
             if learned_interval_positions > 0:
                 p5 = min(p5, max(1, median_pos - learned_interval_positions))
                 p95 = max(p95, min(field_size, median_pos + learned_interval_positions))
+            early_interval_extension = resolve_early_season_interval_extension(
+                team_uncertainty=driver_info.get("team_uncertainty"),
+                races_completed=driver_info.get("season_races_completed"),
+                cfg=cfg,
+                prefix="baseline_predictor.qualifying",
+            )
+            if early_interval_extension > 0:
+                p5 = min(p5, max(1, median_pos - early_interval_extension))
+                p95 = max(p95, min(field_size, median_pos + early_interval_extension))
 
             position_std = np.std(positions)
             confidence = max(
@@ -526,7 +793,13 @@ class BaselineQualifyingMixin:
                 confidence += (float(np.clip(data_confidence_score, 0.0, 1.0)) - 0.5) * (
                     session_confidence_scale
                 )
-                confidence = max(confidence_min, min(confidence_cap, confidence))
+            confidence -= resolve_early_season_confidence_penalty(
+                team_uncertainty=driver_info.get("team_uncertainty"),
+                races_completed=driver_info.get("season_races_completed"),
+                cfg=cfg,
+                prefix="baseline_predictor.qualifying",
+            )
+            confidence = max(confidence_min, min(confidence_cap, confidence))
 
             grid.append(
                 {
@@ -555,6 +828,44 @@ class BaselineQualifyingMixin:
             item["position"] = i + 1
 
         return grid
+
+    def _aggregate_grid_results_with_compat(
+        self,
+        position_records: dict[str, list[int]],
+        all_drivers: list[dict],
+        *,
+        data_confidence_score: float | None = None,
+        data_regime: str | None = None,
+    ) -> list[QualifyingGridEntry]:
+        """Call grid aggregation with backward-compatible keyword handling.
+
+        Some tests and local experiments monkeypatch ``_aggregate_grid_results``
+        with older callables that only accept ``data_confidence_score``. The
+        runtime now supports ``data_regime`` for conformal calibration, but we
+        keep this adapter so existing call sites do not fail just because a
+        patched helper has the older signature.
+        """
+        aggregate_fn = self._aggregate_grid_results
+        try:
+            parameters: Mapping[str, inspect.Parameter] = inspect.signature(aggregate_fn).parameters
+        except (TypeError, ValueError):
+            parameters = {}
+
+        supports_data_regime = "data_regime" in parameters or any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
+        )
+        if supports_data_regime:
+            return aggregate_fn(
+                position_records,
+                all_drivers,
+                data_confidence_score=data_confidence_score,
+                data_regime=data_regime,
+            )
+        return aggregate_fn(
+            position_records,
+            all_drivers,
+            data_confidence_score=data_confidence_score,
+        )
 
     def _build_teammate_head_to_head_probabilities(
         self,
@@ -658,139 +969,88 @@ class BaselineQualifyingMixin:
             seed_material = f"{self.seed}:{year}:{race_name}:{qualifying_stage}:{int(is_sprint)}"
             seed = int(sha256(seed_material.encode("utf-8")).hexdigest()[:16], 16)
             rng = np.random.default_rng(seed)
-
-            lineups = get_lineups(year, race_name)
-
-            normalized_practice_signal_mode = str(practice_signal_mode).strip().lower()
-            if normalized_practice_signal_mode == "stored_profiles":
-                session_name = None
-                fp_performance = None
-                session_laps = None
-                session_laps_by_type: dict[str, Any] = {}
-            else:
-                session_name, fp_performance, session_laps, session_laps_by_type = (
-                    get_best_fp_performance_with_session_laps(
-                        year=year,
-                        race_name=race_name,
-                        is_sprint=is_sprint,
-                        qualifying_stage=qualifying_stage,
-                    )
-                )
-
-            if session_laps is not None:
-                self._update_compound_characteristics_from_session(
-                    session_laps, race_name, year, is_sprint
-                )
-
-            short_profile_weights = self._get_testing_profile_weights(
-                "short_run",
-                _DEFAULT_TESTING_SHORT_RUN_WEIGHTS,
+            prepared = self._prepare_qualifying_prediction_inputs(
+                year=year,
+                race_name=race_name,
+                qualifying_stage=qualifying_stage,
+                practice_signal_mode=practice_signal_mode,
+                checkpoint_session_name=checkpoint_session_name,
+                weather=weather,
             )
-            testing_fallback_performance = None
-            if normalized_practice_signal_mode == "stored_profiles" or (
-                session_name is None and fp_performance is None
-            ):
-                testing_fallback_performance = self._build_testing_short_run_fallback(
-                    lineups=lineups,
-                    metric_weights=short_profile_weights,
-                    checkpoint_session_name=checkpoint_session_name,
-                    qualifying_stage=qualifying_stage,
-                )
-            testing_fallback_used = testing_fallback_performance is not None
-            confidence_session_name = session_name
-            weekend_snapshot_session_name = None
-            if normalized_practice_signal_mode == "stored_profiles" and testing_fallback_used:
-                weekend_snapshot_session_name = self._resolve_weekend_snapshot_session_name(
-                    race_name=race_name
-                )
-                confidence_session_name = self._checkpoint_profile_confidence_label(
-                    weekend_snapshot_session_name
-                )
-            data_confidence_score = self._resolve_data_confidence_score(
-                confidence_session_name,
-                testing_fallback_used=testing_fallback_used,
-            )
-            effective_fp_blend_weight = self._resolve_fp_blend_weight(data_confidence_score)
-            practice_like_stored_profiles = weekend_snapshot_session_name is not None
-            if practice_like_stored_profiles:
-                effective_fp_blend_weight = self._adjust_stored_checkpoint_blend_weight(
-                    effective_fp_blend_weight
+            all_drivers = prepared["all_drivers"]
+            testing_fallback_used = bool(prepared["testing_fallback_used"])
+            normalized_practice_signal_mode = str(prepared["normalized_practice_signal_mode"])
+            practice_like_stored_profiles = bool(prepared["practice_like_stored_profiles"])
+            data_confidence_score = float(prepared["data_confidence_score"])
+            effective_fp_blend_weight = float(prepared["effective_fp_blend_weight"])
+            data_source = str(prepared["data_source"])
+            data_source_mode = str(prepared["data_source_mode"])
+            teams_with_short_profile = int(prepared["teams_with_short_profile"])
+            checkpoint_label = str(prepared["checkpoint_label"])
+
+            residual_adjustments: dict[str, float] = {}
+            qualifying_residual_model = self._load_qualifying_residual_model()
+            if qualifying_residual_model is not None:
+                from src.models.qualifying_residual_model import (
+                    apply_qualifying_residual_model,
+                    build_feature_frame_from_context,
                 )
 
-            all_drivers, teams_with_short_profile = self._build_driver_list_with_strengths(
-                lineups,
-                fp_performance,
-                testing_fallback_performance,
-                (confidence_session_name if practice_like_stored_profiles else None),
-                (effective_fp_blend_weight if practice_like_stored_profiles else None),
-                race_name,
-                is_sprint,
-                effective_fp_blend_weight,
-                prediction_year=year,
-            )
-            if cfg.get("baseline_predictor.qualifying.enable_driver_fp_adjustment", True) and (
-                normalized_practice_signal_mode != "stored_profiles"
-            ):
-                from src.utils.driver_fp_adjustment import calculate_driver_fp_modifiers
-
-                fp_session_types = ["FP1"] if is_sprint else ["FP1", "FP2", "FP3"]
-                modifier_scale = cfg.get(
-                    "baseline_predictor.qualifying.driver_fp_adjustment_scale", 0.10
+                baseline_rows = build_deterministic_qualifying_ranking(
+                    all_drivers=all_drivers,
+                    is_sprint=is_sprint,
+                    has_practice_data=bool(prepared["has_practice_like_data"]),
+                    has_testing_fallback_data=testing_fallback_used,
+                    cfg=cfg,
+                    weather=weather,
                 )
-                smoothing_seconds = cfg.get(
-                    "baseline_predictor.qualifying.driver_fp_adjustment_smoothing", 0.50
-                )
-                driver_fp_modifiers = calculate_driver_fp_modifiers(
+                feature_frame = build_feature_frame_from_context(
+                    predictor=self,
                     year=year,
                     race_name=race_name,
-                    session_types=fp_session_types,
-                    scale=modifier_scale,
-                    smoothing_seconds=smoothing_seconds,
-                    preloaded_session_laps=session_laps_by_type,
+                    weather=weather,
+                    all_drivers=all_drivers,
+                    is_sprint=is_sprint,
+                    data_confidence_score=data_confidence_score,
+                    data_source_mode=data_source_mode,
+                    fp_blend_weight=effective_fp_blend_weight,
+                    driver_fp_modifiers=prepared.get("driver_fp_modifiers"),
+                    baseline_rows=baseline_rows,
                 )
-                for driver_info in all_drivers:
-                    fp_modifier = driver_fp_modifiers.get(driver_info["driver"], 0.0)
-                    if fp_modifier == 0.0:
-                        continue
-                    driver_info["skill"] = np.clip(driver_info["skill"] + fp_modifier, 0.01, 0.99)
+                residual_adjustments = apply_qualifying_residual_model(
+                    model=qualifying_residual_model,
+                    feature_frame=feature_frame,
+                    all_drivers=all_drivers,
+                )
 
             position_records = self._run_qualifying_simulations(
                 all_drivers,
                 n_simulations,
                 is_sprint,
-                session_name is not None or practice_like_stored_profiles,
+                bool(prepared["has_practice_like_data"]),
                 rng,
                 (testing_fallback_used and not practice_like_stored_profiles),
                 weather=weather,
             )
 
-            grid = self._aggregate_grid_results(
+            grid = self._aggregate_grid_results_with_compat(
                 position_records,
                 all_drivers,
                 data_confidence_score=data_confidence_score,
+                data_regime=data_source_mode,
             )
-
-            checkpoint_label = str(checkpoint_session_name or "").strip().upper()
-            if session_name is not None:
-                data_source = session_name
-            elif testing_fallback_used:
-                if normalized_practice_signal_mode == "stored_profiles" and checkpoint_label:
-                    data_source = self._stored_profile_data_source_label(checkpoint_session_name)
-                else:
-                    data_source = "Testing short-run profile blend (no weekend practice data)"
-            else:
-                data_source = "Model-only (no practice/testing data)"
 
             teammate_head_to_head = self._build_teammate_head_to_head_probabilities(
                 position_records=position_records,
                 all_drivers=all_drivers,
             )
-            uses_practice_like_blend = session_name is not None or practice_like_stored_profiles
+            uses_practice_like_blend = bool(prepared["has_practice_like_data"])
             uses_testing_fallback = testing_fallback_used and not practice_like_stored_profiles
 
             return {
                 "grid": grid,
                 "data_source": data_source,
+                "data_regime": data_source_mode,
                 "blend_used": uses_practice_like_blend,
                 "testing_fallback_used": uses_testing_fallback,
                 "data_confidence_score": round(float(data_confidence_score), 3),
@@ -802,6 +1062,13 @@ class BaselineQualifyingMixin:
                 "characteristics_profile_used": "short_run",
                 "teams_with_characteristics_profile": teams_with_short_profile,
                 "teammate_head_to_head": teammate_head_to_head,
+                "qualifying_residual_model_used": qualifying_residual_model is not None,
+                "qualifying_residual_mean_abs_adjustment": round(
+                    float(np.mean([abs(value) for value in residual_adjustments.values()]))
+                    if residual_adjustments
+                    else 0.0,
+                    4,
+                ),
             }
 
     def predict_sprint_race(

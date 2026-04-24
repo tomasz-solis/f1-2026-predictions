@@ -486,11 +486,13 @@ def prepare_driver_info_core(
             "team": team,
             "grid_pos": grid_pos,
             "team_strength": team_strength,
+            "team_uncertainty": float(np.clip(team_uncertainty, 0.0, 1.0)),
             "skill": skill,
             "race_advantage": race_advantage,
             "overtaking_skill": overtaking_skill,
             "defensive_skill": defensive_skill,
             "dnf_probability": dnf_probability,
+            "season_races_completed": int(max(0, races_completed)),
             "wet_skill": float(
                 driver_data.get("wet_skill", 0.70) if isinstance(driver_data, dict) else 0.70
             ),
@@ -600,6 +602,7 @@ def prepare_driver_info_with_compounds_core(
             "team": team,
             "grid_pos": grid_pos,
             "team_strength": base_team_strength,
+            "team_uncertainty": float(np.clip(team_uncertainty, 0.0, 1.0)),
             "team_strength_by_compound": team_strength_by_compound,
             "tire_deg_by_compound": tire_deg_by_compound,
             "skill": skill,
@@ -607,6 +610,7 @@ def prepare_driver_info_with_compounds_core(
             "overtaking_skill": overtaking_skill,
             "defensive_skill": defensive_skill,
             "dnf_probability": dnf_probability,
+            "season_races_completed": int(max(0, races_completed)),
             "wet_skill": float(
                 driver_data.get("wet_skill", 0.70) if isinstance(driver_data, dict) else 0.70
             ),

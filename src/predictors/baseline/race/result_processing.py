@@ -7,6 +7,11 @@ from typing import Any
 
 import numpy as np
 
+from src.predictors.baseline.early_season_uncertainty import (
+    resolve_early_season_confidence_penalty,
+    resolve_early_season_interval_extension,
+)
+
 
 def estimate_predicted_grid_uncertainty_share(
     *,
@@ -154,6 +159,65 @@ def apply_learned_interval_radius(
 
         row["p5"] = max(1, center - required_half_width)
         row["p95"] = min(field_size, center + required_half_width)
+
+
+def apply_early_season_team_uncertainty_adjustments(
+    *,
+    finish_order: list[dict[str, Any]],
+    driver_info_map: dict[str, dict[str, Any]],
+    cfg: Any,
+    field_size: int,
+) -> None:
+    """Widen finish intervals and lower confidence when preseason uncertainty is still live."""
+    if field_size <= 1:
+        return
+
+    confidence_floor = float(cfg.get("baseline_predictor.race.confidence.min", 40.0))
+    confidence_cap = float(cfg.get("baseline_predictor.race.confidence.max", 60.0))
+
+    for row in finish_order:
+        driver_code = str(row.get("driver", "")).strip()
+        if not driver_code:
+            continue
+
+        driver_info = driver_info_map.get(driver_code, {})
+        interval_extension = resolve_early_season_interval_extension(
+            team_uncertainty=driver_info.get("team_uncertainty"),
+            races_completed=driver_info.get("season_races_completed"),
+            cfg=cfg,
+            prefix="baseline_predictor.race",
+        )
+        if interval_extension > 0:
+            try:
+                center = int(row.get("median_position", row.get("position", field_size)))
+                p5 = int(row.get("p5", center))
+                p95 = int(row.get("p95", center))
+            except (TypeError, ValueError):
+                center = int(row.get("position", field_size))
+                p5 = center
+                p95 = center
+
+            center = max(1, min(center, field_size))
+            row["p5"] = max(1, min(p5, center - interval_extension))
+            row["p95"] = min(field_size, max(p95, center + interval_extension))
+
+        confidence_penalty = resolve_early_season_confidence_penalty(
+            team_uncertainty=driver_info.get("team_uncertainty"),
+            races_completed=driver_info.get("season_races_completed"),
+            cfg=cfg,
+            prefix="baseline_predictor.race",
+        )
+        if confidence_penalty <= 0.0:
+            continue
+
+        try:
+            confidence = float(row.get("confidence", confidence_floor))
+        except (TypeError, ValueError):
+            confidence = confidence_floor
+        row["confidence"] = round(
+            float(np.clip(confidence - confidence_penalty, confidence_floor, confidence_cap)),
+            1,
+        )
 
 
 def apply_hypothetical_points_floor(
@@ -570,6 +634,7 @@ def build_finish_order(
             driver=driver_code,
             teammates=team_to_drivers.get(info["team"], []),
             session="race",
+            races_completed=info.get("season_races_completed"),
         )
         position_blend_score -= learned_position_adjustment * fo_cfg.learning_position_scale
         position_blend_score = max(position_blend_score, min_position_score)
@@ -645,6 +710,13 @@ def build_finish_order(
             row["median_position"] = int(np.median(rank_samples))
             row["p5"] = int(np.percentile(rank_samples, 5))
             row["p95"] = int(np.percentile(rank_samples, 95))
+
+    apply_early_season_team_uncertainty_adjustments(
+        finish_order=finish_order,
+        driver_info_map=driver_info_map,
+        cfg=cfg,
+        field_size=max(1, field_size),
+    )
 
     finish_order.sort(key=lambda item: item["position_blend_score"])
     for index, item in enumerate(finish_order, start=1):

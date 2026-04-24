@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from src.data.track_data_loader import (
@@ -14,8 +15,11 @@ from src.data.track_data_loader import (
     resolve_track_temperature_c,
     resolve_track_temperature_profile,
 )
+from src.predictors.baseline.early_season_uncertainty import (
+    resolve_effective_learning_min_samples,
+)
 from src.simulation.pit_strategy import generate_pit_strategy
-from src.types.prediction_types import QualifyingGridEntry
+from src.types.prediction_types import DriverRaceInfo, QualifyingGridEntry
 from src.utils import config_loader
 from src.utils.grid_validation import validate_qualifying_grid
 from src.utils.lap_by_lap_simulator import (
@@ -78,6 +82,7 @@ class BaselineRacePredictionMixin:
         driver: str,
         teammates: list[str],
         session: str = "race",
+        races_completed: int | None = None,
     ) -> float:
         """Return learned position adjustment from systematic calibration state."""
         calibration_system = getattr(self, "calibration_system", None)
@@ -89,11 +94,15 @@ class BaselineRacePredictionMixin:
             return 0.0
 
         cfg = getattr(self, "config", config_loader)
-        min_samples = int(
+        configured_min_samples = int(
             cfg.get(
                 "learning.min_samples",
                 cfg.get("baseline_predictor.learning.min_samples", 1),
             )
+        )
+        min_samples = resolve_effective_learning_min_samples(
+            configured_min_samples=configured_min_samples,
+            races_completed=races_completed,
         )
         driver_error_scale = float(
             cfg.get(
@@ -144,7 +153,7 @@ class BaselineRacePredictionMixin:
         cfg = getattr(self, "config", config_loader)
         min_samples = int(cfg.get("learning.interval_min_samples", 20))
         target_coverage = float(cfg.get("learning.interval_target_coverage", 0.90))
-        max_adjustment = float(cfg.get("learning.interval_max_adjustment", 4.0))
+        max_adjustment = float(cfg.get("learning.interval_max_adjustment", 6.0))
 
         try:
             return float(
@@ -158,6 +167,138 @@ class BaselineRacePredictionMixin:
         except Exception as exc:
             logger.debug("Could not load learned race interval radius: %s", exc)
             return 0.0
+
+    def _load_race_residual_model(self) -> Any | None:
+        """Load the persisted race residual model when enabled."""
+        cfg = getattr(self, "config", config_loader)
+        enabled = bool(cfg.get("baseline_predictor.race.race_residual_model.enabled", False))
+        if not enabled:
+            return None
+        uses_testing_seed = getattr(self, "_uses_testing_model_team_seed", None)
+        if callable(uses_testing_seed) and uses_testing_seed():
+            allow_with_testing_seed = bool(
+                cfg.get(
+                    "baseline_predictor.race.race_residual_model.allow_with_testing_seed", False
+                )
+            )
+            if not allow_with_testing_seed:
+                logger.info(
+                    "Skipping race residual model because the active team seed is testing_model."
+                )
+                return None
+
+        cached = getattr(self, "_race_residual_model_cache", None)
+        if cached is not None:
+            return cached
+
+        from src.models.race_residual_model import load_race_residual_model
+
+        resolver = getattr(self, "_resolve_predictions_data_root", None)
+        data_root = resolver() if callable(resolver) else Path("data")
+        artifact_path = cfg.get(
+            "baseline_predictor.race.race_residual_model.artifact_path",
+            str(
+                Path(data_root)
+                / "processed"
+                / "model_artifacts"
+                / "race_residual"
+                / "race_residual_model.pkl"
+            ),
+        )
+        loaded = load_race_residual_model(artifact_path)
+        self._race_residual_model_cache = loaded
+        return loaded
+
+    def _get_conformal_interval_radius(self, *, session: str, regime: str) -> float:
+        """Return the conformal interval radius for one session/regime bucket."""
+        cfg = getattr(self, "config", config_loader)
+        enabled = bool(cfg.get("baseline_predictor.conformal_calibration.enabled", False))
+        if not enabled:
+            return 0.0
+
+        cached = getattr(self, "_conformal_calibration_artifact_cache", None)
+        if cached is None:
+            from src.models.conformal_calibration import load_conformal_calibration_artifact
+
+            resolver = getattr(self, "_resolve_predictions_data_root", None)
+            data_root = resolver() if callable(resolver) else Path("data")
+            artifact_path = cfg.get(
+                "baseline_predictor.conformal_calibration.artifact_path",
+                str(
+                    Path(data_root)
+                    / "processed"
+                    / "model_artifacts"
+                    / "conformal_calibration"
+                    / "conformal_calibration.json"
+                ),
+            )
+            cached = load_conformal_calibration_artifact(artifact_path)
+            self._conformal_calibration_artifact_cache = cached
+
+        if cached is None:
+            return 0.0
+        try:
+            return float(cached.get_radius(session=session, regime=regime))
+        except (AttributeError, TypeError, ValueError):
+            return 0.0
+
+    def _apply_race_residual_model(
+        self,
+        *,
+        driver_info_map: dict[str, DriverRaceInfo],
+        qualifying_grid: list[QualifyingGridEntry],
+        race_name: str | None,
+        weather: str,
+        input_confidence: float | None,
+        is_sprint: bool,
+        year: int,
+    ) -> dict[str, float]:
+        """Apply the persisted race residual model as a small race-advantage correction."""
+        if not race_name:
+            return {}
+
+        model = self._load_race_residual_model()
+        if model is None:
+            return {}
+
+        from src.models.race_residual_model import (
+            apply_race_residual_model,
+            build_feature_frame_from_context,
+        )
+
+        confidence_values = [
+            float(row["confidence"]) / 100.0
+            for row in qualifying_grid
+            if isinstance(row.get("confidence"), int | float)
+        ]
+        mean_grid_confidence = (
+            float(sum(confidence_values) / len(confidence_values)) if confidence_values else None
+        )
+        grid_source_mode = "predicted" if confidence_values else "actual"
+        feature_frame = build_feature_frame_from_context(
+            predictor=self,
+            year=year,
+            race_name=race_name,
+            weather=weather,
+            qualifying_grid=qualifying_grid,
+            driver_info_map=driver_info_map,
+            input_confidence=input_confidence,
+            mean_grid_confidence=mean_grid_confidence,
+            grid_source_mode=grid_source_mode,
+            is_sprint=is_sprint,
+        )
+        scale = float(
+            getattr(self, "config", config_loader).get(
+                "baseline_predictor.race.race_residual_model.positions_to_race_advantage_scale",
+                0.05,
+            )
+        )
+        return apply_race_residual_model(
+            model=model,
+            feature_frame=feature_frame,
+            driver_info_map=driver_info_map,
+            positions_to_race_advantage_scale=scale,
+        )
 
     def predict_race(
         self,
@@ -195,6 +336,8 @@ class BaselineRacePredictionMixin:
                     prepare_driver_info_with_compounds=self._prepare_driver_info_with_compounds,
                     get_learned_position_adjustment=self._get_learned_position_adjustment,
                     get_learned_interval_radius=self._get_learned_interval_radius,
+                    apply_race_residual_model=self._apply_race_residual_model,
+                    get_conformal_interval_radius=self._get_conformal_interval_radius,
                     enforce_non_increasing=self._enforce_non_increasing,
                     load_track_specific_params=load_track_specific_params,
                     get_tire_stress_score=get_tire_stress_score,
