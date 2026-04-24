@@ -260,6 +260,14 @@ class TestTrackCharacteristicsSchema:
         """Accept valid track payloads with optional composition percentages."""
         validate_track_characteristics(_track_payload())
 
+    def test_valid_track_data_with_artifact_metadata(self):
+        """Accept track payload metadata emitted by baseline generation."""
+        data = _track_payload()
+        data["version"] = 1
+        data["last_updated"] = "2026-04-22T10:00:00+00:00"
+
+        validate_track_characteristics(data)
+
     def test_invalid_missing_tracks_key(self):
         """Reject payloads without the tracks map."""
         with pytest.raises(ValueError, match="tracks"):

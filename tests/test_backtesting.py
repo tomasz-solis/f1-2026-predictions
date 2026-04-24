@@ -11,6 +11,7 @@ from src.utils.backtesting import (
     build_error_analysis,
     build_overlap_comparison,
     build_segment_breakdown,
+    get_races_for_year,
     parse_experiment_spec,
     rank_experiments_for_generalization,
     run_previous_race_naive_backtest,
@@ -68,6 +69,7 @@ class _ContextAwarePredictor:
         self.qualifying_contexts: list[object] = []
         self.race_contexts: list[object] = []
         self.calibration_system = _LearningSystemStub()
+        self.replayed_weekends: list[dict[str, object]] = []
 
     def predict_qualifying(
         self,
@@ -116,6 +118,24 @@ class _ContextAwarePredictor:
             ]
         }
 
+    def record_completed_weekend_actuals(
+        self,
+        *,
+        year: int,
+        race_name: str,
+        qualifying_actual: list[dict[str, object]],
+        race_actual: list[dict[str, object]],
+    ) -> dict[str, object]:
+        self.replayed_weekends.append(
+            {
+                "year": year,
+                "race_name": race_name,
+                "qualifying_actual": qualifying_actual,
+                "race_actual": race_actual,
+            }
+        )
+        return {"teams_updated": 3, "races_recorded": len(self.replayed_weekends)}
+
 
 def test_parse_experiment_spec_parses_typed_overrides():
     name, overrides = parse_experiment_spec(
@@ -157,6 +177,28 @@ def test_apply_config_overrides_sets_nested_values():
 
     assert merged["baseline_predictor"]["race"]["grid_anchor"]["base"] == pytest.approx(0.45)
     assert merged["baseline_predictor"]["race"]["safety_car_luck_range"] == pytest.approx(0.20)
+
+
+def test_get_races_for_year_uses_season_calendar_when_fastf1_fails(patcher):
+    """Historical fallback calendars should not leak modern race names into 2022."""
+    patcher.setattr(
+        "src.utils.backtesting.fastf1.get_event_schedule",
+        lambda _year: (_ for _ in ()).throw(RuntimeError("rate limited")),
+    )
+
+    races = get_races_for_year(2022)
+
+    assert races[:4] == [
+        "Bahrain Grand Prix",
+        "Saudi Arabian Grand Prix",
+        "Australian Grand Prix",
+        "Emilia Romagna Grand Prix",
+    ]
+    assert "French Grand Prix" in races
+    assert "São Paulo Grand Prix" in races
+    assert "Chinese Grand Prix" not in races
+    assert "Las Vegas Grand Prix" not in races
+    assert "Qatar Grand Prix" not in races
 
 
 def test_run_single_race_backtest_returns_metrics_for_successful_race():
@@ -225,8 +267,26 @@ def test_run_single_race_backtest_replays_historical_context_and_learning_update
     assert predictor.race_contexts
     assert predictor.qualifying_contexts[0].mode == "historical"
     assert predictor.race_contexts[0].mode == "historical"
+    assert predictor.qualifying_contexts[0].season_year == 2025
+    assert predictor.race_contexts[0].season_year == 2025
     assert result["adaptive_learning"]["sessions_updated"] == 2
     assert len(predictor.calibration_system.records) == 1
+    assert predictor.replayed_weekends == [
+        {
+            "year": 2025,
+            "race_name": "Bahrain Grand Prix",
+            "qualifying_actual": [
+                {"driver": "VER", "team": "Red Bull Racing", "position": 1},
+                {"driver": "NOR", "team": "McLaren", "position": 2},
+                {"driver": "LEC", "team": "Ferrari", "position": 3},
+            ],
+            "race_actual": [
+                {"driver": "VER", "team": "Red Bull Racing", "position": 1},
+                {"driver": "NOR", "team": "McLaren", "position": 2},
+                {"driver": "LEC", "team": "Ferrari", "position": 3},
+            ],
+        }
+    ]
     assert predictor.calibration_system.records[0]["metadata"]["source"] == "backtest"
     assert result["qualifying_interval_count"] == 3
     assert result["qualifying_interval_hits"] == 3
@@ -271,6 +331,22 @@ def test_run_single_race_backtest_keeps_static_mode_read_only():
     assert result["status"] == "ok"
     assert result["adaptive_learning"] is None
     assert predictor.calibration_system.records == []
+    assert predictor.replayed_weekends == [
+        {
+            "year": 2025,
+            "race_name": "Bahrain Grand Prix",
+            "qualifying_actual": [
+                {"driver": "VER", "team": "Red Bull Racing", "position": 1},
+                {"driver": "NOR", "team": "McLaren", "position": 2},
+                {"driver": "LEC", "team": "Ferrari", "position": 3},
+            ],
+            "race_actual": [
+                {"driver": "VER", "team": "Red Bull Racing", "position": 1},
+                {"driver": "NOR", "team": "McLaren", "position": 2},
+                {"driver": "LEC", "team": "Ferrari", "position": 3},
+            ],
+        }
+    ]
 
 
 def test_run_single_race_backtest_marks_missing_actuals_as_skipped():

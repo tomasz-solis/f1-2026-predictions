@@ -13,6 +13,7 @@ import argparse
 import logging
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -67,6 +68,149 @@ def _expand_learning_modes(raw_mode: str) -> list[str]:
     if normalized == "both":
         return ["static", "adaptive"]
     return [normalized]
+
+
+def _build_backtest_predictor(
+    *,
+    season_year: int,
+    seed: int,
+    merged_config: dict[str, Any],
+    artifact_store: ArtifactStore,
+    data_dir: str | Path = "data/processed",
+) -> Baseline2026Predictor:
+    """Build one predictor instance with season-matched priors for replay runs."""
+    return Baseline2026Predictor(
+        data_dir=str(data_dir),
+        seed=seed,
+        season_year=season_year,
+        config=NestedDictConfig(merged_config),
+        artifact_store=artifact_store,
+    )
+
+
+def _resolve_predictor_data_dir() -> Path:
+    """Resolve the same processed-data root the predictor will read from."""
+    env_data_dir = os.getenv("F1_DATA_DIR")
+    if env_data_dir:
+        return Path(env_data_dir)
+    return Path("data/processed")
+
+
+def _normalize_season_prior_mode(raw_mode: str) -> str:
+    """Return one normalized season-prior mode string."""
+    normalized = str(raw_mode).strip().lower().replace("_", "-")
+    if normalized not in {"auto", "allow", "proxy-only"}:
+        raise ValueError("Unsupported season_prior_mode. Use one of: auto, allow, proxy-only.")
+    return normalized
+
+
+def _resolve_effective_season_prior_mode(
+    *,
+    requested_mode: str,
+    evaluation_mode: str,
+) -> str:
+    """Resolve the effective season-prior mode for one backtest run.
+
+    Historical replay should default to the retained cross-season proxy path
+    unless we explicitly opt into season-scoped priors. That keeps the
+    canonical review packet reproducible even when local untracked prior files
+    exist on disk.
+    """
+    normalized_requested = _normalize_season_prior_mode(requested_mode)
+    if normalized_requested != "auto":
+        return normalized_requested
+    normalized_evaluation = str(evaluation_mode).strip().lower()
+    return "proxy-only" if normalized_evaluation == "historical" else "allow"
+
+
+def _prepare_backtest_data_dir(
+    *,
+    source_data_dir: Path,
+    output_dir: Path,
+    season_year: int,
+    season_prior_mode: str,
+) -> Path:
+    """Prepare the processed-data directory used by the backtest.
+
+    In ``proxy-only`` mode we copy the processed tree into the run output and
+    strip the target season's team/driver/track priors. That gives us a clean,
+    explicit evaluation path without mutating the user's local data files.
+    """
+    normalized_mode = _normalize_season_prior_mode(season_prior_mode)
+    if normalized_mode == "allow":
+        return source_data_dir
+
+    prepared_root = (
+        output_dir / "_backtest_inputs" / f"{season_year}_{normalized_mode.replace('-', '_')}"
+    )
+    prepared_data_dir = prepared_root / "processed"
+    prepared_root.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source_data_dir, prepared_data_dir, dirs_exist_ok=True)
+
+    removed_paths: list[str] = []
+    for relative_path in (
+        Path("car_characteristics") / f"{season_year}_car_characteristics.json",
+        Path("driver_characteristics") / f"{season_year}_driver_characteristics.json",
+        Path("track_characteristics") / f"{season_year}_track_characteristics.json",
+    ):
+        target_path = prepared_data_dir / relative_path
+        if target_path.exists():
+            target_path.unlink()
+            removed_paths.append(str(target_path))
+
+    logger.info(
+        "Prepared %s replay data root at %s from %s.",
+        normalized_mode,
+        prepared_data_dir,
+        source_data_dir,
+    )
+    if removed_paths:
+        logger.info(
+            "Removed season-scoped priors for %s replay: %s",
+            season_year,
+            ", ".join(removed_paths),
+        )
+    return prepared_data_dir
+
+
+def _inspect_season_prior_status(*, data_dir: Path, season_year: int) -> dict[str, dict[str, Any]]:
+    """Report whether season-scoped prior artifacts exist for one replay season."""
+    driver_path = data_dir / "driver_characteristics" / f"{season_year}_driver_characteristics.json"
+    legacy_driver_path = data_dir / "driver_characteristics.json"
+    return {
+        "team": {
+            "path": str(
+                data_dir / "car_characteristics" / f"{season_year}_car_characteristics.json"
+            ),
+            "season_scoped": (
+                data_dir / "car_characteristics" / f"{season_year}_car_characteristics.json"
+            ).exists(),
+            "fallback_path": None,
+        },
+        "driver": {
+            "path": str(driver_path),
+            "season_scoped": driver_path.exists(),
+            "fallback_path": str(legacy_driver_path) if legacy_driver_path.exists() else None,
+        },
+        "track": {
+            "path": str(
+                data_dir / "track_characteristics" / f"{season_year}_track_characteristics.json"
+            ),
+            "season_scoped": (
+                data_dir / "track_characteristics" / f"{season_year}_track_characteristics.json"
+            ).exists(),
+            "fallback_path": None,
+        },
+    }
+
+
+def _summarize_missing_season_priors(prior_status: dict[str, dict[str, Any]]) -> list[str]:
+    """Return the prior categories that still lack season-scoped artifacts."""
+    return [
+        category
+        for category, status in prior_status.items()
+        if isinstance(status, dict) and not bool(status.get("season_scoped"))
+    ]
 
 
 def _emit_markdown_recommendations(
@@ -232,6 +376,21 @@ def _build_reviewer_takeaways(packet: dict[str, Any]) -> list[str]:
     learning_delta = packet.get("adaptive_vs_static_comparison")
     segment_breakdown = packet.get("canonical_segment_breakdown", {})
     recommended = packet.get("recommended_experiments", [])
+    prior_status = packet.get("season_prior_status", {})
+    season_prior_mode = str(packet.get("season_prior_mode", "allow")).strip().lower()
+
+    missing_priors = _summarize_missing_season_priors(prior_status)
+    if missing_priors:
+        if season_prior_mode == "proxy-only":
+            takeaways.append(
+                "Replay ran in `proxy-only` prior mode, so season-scoped priors were "
+                f"intentionally disabled for {', '.join(missing_priors)}."
+            )
+        else:
+            takeaways.append(
+                "Season-scoped priors are still missing for "
+                f"{', '.join(missing_priors)}, so this replay still leans on fallback artifacts."
+            )
 
     race_mae = canonical_summary.get("race_mae_mean")
     top3_accuracy = canonical_summary.get("top3_accuracy_mean")
@@ -304,6 +463,10 @@ def _emit_review_packet_markdown(output_path: Path, packet: dict[str, Any]) -> N
     error_analysis = packet.get("canonical_error_analysis", {})
     reviewer_takeaways = packet.get("reviewer_takeaways", [])
     recommended_experiments = packet.get("recommended_experiments", [])
+    prior_status = packet.get("season_prior_status", {})
+    season_prior_mode = packet.get("season_prior_mode")
+    season_prior_source_data_dir = packet.get("season_prior_source_data_dir")
+    season_prior_data_dir = packet.get("season_prior_data_dir")
 
     lines = [
         "# Review Packet",
@@ -319,6 +482,26 @@ def _emit_review_packet_markdown(output_path: Path, packet: dict[str, Any]) -> N
         f"- Weather assumption: `{packet.get('weather')}`",
         "",
     ]
+
+    if isinstance(prior_status, dict) and prior_status:
+        lines.extend(["## Prior Provenance", ""])
+        if season_prior_mode:
+            lines.append(f"- Mode: `{season_prior_mode}`")
+        if season_prior_source_data_dir:
+            lines.append(f"- Source data dir: `{season_prior_source_data_dir}`")
+        if season_prior_data_dir:
+            lines.append(f"- Effective data dir: `{season_prior_data_dir}`")
+        for category, status in sorted(prior_status.items()):
+            if not isinstance(status, dict):
+                continue
+            path = status.get("path", "n/a")
+            fallback_path = status.get("fallback_path")
+            season_scoped = bool(status.get("season_scoped"))
+            suffix = "season-scoped" if season_scoped else "missing season-scoped file"
+            if fallback_path:
+                suffix = f"{suffix}; fallback `{fallback_path}`" if not season_scoped else suffix
+            lines.append(f"- {category.title()}: `{path}` ({suffix})")
+        lines.append("")
 
     if reviewer_takeaways:
         lines.extend(["## Plain-Language Takeaways", ""])
@@ -573,6 +756,16 @@ def main() -> int:
         help="Use historical cutoff timing or current live timing during backtest replay",
     )
     parser.add_argument(
+        "--season-prior-mode",
+        type=str,
+        default="auto",
+        choices=["auto", "allow", "proxy-only"],
+        help=(
+            "Control whether replay uses exact target-season priors. "
+            "`auto` defaults to proxy-only for historical replay and allow for live mode."
+        ),
+    )
+    parser.add_argument(
         "--learning-mode",
         type=str,
         default="both",
@@ -632,6 +825,40 @@ def main() -> int:
         logger.warning(f"Could not enable FastF1 cache at {args.cache_dir}: {exc}")
 
     base_config = load_config_dict(args.config)
+    source_predictor_data_dir = _resolve_predictor_data_dir()
+    effective_season_prior_mode = _resolve_effective_season_prior_mode(
+        requested_mode=args.season_prior_mode,
+        evaluation_mode=args.evaluation_mode,
+    )
+    predictor_data_dir = _prepare_backtest_data_dir(
+        source_data_dir=source_predictor_data_dir,
+        output_dir=output_dir,
+        season_year=args.year,
+        season_prior_mode=effective_season_prior_mode,
+    )
+    season_prior_status = _inspect_season_prior_status(
+        data_dir=predictor_data_dir,
+        season_year=args.year,
+    )
+    missing_priors = _summarize_missing_season_priors(season_prior_status)
+    logger.info(
+        "Season prior mode requested=%s effective=%s",
+        args.season_prior_mode,
+        effective_season_prior_mode,
+    )
+    if effective_season_prior_mode == "proxy-only":
+        logger.info(
+            "Historical replay will use cross-season proxies instead of local %s season priors.",
+            args.year,
+        )
+    elif missing_priors:
+        logger.warning(
+            "Season-scoped priors missing for %s under %s: %s. "
+            "Historical replay will fall back to cross-season proxies where available.",
+            args.year,
+            predictor_data_dir,
+            ", ".join(missing_priors),
+        )
 
     races = _parse_races_arg(args.races)
     if not races:
@@ -691,10 +918,12 @@ def main() -> int:
             )
             merged_config = apply_config_overrides(base_config, overrides)
             artifact_store = ArtifactStore(data_root=output_dir / "_backtest_runtime" / name)
-            predictor = Baseline2026Predictor(
+            predictor = _build_backtest_predictor(
+                season_year=args.year,
                 seed=args.seed,
-                config=NestedDictConfig(merged_config),
+                merged_config=merged_config,
                 artifact_store=artifact_store,
+                data_dir=predictor_data_dir,
             )
             reset_learning_state = getattr(
                 getattr(predictor, "calibration_system", None),
@@ -870,6 +1099,11 @@ def main() -> int:
         "overlap_comparison": overlap_comparison,
         "canonical_segment_breakdown": canonical_segment_breakdown,
         "canonical_error_analysis": canonical_error_analysis,
+        "season_prior_status": season_prior_status,
+        "season_prior_mode": effective_season_prior_mode,
+        "season_prior_mode_requested": args.season_prior_mode,
+        "season_prior_data_dir": str(predictor_data_dir),
+        "season_prior_source_data_dir": str(source_predictor_data_dir),
         "recommended_experiments": recommended_experiments,
         "rankings": ranked,
         "experiments": comparison_rows,

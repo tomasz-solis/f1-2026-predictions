@@ -282,6 +282,7 @@ TEAM_CHARACTERISTICS_SCHEMA = {
                     "required": ["overall_performance"],
                     "properties": {
                         "overall_performance": _UNIT_INTERVAL_NUMBER,
+                        "preseason_overall_performance": _UNIT_INTERVAL_NUMBER,
                         "uncertainty": _UNIT_INTERVAL_NUMBER,
                         "note": {"type": "string"},
                         "last_updated": _STRING_OR_NULL,
@@ -328,10 +329,12 @@ TRACK_CHARACTERISTICS_SCHEMA = {
     "required": ["year", "tracks"],
     "properties": {
         "year": _YEAR_VALUE,
+        "version": {"type": "integer", "minimum": 0},
         "note": {"type": "string"},
         "generated_at": {"type": "string"},
         "generated_from": {"type": "string"},
         "data_freshness": {"type": "string"},
+        "last_updated": _STRING_OR_NULL,
         "tracks": {
             "type": "object",
             "patternProperties": {

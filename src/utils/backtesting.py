@@ -16,7 +16,6 @@ import yaml  # type: ignore[import-untyped,unused-ignore]
 
 from src.analysis.model_evaluation import compute_calibration_metrics
 from src.data.actual_results_fetcher import fetch_actual_session_results
-from src.data.track_data_loader import KNOWN_MAIN_RACE_LAPS
 from src.utils.prediction_context import PredictionContext, build_historical_prediction_context
 from src.utils.prediction_metrics import PredictionMetrics
 from src.utils.weekend import get_weekend_type
@@ -28,6 +27,82 @@ LearningMode = Literal["adaptive", "static"]
 _TRACK_CHARACTERISTICS_DIR = (
     Path(__file__).resolve().parents[2] / "data" / "processed" / "track_characteristics"
 )
+_FALLBACK_SEASON_CALENDARS: dict[int, tuple[str, ...]] = {
+    2022: (
+        "Bahrain Grand Prix",
+        "Saudi Arabian Grand Prix",
+        "Australian Grand Prix",
+        "Emilia Romagna Grand Prix",
+        "Miami Grand Prix",
+        "Spanish Grand Prix",
+        "Monaco Grand Prix",
+        "Azerbaijan Grand Prix",
+        "Canadian Grand Prix",
+        "British Grand Prix",
+        "Austrian Grand Prix",
+        "French Grand Prix",
+        "Hungarian Grand Prix",
+        "Belgian Grand Prix",
+        "Dutch Grand Prix",
+        "Italian Grand Prix",
+        "Singapore Grand Prix",
+        "Japanese Grand Prix",
+        "United States Grand Prix",
+        "Mexico City Grand Prix",
+        "São Paulo Grand Prix",
+        "Abu Dhabi Grand Prix",
+    ),
+    2023: (
+        "Bahrain Grand Prix",
+        "Saudi Arabian Grand Prix",
+        "Australian Grand Prix",
+        "Azerbaijan Grand Prix",
+        "Miami Grand Prix",
+        "Monaco Grand Prix",
+        "Spanish Grand Prix",
+        "Canadian Grand Prix",
+        "Austrian Grand Prix",
+        "British Grand Prix",
+        "Hungarian Grand Prix",
+        "Belgian Grand Prix",
+        "Dutch Grand Prix",
+        "Italian Grand Prix",
+        "Singapore Grand Prix",
+        "Japanese Grand Prix",
+        "Qatar Grand Prix",
+        "United States Grand Prix",
+        "Mexico City Grand Prix",
+        "São Paulo Grand Prix",
+        "Las Vegas Grand Prix",
+        "Abu Dhabi Grand Prix",
+    ),
+    2024: (
+        "Bahrain Grand Prix",
+        "Saudi Arabian Grand Prix",
+        "Australian Grand Prix",
+        "Japanese Grand Prix",
+        "Chinese Grand Prix",
+        "Miami Grand Prix",
+        "Emilia Romagna Grand Prix",
+        "Monaco Grand Prix",
+        "Canadian Grand Prix",
+        "Spanish Grand Prix",
+        "Austrian Grand Prix",
+        "British Grand Prix",
+        "Hungarian Grand Prix",
+        "Belgian Grand Prix",
+        "Dutch Grand Prix",
+        "Italian Grand Prix",
+        "Azerbaijan Grand Prix",
+        "Singapore Grand Prix",
+        "United States Grand Prix",
+        "Mexico City Grand Prix",
+        "São Paulo Grand Prix",
+        "Las Vegas Grand Prix",
+        "Qatar Grand Prix",
+        "Abu Dhabi Grand Prix",
+    ),
+}
 
 
 class NestedDictConfig:
@@ -200,10 +275,10 @@ def get_races_for_year(year: int, max_races: int | None = None) -> list[str]:
         logger.warning("Could not load FastF1 schedule for %s: %s", year, exc)
 
     if not races:
-        # Conservative deterministic fallback for offline use.
-        races = list(KNOWN_MAIN_RACE_LAPS.keys())
+        races = list(_FALLBACK_SEASON_CALENDARS.get(int(year), ()))
         logger.warning(
-            "Falling back to known race list from track metadata; schedule may be incomplete."
+            "Falling back to static %s season calendar; schedule may be incomplete.",
+            year,
         )
 
     # Deduplicate while preserving order.
@@ -513,6 +588,26 @@ def _build_backtest_prediction_record(
     }
 
 
+def _replay_completed_weekend_actuals(
+    *,
+    predictor: Any,
+    year: int,
+    race_name: str,
+    qualifying_actual: list[dict[str, Any]],
+    race_actual: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Record completed-weekend team form when the predictor exposes replay hooks."""
+    replay_fn = getattr(predictor, "record_completed_weekend_actuals", None)
+    if not callable(replay_fn):
+        return None
+    return replay_fn(
+        year=year,
+        race_name=race_name,
+        qualifying_actual=qualifying_actual,
+        race_actual=race_actual,
+    )
+
+
 def run_single_race_backtest(
     *,
     predictor: Any,
@@ -524,6 +619,7 @@ def run_single_race_backtest(
     evaluation_mode: EvaluationMode = "historical",
     learning_mode: LearningMode = "adaptive",
     results_fetcher: Any = fetch_actual_session_results,
+    include_prediction_payloads: bool = False,
 ) -> dict[str, Any]:
     """Execute one race backtest and return metric payload or skip reason."""
     race_metadata = _resolve_backtest_race_metadata(
@@ -619,8 +715,15 @@ def run_single_race_backtest(
                     race_context=race_context,
                 )
                 learning_summary = update_fn(prediction_record)
+        _replay_completed_weekend_actuals(
+            predictor=predictor,
+            year=year,
+            race_name=race_name,
+            qualifying_actual=list(qualifying_actual),
+            race_actual=list(race_actual),
+        )
 
-        return {
+        result = {
             "race_name": race_name,
             "status": "ok",
             "evaluation_mode": evaluation_mode,
@@ -659,6 +762,30 @@ def run_single_race_backtest(
             "race_actual_top10": _top_n_entries(race_actual),
             "adaptive_learning": learning_summary,
         }
+        if include_prediction_payloads:
+            result.update(
+                {
+                    "qualifying_regime": qualifying_prediction.get("data_regime"),
+                    "race_regime": race_prediction.get("data_regime"),
+                    "qualifying_prediction_rows": _normalize_ranked_entries(
+                        qualifying_prediction["grid"],
+                        preserve_interval_fields=True,
+                    ),
+                    "qualifying_actual_rows": _normalize_ranked_entries(
+                        qualifying_actual,
+                        preserve_interval_fields=False,
+                    ),
+                    "race_prediction_rows": _normalize_ranked_entries(
+                        race_prediction["finish_order"],
+                        preserve_interval_fields=True,
+                    ),
+                    "race_actual_rows": _normalize_ranked_entries(
+                        race_actual,
+                        preserve_interval_fields=False,
+                    ),
+                }
+            )
+        return result
     except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
         logger.warning("Backtest failed for %s: %s", race_name, exc)
         return {

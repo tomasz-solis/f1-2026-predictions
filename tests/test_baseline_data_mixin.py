@@ -8,6 +8,7 @@ import pytest
 
 import src.predictors.baseline.data_mixin as data_mixin_module
 from src.predictors.baseline.data_mixin import BaselineDataMixin
+from src.utils.prediction_context import PredictionContext, activate_prediction_runtime
 
 
 class DummyPredictor(BaselineDataMixin):
@@ -363,6 +364,29 @@ def test_load_data_uses_season_scoped_driver_fallback_file(tmp_path, patcher, sa
     assert predictor.year == 2027
 
 
+def test_load_data_rewrites_cross_season_proxy_payloads(tmp_path, patcher, sample_payloads):
+    """Cross-season fallback should drop live state and relabel priors to the replay year."""
+    car, drivers, tracks = sample_payloads
+    data_dir = tmp_path / "processed"
+    _write_baseline_files(data_dir, car, drivers, tracks)
+
+    predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
+    predictor.season_year = 2025
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_track_characteristics", _noop_schema_validator)
+    patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
+
+    predictor.load_data()
+
+    assert predictor.year == 2025
+    assert predictor.races_completed == 0
+    assert predictor.teams["McLaren"]["current_season_performance"] == []
+    assert predictor.drivers["NOR"].get("bayesian", {}) == {}
+    assert predictor.tracks["Bahrain Grand Prix"]["pit_stop_loss"] == pytest.approx(22.0)
+    assert predictor.car_characteristics_snapshot == {}
+
+
 def test_load_data_raises_for_invalid_team_schema(tmp_path, patcher, sample_payloads):
     car, drivers, tracks = sample_payloads
     data_dir = tmp_path / "processed"
@@ -492,6 +516,65 @@ def test_load_data_infers_current_season_form_from_saved_actuals(
     ) == pytest.approx([0.0, 1.0])
 
 
+def test_current_season_form_uses_replayed_year_instead_of_loaded_live_year(
+    tmp_path, patcher, sample_payloads
+):
+    car, drivers, tracks = sample_payloads
+    car["teams"]["Ferrari"] = {
+        "overall_performance": 0.70,
+        "current_season_performance": [0.90, 0.85],
+        "testing_characteristics": {"run_profile": "balanced", "overall_pace": 0.58},
+        "compound_characteristics": {},
+    }
+    data_dir = tmp_path / "processed"
+    _write_baseline_files(data_dir, car, drivers, tracks)
+
+    _patch_schedule_rows(
+        patcher,
+        [
+            ("Australian Grand Prix", "conventional"),
+            ("Chinese Grand Prix", "sprint"),
+            ("Japanese Grand Prix", "conventional"),
+        ],
+    )
+
+    predictor = DummyPredictor(data_dir=data_dir, artifact_store=StubStore(payloads={}))
+    patcher.setattr(data_mixin_module, "validate_team_characteristics", _noop_schema_validator)
+    patcher.setattr(data_mixin_module, "validate_driver_characteristics", _noop_schema_validator)
+    patcher.setattr("src.utils.driver_validation.validate_driver_data", lambda payload: [])
+    predictor.load_data()
+
+    predictor.record_completed_weekend_actuals(
+        year=2025,
+        race_name="Australian Grand Prix",
+        qualifying_actual=[
+            {"position": 1, "driver": "NOR", "team": "McLaren"},
+            {"position": 2, "driver": "PIA", "team": "McLaren"},
+            {"position": 3, "driver": "LEC", "team": "Ferrari"},
+            {"position": 4, "driver": "HAM", "team": "Ferrari"},
+        ],
+        race_actual=[
+            {"position": 1, "driver": "NOR", "team": "McLaren"},
+            {"position": 2, "driver": "PIA", "team": "McLaren"},
+            {"position": 3, "driver": "LEC", "team": "Ferrari"},
+            {"position": 4, "driver": "HAM", "team": "Ferrari"},
+        ],
+    )
+
+    with activate_prediction_runtime(
+        prediction_context=PredictionContext(mode="historical", season_year=2025)
+    ):
+        observations = predictor._get_current_season_observations(
+            team_name="McLaren",
+            team_data=predictor.teams["McLaren"],
+            race_name="Chinese Grand Prix",
+        )
+        races_completed = predictor._get_contextual_races_completed("Chinese Grand Prix")
+
+    assert observations == pytest.approx([1.0])
+    assert races_completed == 1
+
+
 def test_calculate_track_suitability_variants(tmp_path):
     predictor = DummyPredictor(data_dir=tmp_path)
     predictor.teams = {
@@ -562,6 +645,92 @@ def test_get_blended_team_strength_uses_current_fallback(tmp_path, patcher):
     assert captured["baseline_score"] == 0.82
     assert captured["current_score"] == 0.82
     assert captured["race_number"] == 4
+
+
+def test_get_blended_team_strength_uses_preseason_anchor_for_live_updated_payload(
+    tmp_path, patcher
+):
+    """Live-updated team files should not count early race form as the baseline too."""
+    predictor = DummyPredictor(data_dir=tmp_path)
+    predictor.teams = {
+        "McLaren": {
+            "overall_performance": 0.66,
+            "preseason_overall_performance": 0.85,
+            "current_season_performance": [0.40, 0.55, 0.60],
+        }
+    }
+    predictor.races_completed = 3
+
+    class _ConfigStub:
+        @staticmethod
+        def get(key: str, default):
+            if key == "baseline_predictor.current_season_form.recency_exponent":
+                return 0.0
+            if key == "baseline_predictor.current_season_form.stabilization_strength":
+                return 3.0
+            return default
+
+    predictor.config = _ConfigStub()
+    patcher.setattr(predictor, "calculate_track_suitability", lambda team, race_name: 0.0)
+
+    captured = {}
+
+    def _fake_blend(**kwargs):
+        captured.update(kwargs)
+        return 0.70
+
+    patcher.setattr(data_mixin_module, "calculate_blended_performance", _fake_blend)
+    patcher.setattr(
+        data_mixin_module, "get_recommended_schedule", lambda is_regulation_change: "extreme"
+    )
+
+    result = predictor.get_blended_team_strength("McLaren", "Bahrain Grand Prix")
+
+    assert result == 0.70
+    assert captured["baseline_score"] == 0.85
+    assert captured["testing_modifier"] == 0.85
+    assert captured["current_score"] == pytest.approx(0.6833333333)
+
+
+def test_get_blended_team_strength_recovers_legacy_2026_seed_anchor(tmp_path, patcher):
+    """Older live 2026 artifacts should still shrink early form toward the seed anchor."""
+    predictor = DummyPredictor(data_dir=tmp_path)
+    predictor.season_year = 2026
+    predictor.teams = {
+        "McLaren": {
+            "overall_performance": 0.66,
+            "note": "2025 P1 seed, updated with 3 race(s) of 2026 data",
+            "current_season_performance": [0.40, 0.55, 0.60],
+        }
+    }
+
+    class _ConfigStub:
+        @staticmethod
+        def get(key: str, default):
+            if key == "baseline_predictor.current_season_form.recency_exponent":
+                return 0.0
+            if key == "baseline_predictor.current_season_form.stabilization_strength":
+                return 3.0
+            return default
+
+    predictor.config = _ConfigStub()
+    patcher.setattr(predictor, "calculate_track_suitability", lambda team, race_name: 0.0)
+
+    captured = {}
+
+    def _fake_blend(**kwargs):
+        captured.update(kwargs)
+        return 0.70
+
+    patcher.setattr(data_mixin_module, "calculate_blended_performance", _fake_blend)
+    patcher.setattr(
+        data_mixin_module, "get_recommended_schedule", lambda is_regulation_change: "extreme"
+    )
+
+    predictor.get_blended_team_strength("McLaren", "Bahrain Grand Prix")
+
+    assert captured["baseline_score"] == 0.85
+    assert captured["current_score"] == pytest.approx(0.6833333333)
 
 
 def test_get_blended_team_strength_converts_track_modifier_to_absolute_testing_score(

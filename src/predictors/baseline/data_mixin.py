@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -21,6 +22,8 @@ from src.predictors.baseline.data_support import (
     coerce_non_negative_int,
     driver_characteristics_fallback_paths,
     extract_target_actual_rows,
+    infer_payload_year_from_path,
+    nearest_season_payload_path,
     sanitize_performance_observations,
     score_teams_from_actual_rows,
 )
@@ -49,6 +52,7 @@ from src.systems.weight_schedule import (
     get_recommended_schedule,
 )
 from src.utils import config_loader
+from src.utils.prediction_context import get_active_prediction_context
 from src.utils.schema_validation import (
     validate_driver_characteristics,
     validate_team_characteristics,
@@ -82,6 +86,8 @@ class BaselineDataMixin:
         """Initialize data mixin with compound extraction cache."""
         if not hasattr(self, "_compound_cache"):
             self._compound_cache = {}
+        if not hasattr(self, "_replayed_actual_race_scores"):
+            self._replayed_actual_race_scores: dict[int, list[dict[str, object]]] = {}
 
     def _resolve_predictions_data_root(self) -> Path:
         """Return the data root used when reading saved prediction artifacts."""
@@ -92,6 +98,28 @@ class BaselineDataMixin:
         if isinstance(store_root, str) and store_root:
             return Path(store_root)
         return self.data_dir.parent if self.data_dir.name == "processed" else self.data_dir
+
+    def _resolve_prediction_target_year(self) -> int:
+        """Return the season year that the active prediction should reason about."""
+        active_context = get_active_prediction_context()
+        contextual_year = getattr(active_context, "season_year", None)
+        if isinstance(contextual_year, int) and contextual_year > 0:
+            return int(contextual_year)
+        return int(getattr(self, "season_year", getattr(self, "year", 2026)))
+
+    def _get_replayed_actual_race_scores(self, target_year: int) -> list[dict[str, object]]:
+        """Return actual-result snapshots recorded during one replayed season run."""
+        records = getattr(self, "_replayed_actual_race_scores", {}).get(target_year, [])
+        return list(records) if isinstance(records, list) else []
+
+    @staticmethod
+    def _prefer_longest_observations(*candidates: list[float]) -> list[float]:
+        """Prefer the most complete observation series, breaking ties toward later inputs."""
+        preferred: list[float] = []
+        for candidate in candidates:
+            if len(candidate) >= len(preferred):
+                preferred = candidate
+        return preferred
 
     def _get_race_order_map(self, target_year: int) -> dict[str, int]:
         """Return season race order for contextual current-form cutoffs."""
@@ -371,6 +399,86 @@ class BaselineDataMixin:
             observations.append(float(np.clip(float(score), 0.0, 1.0)))
         return observations
 
+    def _get_replayed_actual_observations(
+        self,
+        *,
+        team_name: str,
+        target_year: int,
+        race_name: str | None,
+    ) -> list[float]:
+        """Return per-team observations recorded during the active historical replay."""
+        observations: list[float] = []
+        for race_record in self._get_replayed_actual_race_scores(target_year):
+            candidate_race_name = str(race_record.get("race_name", "")).strip()
+            if not self._race_precedes_target(
+                target_year=target_year,
+                candidate_race_name=candidate_race_name,
+                target_race_name=race_name,
+            ):
+                continue
+            team_scores = race_record.get("team_scores", {})
+            if not isinstance(team_scores, dict):
+                continue
+            score = team_scores.get(team_name)
+            if score is None:
+                continue
+            observations.append(float(np.clip(float(score), 0.0, 1.0)))
+        return observations
+
+    def record_completed_weekend_actuals(
+        self,
+        *,
+        year: int,
+        race_name: str,
+        qualifying_actual: list[dict[str, object]],
+        race_actual: list[dict[str, object]],
+    ) -> dict[str, object]:
+        """Record one completed weekend so later replayed races can reuse its team-form signal."""
+        known_teams = set(self.teams.keys())
+        team_scores = self._blend_saved_actual_team_scores(
+            qualifying_rows=qualifying_actual,
+            race_rows=race_actual,
+            known_teams=known_teams,
+        )
+        if not team_scores:
+            return {
+                "race_name": race_name,
+                "teams_updated": 0,
+                "races_recorded": len(self._get_replayed_actual_race_scores(year)),
+            }
+
+        replay_store = getattr(self, "_replayed_actual_race_scores", {})
+        if not isinstance(replay_store, dict):
+            replay_store = {}
+
+        normalized_race_name = str(race_name).strip()
+        year_records = [
+            record
+            for record in self._get_replayed_actual_race_scores(year)
+            if str(record.get("race_name", "")).strip() != normalized_race_name
+        ]
+        year_records.append(
+            {
+                "race_name": normalized_race_name,
+                "team_scores": team_scores,
+            }
+        )
+
+        race_order_map = self._get_race_order_map(year)
+        year_records.sort(
+            key=lambda record: (
+                race_order_map.get(str(record.get("race_name", "")).strip(), 10_000),
+                str(record.get("race_name", "")).strip(),
+            )
+        )
+        replay_store[int(year)] = year_records
+        self._replayed_actual_race_scores = replay_store
+        return {
+            "race_name": normalized_race_name,
+            "teams_updated": len(team_scores),
+            "races_recorded": len(year_records),
+        }
+
     def _get_current_season_observations(
         self,
         *,
@@ -386,7 +494,8 @@ class BaselineDataMixin:
         brittle than the telemetry-derived live team series for early-season
         snapshots.
         """
-        target_year = int(getattr(self, "season_year", getattr(self, "year", 2026)))
+        target_year = self._resolve_prediction_target_year()
+        loaded_season_year = int(getattr(self, "season_year", getattr(self, "year", 2026)))
         live_observations = sanitize_performance_observations(
             team_data.get("current_season_performance")
         )
@@ -398,27 +507,47 @@ class BaselineDataMixin:
             target_year=target_year,
             race_name=race_name,
         )
+        replayed_actual_observations = self._get_replayed_actual_observations(
+            team_name=team_name,
+            target_year=target_year,
+            race_name=race_name,
+        )
         if prior_race_limit is not None:
+            live_observations = live_observations[:prior_race_limit]
             saved_actual_observations = saved_actual_observations[:prior_race_limit]
+            replayed_actual_observations = replayed_actual_observations[:prior_race_limit]
+
+        if target_year != loaded_season_year:
+            return self._prefer_longest_observations(
+                saved_actual_observations,
+                replayed_actual_observations,
+            )
 
         if live_observations:
-            if prior_race_limit is None:
-                if len(saved_actual_observations) >= len(live_observations):
-                    return saved_actual_observations
-                return live_observations
-            limited_live_observations = live_observations[:prior_race_limit]
-            if len(saved_actual_observations) >= len(limited_live_observations):
-                return saved_actual_observations
-            return limited_live_observations
+            return self._prefer_longest_observations(
+                live_observations,
+                saved_actual_observations,
+                replayed_actual_observations,
+            )
 
-        return saved_actual_observations
+        return self._prefer_longest_observations(
+            saved_actual_observations,
+            replayed_actual_observations,
+        )
 
     def _get_contextual_races_completed(self, race_name: str | None) -> int:
         """Return completed-race count capped to what the target race could have known."""
-        target_year = int(getattr(self, "season_year", getattr(self, "year", 2026)))
+        target_year = self._resolve_prediction_target_year()
+        loaded_season_year = int(getattr(self, "season_year", getattr(self, "year", 2026)))
+        live_races_completed = (
+            coerce_non_negative_int(getattr(self, "races_completed", 0)) or 0
+            if target_year == loaded_season_year
+            else 0
+        )
         available_races = max(
-            coerce_non_negative_int(getattr(self, "races_completed", 0)) or 0,
+            live_races_completed,
             len(self._load_saved_actual_race_scores(target_year)),
+            len(self._get_replayed_actual_race_scores(target_year)),
         )
         prior_race_limit = self._count_known_prior_races(target_year, race_name)
         if prior_race_limit is None:
@@ -480,20 +609,39 @@ class BaselineDataMixin:
             artifact_type="car_characteristics",
             artifact_key=f"{target_year}::car_characteristics",
         )
+        source_year = target_year
         if not data:
             logger.warning("Could not load car characteristics from DB, falling back to file")
-            car_file = (
-                self.data_dir / "car_characteristics" / f"{target_year}_car_characteristics.json"
+            fallback = nearest_season_payload_path(
+                self.data_dir / "car_characteristics",
+                suffix="car_characteristics",
+                target_year=target_year,
             )
+            if fallback is None:
+                raise FileNotFoundError(
+                    f"Could not locate car characteristics fallback for season {target_year} "
+                    f"under {self.data_dir}"
+                )
+            source_year, car_file = fallback
             with open(car_file) as f:
                 data = json.load(f)
+            if source_year != target_year:
+                logger.warning(
+                    "Using %s car characteristics as preseason proxy for season %s.",
+                    source_year,
+                    target_year,
+                )
 
         try:
-            validate_team_characteristics(data, expected_year=target_year)
+            validate_team_characteristics(data, expected_year=source_year)
         except ValueError as e:
             logger.error("Failed to load team characteristics: %s", e)
             raise
-        return data
+        return self._build_cross_season_team_proxy_payload(
+            data,
+            source_year=source_year,
+            target_year=target_year,
+        )
 
     def _apply_team_payload(self, data: dict, target_year: int) -> int:
         """Set self.teams and self.car_characteristics_snapshot from validated payload.
@@ -508,6 +656,10 @@ class BaselineDataMixin:
         checkpoint_snapshot = data.get("checkpoint_snapshot", {})
         self.car_characteristics_snapshot = (
             checkpoint_snapshot if isinstance(checkpoint_snapshot, dict) else {}
+        )
+        directionality_meta = data.get("directionality_meta", {})
+        self.car_characteristics_meta = (
+            deepcopy(directionality_meta) if isinstance(directionality_meta, dict) else {}
         )
 
         data_freshness = data.get("data_freshness", "UNKNOWN")
@@ -540,6 +692,13 @@ class BaselineDataMixin:
             )
         return races_completed
 
+    def _uses_testing_model_team_seed(self) -> bool:
+        """Return whether the active team payload came from the testing seed model."""
+        meta = getattr(self, "car_characteristics_meta", {})
+        if not isinstance(meta, dict):
+            return False
+        return str(meta.get("seed_mode", "")).strip() == "testing_model"
+
     def _load_driver_characteristics(
         self,
         store: ArtifactStore,
@@ -556,6 +715,7 @@ class BaselineDataMixin:
             artifact_type="driver_characteristics",
             artifact_key=f"{target_year}::driver_characteristics",
         )
+        source_year = target_year
         if not driver_data:
             logger.warning("Could not load driver characteristics from DB, falling back to file")
             driver_data = None
@@ -564,6 +724,10 @@ class BaselineDataMixin:
                     continue
                 with open(driver_file) as f:
                     driver_data = json.load(f)
+                source_year = infer_payload_year_from_path(
+                    driver_file,
+                    suffix="driver_characteristics",
+                ) or int(driver_data.get("year", target_year))
                 logger.info(
                     "Loaded driver characteristics fallback from %s for season %s",
                     driver_file,
@@ -588,6 +752,11 @@ class BaselineDataMixin:
                     stripped,
                 )
 
+        driver_data = self._build_cross_season_driver_proxy_payload(
+            driver_data,
+            source_year=source_year,
+            target_year=target_year,
+        )
         try:
             validate_driver_characteristics(driver_data, expected_year=target_year)
         except ValueError as e:
@@ -620,21 +789,33 @@ class BaselineDataMixin:
             artifact_type="track_characteristics",
             artifact_key=f"{target_year}::track_characteristics",
         )
+        source_year = target_year
         if not track_data:
             logger.warning("Could not load track characteristics from DB, falling back to file")
-            track_file = (
-                self.data_dir
-                / "track_characteristics"
-                / f"{target_year}_track_characteristics.json"
+            fallback = nearest_season_payload_path(
+                self.data_dir / "track_characteristics",
+                suffix="track_characteristics",
+                target_year=target_year,
             )
-            try:
-                with open(track_file) as f:
-                    track_data = json.load(f)
-            except FileNotFoundError:
+            if fallback is None:
                 logger.warning("Track characteristics not found")
                 return {}
+            source_year, track_file = fallback
+            with open(track_file) as f:
+                track_data = json.load(f)
+            if source_year != target_year:
+                logger.warning(
+                    "Using %s track characteristics as preseason proxy for season %s.",
+                    source_year,
+                    target_year,
+                )
 
         if track_data:
+            track_data = self._build_cross_season_track_proxy_payload(
+                track_data,
+                source_year=source_year,
+                target_year=target_year,
+            )
             try:
                 validate_track_characteristics(track_data, expected_year=target_year)
             except ValueError as e:
@@ -642,6 +823,105 @@ class BaselineDataMixin:
                 raise
 
         return self._supplement_track_layout_fields(track_data)
+
+    @staticmethod
+    def _build_proxy_note(
+        existing_note: object,
+        *,
+        source_year: int,
+        target_year: int,
+        label: str,
+    ) -> str:
+        """Append one short note explaining a cross-season proxy fallback."""
+        base_note = str(existing_note).strip() if isinstance(existing_note, str) else ""
+        proxy_note = (
+            f"Proxy fallback: reused {source_year} {label} as preseason priors for season "
+            f"{target_year}."
+        )
+        return f"{base_note} {proxy_note}".strip() if base_note else proxy_note
+
+    def _build_cross_season_team_proxy_payload(
+        self,
+        data: dict[str, Any],
+        *,
+        source_year: int,
+        target_year: int,
+    ) -> dict[str, Any]:
+        """Rewrite cross-season team payloads into preseason proxy state."""
+        if source_year == target_year:
+            return data
+
+        proxy = deepcopy(data)
+        proxy["year"] = target_year
+        proxy["data_freshness"] = "BASELINE_PRESEASON"
+        proxy["races_completed"] = 0
+        proxy["checkpoint_snapshot"] = {}
+        proxy["note"] = self._build_proxy_note(
+            proxy.get("note"),
+            source_year=source_year,
+            target_year=target_year,
+            label="car characteristics",
+        )
+
+        teams = proxy.get("teams", {})
+        if isinstance(teams, dict):
+            for team_payload in teams.values():
+                if not isinstance(team_payload, dict):
+                    continue
+                team_payload["current_season_performance"] = []
+                team_payload["races_completed"] = 0
+
+        return proxy
+
+    def _build_cross_season_driver_proxy_payload(
+        self,
+        data: dict[str, Any],
+        *,
+        source_year: int,
+        target_year: int,
+    ) -> dict[str, Any]:
+        """Rewrite cross-season driver priors so schema and notes match the replay year."""
+        if source_year == target_year:
+            return data
+
+        proxy = deepcopy(data)
+        proxy["year"] = target_year
+        proxy["carried_over_from"] = source_year
+        proxy["note"] = self._build_proxy_note(
+            proxy.get("note"),
+            source_year=source_year,
+            target_year=target_year,
+            label="driver characteristics",
+        )
+        drivers = proxy.get("drivers", {})
+        if isinstance(drivers, dict):
+            for driver_payload in drivers.values():
+                if not isinstance(driver_payload, dict):
+                    continue
+                driver_payload["bayesian"] = {}
+        return proxy
+
+    def _build_cross_season_track_proxy_payload(
+        self,
+        data: dict[str, Any],
+        *,
+        source_year: int,
+        target_year: int,
+    ) -> dict[str, Any]:
+        """Rewrite cross-season track priors so historical replay stays explicit."""
+        if source_year == target_year:
+            return data
+
+        proxy = deepcopy(data)
+        proxy["year"] = target_year
+        proxy["data_freshness"] = "BASELINE_PRESEASON"
+        proxy["note"] = self._build_proxy_note(
+            proxy.get("note"),
+            source_year=source_year,
+            target_year=target_year,
+            label="track characteristics",
+        )
+        return proxy
 
     def _supplement_track_layout_fields(self, track_data: dict) -> dict:
         """Fill missing layout-mix fields from the extracted track-profile cache.
@@ -752,7 +1032,7 @@ class BaselineDataMixin:
     def _select_race_compound(self, race_name: str) -> str:
         """Select the likely primary race compound from Pirelli tire-stress data."""
         cfg = getattr(self, "config", config_loader)
-        season_year = int(getattr(self, "season_year", getattr(self, "year", 2026)))
+        season_year = self._resolve_prediction_target_year()
         return select_race_compound(race_name=race_name, season_year=season_year, cfg=cfg)
 
     def get_compound_adjusted_team_strength(

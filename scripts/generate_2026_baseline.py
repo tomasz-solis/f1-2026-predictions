@@ -1,10 +1,10 @@
 """
-Generate 2026 baseline data from historical averages (2023-2025).
+Generate 2026 baseline data from historical averages.
 
 This script creates baseline characteristics for the 2026 season:
 - Track characteristics: 3-year averages of pit times, SC probability, overtaking difficulty
-- Car/Team characteristics: 2025-seeded preseason starting point (high uncertainty);
-  optional neutral mode when explicitly requested
+- Car/Team characteristics: 2025-seeded preseason starting point with high
+  uncertainty, or an opt-in testing model trained on reset-aware seasons
 - Driver characteristics: Carried over from 2025 end-of-season
 
 WHY THIS MATTERS:
@@ -26,6 +26,10 @@ import fastf1
 import numpy as np
 import pandas as pd
 
+from src.models.testing_team_seed import (
+    build_testing_model_team_payload,
+    write_validation_report,
+)
 from src.utils.track_overtaking import get_track_overtaking_baseline
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
@@ -449,6 +453,9 @@ def generate_team_characteristics(
     *,
     neutral_start: bool = False,
     force_reset: bool = False,
+    team_seed_mode: str = "standings",
+    testing_model_years: tuple[int, ...] = (2022, 2023, 2024),
+    testing_model_report_path: Path | None = None,
 ) -> None:
     """
     Generate preseason team characteristics for 2026.
@@ -468,7 +475,35 @@ def generate_team_characteristics(
         )
         return
 
-    if neutral_start:
+    normalized_seed_mode = str(team_seed_mode).strip().lower().replace("_", "-")
+    if neutral_start and normalized_seed_mode == "standings":
+        normalized_seed_mode = "neutral"
+
+    if normalized_seed_mode == "testing-model":
+        logger.info(
+            "Generating testing-derived team characteristics for 2026 using %s...",
+            list(testing_model_years),
+        )
+        team_characteristics = build_testing_model_team_payload(
+            target_year=2026,
+            training_years=testing_model_years,
+        )
+
+        with open(output_file, "w") as f:
+            json.dump(team_characteristics, f, indent=2)
+
+        if testing_model_report_path is not None:
+            write_validation_report(
+                payload=team_characteristics,
+                output_path=testing_model_report_path,
+            )
+
+        logger.info(f"[OK] Saved team characteristics to {output_file}")
+        logger.info("  Seed mode: testing-model")
+        logger.info("  Teams: %s", len(team_characteristics.get("teams", {})))
+        return
+
+    if normalized_seed_mode == "neutral":
         logger.info("Generating neutral team characteristics for 2026...")
         team_2026_seed = {
             "McLaren": {"position": 1, "performance": 0.50},
@@ -487,7 +522,7 @@ def generate_team_characteristics(
             "2026 REGULATION RESET - All teams start with neutral baseline "
             "(0.5 ± 0.3 uncertainty). Performance unknown until testing/races."
         )
-    else:
+    elif normalized_seed_mode == "standings":
         logger.info("Generating 2025-seeded team characteristics for 2026...")
         # Preserve relative ordering from 2025, but keep large uncertainty for the regulation reset.
         team_2026_seed = {
@@ -507,6 +542,8 @@ def generate_team_characteristics(
             "2026 REGULATION RESET - Initialized from 2025 constructor ranking with high "
             "uncertainty (±0.3). Team strengths are updated as 2026 data arrives."
         )
+    else:
+        raise ValueError("Unknown team_seed_mode. Use one of: standings, neutral, testing-model.")
 
     team_characteristics = {
         "year": 2026,
@@ -517,7 +554,8 @@ def generate_team_characteristics(
     }
 
     for team, team_seed in team_2026_seed.items():
-        if neutral_start:
+        preseason_performance = float(team_seed["performance"])
+        if normalized_seed_mode == "neutral":
             team_note = "Pre-season neutral baseline - no 2026 data yet"
         else:
             team_note = (
@@ -526,11 +564,13 @@ def generate_team_characteristics(
             )
 
         team_characteristics["teams"][team] = {
-            "overall_performance": float(team_seed["performance"]),
+            "overall_performance": preseason_performance,
+            "preseason_overall_performance": preseason_performance,
             "uncertainty": 0.30,
             "note": team_note,
             "last_updated": None,
             "races_completed": 0,
+            "current_season_performance": [],
         }
 
     with open(output_file, "w") as f:
@@ -639,6 +679,30 @@ def main():
         help="Initialize all teams at 0.5 (use only for explicitly neutral preseason experiments).",
     )
     parser.add_argument(
+        "--team-seed-mode",
+        choices=["standings", "neutral", "testing-model"],
+        default=None,
+        help=(
+            "Choose how 2026 team seeds are initialized. "
+            "Defaults to standings unless --neutral-teams is set."
+        ),
+    )
+    parser.add_argument(
+        "--testing-model-years",
+        type=str,
+        default="2022,2023,2024",
+        help=(
+            "Comma-separated training years for the testing-derived team seed mode. "
+            "Add 2025 only for explicit carryover-season ablations."
+        ),
+    )
+    parser.add_argument(
+        "--testing-model-report",
+        type=str,
+        default=None,
+        help="Optional JSON path for the testing-model validation report.",
+    )
+    parser.add_argument(
         "--force-reset-teams",
         action="store_true",
         help=(
@@ -651,6 +715,12 @@ def main():
 
     output_dir = Path(args.output)
     years = [int(y.strip()) for y in args.years.split(",")]
+    testing_model_years = tuple(
+        int(year_text.strip())
+        for year_text in str(args.testing_model_years).split(",")
+        if year_text.strip()
+    )
+    team_seed_mode = args.team_seed_mode or ("neutral" if args.neutral_teams else "standings")
 
     logger.info("=" * 60)
     logger.info("Generating 2026 Baseline Data from Historical Averages")
@@ -670,6 +740,11 @@ def main():
             output_dir,
             neutral_start=args.neutral_teams,
             force_reset=args.force_reset_teams,
+            team_seed_mode=team_seed_mode,
+            testing_model_years=testing_model_years,
+            testing_model_report_path=(
+                Path(args.testing_model_report) if args.testing_model_report is not None else None
+            ),
         )
         logger.info("")
 

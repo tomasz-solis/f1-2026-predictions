@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_baseline_if_missing(data_dir: Path) -> None:
-    """Create baseline data when the required artifacts are missing or stale."""
+    """Create only the baseline artifacts that are missing or stale."""
     logger.info("Checking baseline data status...")
 
     # Check all required files
@@ -18,12 +18,13 @@ def create_baseline_if_missing(data_dir: Path) -> None:
     track_file = data_dir / "track_characteristics" / "2026_track_characteristics.json"
     data_dir / "driver_characteristics.json"
 
-    needs_generation = False
+    needs_team_generation = False
+    needs_track_generation = False
 
     # Check team characteristics
     if not team_file.exists():
         logger.warning("Team characteristics missing - will generate baseline")
-        needs_generation = True
+        needs_team_generation = True
     else:
         with open(team_file) as f:
             data = json.load(f)
@@ -32,12 +33,12 @@ def create_baseline_if_missing(data_dir: Path) -> None:
                 logger.warning(
                     "Team characteristics have unknown freshness - regenerating with proper metadata"
                 )
-                needs_generation = True
+                needs_team_generation = True
 
     # Check track characteristics
     if not track_file.exists():
         logger.warning("Track characteristics missing - will generate baseline")
-        needs_generation = True
+        needs_track_generation = True
     else:
         with open(track_file) as f:
             data = json.load(f)
@@ -46,13 +47,25 @@ def create_baseline_if_missing(data_dir: Path) -> None:
                 logger.warning(
                     "Track characteristics have unknown freshness - regenerating with proper metadata"
                 )
-                needs_generation = True
+                needs_track_generation = True
 
-    # If needed, generate baseline
-    if needs_generation:
-        logger.info("Generating baseline data automatically...")
-        generate_quick_baseline(data_dir)
-        logger.info("Baseline data generated successfully.")
+    if not needs_team_generation and not needs_track_generation:
+        return
+
+    logger.info("Generating missing baseline data automatically...")
+    if needs_team_generation:
+        logger.info("Generating neutral team baseline...")
+        generate_neutral_team_characteristics(data_dir)
+    if needs_track_generation:
+        logger.info("Generating track baseline from F1 historical averages...")
+        generate_default_track_characteristics(data_dir)
+
+    logger.info("Checking driver characteristics...")
+    create_driver_characteristics_if_missing(data_dir)
+
+    logger.info("Resetting learning state...")
+    reset_learning_state()
+    logger.info("Baseline data generated successfully.")
 
 
 def generate_quick_baseline(data_dir: Path) -> None:
@@ -102,8 +115,10 @@ def generate_neutral_team_characteristics(data_dir: Path) -> None:
     }
 
     for team, data in team_2025_standings.items():
+        preseason_performance = float(data["performance"])
         team_characteristics["teams"][team] = {
-            "overall_performance": data["performance"],
+            "overall_performance": preseason_performance,
+            "preseason_overall_performance": preseason_performance,
             "uncertainty": 0.30,  # HIGH - regulations changed!
             "note": f"2025 P{data['position']} - starting estimate with high uncertainty",
             "last_updated": None,

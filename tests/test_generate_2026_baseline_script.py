@@ -99,6 +99,43 @@ def test_generate_team_characteristics_force_reset_overwrites_enriched_file(tmp_
     assert "directionality" not in payload["teams"]["McLaren"]
 
 
+def test_generate_team_characteristics_testing_model_mode_writes_generated_payload(tmp_path):
+    module = _load_baseline_module()
+    payload = {
+        "year": 2026,
+        "data_freshness": "BASELINE_PRESEASON",
+        "generated_at": "2026-04-21T00:00:00+00:00",
+        "teams": {
+            "McLaren": {
+                "overall_performance": 0.81,
+                "uncertainty": 0.15,
+                "note": "testing-derived",
+                "last_updated": "2026-04-21T00:00:00+00:00",
+                "races_completed": 0,
+                "current_season_performance": [],
+                "testing_characteristics": {"run_profile": "balanced", "overall_pace": 0.72},
+            }
+        },
+        "directionality_meta": {"seed_mode": "testing_model"},
+    }
+    written_reports: list[tuple[dict, Path]] = []
+
+    module.build_testing_model_team_payload = lambda target_year, training_years: payload
+    module.write_validation_report = lambda payload, output_path: written_reports.append(
+        (payload, Path(output_path))
+    )
+
+    module.generate_team_characteristics(
+        tmp_path,
+        team_seed_mode="testing-model",
+        testing_model_years=(2022, 2023, 2024, 2025),
+        testing_model_report_path=tmp_path / "report.json",
+    )
+
+    assert _load_team_file(tmp_path) == payload
+    assert written_reports == [(payload, tmp_path / "report.json")]
+
+
 def test_estimate_pit_losses_from_pit_timestamps():
     module = _load_baseline_module()
     laps = pd.DataFrame(

@@ -595,7 +595,7 @@ class SystematicLearningSystem:
         *,
         min_samples: int = 20,
         target_coverage: float = 0.90,
-        max_adjustment: float = 4.0,
+        max_adjustment: float = 6.0,
     ) -> dict[str, float]:
         """Summarize learned interval calibration for one session type.
 
@@ -646,7 +646,7 @@ class SystematicLearningSystem:
         *,
         min_samples: int = 20,
         target_coverage: float = 0.90,
-        max_adjustment: float = 4.0,
+        max_adjustment: float = 6.0,
     ) -> float:
         """Return the learned conformal-style residual radius for one session."""
         summary = self.get_interval_calibration_summary(

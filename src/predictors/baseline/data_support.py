@@ -13,10 +13,51 @@ from src.utils.team_mapping import map_team_to_characteristics
 
 def driver_characteristics_fallback_paths(data_dir: Path, year: int) -> tuple[Path, ...]:
     """Return season-aware driver-characteristics fallback candidates."""
-    return (
-        data_dir / "driver_characteristics" / f"{year}_driver_characteristics.json",
-        data_dir / "driver_characteristics.json",
+    candidates: list[Path] = [
+        data_dir / "driver_characteristics" / f"{year}_driver_characteristics.json"
+    ]
+    nearest = nearest_season_payload_path(
+        data_dir / "driver_characteristics",
+        suffix="driver_characteristics",
+        target_year=year,
     )
+    if nearest is not None:
+        _, nearest_path = nearest
+        if nearest_path not in candidates:
+            candidates.append(nearest_path)
+    candidates.append(data_dir / "driver_characteristics.json")
+    return tuple(candidates)
+
+
+def nearest_season_payload_path(
+    directory: Path,
+    *,
+    suffix: str,
+    target_year: int,
+) -> tuple[int, Path] | None:
+    """Return the closest season-scoped payload file under one directory."""
+    exact_path = directory / f"{target_year}_{suffix}.json"
+    if exact_path.exists():
+        return target_year, exact_path
+
+    candidates: list[tuple[int, Path]] = []
+    for path in directory.glob(f"*_{suffix}.json"):
+        prefix = path.name.split("_", 1)[0].strip()
+        if prefix.isdigit():
+            candidates.append((int(prefix), path))
+
+    if not candidates:
+        return None
+
+    return min(candidates, key=lambda item: (abs(item[0] - target_year), item[0]))
+
+
+def infer_payload_year_from_path(path: Path, *, suffix: str) -> int | None:
+    """Extract the season year from a `YYYY_<suffix>.json` filename."""
+    prefix = path.name.removesuffix(f"_{suffix}.json").split("_", 1)[0].strip()
+    if prefix.isdigit():
+        return int(prefix)
+    return None
 
 
 def coerce_non_negative_int(value: object) -> int | None:

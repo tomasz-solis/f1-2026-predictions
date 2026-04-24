@@ -58,6 +58,7 @@ class PredictionContext:
     as_of_datetime: datetime | None = None
     target_session_datetime: datetime | None = None
     seed: int | None = None
+    season_year: int | None = None
 
     def normalized(self) -> PredictionContext:
         """Return a UTC-normalized copy of this context."""
@@ -69,6 +70,7 @@ class PredictionContext:
             as_of_datetime=normalize_utc_datetime(self.as_of_datetime),
             target_session_datetime=normalize_utc_datetime(self.target_session_datetime),
             seed=self.seed,
+            season_year=self.season_year,
         )
 
     @property
@@ -208,6 +210,7 @@ def build_historical_prediction_context(
             as_of_datetime=None,
             target_session_datetime=None,
             seed=seed,
+            season_year=year,
         )
 
     target_session_datetime = normalize_utc_datetime(raw_session_datetime)
@@ -220,4 +223,5 @@ def build_historical_prediction_context(
         as_of_datetime=as_of_datetime,
         target_session_datetime=target_session_datetime,
         seed=seed,
+        season_year=year,
     )

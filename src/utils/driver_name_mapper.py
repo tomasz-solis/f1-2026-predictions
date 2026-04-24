@@ -46,6 +46,17 @@ class DriverNameMapper:
         "BOT": "Bottas",
         # Red Bull
         "HAD": "Hadjar",
+        # Historical drivers used in replay and reset-year benchmarks
+        "RIC": "Ricciardo",
+        "MAG": "Magnussen",
+        "MSC": "Schumacher",
+        "LAT": "Latifi",
+        "ZHO": "Zhou",
+        "VET": "Vettel",
+        "RAI": "Raikkonen",
+        "GIO": "Giovinazzi",
+        "KVY": "Kvyat",
+        "GRO": "Grosjean",
     }
 
     # Reverse mapping: full name -> abbreviation
@@ -101,6 +112,27 @@ class DriverNameMapper:
         "bottas": "BOT",
         "isack hadjar": "HAD",
         "hadjar": "HAD",
+        "daniel ricciardo": "RIC",
+        "ricciardo": "RIC",
+        "kevin magnussen": "MAG",
+        "magnussen": "MAG",
+        "mick schumacher": "MSC",
+        "schumacher": "MSC",
+        "nicholas latifi": "LAT",
+        "latifi": "LAT",
+        "zhou guanyu": "ZHO",
+        "guanyu zhou": "ZHO",
+        "zhou": "ZHO",
+        "sebastian vettel": "VET",
+        "vettel": "VET",
+        "kimi raikkonen": "RAI",
+        "raikkonen": "RAI",
+        "antonio giovinazzi": "GIO",
+        "giovinazzi": "GIO",
+        "daniil kvyat": "KVY",
+        "kvyat": "KVY",
+        "romain grosjean": "GRO",
+        "grosjean": "GRO",
     }
 
     @classmethod
@@ -112,6 +144,8 @@ class DriverNameMapper:
         # Already an abbreviation?
         if name.upper() in cls.DRIVER_MAP:
             return name.upper()
+        if name.strip().isalpha() and name.strip().isupper() and 2 <= len(name.strip()) <= 4:
+            return name.strip()
 
         # Check variants
         normalized = name.lower().strip()

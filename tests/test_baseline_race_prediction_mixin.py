@@ -8,7 +8,10 @@ import pytest
 import src.predictors.baseline.race.prediction_mixin as prediction_module
 from src.predictors.baseline.race.grid_uncertainty import prepare_grid_uncertainty_profile
 from src.predictors.baseline.race.prediction_mixin import BaselineRacePredictionMixin
-from src.predictors.baseline.race.result_processing import estimate_predicted_grid_uncertainty_share
+from src.predictors.baseline.race.result_processing import (
+    apply_early_season_team_uncertainty_adjustments,
+    estimate_predicted_grid_uncertainty_share,
+)
 
 
 class DummyRacePredictor(BaselineRacePredictionMixin):
@@ -1004,6 +1007,60 @@ def test_estimate_predicted_grid_uncertainty_share_tracks_wide_sampled_grids():
 
     assert wide_share > 0.0
     assert fixed_share == pytest.approx(0.0)
+
+
+def test_race_output_widens_intervals_for_high_uncertainty_in_opening_rounds():
+    class _Config:
+        def get(self, key, default=None):
+            overrides = {
+                "baseline_predictor.race.confidence.min": 40.0,
+                "baseline_predictor.race.confidence.max": 60.0,
+                "baseline_predictor.race.early_season_team_uncertainty.activation_floor": 0.22,
+                "baseline_predictor.race.early_season_team_uncertainty.scale": 0.20,
+                "baseline_predictor.race.early_season_team_uncertainty.decay_races": 3,
+                "baseline_predictor.race.early_season_team_uncertainty.interval_positions_scale": 2.5,
+                "baseline_predictor.race.early_season_team_uncertainty.confidence_penalty_scale": 5.0,
+            }
+            return overrides.get(key, default)
+
+    early_finish = [
+        {
+            "driver": "NOR",
+            "team": "McLaren",
+            "position": 1,
+            "median_position": 1,
+            "p5": 1,
+            "p95": 1,
+            "confidence": 55.0,
+        }
+    ]
+    late_finish = [
+        {
+            "driver": "NOR",
+            "team": "McLaren",
+            "position": 1,
+            "median_position": 1,
+            "p5": 1,
+            "p95": 1,
+            "confidence": 55.0,
+        }
+    ]
+
+    apply_early_season_team_uncertainty_adjustments(
+        finish_order=early_finish,
+        driver_info_map={"NOR": {"team_uncertainty": 0.42, "season_races_completed": 0}},
+        cfg=_Config(),
+        field_size=8,
+    )
+    apply_early_season_team_uncertainty_adjustments(
+        finish_order=late_finish,
+        driver_info_map={"NOR": {"team_uncertainty": 0.42, "season_races_completed": 4}},
+        cfg=_Config(),
+        field_size=8,
+    )
+
+    assert early_finish[0]["p95"] > late_finish[0]["p95"]
+    assert early_finish[0]["confidence"] < late_finish[0]["confidence"]
 
 
 def test_predict_race_applies_learned_position_adjustment():

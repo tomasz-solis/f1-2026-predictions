@@ -123,7 +123,9 @@ def _reset_car_artifact(car_file: Path, *, year: int) -> None:
         if seed is None:
             raise KeyError(f"Missing 2026 baseline seed for team '{team_name}'")
 
-        team_data["overall_performance"] = float(seed["performance"])
+        preseason_performance = float(seed["performance"])
+        team_data["overall_performance"] = preseason_performance
+        team_data["preseason_overall_performance"] = preseason_performance
         team_data["uncertainty"] = 0.30
         team_data["note"] = (
             f"2025 P{seed['position']} seed with high uncertainty for 2026 regulation reset"

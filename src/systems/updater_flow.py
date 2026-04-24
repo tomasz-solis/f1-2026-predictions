@@ -119,6 +119,7 @@ def _apply_team_performance_updates(
             old_uncertainty = team_data["uncertainty"]
             updated_uncertainty = max(0.10, old_uncertainty * 0.9)
             old_baseline = float(team_data.get("overall_performance", 0.5))
+            team_data.setdefault("preseason_overall_performance", round(old_baseline, 4))
             updated_baseline = old_baseline + (
                 baseline_learning_rate * (float(running_avg) - old_baseline)
             )

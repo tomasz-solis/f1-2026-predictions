@@ -173,6 +173,40 @@ def test_update_from_prediction_record_learns_interval_radius_from_residuals(tmp
     assert race_summary["learned_radius"] >= 1.0
 
 
+def test_interval_radius_default_clip_matches_runtime_default(tmp_path):
+    """Default interval clip should match the shared runtime fallback."""
+    state_file = tmp_path / "learning_state.json"
+    system = SystematicLearningSystem(state_file=state_file)
+
+    prediction = _sample_prediction_record()
+    for row in prediction["qualifying"]["predicted_grid"]:
+        row["p5"] = row["position"]
+        row["p95"] = row["position"]
+    for row in prediction["race"]["predicted_results"]:
+        row["p5"] = row["position"]
+        row["p95"] = row["position"]
+
+    prediction["actuals"]["qualifying"] = [
+        {"position": 12, "driver": "VER", "team": "Red Bull Racing"},
+        {"position": 13, "driver": "NOR", "team": "McLaren"},
+        {"position": 14, "driver": "HAD", "team": "Red Bull Racing"},
+        {"position": 15, "driver": "PIA", "team": "McLaren"},
+    ]
+    prediction["actuals"]["race"] = [
+        {"position": 11, "driver": "VER", "team": "Red Bull Racing"},
+        {"position": 12, "driver": "NOR", "team": "McLaren"},
+        {"position": 13, "driver": "PIA", "team": "McLaren"},
+        {"position": 14, "driver": "HAD", "team": "Red Bull Racing"},
+    ]
+
+    system.update_from_prediction_record(prediction)
+    qualifying_radius = system.get_interval_radius("qualifying", min_samples=1)
+    race_radius = system.get_interval_radius("race", min_samples=1)
+
+    assert qualifying_radius == 6.0
+    assert race_radius == 6.0
+
+
 def test_update_from_prediction_record_skips_retrospective_predictions(tmp_path):
     state_file = tmp_path / "learning_state.json"
     system = SystematicLearningSystem(state_file=state_file)

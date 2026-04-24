@@ -20,50 +20,119 @@ def _write_baseline_artifacts(data_dir: Path, team_freshness: str, track_freshne
 
 
 def test_create_baseline_if_missing_triggers_generation_when_files_missing(tmp_path, patcher):
+    """Missing team and track priors should rebuild both baseline artifacts."""
     data_dir = tmp_path / "processed"
-    calls: list[Path] = []
+    calls: list[str] = []
     patcher.setattr(
         data_generator,
-        "generate_quick_baseline",
-        lambda path: calls.append(Path(path)),
+        "generate_neutral_team_characteristics",
+        lambda _data_dir: calls.append("teams"),
     )
+    patcher.setattr(
+        data_generator,
+        "generate_default_track_characteristics",
+        lambda _data_dir: calls.append("tracks"),
+    )
+    patcher.setattr(
+        data_generator,
+        "create_driver_characteristics_if_missing",
+        lambda _data_dir: calls.append("drivers"),
+    )
+    patcher.setattr(data_generator, "reset_learning_state", lambda: calls.append("learning"))
 
     data_generator.create_baseline_if_missing(data_dir)
 
-    assert calls == [data_dir]
+    assert calls == ["teams", "tracks", "drivers", "learning"]
 
 
 def test_create_baseline_if_missing_triggers_generation_for_unknown_freshness(tmp_path, patcher):
+    """Unknown team freshness should refresh teams without rewriting tracks."""
     data_dir = tmp_path / "processed"
     _write_baseline_artifacts(
         data_dir, team_freshness="UNKNOWN", track_freshness="BASELINE_PRESEASON"
     )
 
-    calls: list[Path] = []
+    calls: list[str] = []
     patcher.setattr(
         data_generator,
-        "generate_quick_baseline",
-        lambda path: calls.append(Path(path)),
+        "generate_neutral_team_characteristics",
+        lambda _data_dir: calls.append("teams"),
     )
+    patcher.setattr(
+        data_generator,
+        "generate_default_track_characteristics",
+        lambda _data_dir: calls.append("tracks"),
+    )
+    patcher.setattr(
+        data_generator,
+        "create_driver_characteristics_if_missing",
+        lambda _data_dir: calls.append("drivers"),
+    )
+    patcher.setattr(data_generator, "reset_learning_state", lambda: calls.append("learning"))
 
     data_generator.create_baseline_if_missing(data_dir)
 
-    assert calls == [data_dir]
+    assert calls == ["teams", "drivers", "learning"]
 
 
-def test_create_baseline_if_missing_skips_generation_when_metadata_is_fresh(tmp_path, patcher):
+def test_create_baseline_if_missing_rebuilds_track_without_overwriting_team(tmp_path, patcher):
+    """Missing track priors should not clobber an already-prepared team seed."""
     data_dir = tmp_path / "processed"
     _write_baseline_artifacts(
         data_dir,
         team_freshness="BASELINE_PRESEASON",
         track_freshness="BASELINE_PRESEASON",
     )
-    calls: list[Path] = []
+    (data_dir / "track_characteristics" / "2026_track_characteristics.json").unlink()
+
+    calls: list[str] = []
     patcher.setattr(
         data_generator,
-        "generate_quick_baseline",
-        lambda path: calls.append(Path(path)),
+        "generate_neutral_team_characteristics",
+        lambda _data_dir: calls.append("teams"),
     )
+    patcher.setattr(
+        data_generator,
+        "generate_default_track_characteristics",
+        lambda _data_dir: calls.append("tracks"),
+    )
+    patcher.setattr(
+        data_generator,
+        "create_driver_characteristics_if_missing",
+        lambda _data_dir: calls.append("drivers"),
+    )
+    patcher.setattr(data_generator, "reset_learning_state", lambda: calls.append("learning"))
+
+    data_generator.create_baseline_if_missing(data_dir)
+
+    assert calls == ["tracks", "drivers", "learning"]
+
+
+def test_create_baseline_if_missing_skips_generation_when_metadata_is_fresh(tmp_path, patcher):
+    """Fresh team and track artifacts should leave the baseline untouched."""
+    data_dir = tmp_path / "processed"
+    _write_baseline_artifacts(
+        data_dir,
+        team_freshness="BASELINE_PRESEASON",
+        track_freshness="BASELINE_PRESEASON",
+    )
+    calls: list[str] = []
+    patcher.setattr(
+        data_generator,
+        "generate_neutral_team_characteristics",
+        lambda _data_dir: calls.append("teams"),
+    )
+    patcher.setattr(
+        data_generator,
+        "generate_default_track_characteristics",
+        lambda _data_dir: calls.append("tracks"),
+    )
+    patcher.setattr(
+        data_generator,
+        "create_driver_characteristics_if_missing",
+        lambda _data_dir: calls.append("drivers"),
+    )
+    patcher.setattr(data_generator, "reset_learning_state", lambda: calls.append("learning"))
 
     data_generator.create_baseline_if_missing(data_dir)
 
@@ -110,6 +179,7 @@ def test_generate_neutral_team_characteristics_writes_expected_payload(tmp_path)
 
 
 def test_generate_default_track_characteristics_writes_calendar_baseline(tmp_path):
+    """Track baseline generation should stamp artifact metadata and core priors."""
     data_dir = tmp_path / "processed"
     data_generator.generate_default_track_characteristics(data_dir)
 
@@ -118,7 +188,9 @@ def test_generate_default_track_characteristics_writes_calendar_baseline(tmp_pat
     )
 
     assert payload["year"] == 2026
+    assert payload["version"] == 1
     assert payload["data_freshness"] == "BASELINE_PRESEASON"
+    assert "last_updated" in payload
     assert "Bahrain Grand Prix" in payload["tracks"]
     assert payload["tracks"]["Monaco Grand Prix"]["overtaking_difficulty"] == 0.95
     assert payload["tracks"]["Chinese Grand Prix"]["has_sprint"] is True

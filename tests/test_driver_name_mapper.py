@@ -10,6 +10,11 @@ def test_normalize_abbreviation():
     assert DriverNameMapper.normalize_driver_name("VER") == "VER"
     assert DriverNameMapper.normalize_driver_name("ver") == "VER"
     assert DriverNameMapper.normalize_driver_name("NOR") == "NOR"
+    assert DriverNameMapper.normalize_driver_name("MSC") == "MSC"
+    assert DriverNameMapper.normalize_driver_name("MAG") == "MAG"
+    assert DriverNameMapper.normalize_driver_name("LAT") == "LAT"
+    assert DriverNameMapper.normalize_driver_name("ZHO") == "ZHO"
+    assert DriverNameMapper.normalize_driver_name("RIC") == "RIC"
 
 
 def test_normalize_full_name():
@@ -24,6 +29,11 @@ def test_normalize_full_name_with_first():
     assert DriverNameMapper.normalize_driver_name("max verstappen") == "VER"
     assert DriverNameMapper.normalize_driver_name("lando norris") == "NOR"
     assert DriverNameMapper.normalize_driver_name("lewis hamilton") == "HAM"
+    assert DriverNameMapper.normalize_driver_name("mick schumacher") == "MSC"
+    assert DriverNameMapper.normalize_driver_name("kevin magnussen") == "MAG"
+    assert DriverNameMapper.normalize_driver_name("nicholas latifi") == "LAT"
+    assert DriverNameMapper.normalize_driver_name("zhou guanyu") == "ZHO"
+    assert DriverNameMapper.normalize_driver_name("daniel ricciardo") == "RIC"
 
 
 def test_normalize_case_insensitive():
@@ -59,6 +69,12 @@ def test_normalize_unknown_driver():
     """Test normalizing an unknown driver name."""
     unknown = DriverNameMapper.normalize_driver_name("Unknown Driver")
     assert unknown == "Unknown Driver"  # Returns original if not found
+
+
+def test_unknown_uppercase_driver_code_does_not_warn(caplog):
+    """Valid-looking historical or future driver codes should pass through quietly."""
+    assert DriverNameMapper.normalize_driver_name("XYZ") == "XYZ"
+    assert "Could not normalize driver name" not in caplog.text
 
 
 def test_add_driver():

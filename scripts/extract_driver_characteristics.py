@@ -186,21 +186,27 @@ def _apply_rookie_penalty(base_rating: float, experience_data: dict) -> float:
     return adjusted_rating * 0.90
 
 
-def _load_current_lineups(lineup_file: Path) -> dict[str, list[str]]:
-    """Load current lineup mapping from disk when available."""
+def _load_lineup_seed_context(lineup_file: Path) -> tuple[dict[str, list[str]], int | None]:
+    """Load current lineup mapping plus optional target season from disk."""
     if not lineup_file.exists():
-        return {}
+        return {}, None
 
     try:
         with open(lineup_file) as handle:
             payload = json.load(handle)
     except (OSError, json.JSONDecodeError) as exc:
         logger.warning("Could not read %s: %s", lineup_file, exc)
-        return {}
+        return {}, None
 
     current_lineups = payload.get("current_lineups", {})
     if not isinstance(current_lineups, dict):
-        return {}
+        return {}, None
+
+    raw_season = payload.get("season")
+    try:
+        lineup_season = int(raw_season) if raw_season is not None else None
+    except (TypeError, ValueError):
+        lineup_season = None
 
     normalized: dict[str, list[str]] = {}
     for team_name, raw_drivers in current_lineups.items():
@@ -209,7 +215,13 @@ def _load_current_lineups(lineup_file: Path) -> dict[str, list[str]]:
         normalized[str(team_name)] = [
             str(driver).strip().upper() for driver in raw_drivers if driver
         ]
-    return normalized
+    return normalized, lineup_season
+
+
+def _load_current_lineups(lineup_file: Path) -> dict[str, list[str]]:
+    """Load current lineup mapping from disk when available."""
+    current_lineups, _lineup_season = _load_lineup_seed_context(lineup_file)
+    return current_lineups
 
 
 def _resolve_bayesian_seed_grid_size(
@@ -228,17 +240,65 @@ def _seed_initial_bayesian_state(
     *,
     grid_size: int,
 ) -> None:
-    """Seed Bayesian state so file-only loads still expose an in-season prior."""
+    """Seed Bayesian state so file-only loads still expose an in-season prior.
+
+    The persisted Bayesian block intentionally stays minimal. Older payloads
+    used to include extra derived fields such as ``normalized_skill_score``,
+    but the current schema treats those as legacy-only and strips them during
+    load/update flows.
+    """
     for _driver_code, entry in final_ratings.items():
         skill = float(entry["racecraft"]["skill_score"])
         rating_mu = 1.0 + (skill * max(grid_size - 1, 1))
         entry["bayesian"] = {
             "rating_mu": round(rating_mu, 3),
             "rating_sigma": _DEFAULT_BAYESIAN_SIGMA,
-            "normalized_skill_score": round(skill, 3),
             "sessions_observed": 0,
             "seeded_from": "extraction_prior",
         }
+
+
+def _build_team_based_prior_entry(
+    *,
+    driver_code: str,
+    team_name: str,
+    teammate_ratings: list[float],
+    rookie_debut_year: int,
+) -> dict[str, object]:
+    """Build one missing-lineup driver prior from teammate context."""
+    if teammate_ratings:
+        prior_rating = float(np.clip(np.mean(teammate_ratings) - 0.08, 0.10, 0.90))
+    else:
+        prior_rating = 0.40
+
+    logger.info(
+        "  %s: no race data, using team-based prior (%s, base=%.3f)",
+        driver_code,
+        team_name,
+        prior_rating,
+    )
+    return {
+        "name": DRIVER_FULL_NAMES.get(driver_code, driver_code),
+        "wet_skill": WET_SKILL_PRIORS.get(driver_code, WET_SKILL_DEFAULT),
+        "pace": {
+            "quali_pace": round(prior_rating * 0.95, 3),
+            "race_pace": round(prior_rating, 3),
+        },
+        "racecraft": {
+            "skill_score": round(prior_rating, 3),
+            "overtaking_skill": round(prior_rating, 3),
+        },
+        "experience": {
+            "years_of_experience": 0,
+            "debut_year": int(rookie_debut_year),
+            "total_races": 0,
+            "tier": "rookie",
+        },
+        "dnf_risk": {
+            "dnf_rate": round(_DNF_RATE_FLOOR, 3),
+        },
+        "prior_source": "team_based_prior",
+    }
 
 
 def _absolute_finish_floor(
@@ -892,6 +952,12 @@ def main():
     parser.add_argument("--years", type=str, default="2024,2025", help="Comma-separated years")
     parser.add_argument("--output", type=str, default="data/processed/driver_characteristics.json")
     parser.add_argument(
+        "--lineup-file",
+        type=str,
+        default="data/current_lineups.json",
+        help="Lineup mapping used to seed missing drivers with team-based priors.",
+    )
+    parser.add_argument(
         "--request-delay",
         type=float,
         default=0.80,
@@ -986,7 +1052,8 @@ def main():
         race_summaries,
     )
     absolute_finish_baselines = calculate_absolute_finish_baselines(years, race_summaries)
-    current_lineups = _load_current_lineups(Path("data/current_lineups.json"))
+    current_lineups, lineup_season = _load_lineup_seed_context(Path(args.lineup_file))
+    rookie_debut_year = int(lineup_season or (max(years) + 1))
 
     # Step 6: Combine into final ratings
     final_ratings = {}
@@ -1052,39 +1119,12 @@ def main():
                 for teammate in team_drivers
                 if teammate in final_ratings and teammate != driver_code
             ]
-            if teammate_ratings:
-                prior_rating = float(np.clip(np.mean(teammate_ratings) - 0.08, 0.10, 0.90))
-            else:
-                prior_rating = 0.40
-
-            logger.info(
-                "  %s: no race data, using team-based prior (%s, base=%.3f)",
-                driver_code,
-                team_name,
-                prior_rating,
+            final_ratings[driver_code] = _build_team_based_prior_entry(
+                driver_code=driver_code,
+                team_name=team_name,
+                teammate_ratings=teammate_ratings,
+                rookie_debut_year=rookie_debut_year,
             )
-            final_ratings[driver_code] = {
-                "name": DRIVER_FULL_NAMES.get(driver_code, driver_code),
-                "wet_skill": WET_SKILL_PRIORS.get(driver_code, WET_SKILL_DEFAULT),
-                "pace": {
-                    "quali_pace": round(prior_rating * 0.95, 3),
-                    "race_pace": round(prior_rating, 3),
-                },
-                "racecraft": {
-                    "skill_score": round(prior_rating, 3),
-                    "overtaking_skill": round(prior_rating, 3),
-                },
-                "experience": {
-                    "years_of_experience": 0,
-                    "debut_year": 2026,
-                    "total_races": 0,
-                    "tier": "rookie",
-                },
-                "dnf_risk": {
-                    "dnf_rate": round(_DNF_RATE_FLOOR, 3),
-                },
-                "prior_source": "team_based_prior",
-            }
 
     # Step 8: Seed initial Bayesian state so file-based fallbacks can use it.
     _seed_initial_bayesian_state(
