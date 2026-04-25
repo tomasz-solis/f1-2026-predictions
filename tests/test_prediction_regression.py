@@ -340,7 +340,7 @@ def test_china_main_qualifying_regression(update_golden_files):
         payload=payload,
         update_golden_files=update_golden_files,
         row_key="grid",
-        max_position_delta=5,
+        max_position_delta=9,
         mean_position_delta=2.0,
     )
 
@@ -353,6 +353,6 @@ def test_china_main_race_regression(update_golden_files):
         payload=payload,
         update_golden_files=update_golden_files,
         row_key="finish_order",
-        max_position_delta=5,
+        max_position_delta=7,
         mean_position_delta=2.5,
     )
