@@ -31,14 +31,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Add the repository root to the path so src.* imports work when run as a script.
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from features.driver_experience import load_driver_debuts_from_csv
-from persistence.artifact_store import ArtifactStore
-from persistence.config import USE_DB_STORAGE
-from persistence.runtime_state_store import RuntimeStateStore
-from utils.car_snapshot_history import SNAPSHOT_ARTIFACT_TYPE
+from src.features.driver_experience import load_driver_debuts_from_csv
+from src.persistence.artifact_store import ArtifactStore
+from src.persistence.config import USE_DB_STORAGE
+from src.persistence.runtime_state_store import RuntimeStateStore
+from src.utils.car_snapshot_history import SNAPSHOT_ARTIFACT_TYPE
 
 
 def compute_checksum(data: dict) -> str:
@@ -507,6 +507,11 @@ def main():
         default=Path("data"),
         help="Root data directory (default: data/)",
     )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip the interactive confirmation prompt and run the backfill.",
+    )
 
     args = parser.parse_args()
 
@@ -560,7 +565,7 @@ def main():
         print(f"   - {payload['namespace']}: {payload['record_count']}")
 
     # Confirm before proceeding
-    if not args.dry_run:
+    if not args.dry_run and not args.yes:
         print("\n" + "=" * 70)
         response = input("Proceed with backfill? [y/N]: ")
         if response.lower() != "y":

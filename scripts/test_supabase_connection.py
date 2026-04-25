@@ -12,11 +12,11 @@ Usage:
 import sys
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Add the repository root to the path so src.* imports work when run as a script.
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from persistence.artifact_store import ArtifactStore
-from persistence.db import check_connection
+from src.persistence.artifact_store import ArtifactStore
+from src.persistence.db import check_connection
 
 
 def main():
