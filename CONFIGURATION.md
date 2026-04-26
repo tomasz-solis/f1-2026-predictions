@@ -30,7 +30,13 @@ Examples:
 
 ### Other sections in `default.yaml`
 
-Sections such as `bayesian`, `race`, `qualifying`, and `learning` are still useful for other modules/scripts, but they are not the primary scoring knobs for the baseline predictor race/qualifying simulation path.
+Sections such as `bayesian`, `race`, and `qualifying` are still useful for
+other modules/scripts, but they are not the primary scoring knobs for the
+baseline predictor race/qualifying simulation path.
+
+The top-level `learning` section is active. It controls adaptive calibration
+sample gates, adjustment scales, and interval widening thresholds used by
+`src/systems/systematic_learning.py`.
 
 ## 2. `config/production_config.json`
 
@@ -111,6 +117,22 @@ Edit:
 
 - `baseline_predictor.race.dnf_rate_historical_cap`
 - `baseline_predictor.race.dnf_rate_final_cap`
+
+### Change adaptive-learning safeguards
+
+Edit:
+
+- `learning.min_samples` - minimum stored samples before a learned driver or teammate correction can be applied
+- `learning.driver_error_scale` - how strongly driver EMA error moves position scoring
+- `learning.teammate_gap_scale` - how strongly teammate-gap error moves position scoring
+- `learning.max_adjustment` - cap for learned position movement
+- `learning.interval_min_samples` - minimum interval residual samples before learned interval widening applies
+- `learning.interval_target_coverage` - target empirical coverage for learned interval radius
+- `learning.interval_max_adjustment` - cap for learned interval radius
+
+Learning updates are also gated in code: retrospective predictions, duplicate
+run IDs, missing actuals, and tiny actual overlaps are skipped instead of
+training adaptive calibration.
 
 ### Change lap-by-lap simulation parameters (NEW)
 

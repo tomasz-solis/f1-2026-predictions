@@ -35,8 +35,8 @@ tracks) rather than treating raw lap times as ground truth.
 
 **Progressive trust shifting.** As in-season data accumulates, the weight on testing
 signals drops and the weight on actual race performance rises. By Race 3, the system
-is running almost entirely on current-season evidence. The weight schedule is
-configurable and runs in "extreme" mode for regulation-change seasons.
+is running mostly on current-season evidence. The weight schedule is configurable;
+the current reset-year runtime uses `rapid_adaptive`.
 
 **Compound data scarcity.** Tire compound characteristics can only be learned
 track-by-track. A team's SOFT performance at Monaco tells you nothing useful about
@@ -66,13 +66,14 @@ blended_strength = w_baseline * baseline
                  + w_current * current_season_mean
 ```
 
-In regulation-change mode (the 2026 season):
+In the current 2026 reset-year runtime:
 
 | Race | Baseline | Testing | Current |
 |------|----------|---------|---------|
-| 1    | 30%      | 20%     | 50%     |
-| 2    | 15%      | 10%     | 75%     |
-| 3+   | 5%       | 0%      | 95%     |
+| 1    | 35%      | 20%     | 45%     |
+| 2    | 20%      | 10%     | 70%     |
+| 3    | 8%       | 5%      | 87%     |
+| 4+   | 5%       | 0%      | 95%     |
 
 Before any races exist, `current` falls back to `baseline` rather than zero.
 
@@ -113,6 +114,10 @@ qualifying grid (actual or predicted)
 After each race, the system updates per-driver EMA error state and teammate-gap
 calibration using actual results. These learned adjustments feed into the next
 prediction cycle automatically.
+
+Learning is gated. Retrospective predictions, duplicate run IDs, missing actuals,
+and tiny actual overlaps are skipped so the model does not train on contaminated
+or partial records.
 
 ---
 
@@ -163,6 +168,8 @@ too tight.
 - **Baseline comparison** — does it beat a naive previous-race classifier on MAE and
   rank correlation?
 - **Error analysis** — which weekends and drivers keep showing up among the biggest misses?
+- **Promotion gates** — whether experimental components improved central MAE
+  without degrading headline accuracy or making most weekends worse.
 
 To regenerate after new races complete:
 

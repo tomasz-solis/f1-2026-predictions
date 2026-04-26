@@ -155,6 +155,17 @@ When actuals are attached (dashboard or script path calling `PredictionLogger.up
 
 These learned adjustments are consumed by qualifying/race scoring in the baseline predictor.
 
+Learning is intentionally conservative. The update path skips:
+
+- retrospective checkpoint reconstructions,
+- duplicate `run_id` values,
+- records with no actual results,
+- records where too few predicted drivers overlap with actual results.
+
+Skipped records do not mark the run ID as processed, so a later complete actual
+update can still train the learner. Interval residual history uses the same
+valid-session gate.
+
 ## Accuracy View
 
 In the dashboard **Prediction Accuracy** page, metrics are computed per target.
@@ -189,3 +200,4 @@ The dashboard shows:
 2. Actuals updates still depend on FastF1 availability for the needed target session.
 3. Historic sprint weekends can have genuine gaps for early main `Q/R` targets if those forecasts were never stored.
 4. Learning updates still depend on matching driver identifiers between predicted payloads and actual results.
+5. Very small partial actual payloads are ignored until enough driver overlap exists.

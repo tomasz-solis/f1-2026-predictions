@@ -100,9 +100,9 @@ Composed from focused mixins:
 
 File: `src/systems/weight_schedule.py`
 
-Blends baseline, testing, and current-season signals. In regulation-change mode
-(`extreme` schedule), trust shifts to current-season data aggressively: Race 1
-starts at 50% current, Race 3+ runs at 95% current. See
+Blends baseline, testing, and current-season signals. The active reset-year
+runtime uses `rapid_adaptive`: Race 1 starts at 45% current, Race 3 runs at
+87% current, and Race 4+ runs at 95% current. See
 `docs/WEIGHT_SCHEDULE_GUIDE.md` for the full progression table.
 
 ### 3. FP Blending
@@ -153,8 +153,23 @@ locks for idempotent practice backlog updates. Emits counters and alerts to
 - `src/utils/prediction_logger.py`
 
 Updates per-driver and teammate-gap EMA error state from stored prediction
-records vs actual results. Bounded learned adjustments are consumed by
-qualifying and race scoring on the next prediction cycle.
+records vs actual results. The update path skips retrospective records,
+duplicate run IDs, missing actuals, and tiny actual overlaps. Bounded learned
+adjustments are consumed by qualifying and race scoring on the next prediction
+cycle.
+
+### 8. Model Promotion And Diagnostics
+
+- `src/analysis/promotion_gate.py`
+- `src/analysis/component_diagnostics.py`
+- `scripts/evaluate_testing_team_seed_model.py`
+
+Experimental components are evaluated before they are allowed to stack or
+promote. The promotion gate requires central-MAE improvement while preserving
+winner/top-3 accuracy and avoiding broad weekend-level degradation. Movement
+diagnostics compare champion, challenger, and actual positions per driver so
+residual or seed experiments show whether they moved predictions closer or
+farther from reality.
 
 ---
 

@@ -61,7 +61,7 @@ score = calculate_blended_performance(
     testing_modifier=0.02,
     current_score=0.85,   # pre-season: inherits baseline
     race_number=1,
-    schedule="extreme",
+    schedule="rapid_adaptive",
 )
 ```
 

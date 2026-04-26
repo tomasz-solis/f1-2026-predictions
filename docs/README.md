@@ -25,6 +25,10 @@ Automatic vs manual updates during dashboard use and cache behavior.
 ### `PREDICTION_TRACKING.md`
 Session-based prediction storage, attaching actual results, and accuracy metrics.
 
+### `MODEL_PROMOTION.md`
+Promotion gates, movement diagnostics, and adaptive-learning safety checks for
+research components.
+
 ### `../reports/backtest_2025/REVIEW_PACKET.md`
 Canonical historical backtest summary with adaptive-vs-static comparison,
 baseline overlap, and experiment ranking output.

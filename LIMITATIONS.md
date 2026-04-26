@@ -9,11 +9,11 @@ not easier.
 
 ## 1. Weight schedule calibrated on a single regime change
 
-**What the model does:** the signal-blending weight schedule (`extreme` by
-default) determines how fast the model shifts trust from pre-season baseline
-data toward current-season race results. It was calibrated by running a grid
-search across eight named schedules against the 2021→2022 regulation reset
-— the closest recent parallel to the 2026 reset.
+**What the model does:** the signal-blending weight schedule determines how
+fast the model shifts trust from pre-season baseline data toward current-season
+race results. The current runtime uses `rapid_adaptive`; earlier reset-year
+analysis also studied `extreme` against the 2021→2022 regulation reset — the
+closest recent parallel to the 2026 reset.
 
 **The gap:** that is one data point. The margin between `extreme` (0.809
 Spearman correlation) and the next-best schedule `insane` (0.807) is 0.002
@@ -42,9 +42,10 @@ third in 2025 might be first in 2026 (or last). The values carry explicit
 uncertainty fields, but the uncertainty is uniform rather than tracking which
 teams are likely to see the largest disruption.
 
-**What partially mitigates it:** under the `extreme` schedule, the baseline
-carries only 30% weight at race 1 and 5% by race 3. By mid-season it is
-effectively irrelevant. Races 1–2 predictions are the most exposed.
+**What partially mitigates it:** under the active `rapid_adaptive` schedule,
+the baseline carries 35% weight at race 1, 8% at race 3, and 5% from race 4
+onward. By mid-season it is effectively irrelevant. Races 1–2 predictions are
+the most exposed.
 
 **What would fix it:** a Bayesian prior over team disruption magnitude based
 on regulation-change history (teams that led major rule changes have
@@ -180,3 +181,30 @@ saved predictions remain under-covered.
 learning path through historical backtests, and only then tighten the default
 radius or target settings if the empirical coverage stays close to 90% across
 a materially larger sample.
+
+---
+
+## 9. Experimental model components can look useful until stacked
+
+**What the model does:** reset-year research can evaluate testing-derived team
+seeds, residual models, and conformal interval calibration as separate
+components. The evaluation script now applies an executable promotion gate and
+movement diagnostics before a component is treated as stackable.
+
+**The gap:** a component can improve one headline metric while making the
+overall model worse. The clearest current risk is residual stacking: a
+testing-derived team seed and residual correction can both encode similar
+information, so applying both can overcorrect. Mean metrics can also hide broad
+per-weekend damage.
+
+**What partially mitigates it:** residual models are skipped by default when
+the active team seed is `testing_model`, unless an ablation explicitly opts in.
+Promotion gates require central-MAE improvement, no winner-accuracy drop, no
+large top-3 drop, and no broad weekend-level degradation. Movement diagnostics
+count whether challenger predictions moved drivers closer to or farther from
+actual positions.
+
+**What would fix it:** rerun guarded ablations after each component change and
+promote only components that pass the gate across holdouts and live slices.
+Qualifying residuals need direction diagnostics before clip tuning; if they
+often move drivers the wrong way, smaller clips only hide a bad signal.
