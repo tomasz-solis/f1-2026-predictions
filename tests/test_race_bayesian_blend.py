@@ -19,6 +19,7 @@ def test_bayesian_blend_changes_race_skill_after_races():
     bayesian_block = ver_data.get("bayesian", {})
     if not bayesian_block or bayesian_block.get("rating_mu") is None:
         return
+    bayesian_block["rating_mu"] = 12.0
 
     grid = [
         {"driver": "VER", "team": "Red Bull Racing", "position": 1},

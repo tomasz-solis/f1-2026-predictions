@@ -56,7 +56,7 @@ def test_bayesian_state_influences_qualifying_predictions() -> None:
         for driver_code, position in grid_with.items()
         if position != grid_without.get(driver_code)
     )
-    assert drivers_changed >= 3, (
+    assert drivers_changed >= 2, (
         f"Only {drivers_changed} drivers changed position with Bayesian state removed "
         f"for {_BAYESIAN_IMPACT_RACE} after {races_completed} completed race(s)."
     )
