@@ -241,6 +241,7 @@ class SystematicLearningSystem:
         predicted: list[dict[str, Any]],
         actual: list[dict[str, Any]],
         alpha: float,
+        min_common_drivers: int,
     ) -> dict[str, Any]:
         if not predicted or not actual:
             return {
@@ -248,6 +249,8 @@ class SystematicLearningSystem:
                 "drivers_updated": 0,
                 "pairs_updated": 0,
                 "mae": None,
+                "skipped": True,
+                "skip_reason": "missing_predictions_or_actuals",
             }
 
         pred_positions: dict[str, int] = {}
@@ -280,6 +283,19 @@ class SystematicLearningSystem:
                 "drivers_updated": 0,
                 "pairs_updated": 0,
                 "mae": None,
+                "skipped": True,
+                "skip_reason": "no_driver_overlap",
+            }
+        if len(common_drivers) < max(1, min_common_drivers):
+            return {
+                "session": session,
+                "drivers_updated": 0,
+                "pairs_updated": 0,
+                "mae": None,
+                "skipped": True,
+                "skip_reason": "insufficient_driver_overlap",
+                "common_drivers": len(common_drivers),
+                "min_common_drivers": max(1, min_common_drivers),
             }
 
         calibration = self.state["adaptive_calibration"]
@@ -322,6 +338,8 @@ class SystematicLearningSystem:
             "drivers_updated": len(common_drivers),
             "pairs_updated": pair_updates,
             "mae": round(mae, 4),
+            "skipped": False,
+            "skip_reason": None,
         }
 
     def _update_interval_residual_history(
@@ -400,6 +418,7 @@ class SystematicLearningSystem:
         prediction_data: dict[str, Any],
         alpha: float = 0.35,
         history_limit: int = 250,
+        min_common_drivers: int = 3,
     ) -> dict[str, Any]:
         """Update calibration from a saved prediction record with actual results."""
         skip_reason = self._learning_skip_reason(prediction_data)
@@ -408,6 +427,7 @@ class SystematicLearningSystem:
                 "sessions_updated": 0,
                 "driver_updates": 0,
                 "pair_updates": 0,
+                "interval_samples": 0,
                 "details": [],
                 "skipped": True,
                 "skip_reason": skip_reason,
@@ -427,13 +447,16 @@ class SystematicLearningSystem:
                 predicted=predicted_quali,
                 actual=actual_quali,
                 alpha=alpha,
+                min_common_drivers=min_common_drivers,
             )
-            qualifying_update["interval_samples"] = self._update_interval_residual_history(
-                session="qualifying",
-                predicted=predicted_quali,
-                actual=actual_quali,
-                history_limit=interval_history_limit,
-            )
+            qualifying_update["interval_samples"] = 0
+            if not qualifying_update.get("skipped"):
+                qualifying_update["interval_samples"] = self._update_interval_residual_history(
+                    session="qualifying",
+                    predicted=predicted_quali,
+                    actual=actual_quali,
+                    history_limit=interval_history_limit,
+                )
             updates.append(qualifying_update)
         if actual_race:
             race_update = self._update_session_errors(
@@ -441,14 +464,33 @@ class SystematicLearningSystem:
                 predicted=predicted_race,
                 actual=actual_race,
                 alpha=alpha,
+                min_common_drivers=min_common_drivers,
             )
-            race_update["interval_samples"] = self._update_interval_residual_history(
-                session="race",
-                predicted=predicted_race,
-                actual=actual_race,
-                history_limit=interval_history_limit,
-            )
+            race_update["interval_samples"] = 0
+            if not race_update.get("skipped"):
+                race_update["interval_samples"] = self._update_interval_residual_history(
+                    session="race",
+                    predicted=predicted_race,
+                    actual=actual_race,
+                    history_limit=interval_history_limit,
+                )
             updates.append(race_update)
+
+        valid_updates = [item for item in updates if not item.get("skipped")]
+        if not valid_updates:
+            if not actual_quali and not actual_race:
+                record_skip_reason = "missing_actual_results"
+            else:
+                record_skip_reason = "insufficient_actual_overlap"
+            return {
+                "sessions_updated": 0,
+                "driver_updates": 0,
+                "pair_updates": 0,
+                "interval_samples": 0,
+                "details": updates,
+                "skipped": True,
+                "skip_reason": record_skip_reason,
+            }
 
         metadata = prediction_data.get("metadata", {})
         event_entry = {
@@ -456,7 +498,7 @@ class SystematicLearningSystem:
             "session_name": metadata.get("session_name"),
             "run_id": metadata.get("run_id"),
             "updated_at": datetime.now(UTC).isoformat(),
-            "updates": updates,
+            "updates": valid_updates,
         }
 
         calibration = self.state["adaptive_calibration"]
@@ -467,16 +509,16 @@ class SystematicLearningSystem:
 
         self.save_state()
 
-        total_driver_updates = sum(item.get("drivers_updated", 0) for item in updates)
-        total_pair_updates = sum(item.get("pairs_updated", 0) for item in updates)
-        total_interval_samples = sum(item.get("interval_samples", 0) for item in updates)
+        total_driver_updates = sum(item.get("drivers_updated", 0) for item in valid_updates)
+        total_pair_updates = sum(item.get("pairs_updated", 0) for item in valid_updates)
+        total_interval_samples = sum(item.get("interval_samples", 0) for item in valid_updates)
 
         return {
-            "sessions_updated": len(updates),
+            "sessions_updated": len(valid_updates),
             "driver_updates": total_driver_updates,
             "pair_updates": total_pair_updates,
             "interval_samples": total_interval_samples,
-            "details": updates,
+            "details": valid_updates,
             "skipped": False,
             "skip_reason": None,
         }

@@ -144,6 +144,8 @@ def test_update_from_prediction_record_no_actuals_no_updates(tmp_path):
     assert summary["sessions_updated"] == 0
     assert summary["driver_updates"] == 0
     assert summary["pair_updates"] == 0
+    assert summary["skipped"] is True
+    assert summary["skip_reason"] == "missing_actual_results"
 
 
 def test_update_from_prediction_record_learns_interval_radius_from_residuals(tmp_path):
@@ -248,3 +250,42 @@ def test_update_from_prediction_record_skips_duplicate_run_id(tmp_path):
     assert first["skipped"] is False
     assert second["skipped"] is True
     assert second["skip_reason"] == "duplicate_run_id"
+
+
+def test_update_from_prediction_record_skips_tiny_actual_overlap(tmp_path):
+    """A tiny partial result should not train adaptive corrections."""
+    state_file = tmp_path / "learning_state.json"
+    system = SystematicLearningSystem(state_file=state_file)
+
+    prediction = _sample_prediction_record()
+    prediction["actuals"] = {
+        "qualifying": [{"position": 1, "driver": "VER", "team": "Red Bull Racing"}],
+        "race": [],
+    }
+
+    summary = system.update_from_prediction_record(prediction, min_common_drivers=3)
+
+    assert summary["skipped"] is True
+    assert summary["skip_reason"] == "insufficient_actual_overlap"
+    assert summary["sessions_updated"] == 0
+    assert system.get_driver_position_adjustment("VER", "qualifying", min_samples=1) == 0.0
+
+
+def test_skipped_record_does_not_mark_run_id_processed(tmp_path):
+    """A skipped partial record should not block a later complete actual update."""
+    state_file = tmp_path / "learning_state.json"
+    system = SystematicLearningSystem(state_file=state_file)
+
+    partial = _sample_prediction_record()
+    partial["actuals"] = {
+        "qualifying": [{"position": 1, "driver": "VER", "team": "Red Bull Racing"}],
+        "race": [],
+    }
+    complete = _sample_prediction_record()
+
+    first = system.update_from_prediction_record(partial, min_common_drivers=3)
+    second = system.update_from_prediction_record(complete, min_common_drivers=3)
+
+    assert first["skipped"] is True
+    assert second["skipped"] is False
+    assert second["driver_updates"] == 8
