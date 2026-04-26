@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from src.utils.backtesting import (
+    _normalize_ranked_entries,
     aggregate_race_metrics,
     apply_config_overrides,
     build_checked_backtest_summary,
@@ -45,6 +46,35 @@ class _StubPredictor:
                 {"driver": "LEC", "team": "Ferrari", "position": 3},
             ]
         }
+
+
+def test_normalize_ranked_entries_preserves_adjustment_diagnostics():
+    """Prediction payload snapshots should keep model adjustment diagnostics."""
+    rows = [
+        {
+            "driver": "NOR",
+            "team": "McLaren",
+            "position": 2,
+            "median_position": 2,
+            "qualifying_residual_adjustment": 0.5,
+            "race_residual_adjustment": "-0.25",
+            "learned_position_adjustment": 1,
+        }
+    ]
+
+    normalized = _normalize_ranked_entries(rows, preserve_interval_fields=True)
+
+    assert normalized == [
+        {
+            "driver": "NOR",
+            "team": "McLaren",
+            "position": 2,
+            "median_position": 2,
+            "qualifying_residual_adjustment": 0.5,
+            "race_residual_adjustment": -0.25,
+            "learned_position_adjustment": 1.0,
+        }
+    ]
 
 
 class _LearningSystemStub:

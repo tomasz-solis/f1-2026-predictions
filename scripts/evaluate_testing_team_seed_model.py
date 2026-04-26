@@ -16,6 +16,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.analysis.component_diagnostics import build_component_movement_diagnostics
+from src.analysis.promotion_gate import evaluate_component_promotion_gate
 from src.models.conformal_calibration import (
     build_conformal_calibration_artifact,
     save_conformal_calibration_artifact,
@@ -220,42 +222,43 @@ def _compare_reports(
 
     race_delta = _delta("race_mae_mean", lower_is_better=True)
     qualifying_delta = _delta("qualifying_mae_mean", lower_is_better=True)
+    deltas = {
+        "race_mae_improvement": race_delta,
+        "qualifying_mae_improvement": qualifying_delta,
+        "top3_accuracy_delta": _delta("top3_accuracy_mean", lower_is_better=False),
+        "winner_accuracy_delta": _delta("winner_accuracy_percent", lower_is_better=False),
+        "overlap_race_mae_delta": (
+            None
+            if experimental_overlap.get("race_mae_improvement") is None
+            or baseline_overlap.get("race_mae_improvement") is None
+            else float(experimental_overlap["race_mae_improvement"])
+            - float(baseline_overlap["race_mae_improvement"])
+        ),
+        "overlap_qualifying_mae_delta": (
+            None
+            if experimental_overlap.get("qualifying_mae_improvement") is None
+            or baseline_overlap.get("qualifying_mae_improvement") is None
+            else float(experimental_overlap["qualifying_mae_improvement"])
+            - float(baseline_overlap["qualifying_mae_improvement"])
+        ),
+    }
+    race_delta_summary = _race_delta_summary(
+        experimental_report=experimental_report,
+        baseline_report=baseline_report,
+    )
+    promotion_gate = evaluate_component_promotion_gate(
+        deltas=deltas,
+        race_delta_summary=race_delta_summary,
+    )
     return {
         "label": label,
-        "wins_promotion_gate": bool(
-            race_delta is not None
-            and qualifying_delta is not None
-            and race_delta > 0.0
-            and qualifying_delta > 0.0
-            and float(experimental_summary.get("race_mae_mean") or 0.0)
-            <= float(baseline_summary.get("race_mae_mean") or 0.0) + 0.30
-            and float(experimental_summary.get("qualifying_mae_mean") or 0.0)
-            <= float(baseline_summary.get("qualifying_mae_mean") or 0.0) + 0.30
-        ),
+        "wins_promotion_gate": bool(promotion_gate["passed"]),
+        "promotion_gate": promotion_gate,
         "experimental_summary": experimental_summary,
         "baseline_summary": baseline_summary,
         "experimental_overlap": experimental_overlap,
         "baseline_overlap": baseline_overlap,
-        "deltas": {
-            "race_mae_improvement": race_delta,
-            "qualifying_mae_improvement": qualifying_delta,
-            "top3_accuracy_delta": _delta("top3_accuracy_mean", lower_is_better=False),
-            "winner_accuracy_delta": _delta("winner_accuracy_percent", lower_is_better=False),
-            "overlap_race_mae_delta": (
-                None
-                if experimental_overlap.get("race_mae_improvement") is None
-                or baseline_overlap.get("race_mae_improvement") is None
-                else float(experimental_overlap["race_mae_improvement"])
-                - float(baseline_overlap["race_mae_improvement"])
-            ),
-            "overlap_qualifying_mae_delta": (
-                None
-                if experimental_overlap.get("qualifying_mae_improvement") is None
-                or baseline_overlap.get("qualifying_mae_improvement") is None
-                else float(experimental_overlap["qualifying_mae_improvement"])
-                - float(baseline_overlap["qualifying_mae_improvement"])
-            ),
-        },
+        "deltas": deltas,
     }
 
 
@@ -959,6 +962,10 @@ def _run_component_ablation(
                 experimental_report=report,
                 baseline_report=champion_report,
             ),
+            "movement_diagnostics": build_component_movement_diagnostics(
+                champion_report=champion_report,
+                challenger_report=report,
+            ),
         }
         variant_packets.append(packet)
         (output_dir / f"{label}_report.json").write_text(json.dumps(report, indent=2))
@@ -984,17 +991,25 @@ def _write_ablation_markdown(*, ablation: dict[str, Any], output_path: Path) -> 
     lines = [
         f"# Component Ablation {ablation.get('season_year')}",
         "",
-        "| Variant | Race MAE delta | Qualifying MAE delta | Top-3 delta | Winner delta | Race worse/better | Qualifying worse/better |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Variant | Gate | Race MAE delta | Qualifying MAE delta | Top-3 delta | Winner delta | Race worse/better | Qualifying worse/better | Qualifying closer/farther | Race closer/farther |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for variant in ablation.get("variants", []):
         comparison = variant.get("comparison", {})
         deltas = comparison.get("deltas", {})
         race_delta_summary = variant.get("race_delta_summary", {})
+        promotion_gate = comparison.get("promotion_gate", {})
+        movement_diagnostics = variant.get("movement_diagnostics", {})
+        qualifying_movement = movement_diagnostics.get("qualifying", {})
+        race_movement = movement_diagnostics.get("race", {})
+        gate_label = "pass" if promotion_gate.get("passed") else "block"
         lines.append(
-            "| {label} | {race_delta} | {qualifying_delta} | {top3_delta} | "
-            "{winner_delta} | {race_worse}/{race_better} | {qualifying_worse}/{qualifying_better} |".format(
+            "| {label} | {gate_label} | {race_delta} | {qualifying_delta} | {top3_delta} | "
+            "{winner_delta} | {race_worse}/{race_better} | "
+            "{qualifying_worse}/{qualifying_better} | {qualifying_closer}/{qualifying_farther} | "
+            "{race_closer}/{race_farther} |".format(
                 label=variant.get("label"),
+                gate_label=gate_label,
                 race_delta=deltas.get("race_mae_improvement"),
                 qualifying_delta=deltas.get("qualifying_mae_improvement"),
                 top3_delta=deltas.get("top3_accuracy_delta"),
@@ -1003,8 +1018,15 @@ def _write_ablation_markdown(*, ablation: dict[str, Any], output_path: Path) -> 
                 race_better=race_delta_summary.get("race_better_count"),
                 qualifying_worse=race_delta_summary.get("qualifying_worse_count"),
                 qualifying_better=race_delta_summary.get("qualifying_better_count"),
+                qualifying_closer=qualifying_movement.get("closer_count"),
+                qualifying_farther=qualifying_movement.get("farther_count"),
+                race_closer=race_movement.get("closer_count"),
+                race_farther=race_movement.get("farther_count"),
             )
         )
+        reasons = promotion_gate.get("reasons") or []
+        if reasons:
+            lines.append(f"  - {variant.get('label')} blocked: {'; '.join(map(str, reasons))}")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines))
 

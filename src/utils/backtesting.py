@@ -366,6 +366,18 @@ def _normalize_ranked_entries(
                     normalized_row[key] = int(value)
                 except (TypeError, ValueError):
                     continue
+            for key in (
+                "qualifying_residual_adjustment",
+                "race_residual_adjustment",
+                "learned_position_adjustment",
+            ):
+                value = row.get(key)
+                if value is None:
+                    continue
+                try:
+                    normalized_row[key] = float(value)
+                except (TypeError, ValueError):
+                    continue
         normalized.append(normalized_row)
     return normalized
 
