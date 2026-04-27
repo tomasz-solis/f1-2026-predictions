@@ -31,6 +31,40 @@ _WATCHED_COUNTERS = [
     "practice_backlog_retry_total",
     "fastf1_circuit_trip_total",
 ]
+_REGULATION_RESET_EVIDENCE_RACES = 3
+
+
+def coerce_completed_races_count(value: Any) -> int | None:
+    """Normalize a persisted completed-race count into a non-negative integer."""
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        return None
+    return max(0, count)
+
+
+def _build_2026_regulation_reset_message(
+    completed_races_count: int | None,
+) -> tuple[str, str] | None:
+    """Return the 2026 reset warning only while race evidence is still thin."""
+    completed_count = coerce_completed_races_count(completed_races_count)
+    if completed_count is None:
+        return (
+            "warning",
+            "2026 regulation reset: completed Grand Prix race evidence is unavailable here, "
+            "so predictions still carry early-season uncertainty.",
+        )
+
+    if completed_count >= _REGULATION_RESET_EVIDENCE_RACES:
+        return None
+
+    result_label = "result is" if completed_count == 1 else "results are"
+    return (
+        "warning",
+        "2026 regulation reset: only "
+        f"{completed_count}/{_REGULATION_RESET_EVIDENCE_RACES} completed Grand Prix race "
+        f"{result_label} in the model, so predictions still carry early-season uncertainty.",
+    )
 
 
 def latest_data_status_message(
@@ -184,17 +218,15 @@ def build_runtime_messages(
     prediction_cache_hit: bool,
     boundary_fallback: dict[str, Any],
     precompute_summary: dict[str, Any],
+    completed_races_count: int | None = None,
     latest_data_status_message_fn: Any = latest_data_status_message,
 ) -> list[tuple[str, str]]:
     """Build the runtime notice stack shown after a prediction load."""
     runtime_messages: list[tuple[str, str]] = []
     if selected_season == 2026:
-        runtime_messages.append(
-            (
-                "warning",
-                "2026 regulation reset: predictions are uncertain until races complete.",
-            )
-        )
+        reset_message = _build_2026_regulation_reset_message(completed_races_count)
+        if reset_message:
+            runtime_messages.append(reset_message)
     else:
         runtime_messages.append(
             (

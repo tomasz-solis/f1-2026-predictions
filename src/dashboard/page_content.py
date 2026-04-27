@@ -7,7 +7,7 @@ The dashboard uses one predictor (`Baseline2026Predictor`) for both qualifying a
 
 **1. Team baseline**
 - Builds team strength from preseason baseline, testing directionality, and current-season performance.
-- Applies race-by-race weighting so trust shifts toward current-season evidence.
+- Uses the `rapid_adaptive` reset-year schedule so trust shifts toward current-season evidence.
 
 **2. Qualifying forecast**
 - Uses the best available weekend practice pace for blending.
@@ -25,9 +25,14 @@ The dashboard uses one predictor (`Baseline2026Predictor`) for both qualifying a
 - Saved predictions with actuals update a persistent calibration state.
 - Tracks per-driver and teammate residual errors by session type.
 - Applies learned adjustments in qualifying and race scoring.
+- Skips retrospective records, duplicate run IDs, missing actuals, and tiny actual overlaps.
 
 **5. Outputs**
 - Expected finish order, uncertainty bands, podium probabilities, and strategy distribution summaries.
+
+**6. Research safeguards**
+- Experimental model components must pass promotion gates before stacking.
+- Ablation reports compare champion and challenger movement against actual results.
 """
 
 QUALIFYING_HYPERPARAMETERS_MARKDOWN = """
@@ -53,9 +58,9 @@ CONTACT_PAGE_HTML = """
   <section class="contact-card">
     <h3>Project Links</h3>
     <div class="contact-link-stack">
-      <a class="contact-link-row" href="https://github.com/tomasz-solis/trackside-labs" target="_blank" rel="noopener noreferrer">
+      <a class="contact-link-row" href="https://github.com/tomasz-solis/f1-2026-predictions" target="_blank" rel="noopener noreferrer">
         <span class="contact-link-row__label">GitHub</span>
-        <span class="contact-link-row__value">trackside-labs</span>
+        <span class="contact-link-row__value">f1-2026-predictions</span>
       </a>
       <a class="contact-link-row" href="https://www.linkedin.com/in/tomaszsolis/" target="_blank" rel="noopener noreferrer">
         <span class="contact-link-row__label">LinkedIn</span>
@@ -69,7 +74,7 @@ CONTACT_PAGE_HTML = """
     <ul>
       <li>Baseline/testing/current-season team blending</li>
       <li>Practice-aware qualifying and race simulation</li>
-      <li>Session-based logging for post-race accuracy analysis</li>
+      <li>Session-based logging for gated learning and post-race accuracy analysis</li>
     </ul>
   </section>
 </div>

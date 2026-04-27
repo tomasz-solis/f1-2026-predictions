@@ -18,6 +18,7 @@ _prediction_section_summary = rendering_html._prediction_section_summary
 _render_collapsible_warnings = rendering_html._render_collapsible_warnings
 _short_data_source_label = rendering_html._short_data_source_label
 render_notice_banner = rendering_html.render_notice_banner
+render_page_hero_deck = rendering_html.render_page_hero_deck
 render_prediction_hero_deck = rendering_html.render_prediction_hero_deck
 render_stage_timeline = rendering_html.render_stage_timeline
 render_stat_cards = rendering_html.render_stat_cards

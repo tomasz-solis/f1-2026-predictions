@@ -10,6 +10,7 @@ from typing import Any
 import fastf1
 import streamlit as st
 
+from src.persistence.artifact_store import ArtifactStore
 from src.utils.data_paths import resolve_repo_data_path
 from src.utils.weekend import get_schedule_rows, is_sprint_weekend
 
@@ -51,6 +52,7 @@ from .prediction_flow import run_prediction
 from .rendering import (
     display_prediction_result,
     render_notice_banner,
+    render_page_hero_deck,
     render_prediction_hero_deck,
 )
 from .update_flow import (
@@ -113,12 +115,43 @@ def _set_selected_season(year: int) -> None:
 
 def render_team_comparison_page() -> None:
     """Render the team-comparison page."""
-    st.header("Team Comparison")
-    st.markdown(
-        "Compare team characteristic fingerprints from synced session inputs. "
-        "Profile metrics and season-prior baseline are separate signals and can diverge."
+    selected_season = _get_selected_season()
+    render_page_hero_deck(
+        title="Team Comparison",
+        summary=(
+            "Compare synced team fingerprints without blending session profile pace into the "
+            "season-prior baseline."
+        ),
+        eyebrow="Team form",
+        cards=[
+            {
+                "label": "Season",
+                "value": str(selected_season),
+                "meta": "Uses the shared dashboard season.",
+                "tone": "neutral",
+            },
+            {
+                "label": "Source",
+                "value": "Latest snapshot",
+                "meta": "Falls back to the season file when needed.",
+                "tone": "accent",
+            },
+            {
+                "label": "View",
+                "value": "Radar + trend",
+                "meta": "Profile shape and development history.",
+                "tone": "neutral",
+            },
+            {
+                "label": "Scale",
+                "value": "10-100",
+                "meta": "Higher display score is stronger.",
+                "tone": "neutral",
+            },
+        ],
+        st_module=st,
     )
-    _render_team_comparison_section(year=_get_selected_season())
+    _render_team_comparison_section(year=selected_season)
 
 
 def _clear_fastf1_race_cache(year: int, race_name: str) -> None:
@@ -290,6 +323,45 @@ def _dashboard_refresh_label(year: int) -> str:
         latest_dashboard_refresh_timestamp_fn=_latest_dashboard_refresh_timestamp,
         fallback_label=BRAND_LAST_UPDATED,
     )
+
+
+def _load_completed_races_count(year: int) -> int | None:
+    """Read the completed Grand Prix race count from the active car artifact."""
+    season_year = int(year)
+    try:
+        payload = ArtifactStore(data_root="data").load_artifact(
+            "car_characteristics",
+            f"{season_year}::car_characteristics",
+        )
+    except Exception as exc:
+        logger.warning("Could not read %s completed-race count: %s", season_year, exc)
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    completed_count = _prediction_messages.coerce_completed_races_count(
+        payload.get("races_completed")
+    )
+    if completed_count is not None:
+        return completed_count
+
+    team_payloads = payload.get("teams", {})
+    if not isinstance(team_payloads, dict):
+        return None
+
+    team_counts: list[int] = []
+    for team_payload in team_payloads.values():
+        if not isinstance(team_payload, dict):
+            continue
+        count = _prediction_messages.coerce_completed_races_count(
+            team_payload.get("races_completed")
+        )
+        if count is not None:
+            team_counts.append(count)
+    if not team_counts:
+        return None
+    return min(team_counts)
 
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -547,6 +619,7 @@ def _build_runtime_messages(
     prediction_cache_hit: bool,
     boundary_fallback: dict[str, Any],
     precompute_summary: dict[str, Any],
+    completed_races_count: int | None = None,
 ) -> list[tuple[str, str]]:
     """Build the runtime notices displayed after prediction loading."""
     return _prediction_messages.build_runtime_messages(
@@ -558,6 +631,7 @@ def _build_runtime_messages(
         prediction_cache_hit=prediction_cache_hit,
         boundary_fallback=boundary_fallback,
         precompute_summary=precompute_summary,
+        completed_races_count=completed_races_count,
         latest_data_status_message_fn=_latest_data_status_message,
     )
 
@@ -737,6 +811,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                     prediction_cache_hit=prediction_cache_hit,
                     boundary_fallback=boundary_fallback,
                     precompute_summary=precompute_summary,
+                    completed_races_count=_load_completed_races_count(selected_season),
                 )
 
                 _render_collapsible_runtime_messages(runtime_messages)
@@ -783,8 +858,41 @@ def render_live_prediction_page(enable_logging: bool) -> None:
 
 def render_model_insights_page() -> None:
     """Render the model insights page with hyperparameters and learning state."""
-    st.header("Model and Learning Runtime")
-    st.caption(f"Active release: {BRAND_MODEL_VERSION}")
+    render_page_hero_deck(
+        title="Model and Learning Runtime",
+        summary=(
+            "Inspect the active forecast path, calibration loop, and guardrails used before "
+            "experimental components are promoted."
+        ),
+        eyebrow="Model notes",
+        cards=[
+            {
+                "label": "Release",
+                "value": BRAND_MODEL_VERSION,
+                "meta": "Active dashboard model label.",
+                "tone": "accent",
+            },
+            {
+                "label": "Learning",
+                "value": "Gated",
+                "meta": "Saved actuals update calibration state.",
+                "tone": "success",
+            },
+            {
+                "label": "Reset year",
+                "value": "2026",
+                "meta": "Current-season evidence ramps in quickly.",
+                "tone": "warning",
+            },
+            {
+                "label": "Outputs",
+                "value": "Q + Race",
+                "meta": "One predictor serves both sections.",
+                "tone": "neutral",
+            },
+        ],
+        st_module=st,
+    )
     st.markdown(MODEL_INSIGHTS_MARKDOWN)
 
     st.subheader("Key Hyperparameters")
@@ -836,7 +944,42 @@ def _render_accuracy_page_controls() -> tuple[int, bool]:
 
 def render_prediction_accuracy_page() -> None:
     """Render the target-aware accuracy dashboard."""
-    st.header("Prediction Accuracy Tracker")
+    selected_season = _get_selected_season()
+    render_page_hero_deck(
+        title="Prediction Accuracy Tracker",
+        summary=(
+            "Review saved checkpoint forecasts against completed qualifying, sprint, and race "
+            "results."
+        ),
+        eyebrow="Forecast audit",
+        cards=[
+            {
+                "label": "Season",
+                "value": str(selected_season),
+                "meta": "Can be changed in the controls below.",
+                "tone": "neutral",
+            },
+            {
+                "label": "Refresh",
+                "value": "Manual",
+                "meta": "Actuals update only when requested.",
+                "tone": "accent",
+            },
+            {
+                "label": "Targets",
+                "value": "Checkpointed",
+                "meta": "Primary and sprint-only targets are tracked.",
+                "tone": "neutral",
+            },
+            {
+                "label": "Scope",
+                "value": "Saved runs",
+                "meta": "Retrospective-only records stay excluded.",
+                "tone": "success",
+            },
+        ],
+        st_module=st,
+    )
 
     from .accuracy import AccuracyPipeline
 
@@ -901,11 +1044,45 @@ def render_prediction_accuracy_page() -> None:
 
 def render_checkpoint_viewer_page() -> None:
     """Render a dedicated browser for saved checkpoint artifacts."""
-    st.header("Checkpoint Viewer")
+    selected_season = _get_selected_season()
+    render_page_hero_deck(
+        title="Checkpoint Viewer",
+        summary=(
+            "Browse saved race-weekend artifacts directly, separate from accuracy charts and "
+            "summary metrics."
+        ),
+        eyebrow="Artifact browser",
+        cards=[
+            {
+                "label": "Season",
+                "value": str(selected_season),
+                "meta": "Can be changed in the controls below.",
+                "tone": "neutral",
+            },
+            {
+                "label": "Granularity",
+                "value": "Checkpoint",
+                "meta": "Open each stored session boundary.",
+                "tone": "accent",
+            },
+            {
+                "label": "Mode",
+                "value": "Read-only",
+                "meta": "No prediction refresh from this view.",
+                "tone": "neutral",
+            },
+            {
+                "label": "Source",
+                "value": "Artifacts",
+                "meta": "Uses persisted prediction records.",
+                "tone": "success",
+            },
+        ],
+        st_module=st,
+    )
 
     from .accuracy import AccuracyPipeline
 
-    selected_season = _get_selected_season()
     season_options = _available_seasons()
     if selected_season not in season_options:
         season_options = [selected_season, *season_options]
@@ -935,7 +1112,38 @@ def render_checkpoint_viewer_page() -> None:
 
 def render_contact_page() -> None:
     """Render the contact page."""
-    st.header("Contact")
+    render_page_hero_deck(
+        title="Contact",
+        summary=("Project links, scope notes, and the independence disclaimer for Trackside Labs."),
+        eyebrow="About the project",
+        cards=[
+            {
+                "label": "Project",
+                "value": "GitHub",
+                "meta": "Repository link is listed below.",
+                "tone": "accent",
+            },
+            {
+                "label": "Scope",
+                "value": "Forecasting",
+                "meta": "Prediction workflow and accuracy tracking.",
+                "tone": "neutral",
+            },
+            {
+                "label": "Status",
+                "value": "Independent",
+                "meta": "No team or series affiliation.",
+                "tone": "neutral",
+            },
+            {
+                "label": "Contact",
+                "value": "LinkedIn",
+                "meta": "Profile link is listed below.",
+                "tone": "success",
+            },
+        ],
+        st_module=st,
+    )
     st.markdown(CONTACT_PAGE_HTML, unsafe_allow_html=True)
 
 

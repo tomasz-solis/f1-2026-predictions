@@ -545,6 +545,59 @@ def test_dashboard_refresh_label_falls_back_when_no_runtime_timestamp_exists(pat
     assert pages._dashboard_refresh_label(2026) == "Unavailable"
 
 
+def test_load_completed_races_count_reads_car_characteristics_artifact(patcher):
+    class _Store:
+        def __init__(self, data_root: str):
+            assert data_root == "data"
+
+        def load_artifact(self, artifact_type: str, artifact_key: str):
+            assert artifact_type == "car_characteristics"
+            assert artifact_key == "2026::car_characteristics"
+            return {"races_completed": "3", "teams": {}}
+
+    patcher.setattr(pages, "ArtifactStore", _Store)
+
+    assert pages._load_completed_races_count(2026) == 3
+
+
+def test_load_completed_races_count_falls_back_to_team_counts(patcher):
+    class _Store:
+        def __init__(self, data_root: str):
+            assert data_root == "data"
+
+        def load_artifact(self, _artifact_type: str, _artifact_key: str):
+            return {
+                "teams": {
+                    "Mercedes": {"races_completed": 2},
+                    "Ferrari": {"races_completed": "2"},
+                    "McLaren": {"races_completed": 3},
+                }
+            }
+
+    patcher.setattr(pages, "ArtifactStore", _Store)
+
+    assert pages._load_completed_races_count(2026) == 2
+
+
+def test_build_runtime_messages_suppresses_2026_reset_warning_after_three_races():
+    messages = pages._build_runtime_messages(
+        selected_season=2026,
+        race_name="Miami Grand Prix",
+        is_sprint=True,
+        boundary_refresh={"latest_elapsed_session": "FP3"},
+        practice_update={"updated": False, "completed_fp_sessions": []},
+        prediction_cache_hit=False,
+        boundary_fallback={},
+        precompute_summary={},
+        completed_races_count=3,
+    )
+
+    texts = [message for _level, message in messages]
+
+    assert not any("2026 regulation reset" in text for text in texts)
+    assert any("Sprint weekend mode active" in text for text in texts)
+
+
 def test_save_prediction_if_enabled_saves_new_session(patcher):
     saved_payload: dict = {}
     info_messages: list[str] = []
@@ -816,6 +869,7 @@ def test_render_prediction_results_routes_normal_weekend(patcher):
     patcher.setattr(pages.st, "markdown", lambda *_args, **_kwargs: None)
     patcher.setattr(pages.st, "header", lambda _msg: None)
     patcher.setattr(pages.st, "info", lambda _msg: None)
+    patcher.setattr(pages.st, "tabs", lambda labels: [_Ctx() for _label in labels])
     patcher.setattr(
         pages,
         "display_prediction_result",
@@ -840,12 +894,17 @@ def test_render_prediction_results_routes_normal_weekend(patcher):
 
 def test_render_prediction_results_reports_cache_hit_runtime_from_pipeline(patcher):
     rendered_sections: list[str] = []
-    success_messages: list[str] = []
+    markdown_messages: list[str] = []
 
-    patcher.setattr(pages.st, "success", lambda message: success_messages.append(str(message)))
-    patcher.setattr(pages.st, "markdown", lambda *_args, **_kwargs: None)
+    patcher.setattr(pages.st, "success", lambda _message: None)
+    patcher.setattr(
+        pages.st,
+        "markdown",
+        lambda message, **_kwargs: markdown_messages.append(str(message)),
+    )
     patcher.setattr(pages.st, "header", lambda _msg: None)
     patcher.setattr(pages.st, "info", lambda _msg: None)
+    patcher.setattr(pages.st, "tabs", lambda labels: [_Ctx() for _label in labels])
     patcher.setattr(
         pages,
         "display_prediction_result",
@@ -864,7 +923,7 @@ def test_render_prediction_results_reports_cache_hit_runtime_from_pipeline(patch
         pipeline_timing={"total": 0.1},
     )
 
-    assert success_messages == ["Prediction loaded from cache in 0.10s"]
+    assert any("Prediction loaded from cache in 0.10s" in text for text in markdown_messages)
     assert rendered_sections == [
         "Qualifying Prediction:quali",
         "Race Prediction:race",
@@ -878,6 +937,7 @@ def test_render_prediction_results_routes_sprint_weekend(patcher):
     patcher.setattr(pages.st, "markdown", lambda *_args, **_kwargs: None)
     patcher.setattr(pages.st, "header", lambda _msg: None)
     patcher.setattr(pages.st, "info", lambda _msg: None)
+    patcher.setattr(pages.st, "tabs", lambda labels: [_Ctx() for _label in labels])
     patcher.setattr(
         pages,
         "display_prediction_result",
@@ -911,6 +971,7 @@ def test_render_prediction_results_renames_completed_sections_as_results(patcher
     patcher.setattr(pages.st, "markdown", lambda *_args, **_kwargs: None)
     patcher.setattr(pages.st, "header", lambda _msg: None)
     patcher.setattr(pages.st, "info", lambda _msg: None)
+    patcher.setattr(pages.st, "tabs", lambda labels: [_Ctx() for _label in labels])
     patcher.setattr(
         pages,
         "display_prediction_result",

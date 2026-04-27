@@ -165,6 +165,158 @@ def _build_position_change_frame(
     return merged[["driver", "team", "start_position", "finish_position", "positions_gained"]]
 
 
+def _build_movement_story_cards(comparison: pd.DataFrame) -> list[dict[str, str]]:
+    """Build compact cards that summarize the race movement story."""
+    if comparison.empty:
+        return []
+
+    cards: list[dict[str, str]] = []
+    top_gainers = comparison[comparison["positions_gained"] > 0].copy()
+    top_losers = comparison[comparison["positions_gained"] < 0].copy()
+
+    if not top_gainers.empty:
+        gainer = top_gainers.iloc[0]
+        gain = int(gainer["positions_gained"])
+        cards.append(
+            {
+                "label": "Biggest gainer",
+                "value": f"{gainer['driver']} +{gain}",
+                "meta": (
+                    f"P{int(gainer['start_position'])} -> "
+                    f"P{int(gainer['finish_position'])} | {gainer['team']}"
+                ),
+                "tone": "success",
+            }
+        )
+
+    if not top_losers.empty:
+        loser = top_losers.sort_values(["positions_gained", "start_position", "driver"]).iloc[0]
+        loss = int(abs(loser["positions_gained"]))
+        cards.append(
+            {
+                "label": "Biggest drop",
+                "value": f"{loser['driver']} -{loss}",
+                "meta": (
+                    f"P{int(loser['start_position'])} -> "
+                    f"P{int(loser['finish_position'])} | {loser['team']}"
+                ),
+                "tone": "warning",
+            }
+        )
+
+    unchanged_count = int((comparison["positions_gained"] == 0).sum())
+    max_swing = int(comparison["positions_gained"].abs().max())
+    cards.append(
+        {
+            "label": "Movement spread",
+            "value": f"{max_swing} places",
+            "meta": f"{unchanged_count} driver(s) projected to hold position.",
+            "tone": "neutral",
+        }
+    )
+    return cards
+
+
+def _movement_ladder_rows(comparison: pd.DataFrame, *, row_limit: int = 12) -> pd.DataFrame:
+    """Return only projected movers for the movement ladder."""
+    if comparison.empty:
+        return comparison
+
+    ladder_rows = comparison[comparison["positions_gained"] != 0].copy()
+    if ladder_rows.empty:
+        return ladder_rows
+
+    ladder_rows["abs_change"] = ladder_rows["positions_gained"].abs()
+    ladder_rows = ladder_rows.sort_values(
+        ["abs_change", "finish_position", "driver"],
+        ascending=[False, True, True],
+    )
+    ladder_rows = ladder_rows.head(row_limit)
+    return ladder_rows.sort_values(["start_position", "finish_position", "driver"])
+
+
+def _position_change_ladder_figure(rows: pd.DataFrame, *, title: str) -> go.Figure:
+    """Build a start-to-finish movement ladder for the top projected movers."""
+    fig = go.Figure()
+    for row in rows.itertuples(index=False):
+        delta = int(row.positions_gained)
+        color = "#76D3B3" if delta > 0 else "#C28657" if delta < 0 else "rgba(139,148,158,0.65)"
+        line_width = 4 if delta != 0 else 2
+        customdata = [
+            [row.driver, row.team, int(row.start_position), int(row.finish_position), delta],
+            [row.driver, row.team, int(row.start_position), int(row.finish_position), delta],
+        ]
+        fig.add_trace(
+            go.Scatter(
+                x=[0, 1],
+                y=[int(row.start_position), int(row.finish_position)],
+                mode="lines+markers",
+                line={"color": color, "width": line_width},
+                marker={"size": 9, "color": color, "line": {"width": 0}},
+                customdata=customdata,
+                hovertemplate=(
+                    "<b>%{customdata[0]}</b> (%{customdata[1]})"
+                    "<br>Grid: P%{customdata[2]}"
+                    "<br>Finish: P%{customdata[3]}"
+                    "<br>Net: %{customdata[4]:+d}<extra></extra>"
+                ),
+                showlegend=False,
+            )
+        )
+        fig.add_annotation(
+            x=-0.06,
+            y=int(row.start_position),
+            text=f"{row.driver} P{int(row.start_position)}",
+            showarrow=False,
+            xanchor="right",
+            font={"size": 11, "color": "rgba(232,237,242,0.82)"},
+        )
+        fig.add_annotation(
+            x=1.06,
+            y=int(row.finish_position),
+            text=f"P{int(row.finish_position)} {delta:+d}",
+            showarrow=False,
+            xanchor="left",
+            font={"size": 11, "color": color},
+        )
+
+    fig.update_layout(
+        height=max(340, 28 * len(rows) + 180),
+        margin={"l": 90, "r": 90, "t": 56, "b": 36},
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        title={
+            "text": title,
+            "x": 0.02,
+            "xanchor": "left",
+            "font": {"size": 16, "color": "rgba(232,237,242,0.94)"},
+        },
+        xaxis={
+            "range": [-0.22, 1.22],
+            "tickmode": "array",
+            "tickvals": [0, 1],
+            "ticktext": ["Grid", "Finish"],
+            "fixedrange": True,
+            "showgrid": False,
+            "zeroline": False,
+            "tickfont": {"size": 12, "color": "rgba(232,237,242,0.80)"},
+        },
+        yaxis={
+            "title": {
+                "text": "Position",
+                "font": {"size": 11, "color": "rgba(232,237,242,0.72)"},
+            },
+            "autorange": "reversed",
+            "dtick": 1,
+            "gridcolor": "rgba(232,237,242,0.08)",
+            "fixedrange": True,
+            "tickfont": {"size": 11, "color": "rgba(232,237,242,0.62)"},
+        },
+        font={"family": "IBM Plex Sans, sans-serif", "color": "rgba(232,237,242,0.88)"},
+    )
+    return fig
+
+
 def _render_position_change_chart(
     finish_df: pd.DataFrame,
     *,
@@ -181,12 +333,6 @@ def _render_position_change_chart(
         return
 
     top_gainers = comparison[comparison["positions_gained"] > 0].head(5).copy()
-    top_losers = (
-        comparison[comparison["positions_gained"] < 0]
-        .sort_values(["positions_gained", "start_position", "driver"])
-        .head(5)
-        .copy()
-    )
     if top_gainers.empty:
         summary = "No major gainers in this run; the model expects a fairly grid-shaped race."
     else:
@@ -199,50 +345,35 @@ def _render_position_change_chart(
         title="Biggest Movers",
         summary=(
             "Net position change from the paired grid to the projected finish. "
-            "Bars isolate the clearest gainers and losers instead of showing the full field."
+            "This isolates the race story before the full classification table."
         ),
         eyebrow=_position_change_chart_title(prediction_name, result),
     )
+    render_stat_cards(
+        _build_movement_story_cards(comparison),
+        grid_class="ts-stat-grid ts-stat-grid--movement",
+    )
+    st.caption(
+        "Movement ladder shows projected position changes only; unchanged drivers are omitted."
+    )
     st.caption(summary)
 
-    max_change = int(comparison["positions_gained"].abs().max())
-    gainers_col, losers_col = st.columns(2, gap="large")
-    with gainers_col:
-        if top_gainers.empty:
-            render_notice_banner(
-                "No projected gainers in this run.",
-                tone="info",
-                label="Gainers",
-            )
-        else:
-            st.plotly_chart(
-                _position_change_chart_figure(
-                    top_gainers,
-                    title="Gainers",
-                    marker_color="#76D3B3",
-                    x_limit=max_change,
-                ),
-                width="stretch",
-                config={"displayModeBar": False},
-            )
-    with losers_col:
-        if top_losers.empty:
-            render_notice_banner(
-                "No projected losers in this run.",
-                tone="info",
-                label="Losers",
-            )
-        else:
-            st.plotly_chart(
-                _position_change_chart_figure(
-                    top_losers,
-                    title="Losers",
-                    marker_color="#C28657",
-                    x_limit=max_change,
-                ),
-                width="stretch",
-                config={"displayModeBar": False},
-            )
+    if not bool((comparison["positions_gained"] != 0).any()):
+        render_notice_banner(
+            "No projected position changes in this run.",
+            tone="info",
+            label="Movement",
+        )
+        return
+
+    st.plotly_chart(
+        _position_change_ladder_figure(
+            _movement_ladder_rows(comparison),
+            title="Grid to projected finish - movers only",
+        ),
+        width="stretch",
+        config={"displayModeBar": False},
+    )
 
 
 def _render_track_temperature_context(result: dict) -> None:

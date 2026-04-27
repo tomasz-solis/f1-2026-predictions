@@ -51,6 +51,73 @@ def test_rendering_race_build_position_change_frame_merges_and_sorts_rows() -> N
     assert list(frame["team"]) == ["McLaren", "Ferrari", "Red Bull Racing"]
 
 
+def test_rendering_race_movement_ladder_rows_only_returns_movers() -> None:
+    """Movement ladder should not show drivers projected to hold position."""
+    comparison = pd.DataFrame(
+        [
+            {
+                "driver": "NOR",
+                "team": "McLaren",
+                "start_position": 1,
+                "finish_position": 1,
+                "positions_gained": 0,
+            },
+            {
+                "driver": "LEC",
+                "team": "Ferrari",
+                "start_position": 5,
+                "finish_position": 2,
+                "positions_gained": 3,
+            },
+            {
+                "driver": "VER",
+                "team": "Red Bull Racing",
+                "start_position": 2,
+                "finish_position": 4,
+                "positions_gained": -2,
+            },
+        ]
+    )
+
+    ladder_rows = rendering_race._movement_ladder_rows(comparison)
+
+    assert list(ladder_rows["driver"]) == ["VER", "LEC"]
+    assert all(ladder_rows["positions_gained"] != 0)
+
+
+def test_rendering_qualifying_orders_teammate_matchups_by_edge() -> None:
+    """Teammate cards should read strongest simulated edge first."""
+    rows = rendering_qualifying._normalize_teammate_matchups(
+        [
+            {
+                "team": "McLaren",
+                "driver_a": "NOR",
+                "driver_b": "PIA",
+                "p_driver_a_ahead": "0.62",
+                "n_samples": 1000,
+            },
+            {
+                "team": "Mercedes",
+                "driver_a": "RUS",
+                "driver_b": "ANT",
+                "p_driver_a_ahead": 0.84,
+                "n_samples": 1000,
+            },
+            {
+                "team": "Ferrari",
+                "driver_a": "LEC",
+                "driver_b": "HAM",
+                "p_driver_a_ahead": 0.44,
+                "n_samples": 1000,
+            },
+        ]
+    )
+
+    assert [row["team"] for row in rows] == ["Mercedes", "McLaren", "Ferrari"]
+    assert [row["favorite"] for row in rows] == ["RUS", "NOR", "HAM"]
+    assert [row["rank"] for row in rows] == [1, 2, 3]
+
+
 def test_rendering_qualifying_renders_teammate_matchups_directly(monkeypatch) -> None:
     class _Ctx:
         def __enter__(self):
@@ -92,4 +159,6 @@ def test_rendering_qualifying_renders_teammate_matchups_directly(monkeypatch) ->
 
     assert any("How to read" in message for message in messages)
     assert any("McLaren" in message and "moderate edge" in message for message in messages)
+    assert any("#1" in message and "+22.0 pp toward NOR" in message for message in messages)
+    assert any("50/50" in message and "PIA" in message for message in messages)
     assert not any("Ferrari" in message for message in messages)

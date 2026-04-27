@@ -75,15 +75,20 @@ def render_surface_header(
     )
 
 
-def render_stat_cards(cards: list[dict[str, str]], *, st_module: Any = st) -> None:
+def render_stat_cards(
+    cards: list[dict[str, str]],
+    *,
+    grid_class: str = "ts-stat-grid",
+    st_module: Any = st,
+) -> None:
     """Render a compact grid of highlight cards."""
-    cards_html = _build_stat_cards_html(cards)
+    cards_html = _build_stat_cards_html(cards, grid_class=grid_class)
     if not cards_html:
         return
     st_module.markdown(cards_html, unsafe_allow_html=True)
 
 
-def render_prediction_hero_deck(
+def render_page_hero_deck(
     *,
     title: str,
     summary: str,
@@ -91,7 +96,7 @@ def render_prediction_hero_deck(
     cards: list[dict[str, str]],
     st_module: Any = st,
 ) -> None:
-    """Render the prediction-page intro and metadata as one aligned deck."""
+    """Render a page intro and metadata as one aligned dashboard deck."""
     cards_html = _build_stat_cards_html(cards, grid_class="ts-stat-grid ts-stat-grid--hero")
     st_module.markdown(
         (
@@ -105,6 +110,24 @@ def render_prediction_hero_deck(
             "</section>"
         ),
         unsafe_allow_html=True,
+    )
+
+
+def render_prediction_hero_deck(
+    *,
+    title: str,
+    summary: str,
+    eyebrow: str,
+    cards: list[dict[str, str]],
+    st_module: Any = st,
+) -> None:
+    """Render the prediction-page intro with the generic page hero layout."""
+    render_page_hero_deck(
+        title=title,
+        summary=summary,
+        eyebrow=eyebrow,
+        cards=cards,
+        st_module=st_module,
     )
 
 

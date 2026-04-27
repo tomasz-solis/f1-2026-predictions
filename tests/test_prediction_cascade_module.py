@@ -3,81 +3,89 @@
 from src.dashboard import prediction_cascade
 
 
+class _Ctx:
+    """Small context manager used to stand in for a Streamlit container."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
 def test_render_prediction_results_core_routes_sprint_sections_and_result_titles():
-    """Sprint cascade rendering should preserve order and rename completed sections."""
+    """Sprint rendering should use session tabs and enrich race sections with paired grids."""
 
     class _Streamlit:
-        """Collect rendered dashboard notices without using Streamlit itself."""
+        """Collect rendered dashboard markup without using Streamlit itself."""
 
         def __init__(self) -> None:
-            self.success_messages: list[str] = []
-            self.headers: list[str] = []
-            self.info_messages: list[str] = []
-            self.markdown_calls = 0
+            self.markdown_messages: list[str] = []
+            self.tab_labels: list[list[str]] = []
 
-        def success(self, message: str) -> None:
-            self.success_messages.append(str(message))
+        def markdown(self, message: str, **_kwargs) -> None:
+            self.markdown_messages.append(str(message))
 
-        def header(self, message: str) -> None:
-            self.headers.append(str(message))
-
-        def info(self, message: str) -> None:
-            self.info_messages.append(str(message))
-
-        def markdown(self, _message: str) -> None:
-            self.markdown_calls += 1
+        def tabs(self, labels: list[str]) -> list[_Ctx]:
+            self.tab_labels.append(list(labels))
+            return [_Ctx() for _label in labels]
 
     streamlit = _Streamlit()
-    rendered_sections: list[str] = []
+    rendered_sections: list[tuple[dict, str, bool]] = []
 
     prediction_cascade.render_prediction_results_core(
         prediction_results={
-            "sprint_quali": {"timing": {"total": 1.2}, "grid": [], "result_mode": "ACTUAL"},
+            "sprint_quali": {
+                "timing": {"total": 1.2},
+                "grid": [{"position": 1, "driver": "RUS", "team": "Mercedes"}],
+                "result_mode": "ACTUAL",
+            },
             "sprint_race": {"finish_order": []},
-            "main_quali": {"grid": []},
+            "main_quali": {"grid": [{"position": 1, "driver": "LEC", "team": "Ferrari"}]},
             "main_race": {"finish_order": []},
         },
         is_sprint=True,
-        display_prediction_result_fn=lambda _result, title, is_race: rendered_sections.append(
-            f"{title}:{'race' if is_race else 'quali'}"
+        display_prediction_result_fn=lambda result, title, is_race: rendered_sections.append(
+            (result, title, is_race)
         ),
         st_module=streamlit,
     )
 
-    assert streamlit.success_messages == ["Predictions complete in 1.20s"]
-    assert streamlit.headers == ["Sprint Weekend Cascade"]
-    assert streamlit.info_messages == [
-        "Full weekend flow: Sprint Qualifying → Sprint Race → Main Qualifying → Main Race"
+    assert any(
+        "Predictions complete in 1.20s" in message for message in streamlit.markdown_messages
+    )
+    assert any("Sprint Weekend" in message for message in streamlit.markdown_messages)
+    assert streamlit.tab_labels == [
+        ["1. Sprint Quali", "2. Sprint Race", "3. Main Quali", "4. Main Race"]
     ]
-    assert streamlit.markdown_calls == 1
-    assert rendered_sections == [
+    assert [
+        f"{title}:{'race' if is_race else 'quali'}" for _result, title, is_race in rendered_sections
+    ] == [
         "Sprint Qualifying Result:quali",
         "Sprint Race Prediction:race",
         "Main Qualifying Prediction:quali",
         "Main Race Prediction:race",
     ]
+    assert rendered_sections[1][0]["starting_grid"][0]["driver"] == "RUS"
+    assert rendered_sections[1][0]["starting_session_name"] == "SQ"
+    assert rendered_sections[3][0]["starting_grid"][0]["driver"] == "LEC"
+    assert rendered_sections[3][0]["starting_session_name"] == "Q"
 
 
 def test_render_prediction_results_core_prefers_pipeline_timing_for_cache_hits():
     """Cache-hit banner should report the request runtime instead of simulated timing."""
 
     class _Streamlit:
-        """Collect only the success banner for cache-hit assertions."""
+        """Collect only the rendered markup for cache-hit assertions."""
 
         def __init__(self) -> None:
-            self.success_messages: list[str] = []
+            self.markdown_messages: list[str] = []
 
-        def success(self, message: str) -> None:
-            self.success_messages.append(str(message))
+        def markdown(self, message: str, **_kwargs) -> None:
+            self.markdown_messages.append(str(message))
 
-        def header(self, _message: str) -> None:
-            return None
-
-        def info(self, _message: str) -> None:
-            return None
-
-        def markdown(self, _message: str) -> None:
-            return None
+        def tabs(self, labels: list[str]) -> list[_Ctx]:
+            return [_Ctx() for _label in labels]
 
     streamlit = _Streamlit()
 
@@ -93,4 +101,7 @@ def test_render_prediction_results_core_prefers_pipeline_timing_for_cache_hits()
         pipeline_timing={"total": 0.1},
     )
 
-    assert streamlit.success_messages == ["Prediction loaded from cache in 0.10s"]
+    assert any(
+        "Prediction loaded from cache in 0.10s" in message
+        for message in streamlit.markdown_messages
+    )

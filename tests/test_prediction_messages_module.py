@@ -51,11 +51,14 @@ def test_build_runtime_messages_collects_key_runtime_notices():
             "ready_races": ["Chinese Grand Prix"],
             "errors": ["rain run failed"],
         },
+        completed_races_count=2,
     )
 
     texts = [message for _level, message in messages]
 
-    assert any("2026 regulation reset" in text for text in texts)
+    assert any(
+        "only 2/3 completed Grand Prix race results are in the model" in text for text in texts
+    )
     assert any("Sprint weekend mode active" in text for text in texts)
     assert any("Prediction reused from cache" in text for text in texts)
     assert any(
@@ -66,6 +69,42 @@ def test_build_runtime_messages_collects_key_runtime_notices():
         "Boundary precompute completed: 2 scenario(s) generated, 1 reused" in text for text in texts
     )
     assert any("Some precompute scenarios failed: rain run failed" in text for text in texts)
+
+
+def test_build_runtime_messages_suppresses_reset_warning_after_three_races():
+    messages = prediction_messages.build_runtime_messages(
+        selected_season=2026,
+        race_name="Miami Grand Prix",
+        is_sprint=False,
+        boundary_refresh={"latest_elapsed_session": "FP3"},
+        practice_update={"updated": False, "completed_fp_sessions": []},
+        prediction_cache_hit=False,
+        boundary_fallback={},
+        precompute_summary={},
+        completed_races_count=3,
+    )
+
+    texts = [message for _level, message in messages]
+
+    assert not any("2026 regulation reset" in text for text in texts)
+    assert any("Latest datapoint in use" in text for text in texts)
+
+
+def test_build_runtime_messages_keeps_reset_warning_when_count_is_missing():
+    messages = prediction_messages.build_runtime_messages(
+        selected_season=2026,
+        race_name="Miami Grand Prix",
+        is_sprint=False,
+        boundary_refresh={},
+        practice_update={"updated": False, "completed_fp_sessions": []},
+        prediction_cache_hit=False,
+        boundary_fallback={},
+        precompute_summary={},
+    )
+
+    texts = [message for _level, message in messages]
+
+    assert any("completed Grand Prix race evidence is unavailable" in text for text in texts)
 
 
 def test_render_collapsible_runtime_messages_deduplicates_details():

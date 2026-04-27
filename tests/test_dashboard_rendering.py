@@ -306,11 +306,13 @@ def test_render_position_change_chart_shows_plot_for_starting_grid(patcher):
         prediction_name="Race Prediction",
     )
 
-    assert calls.count(("plotly_chart", "rendered")) == 2
+    assert calls.count(("plotly_chart", "rendered")) == 1
     captions = [value for kind, value in calls if kind == "caption"]
+    assert any("Movement ladder shows projected position changes only" in text for text in captions)
     assert any("Biggest projected gainers: NOR +2" in text for text in captions)
     markdown_blocks = [value for kind, value in calls if kind == "markdown"]
     assert any("Biggest Movers" in block for block in markdown_blocks)
+    assert any("Biggest gainer" in block and "NOR +2" in block for block in markdown_blocks)
 
 
 def test_render_prediction_hero_deck_uses_fixed_meta_grid(patcher):
@@ -485,3 +487,5 @@ def test_display_prediction_result_renders_teammate_head_to_head_probabilities(p
     assert any("How to read:" in text for text in markdown_blocks)
     assert any("VER over HAD" in text for text in markdown_blocks)
     assert any("80.3%" in text for text in markdown_blocks)
+    assert any("+30.3 pp toward VER" in text for text in markdown_blocks)
+    assert any("50/50" in text and "HAD" in text for text in markdown_blocks)
