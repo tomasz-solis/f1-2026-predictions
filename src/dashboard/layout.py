@@ -30,6 +30,9 @@ if ENABLE_PREDICTION_ACCURACY_TAB:
     NAVIGATION_PAGES.append("Prediction Accuracy")
     NAVIGATION_PAGES.append("Checkpoint Viewer")
 NAVIGATION_PAGES.extend(["Model & Learning", "Contact"])
+_NAVIGATION_STATE_KEY = "nav_tabs"
+_NAVIGATION_WIDGET_KEY = "nav_tabs_selector"
+_NAVIGATION_FALLBACK_KEY = "nav_tabs_selectbox"
 
 # Backwards-compatible alias used by tests and external imports.
 _CUSTOM_CSS = CUSTOM_CSS
@@ -152,37 +155,93 @@ def render_header() -> None:
     )
 
 
+def _coerce_navigation_page(value: object) -> str | None:
+    """Return a valid navigation page from a widget value."""
+    if isinstance(value, str) and value in NAVIGATION_PAGES:
+        return value
+    return None
+
+
+def _active_navigation_page(default: str | None = None) -> str:
+    """Return the last valid navigation page stored in session state."""
+    fallback = default if default in NAVIGATION_PAGES else NAVIGATION_PAGES[0]
+    try:
+        stored_page = st.session_state.get(_NAVIGATION_STATE_KEY)
+    except Exception:
+        stored_page = None
+    return _coerce_navigation_page(stored_page) or fallback
+
+
+def _store_navigation_page(page: str) -> None:
+    """Remember the active navigation page when session state is available."""
+    if page not in NAVIGATION_PAGES:
+        return
+    try:
+        st.session_state[_NAVIGATION_STATE_KEY] = page
+    except Exception:
+        return
+
+
+def _sync_navigation_widget() -> None:
+    """Pin nullable segmented-control state to the last valid page."""
+    try:
+        raw_page = st.session_state.get(_NAVIGATION_WIDGET_KEY)
+    except Exception:
+        return
+
+    page = _coerce_navigation_page(raw_page)
+    if page is None:
+        page = _active_navigation_page()
+        try:
+            st.session_state[_NAVIGATION_WIDGET_KEY] = page
+        except Exception:
+            pass
+    _store_navigation_page(page)
+
+
 def render_sidebar() -> tuple[str, bool]:
     """Render sidebar navigation and return selected page with logging enabled."""
     segmented_control = getattr(st, "segmented_control", None)
-    page: str | None = None
+    active_page = _active_navigation_page()
     if callable(segmented_control):
         try:
             selection = segmented_control(
                 "Navigation",
                 options=NAVIGATION_PAGES,
                 selection_mode="single",
-                default=NAVIGATION_PAGES[0],
-                key="nav_tabs",
+                default=active_page,
+                key=_NAVIGATION_WIDGET_KEY,
+                on_change=_sync_navigation_widget,
             )
         except TypeError:
-            selection = segmented_control(
-                "Navigation",
-                options=NAVIGATION_PAGES,
-                default=NAVIGATION_PAGES[0],
-                key="nav_tabs",
-            )
+            try:
+                selection = segmented_control(
+                    "Navigation",
+                    options=NAVIGATION_PAGES,
+                    default=active_page,
+                    key=_NAVIGATION_WIDGET_KEY,
+                    on_change=_sync_navigation_widget,
+                )
+            except TypeError:
+                selection = segmented_control(
+                    "Navigation",
+                    options=NAVIGATION_PAGES,
+                    default=active_page,
+                    key=_NAVIGATION_WIDGET_KEY,
+                )
 
-        if isinstance(selection, str) and selection in NAVIGATION_PAGES:
-            page = selection
+        page = _coerce_navigation_page(selection) or _active_navigation_page(active_page)
+        _store_navigation_page(page)
+        return page, True
 
-    if page is None:
-        page = st.selectbox(
-            "Navigation",
-            NAVIGATION_PAGES,
-            index=0,
-            key="nav_tabs",
-            label_visibility="collapsed",
-        )
+    page = st.selectbox(
+        "Navigation",
+        NAVIGATION_PAGES,
+        index=NAVIGATION_PAGES.index(active_page),
+        key=_NAVIGATION_FALLBACK_KEY,
+        label_visibility="collapsed",
+    )
+    page = _coerce_navigation_page(page) or active_page
+    _store_navigation_page(page)
 
     return page, True

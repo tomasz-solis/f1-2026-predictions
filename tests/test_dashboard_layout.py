@@ -119,12 +119,14 @@ def test_render_sidebar_returns_page_and_logging_toggle(patcher):
     calls = {
         "segmented_label": None,
         "segmented_options": None,
+        "segmented_key": None,
         "radio_called": False,
     }
 
     def _segmented_control(label, options, **_kwargs):
         calls["segmented_label"] = label
         calls["segmented_options"] = list(options)
+        calls["segmented_key"] = _kwargs.get("key")
         return "Team Comparison"
 
     def _radio(*_args, **_kwargs):
@@ -142,7 +144,57 @@ def test_render_sidebar_returns_page_and_logging_toggle(patcher):
     assert enable_logging is True
     assert calls["segmented_label"] == "Navigation"
     assert calls["segmented_options"] == layout.NAVIGATION_PAGES
+    assert calls["segmented_key"] == layout._NAVIGATION_WIDGET_KEY
     assert calls["radio_called"] is False
+
+
+def test_render_sidebar_keeps_previous_page_when_segmented_control_is_unselected(patcher):
+    state = {
+        layout._NAVIGATION_STATE_KEY: "Prediction Accuracy",
+        layout._NAVIGATION_WIDGET_KEY: None,
+    }
+    selectbox_called = False
+
+    def _segmented_control(_label, options, **_kwargs):
+        assert list(options) == layout.NAVIGATION_PAGES
+        return None
+
+    def _selectbox(*_args, **_kwargs):
+        nonlocal selectbox_called
+        selectbox_called = True
+        return "Prediction"
+
+    patcher.setattr(layout.st, "session_state", state)
+    patcher.setattr(layout.st, "segmented_control", _segmented_control)
+    patcher.setattr(layout.st, "selectbox", _selectbox)
+
+    page, enable_logging = layout.render_sidebar()
+
+    assert page == "Prediction Accuracy"
+    assert enable_logging is True
+    assert selectbox_called is False
+    assert state[layout._NAVIGATION_STATE_KEY] == "Prediction Accuracy"
+
+
+def test_render_sidebar_fallback_selectbox_uses_distinct_key(patcher):
+    state = {layout._NAVIGATION_STATE_KEY: "Checkpoint Viewer"}
+    calls: dict[str, object] = {}
+
+    def _selectbox(_label, options, index=0, **kwargs):
+        calls["key"] = kwargs.get("key")
+        calls["index"] = index
+        return options[index]
+
+    patcher.setattr(layout.st, "session_state", state)
+    patcher.setattr(layout.st, "segmented_control", None)
+    patcher.setattr(layout.st, "selectbox", _selectbox)
+
+    page, _enable_logging = layout.render_sidebar()
+
+    assert page == "Checkpoint Viewer"
+    assert calls["key"] == layout._NAVIGATION_FALLBACK_KEY
+    assert calls["key"] != layout._NAVIGATION_STATE_KEY
+    assert calls["index"] == layout.NAVIGATION_PAGES.index("Checkpoint Viewer")
 
 
 def test_navigation_pages_match_dashboard_order():
