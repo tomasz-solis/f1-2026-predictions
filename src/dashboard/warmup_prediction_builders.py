@@ -11,6 +11,7 @@ from .prediction_checkpointing import (
     resolve_prediction_checkpoint_session,
     session_is_within_prediction_boundary,
 )
+from .race_context import attach_starting_grid_context
 
 logger = logging.getLogger(__name__)
 
@@ -310,6 +311,7 @@ def compute_weather_predictions(
             or "PREDICTED"
         )
         sprint_race["grid_source"] = sprint_grid_source
+        attach_starting_grid_context(sprint_race, base_features["sprint_grid_for_race"], "SQ")
         if sprint_grid_source == "ACTUAL":
             sprint_race["starting_grid_note"] = build_starting_grid_note_fn("SQ")
         if str(sprint_race.get("result_mode", "")).upper() != "ACTUAL":
@@ -337,6 +339,7 @@ def compute_weather_predictions(
         main_grid_source = str(base_features.get("main_quali", {}).get("grid_source", "PREDICTED"))
         main_grid_source = main_grid_source.strip().upper() or "PREDICTED"
         main_race["grid_source"] = main_grid_source
+        attach_starting_grid_context(main_race, base_features["main_grid_for_race"], "Q")
         if main_grid_source == "ACTUAL":
             main_race["starting_grid_note"] = build_starting_grid_note_fn("Q")
         if str(main_race.get("result_mode", "")).upper() != "ACTUAL":
@@ -385,6 +388,7 @@ def compute_weather_predictions(
     race_grid_source = str(base_features.get("qualifying", {}).get("grid_source", "PREDICTED"))
     race_grid_source = race_grid_source.strip().upper() or "PREDICTED"
     race["grid_source"] = race_grid_source
+    attach_starting_grid_context(race, base_features["qualifying_grid_for_race"], "Q")
     if race_grid_source == "ACTUAL":
         race["starting_grid_note"] = build_starting_grid_note_fn("Q")
     if str(race.get("result_mode", "")).upper() != "ACTUAL":

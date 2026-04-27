@@ -17,6 +17,7 @@ from .prediction_checkpointing import (
     resolve_prediction_checkpoint_session,
     session_is_within_prediction_boundary,
 )
+from .race_context import attach_starting_grid_context
 
 logger = logging.getLogger(__name__)
 
@@ -368,6 +369,7 @@ def _resolve_race_section(
     if actual_results is not None:
         actual_payload = build_actual_race_section(actual_results, session_name=session_name)
         actual_payload["grid_source"] = qualifying_grid_source
+        attach_starting_grid_context(actual_payload, qualifying_grid, grid_session_name)
         if qualifying_grid_source == "ACTUAL":
             actual_payload["starting_grid_note"] = build_starting_grid_note(grid_session_name)
         return actual_payload
@@ -390,6 +392,7 @@ def _resolve_race_section(
             input_confidence=input_confidence,
         )
     race_result["grid_source"] = qualifying_grid_source
+    attach_starting_grid_context(race_result, qualifying_grid, grid_session_name)
     if qualifying_grid_source == "ACTUAL":
         race_result["starting_grid_note"] = build_starting_grid_note(grid_session_name)
     return race_result

@@ -273,6 +273,14 @@ def test_compute_weather_predictions_uses_actual_main_race_for_sprint_weekend():
     assert result["main_race"]["result_mode"] == "ACTUAL"
     assert result["main_race"]["grid_source"] == "ACTUAL"
     assert result["main_race"]["starting_grid_note"] == "note Q"
+    assert result["main_race"]["starting_grid"] == [
+        {"position": 1, "driver": "VER", "team": "Red Bull"}
+    ]
+    assert result["main_race"]["starting_session_name"] == "Q"
+    assert result["sprint_race"]["starting_grid"] == [
+        {"position": 1, "driver": "NOR", "team": "McLaren"}
+    ]
+    assert result["sprint_race"]["starting_session_name"] == "SQ"
     assert "input_confidence" not in result["main_race"]
 
 
@@ -312,4 +320,6 @@ def test_compute_weather_predictions_uses_actual_race_for_normal_weekend():
     assert result["race"]["result_mode"] == "ACTUAL"
     assert result["race"]["grid_source"] == "ACTUAL"
     assert result["race"]["starting_grid_note"] == "note Q"
+    assert result["race"]["starting_grid"] == [{"position": 1, "driver": "RUS", "team": "Mercedes"}]
+    assert result["race"]["starting_session_name"] == "Q"
     assert "input_confidence" not in result["race"]

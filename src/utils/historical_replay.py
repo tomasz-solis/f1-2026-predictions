@@ -24,6 +24,7 @@ from src.dashboard.prediction_flow import (
     build_actual_race_section,
     build_starting_grid_note,
 )
+from src.dashboard.race_context import attach_starting_grid_context
 from src.persistence.artifact_store import ArtifactStore
 from src.predictors.baseline_2026 import Baseline2026Predictor
 from src.systems.testing_updater import _season_snapshot_plan, update_from_testing_sessions
@@ -344,6 +345,7 @@ def _resolve_race_section_for_replay(
         )
         section = build_actual_race_section(actual_results, session_name=target_session)
         section["grid_source"] = qualifying_grid_source
+        attach_starting_grid_context(section, qualifying_grid, grid_session_name)
         if qualifying_grid_source == "ACTUAL":
             section["starting_grid_note"] = build_starting_grid_note(grid_session_name)
         return section
@@ -379,6 +381,7 @@ def _resolve_race_section_for_replay(
     section["grid_source"] = qualifying_grid_source
     section["result_mode"] = "PREDICTED"
     section["input_confidence"] = round(float(input_confidence), 3)
+    attach_starting_grid_context(section, qualifying_grid, grid_session_name)
     if qualifying_grid_source == "ACTUAL":
         section["starting_grid_note"] = build_starting_grid_note(grid_session_name)
     return section

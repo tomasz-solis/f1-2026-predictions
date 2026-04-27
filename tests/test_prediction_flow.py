@@ -604,6 +604,8 @@ def test_run_prediction_ignores_completed_q_results_and_stays_on_fp3(patcher):
     assert result["qualifying"]["grid_source"] == "PREDICTED"
     assert result["qualifying"]["grid"][0]["driver"] == "NOR"
     assert result["race"]["grid_source"] == "PREDICTED"
+    assert result["race"]["starting_grid"] == [{"driver": "NOR", "team": "McLaren", "position": 1}]
+    assert result["race"]["starting_session_name"] == "Q"
     assert "starting_grid_note" not in result["race"]
     assert mock_predictor.predict_race.call_args.kwargs["qualifying_grid"] == [
         {"driver": "NOR", "team": "McLaren", "position": 1}
@@ -657,6 +659,10 @@ def test_run_prediction_uses_actual_sprint_race_section_after_completion(patcher
     assert mock_predictor.predict_sprint_race.call_count == 0
     assert result["sprint_quali"]["result_mode"] == "ACTUAL"
     assert result["sprint_race"]["result_mode"] == "ACTUAL"
+    assert result["sprint_race"]["starting_grid"] == [
+        {"driver": "RUS", "team": "Mercedes", "position": 1}
+    ]
+    assert result["sprint_race"]["starting_session_name"] == "SQ"
     assert result["main_quali"]["grid_source"] == "PREDICTED"
     assert mock_predictor.predict_qualifying.call_count == 1
     assert mock_predictor.predict_race.call_count == 1
