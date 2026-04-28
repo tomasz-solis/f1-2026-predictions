@@ -53,7 +53,7 @@ class SessionDetector:
     FINAL_STATUS_TOKENS = ("FINISHED", "FINALISED", "FINALIZED", "ENDED", "ABORTED")
     ACTIVE_STATUS_TOKENS = ("STARTED", "GREEN", "RUNNING", "RESTART", "SUSPENDED")
 
-    def __init__(self):
+    def __init__(self) -> None:
         cache_dir = Path("data/raw/.fastf1_cache")
         cache_dir.mkdir(parents=True, exist_ok=True)
         try:

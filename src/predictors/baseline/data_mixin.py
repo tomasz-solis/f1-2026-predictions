@@ -82,10 +82,10 @@ class BaselineDataMixin:
         tracks: dict[str, dict[str, Any]]
         year: int
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize data mixin with compound extraction cache."""
         if not hasattr(self, "_compound_cache"):
-            self._compound_cache = {}
+            self._compound_cache: dict[tuple[str, int, int], dict[str, dict[str, Any]]] = {}
         if not hasattr(self, "_replayed_actual_race_scores"):
             self._replayed_actual_race_scores: dict[int, list[dict[str, object]]] = {}
 

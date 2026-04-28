@@ -49,21 +49,21 @@ def evaluate_component_promotion_gate(
     checks["has_central_mae_deltas"] = race_delta is not None and qualifying_delta is not None
     if not checks["has_central_mae_deltas"]:
         reasons.append("missing race or qualifying MAE delta")
-        race_delta = 0.0
-        qualifying_delta = 0.0
+    race_mae_delta = race_delta if race_delta is not None else 0.0
+    qualifying_mae_delta = qualifying_delta if qualifying_delta is not None else 0.0
 
-    total_mae_improvement = float(race_delta + qualifying_delta)
+    total_mae_improvement = float(race_mae_delta + qualifying_mae_delta)
     checks["improves_total_central_mae"] = total_mae_improvement >= min_total_mae_improvement
     if not checks["improves_total_central_mae"]:
         reasons.append(
             f"combined race and qualifying MAE improvement is below {min_total_mae_improvement:.3f}"
         )
 
-    checks["race_mae_not_regressed"] = race_delta >= -central_mae_tolerance
+    checks["race_mae_not_regressed"] = race_mae_delta >= -central_mae_tolerance
     if not checks["race_mae_not_regressed"]:
         reasons.append(f"race MAE regressed by more than {central_mae_tolerance:.3f}")
 
-    checks["qualifying_mae_not_regressed"] = qualifying_delta >= -central_mae_tolerance
+    checks["qualifying_mae_not_regressed"] = qualifying_mae_delta >= -central_mae_tolerance
     if not checks["qualifying_mae_not_regressed"]:
         reasons.append(f"qualifying MAE regressed by more than {central_mae_tolerance:.3f}")
 
