@@ -3,6 +3,10 @@
 Events are best-effort and never raise into the UI. Session IDs are short
 hashed UUIDs scoped to the Streamlit session_state; they reset when the
 browser tab closes. No IP, no email, no other PII is stored.
+
+UTM parameters (utm_source, utm_medium, utm_campaign, utm_content,
+utm_term) are captured once on the first event of a session and pinned
+to every subsequent event in that session, giving per-session attribution.
 """
 
 import logging
@@ -20,7 +24,10 @@ logger = logging.getLogger(__name__)
 _SESSION_KEY = "_analytics_session_id"
 _LAST_PAGE_KEY = "_analytics_last_page"
 _USER_AGENT_KEY = "_analytics_user_agent"
+_UTM_KEY = "_analytics_utm"
 _TABLE = "app_events"
+
+_UTM_FIELDS = ("utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term")
 
 
 def _session_id() -> str:
@@ -55,21 +62,54 @@ def _user_agent() -> str | None:
     return ua
 
 
+def _capture_utm() -> dict[str, str]:
+    """Read UTM params from the URL once and pin them to session_state.
+
+    Subsequent calls return the cached dict. Empty dict if no UTMs were
+    present on the first hit (direct visit, refresh without query string,
+    etc.). We freeze on first read so a user navigating internally can't
+    overwrite their original attribution.
+    """
+    cached = st.session_state.get(_UTM_KEY)
+    if cached is not None:
+        return cached
+
+    captured: dict[str, str] = {}
+    try:
+        params = st.query_params
+        for field in _UTM_FIELDS:
+            value = params.get(field)
+            if isinstance(value, list):
+                value = value[0] if value else None
+            if value:
+                # Cap length defensively; UTMs are short by convention.
+                captured[field] = str(value)[:128]
+    except Exception as exc:
+        logger.warning("UTM capture failed: %s", exc)
+
+    st.session_state[_UTM_KEY] = captured
+    return captured
+
+
 def track_event(event_type: str, **payload: Any) -> None:
     """Insert one row into app_events. Silent on failure.
 
     Special kwargs: ``page`` (str) is promoted to its own column.
-    Everything else lands in the JSONB ``payload`` column.
+    Everything else lands in the JSONB ``payload`` column. UTM params
+    captured at session start are merged into the payload automatically.
     """
     if not is_db_enabled():
         return
 
     page = payload.pop("page", None)
+    utm = _capture_utm()
+    merged_payload: dict[str, Any] = {**utm, **payload}
+
     record = {
         "session_id": _session_id(),
         "event_type": event_type,
         "page": page,
-        "payload": payload,
+        "payload": merged_payload,
         "model_version": format_model_version_label(),
         "user_agent": _user_agent(),
     }
