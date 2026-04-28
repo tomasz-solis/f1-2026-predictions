@@ -58,9 +58,9 @@ CONTACT_PAGE_HTML = """
   <section class="contact-card">
     <h3>Project Links</h3>
     <div class="contact-link-stack">
-      <a class="contact-link-row" href="https://github.com/tomasz-solis/f1-2026-predictions" target="_blank" rel="noopener noreferrer">
+      <a class="contact-link-row" href="https://github.com/tomasz-solis/trackside-labs" target="_blank" rel="noopener noreferrer">
         <span class="contact-link-row__label">GitHub</span>
-        <span class="contact-link-row__value">f1-2026-predictions</span>
+        <span class="contact-link-row__value">trackside-labs</span>
       </a>
       <a class="contact-link-row" href="https://www.linkedin.com/in/tomaszsolis/" target="_blank" rel="noopener noreferrer">
         <span class="contact-link-row__label">LinkedIn</span>

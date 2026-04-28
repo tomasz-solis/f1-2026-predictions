@@ -71,6 +71,32 @@ def render_global_styles() -> None:
     st.markdown(_CUSTOM_CSS, unsafe_allow_html=True)
 
 
+def render_analytics_scripts() -> None:
+    """Inject the GoatCounter pageview script into the parent document.
+
+    components.html runs inside a sandboxed iframe; without
+    window.parent.document the tracker would count iframe loads, not the
+    Streamlit app. The flag on window.parent prevents double-loading on
+    Streamlit reruns.
+    """
+    components.html(
+        """
+        <script>
+        (function () {
+          if (window.parent.__goatcounterLoaded) return;
+          window.parent.__goatcounterLoaded = true;
+          const s = window.parent.document.createElement('script');
+          s.async = true;
+          s.dataset.goatcounter = 'https://tracksidelabs.goatcounter.com/count';
+          s.src = 'https://gc.zgo.at/count.js';
+          window.parent.document.head.appendChild(s);
+        })();
+        </script>
+        """,
+        height=0,
+    )
+
+
 @lru_cache(maxsize=4)
 def _build_asset_data_uri(path_str: str) -> str:
     asset_path = Path(path_str)

@@ -24,6 +24,7 @@ from .accuracy_view import (
     render_saved_predictions_summary,
     render_target_sections,
 )
+from .analytics import track_event
 from .cache import get_artifact_versions
 from .layout import BRAND_LAST_UPDATED, BRAND_MODEL_VERSION, ENABLE_PREDICTION_ACCURACY_TAB
 from .live_prediction_flow import (
@@ -773,6 +774,14 @@ def render_live_prediction_page(enable_logging: bool) -> None:
     )
 
     if predict_clicked:
+        track_event(
+            "predict_clicked",
+            race=race_name,
+            is_sprint=race_selection.endswith("(Sprint)"),
+            weather=str(weather),
+            season=int(selected_season),
+        )
+
         status_placeholder = st.empty()
 
         with st.spinner("Loading prediction data..."):
