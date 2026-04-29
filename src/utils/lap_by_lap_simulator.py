@@ -127,6 +127,104 @@ def _calculate_safety_car_lap_probability(
     return float(1.0 - (1.0 - probability) ** (1.0 / eligible_laps))
 
 
+def _sample_neutralization_events(
+    race_distance: int,
+    sc_prob: float,
+    vsc_prob: float,
+    multi_sc_prob: float,
+    trigger_lap: int,
+    rng: np.random.Generator,
+) -> list[dict[str, Any]]:
+    """Sample zero or more SC/VSC events for one race iteration.
+
+    Returns a list of dicts with keys ``kind`` ("SC" or "VSC"),
+    ``lap_start``, and ``duration_laps``, sorted by lap_start.
+
+    SC and VSC are sampled independently. After an SC fires, multi_sc_prob
+    governs whether a second SC deploys later in the race. VSC events can
+    coexist with SC events in the same race.
+    """
+    events: list[dict[str, Any]] = []
+    eligible_laps = max(0, race_distance - trigger_lap)
+    if eligible_laps <= 0:
+        return events
+
+    def _per_lap_prob(race_level: float) -> float:
+        p = float(np.clip(race_level, 0.0, 1.0))
+        if p <= 0.0:
+            return 0.0
+        if p >= 1.0:
+            return 1.0
+        return _calculate_safety_car_lap_probability(p, eligible_laps)
+
+    sc_lap_prob = _per_lap_prob(sc_prob)
+    vsc_lap_prob = _per_lap_prob(vsc_prob)
+
+    # Full SC: sample at most once; a second SC is conditional on multi_sc_prob.
+    sc_fired_lap: int | None = None
+    for lap in range(trigger_lap + 1, race_distance + 1):
+        if rng.random() < sc_lap_prob:
+            duration = int(rng.integers(low=3, high=7))
+            events.append({"kind": "SC", "lap_start": lap, "duration_laps": duration})
+            sc_fired_lap = lap
+            break
+
+    # Second SC (conditional on first firing).
+    if sc_fired_lap is not None and rng.random() < float(multi_sc_prob):
+        first_ev = next(e for e in events if e["kind"] == "SC")
+        earliest_second = first_ev["lap_start"] + first_ev["duration_laps"] + 6
+        if earliest_second < race_distance:
+            second_lap = int(rng.integers(low=earliest_second, high=race_distance))
+            events.append(
+                {
+                    "kind": "SC",
+                    "lap_start": second_lap,
+                    "duration_laps": int(rng.integers(low=3, high=7)),
+                }
+            )
+
+    # VSC: independent of SC.
+    for lap in range(trigger_lap + 1, race_distance + 1):
+        if rng.random() < vsc_lap_prob:
+            events.append(
+                {
+                    "kind": "VSC",
+                    "lap_start": lap,
+                    "duration_laps": int(rng.integers(low=2, high=5)),
+                }
+            )
+            break
+
+    return sorted(events, key=lambda e: e["lap_start"])
+
+
+def _apply_sc_field_compression(
+    driver_states: dict[str, Any],
+    gap_s: float,
+    rng: np.random.Generator,
+) -> None:
+    """Compress field gaps to model safety car bunching.
+
+    Sets every active car's cumulative time so they are ``gap_s`` seconds
+    apart from the car ahead, with ±0.12s noise per car. DNF drivers are
+    unaffected. The leader's time is not moved.
+    """
+    active = [
+        (driver, state["cumulative_time"])
+        for driver, state in driver_states.items()
+        if not state["has_dnf"]
+    ]
+    if len(active) < 2:
+        return
+
+    active.sort(key=lambda x: x[1])
+    leader_time = active[0][1]
+
+    for idx, (driver, _) in enumerate(active):
+        noise = float(rng.uniform(-0.12, 0.12))
+        driver_states[driver]["cumulative_time"] = leader_time + idx * gap_s + noise
+
+
 def simulate_race_lap_by_lap(
     driver_info_map: dict[str, dict[str, Any]],
     strategies: dict[str, PitStrategy],
@@ -199,11 +297,29 @@ def simulate_race_lap_by_lap(
     start_grid_gap_seconds = race_params.get("start_grid_gap_seconds", 0.32)
     safety_car_trigger_lap = race_params.get("safety_car_trigger_lap", 10)
     sc_probability_race = float(np.clip(race_params.get("sc_probability", 0.0), 0.0, 1.0))
-    eligible_sc_laps = max(0, race_distance - safety_car_trigger_lap)
-    sc_lap_probability = _calculate_safety_car_lap_probability(
-        sc_probability_race=sc_probability_race,
-        eligible_laps=eligible_sc_laps,
+    vsc_probability_race = float(np.clip(race_params.get("vsc_probability", 0.0), 0.0, 1.0))
+    multi_sc_prob = float(np.clip(race_params.get("multi_sc_prob", 0.0), 0.0, 1.0))
+
+    neutralization_events = _sample_neutralization_events(
+        race_distance=race_distance,
+        sc_prob=sc_probability_race,
+        vsc_prob=vsc_probability_race,
+        multi_sc_prob=multi_sc_prob,
+        trigger_lap=safety_car_trigger_lap,
+        rng=rng,
     )
+    # Pre-compute lap → event kind for O(1) lookup during the lap loop.
+    _neutralization_by_lap: dict[int, str] = {}
+    _sc_first_laps: set[int] = set()
+    for _ev in neutralization_events:
+        _sc_first_laps.add(_ev["lap_start"])
+        for _offset in range(_ev["duration_laps"] + 1):
+            _lap = _ev["lap_start"] + _offset
+            if _lap <= race_distance and _lap not in _neutralization_by_lap:
+                _neutralization_by_lap[_lap] = _ev["kind"]
+            elif _lap <= race_distance and _ev["kind"] == "SC":
+                # Full SC overrides VSC if both cover the same lap.
+                _neutralization_by_lap[_lap] = "SC"
     driver_states = {}
     for driver, info in driver_info_map.items():
         driver_states[driver] = {
@@ -251,9 +367,7 @@ def simulate_race_lap_by_lap(
         driver_ahead_map = {
             active_order[idx][0]: active_order[idx - 1][0] for idx in range(1, len(active_order))
         }
-        sc_deployed_this_lap = (
-            lap_num > safety_car_trigger_lap and rng.random() < sc_lap_probability
-        )
+        active_neutralization = _neutralization_by_lap.get(lap_num)  # "SC", "VSC", or None
 
         for driver in list(driver_states.keys()):
             state = driver_states[driver]
@@ -330,16 +444,17 @@ def simulate_race_lap_by_lap(
 
             tire_deg_delta = calculate_tire_deg_delta(
                 tire_deg_slope=effective_tire_deg_slope,
-                laps_on_tire=laps_on_tire,
+                laps_on_tire=int(laps_on_tire),
                 fuel_load_kg=fuel_load,
                 initial_fuel_kg=race_params["fuel"]["initial_load_kg"],
                 compound=compound,
                 track_temp=track_temperature_c,
+                tire_stress_score=race_params.get("tire_stress_score"),
             )
 
             fresh_tire_bonus = get_fresh_tire_advantage(
                 compound=compound,
-                laps_on_tire=laps_on_tire,
+                laps_on_tire=int(laps_on_tire),
                 track_temp=track_temperature_c,
             )
 
@@ -366,8 +481,10 @@ def simulate_race_lap_by_lap(
                 chaos *= track_multiplier
 
             sc_luck = 0.0
-            if sc_deployed_this_lap:
-                sc_luck_range = race_params.get("safety_car_luck_range", 0.25)
+            if active_neutralization is not None:
+                # Main SC effect comes from field compression and pit-loss reduction.
+                # This is kept narrow as a residual for minor positioning noise only.
+                sc_luck_range = race_params.get("safety_car_luck_range", 0.08)
                 sc_luck = rng.uniform(-sc_luck_range, sc_luck_range)
 
             teammate_variance = state.get("teammate_setup_offset", 0.0)
@@ -398,9 +515,15 @@ def simulate_race_lap_by_lap(
             lap_time_bounds = _lap_time_bounds
             lap_time = max(lap_time_bounds[0], min(lap_time_bounds[1], lap_time))
 
-            # Update cumulative time and tire age
+            # Update cumulative time and tire age.
             state["cumulative_time"] += lap_time
-            state["laps_on_tire"] += 1
+            # SC/VSC pace is much lower; model reduced thermal stress as fractional tire-age increment.
+            sc_tire_wear_fraction = (
+                float(race_params.get("sc_tire_wear_fraction", 0.65))
+                if active_neutralization is not None
+                else 1.0
+            )
+            state["laps_on_tire"] += sc_tire_wear_fraction
 
             # Fuel burn (configurable)
             fuel_burn_rate = race_params.get("fuel", {}).get("burn_rate_kg_per_lap", 1.5)
@@ -408,7 +531,14 @@ def simulate_race_lap_by_lap(
 
             strategy = strategies[driver]
             if lap_num in strategy["pit_laps"]:
-                _apply_pit_stop(state, strategy, race_params, rng)
+                _apply_pit_stop(
+                    state, strategy, race_params, rng, neutralization_type=active_neutralization
+                )
+
+        # Field compression: applied once when SC first deploys, not every SC lap.
+        if lap_num in _sc_first_laps and _neutralization_by_lap.get(lap_num) == "SC":
+            sc_gap = float(race_params.get("sc_compression_gap_s", 0.60))
+            _apply_sc_field_compression(driver_states, gap_s=sc_gap, rng=rng)
 
         # Update positions based on cumulative time (after all drivers complete lap)
         _update_positions_from_times(driver_states)
@@ -649,10 +779,21 @@ def _apply_pit_stop(
     strategy: PitStrategy,
     race_params: dict[str, Any],
     rng: np.random.Generator,
+    neutralization_type: str | None = None,
 ) -> None:
-    """Apply pit stop time loss and compound change to driver state."""
-    # Base pit loss
+    """Apply pit stop time loss and compound change to driver state.
+
+    Reduces pit loss when pitting under a safety car or VSC because cars are
+    running at reduced pace, narrowing the gap to drivers who stay out.
+    """
     pit_loss = race_params["pit_stops"]["loss_duration"]
+
+    if neutralization_type == "SC":
+        reduction = float(race_params.get("sc_pit_loss_reduction_s", 12.0))
+        pit_loss = max(0.0, pit_loss - reduction)
+    elif neutralization_type == "VSC":
+        reduction = float(race_params.get("vsc_pit_loss_reduction_s", 5.0))
+        pit_loss = max(0.0, pit_loss - reduction)
 
     # Optional: overtake loss if unlucky timing
     overtake_loss_range = race_params["pit_stops"].get("overtake_loss_range", [0, 3])

@@ -52,8 +52,18 @@ def _lap_top_speed_series(team_laps: pd.DataFrame) -> pd.Series:
     return speed_frame.max(axis=1, skipna=True).dropna()
 
 
+# See compound_analyzer._FUEL_SLOPE_CORRECTION_S_PER_LAP for derivation.
+_FUEL_SLOPE_CORRECTION_S_PER_LAP: float = 0.045
+
+
 def _estimate_tire_deg_slope(team_laps: pd.DataFrame) -> float | None:
-    """Estimate tire degradation in seconds per lap from same-stint race runs."""
+    """Estimate fuel-corrected tire degradation slope (s/lap) across all compounds.
+
+    Adds 0.045 s/lap to each raw regression slope to remove the systematic
+    improvement from fuel burn. Without this correction, durable compounds
+    (HARD/MEDIUM) often show negative slopes that reflect fuel weight loss,
+    not actual rubber wear.
+    """
     if team_laps.empty or "LapTime" not in team_laps.columns:
         return None
 
@@ -76,9 +86,11 @@ def _estimate_tire_deg_slope(team_laps: pd.DataFrame) -> float | None:
 
         x = np.arange(len(lap_seconds), dtype=float)
         y = lap_seconds.to_numpy(dtype=float)
-        slope = float(np.polyfit(x, y, 1)[0])
-        if -0.3 <= slope <= 1.0:
-            slopes.append(slope)
+        raw_slope = float(np.polyfit(x, y, 1)[0])
+        corrected_slope = raw_slope + _FUEL_SLOPE_CORRECTION_S_PER_LAP
+
+        if -0.10 <= corrected_slope <= 0.50:
+            slopes.append(corrected_slope)
 
     if not slopes:
         return None
@@ -283,12 +295,18 @@ def calculate_team_performance_from_races(
             logger.warning(f"  Failed to load {race_name}: {e}")
             continue
 
-    # Aggregate across season
+    # Aggregate across season.
+    # Require at least 2 races, or all available races if fewer than 3 completed.
+    # A fixed minimum of 3 incorrectly excludes teams with DNFs early in the season
+    # when only 3 rounds have been run.
+    min_races_required = min(3, max(2, races_analyzed - 1))
     team_characteristics = {}
 
     for team, performances in team_race_performances.items():
-        if len(performances) < 3:
-            logger.warning(f"Skipping {team} - only {len(performances)} races")
+        if len(performances) < min_races_required:
+            logger.warning(
+                f"Skipping {team} - only {len(performances)} races (need {min_races_required})"
+            )
             continue
 
         avg_performance = np.mean(performances)

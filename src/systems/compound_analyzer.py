@@ -66,8 +66,25 @@ def _median_lap_seconds_series(lap_times: pd.Series) -> float | None:
     return float(lap_seconds.median())
 
 
+# A car burns ~1.5 kg/lap; fuel weight reduces lap time by ~0.03 s/kg.
+# Each lap the car is 1.5 × 0.03 = 0.045 s faster purely from fuel loss.
+# Raw polyfit absorbs this as a −0.045 s/lap negative trend, masking real
+# degradation. Adding the constant back gives a fuel-neutral estimate.
+_FUEL_SLOPE_CORRECTION_S_PER_LAP: float = 0.045  # 1.5 kg/lap × 0.030 s/kg
+
+
 def _estimate_compound_tire_deg(compound_laps: pd.DataFrame) -> float | None:
-    """Estimate tire degradation slope in seconds/lap (higher = more degradation)."""
+    """Estimate tire degradation slope (s/lap) after removing the fuel-burn trend.
+
+    Fits a linear regression of lap time against lap index within each
+    (Driver, Stint) group. Corrects for the systematic ~0.045 s/lap
+    improvement from fuel burn, which otherwise produces negative slopes on
+    durable compounds. Track evolution is not yet removed; that requires
+    session-level data and is deferred to a future pass.
+
+    Returns the median fuel-corrected slope across stints, or None when
+    there are insufficient laps.
+    """
     if compound_laps.empty or "LapNumber" not in compound_laps.columns:
         return None
 
@@ -75,7 +92,7 @@ def _estimate_compound_tire_deg(compound_laps: pd.DataFrame) -> float | None:
     if "Stint" in compound_laps.columns:
         grouping_cols.append("Stint")
 
-    slopes = []
+    slopes: list[float] = []
     for _, stint_laps in compound_laps.groupby(grouping_cols, dropna=False):
         stint = stint_laps.sort_values("LapNumber")
         if len(stint) < 3:
@@ -89,10 +106,15 @@ def _estimate_compound_tire_deg(compound_laps: pd.DataFrame) -> float | None:
         x = np.arange(len(lap_seconds), dtype=float)
         y = lap_seconds.to_numpy(dtype=float)
 
-        slope = float(np.polyfit(x, y, 1)[0])
-        # Filter unrealistic slopes (negative or extreme)
-        if -0.3 <= slope <= 1.0:
-            slopes.append(slope)
+        raw_slope = float(np.polyfit(x, y, 1)[0])
+
+        # Fuel correction: raw slope includes −0.045 s/lap from lighter car each lap.
+        corrected_slope = raw_slope + _FUEL_SLOPE_CORRECTION_S_PER_LAP
+
+        # Post-correction, true wear should be ~0 to 0.20 s/lap.
+        # Accept −0.10 margin for noisy data at low-deg circuits.
+        if -0.10 <= corrected_slope <= 0.50:
+            slopes.append(corrected_slope)
 
     if not slopes:
         return None

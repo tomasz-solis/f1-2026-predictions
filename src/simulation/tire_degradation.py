@@ -84,18 +84,67 @@ def _temperature_fresh_tire_multiplier(track_temp: float | None) -> float:
     return float(max(min_multiplier, min(1.0, multiplier)))
 
 
+def get_compound_max_age(
+    compound: str,
+    tire_stress_score: float | None = None,
+    track_temp: float | None = None,
+) -> int:
+    """Return the lap count at which compound degradation enters the cliff zone.
+
+    Scales the global default cliff age from config by Pirelli tire stress score
+    (1–5 scale) and track temperature. A stress score of 3.0 applies no scaling.
+    Higher stress and hotter tracks pull the cliff in; lower stress and cooler
+    tracks extend it.
+
+    Falls back to bare config defaults when stress or temperature are absent.
+    """
+    compound_max_ages = config_loader.get(
+        "baseline_predictor.race.tire_physics.compound_max_age",
+        {"SOFT": 24, "MEDIUM": 34, "HARD": 42},
+    )
+    base = int(compound_max_ages.get(compound.upper(), 40))
+
+    if tire_stress_score is None and track_temp is None:
+        return base
+
+    sensitivity = config_loader.get(
+        "baseline_predictor.race.tire_physics.stress_cliff_sensitivity", 0.10
+    )
+    ref_temp = config_loader.get(
+        "baseline_predictor.race.tire_physics.cliff_reference_temp_c", 35.0
+    )
+    temp_sensitivity = config_loader.get(
+        "baseline_predictor.race.tire_physics.cliff_temp_sensitivity", 0.008
+    )
+
+    stress_multiplier = 1.0
+    if tire_stress_score is not None:
+        # Score 3.0 = neutral; 5.0 pulls cliff in by ~20%; 1.0 extends it by ~20%.
+        stress_multiplier = 1.0 + (3.0 - float(tire_stress_score)) * float(sensitivity)
+
+    temp_multiplier = 1.0
+    if track_temp is not None:
+        delta = float(track_temp) - float(ref_temp)
+        temp_multiplier = 1.0 - delta * float(temp_sensitivity)
+
+    multiplier = max(0.6, min(1.4, stress_multiplier * temp_multiplier))
+    return int(round(base * multiplier))
+
+
 def calculate_tire_deg_delta(
     tire_deg_slope: float,
-    laps_on_tire: int,
+    laps_on_tire: int | float,
     fuel_load_kg: float,
     initial_fuel_kg: float | None = None,
     compound: str | None = None,
     track_temp: float | None = None,
+    tire_stress_score: float | None = None,
 ) -> float:
     """Calculate lap time penalty from tire wear.
 
     Degradation increases linearly with tire age up to compound max age,
     then accelerates sharply (cliff). Fuel load also increases wear.
+    The cliff age is scaled by tire stress and track temperature when provided.
     """
     if tire_deg_slope <= 0.0 or laps_on_tire <= 0:
         return 0.0
@@ -115,16 +164,16 @@ def calculate_tire_deg_delta(
 
     temp_multiplier = _temperature_degradation_multiplier(track_temp)
 
-    # Tire cliff: beyond max age, degradation slope multiplies sharply
+    # Tire cliff: beyond track-adjusted max age, degradation accelerates sharply.
     if compound is not None:
-        compound_max_ages = config_loader.get(
-            "baseline_predictor.race.tire_physics.compound_max_age",
-            {"SOFT": 24, "MEDIUM": 34, "HARD": 42},
-        )
         cliff_multiplier = config_loader.get(
             "baseline_predictor.race.tire_physics.cliff_multiplier", 2.8
         )
-        max_age = compound_max_ages.get(compound.upper(), 40)
+        max_age = get_compound_max_age(
+            compound=compound,
+            tire_stress_score=tire_stress_score,
+            track_temp=track_temp,
+        )
         if laps_on_tire > max_age:
             laps_past_cliff = laps_on_tire - max_age
             linear_portion = tire_deg_slope * max_age * fuel_multiplier * temp_multiplier

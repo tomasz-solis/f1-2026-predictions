@@ -707,10 +707,18 @@ def load_track_specific_params(race_name: str | None = None, year: int = 2026) -
                         "Loaded track-specific pit stop loss for %s: %ss", race_name, pit_loss
                     )
 
-                # Extract safety car probability
+                # Extract full SC and VSC probabilities.
                 sc_prob = track_info.get("safety_car_prob")
                 if sc_prob is not None:
                     track_params["sc_probability"] = float(sc_prob)
+
+                vsc_prob = track_info.get("vsc_prob")
+                if vsc_prob is not None:
+                    track_params["vsc_probability"] = float(vsc_prob)
+
+                multi_sc_prob = track_info.get("multi_sc_prob")
+                if multi_sc_prob is not None:
+                    track_params["multi_sc_prob"] = float(multi_sc_prob)
 
                 # Extract overtaking difficulty
                 overtaking = _normalize_overtaking_difficulty(

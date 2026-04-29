@@ -32,6 +32,73 @@ def _ordered_available_compounds(available_compounds: list[str]) -> list[str]:
     return ordered + extras
 
 
+def sample_sprint_compound(
+    available_compounds: list[str],
+    grid_position: int | None,
+    tire_stress_score: float,
+    rng: np.random.Generator,
+) -> str:
+    """Pick a sprint starting compound for one driver.
+
+    Empirical 2024-2025 sprint data: MEDIUM is the modal compound (~88%).
+    A small fraction of back-of-grid drivers gamble on SOFT for early track
+    position. HARD appears occasionally at high-stress tracks.
+
+    Returns a compound name that is always present in available_compounds.
+    """
+    base_distribution = get_config_value(
+        "baseline_predictor.race.sprint_compound.base_distribution",
+        {"MEDIUM": 0.88, "SOFT": 0.08, "HARD": 0.04},
+        config=config_loader,
+    )
+    soft_bonus = float(
+        get_config_value(
+            "baseline_predictor.race.sprint_compound.soft_lower_grid_bonus",
+            0.06,
+            config=config_loader,
+        )
+    )
+    high_stress_threshold = float(
+        get_config_value(
+            "baseline_predictor.race.sprint_compound.high_stress_threshold",
+            4.0,
+            config=config_loader,
+        )
+    )
+    high_stress_shift = float(
+        get_config_value(
+            "baseline_predictor.race.sprint_compound.high_stress_hard_shift",
+            0.08,
+            config=config_loader,
+        )
+    )
+
+    weights: dict[str, float] = {k: float(v) for k, v in base_distribution.items()}
+
+    # Back-of-grid drivers more likely to gamble on SOFT for early position gain.
+    if grid_position is not None and grid_position > 10:
+        weights["SOFT"] = weights.get("SOFT", 0.0) + soft_bonus
+        weights["MEDIUM"] = max(0.0, weights.get("MEDIUM", 0.0) - soft_bonus)
+
+    # High-stress tracks shift mass toward HARD.
+    if tire_stress_score > high_stress_threshold:
+        shift = high_stress_shift
+        weights["SOFT"] = max(0.0, weights.get("SOFT", 0.0) - shift / 2)
+        weights["MEDIUM"] = max(0.0, weights.get("MEDIUM", 0.0) - shift / 2)
+        weights["HARD"] = weights.get("HARD", 0.0) + shift
+
+    available_set = set(_ordered_available_compounds(available_compounds))
+    weights = {c: w for c, w in weights.items() if c in available_set and w > 0}
+
+    if not weights:
+        return available_compounds[0] if available_compounds else "MEDIUM"
+
+    total = sum(weights.values())
+    compounds = list(weights.keys())
+    probs = [weights[c] / total for c in compounds]
+    return str(rng.choice(compounds, p=probs))
+
+
 def generate_pit_strategy(
     race_distance: int,
     tire_stress_score: float,

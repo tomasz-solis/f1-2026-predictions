@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 
+from src.simulation.pit_strategy import sample_sprint_compound as _sample_sprint_compound
 from src.types.prediction_types import PitStrategy, QualifyingGridEntry, RaceSimulationResult
 
 from .grid_uncertainty import (
@@ -300,6 +301,8 @@ def predict_race_core(
     except TypeError:
         # Backward compatibility for patched/legacy callables without year kwargs.
         tire_stress_score = deps.get_tire_stress_score(race_name)
+    # Make stress score available to the lap-by-lap simulator for per-track cliff ages.
+    race_params["tire_stress_score"] = float(tire_stress_score)
     available_compounds = deps.get_available_compounds(race_name, weather=weather)
     enforce_two_compound_rule = weather in {"dry", "mixed"}
 
@@ -354,6 +357,30 @@ def predict_race_core(
     race_params["sc_probability"] = race_params.get(
         "sc_probability", np.clip(default_sc_probability, 0.0, 1.0)
     )
+    race_params["sc_pit_loss_reduction_s"] = float(
+        race_params.get(
+            "sc_pit_loss_reduction_s",
+            cfg.get("baseline_predictor.race.sc_pit_loss_reduction_s", 12.0),
+        )
+    )
+    race_params["vsc_pit_loss_reduction_s"] = float(
+        race_params.get(
+            "vsc_pit_loss_reduction_s",
+            cfg.get("baseline_predictor.race.vsc_pit_loss_reduction_s", 5.0),
+        )
+    )
+    race_params["sc_compression_gap_s"] = float(
+        race_params.get(
+            "sc_compression_gap_s",
+            cfg.get("baseline_predictor.race.sc_compression_gap_s", 0.60),
+        )
+    )
+    race_params["sc_tire_wear_fraction"] = float(
+        race_params.get(
+            "sc_tire_wear_fraction",
+            cfg.get("baseline_predictor.race.sc_tire_wear_fraction", 0.65),
+        )
+    )
 
     if "pit_stops" not in race_params:
         race_params["pit_stops"] = {
@@ -385,13 +412,15 @@ def predict_race_core(
             }
 
         strategies: dict[str, PitStrategy] = {}
-        sprint_compound = (
-            "SOFT"
-            if "SOFT" in available_compounds
-            else (available_compounds[0] if available_compounds else "MEDIUM")
-        )
         for driver in simulation_driver_info_map.keys():
             if is_sprint:
+                driver_info = simulation_driver_info_map.get(driver, {})
+                sprint_compound = _sample_sprint_compound(
+                    available_compounds=available_compounds,
+                    grid_position=driver_info.get("grid_pos"),
+                    tire_stress_score=tire_stress_score,
+                    rng=rng,
+                )
                 strategies[driver] = {
                     "num_stops": 0,
                     "pit_laps": [],
