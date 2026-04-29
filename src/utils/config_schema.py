@@ -474,6 +474,17 @@ class BaselineQualifyingConfig(StrictConfigModel):
     )
 
 
+class SprintCompoundDistributionConfig(StrictConfigModel):
+    """Sprint race starting compound distribution derived from 2024-2025 empirical data."""
+
+    base_distribution: dict[str, float] = Field(
+        default_factory=lambda: {"MEDIUM": 0.88, "SOFT": 0.08, "HARD": 0.04}
+    )
+    soft_lower_grid_bonus: float = Field(default=0.06, ge=0.0, le=0.30)
+    high_stress_threshold: float = Field(default=4.0, ge=0.0)
+    high_stress_hard_shift: float = Field(default=0.08, ge=0.0, le=0.30)
+
+
 class CompoundSelectionConfig(StrictConfigModel):
     """Shared compound-selection thresholds."""
 
@@ -751,6 +762,9 @@ class TirePhysicsConfig(StrictConfigModel):
         default_factory=lambda: CompoundIntConfig(SOFT=24, MEDIUM=34, HARD=42)
     )
     cliff_multiplier: float = Field(default=2.8, ge=0.0)
+    stress_cliff_sensitivity: float = Field(default=0.10, ge=0.0, le=1.0)
+    cliff_reference_temp_c: float = Field(default=35.0)
+    cliff_temp_sensitivity: float = Field(default=0.008, ge=0.0, le=0.05)
     temperature: TirePhysicsTemperatureConfig = Field(default_factory=TirePhysicsTemperatureConfig)
 
 
@@ -908,7 +922,11 @@ class BaselineRaceConfig(StrictConfigModel):
     lap1_chaos: Lap1ChaosConfig = Field(default_factory=Lap1ChaosConfig)
     strategy_variance_base: float = Field(default=0.30, ge=0.0)
     strategy_track_modifier: float = Field(default=0.5, ge=0.0)
-    safety_car_luck_range: float = Field(default=0.25, ge=0.0)
+    safety_car_luck_range: float = Field(default=0.08, ge=0.0)
+    sc_pit_loss_reduction_s: float = Field(default=12.0, ge=0.0)
+    vsc_pit_loss_reduction_s: float = Field(default=5.0, ge=0.0)
+    sc_compression_gap_s: float = Field(default=0.60, ge=0.0)
+    sc_tire_wear_fraction: float = Field(default=0.65, ge=0.0, le=1.0)
     pace_weight_base: float = Field(default=0.40, ge=0.0)
     pace_weight_track_modifier: float = Field(default=0.10, ge=0.0)
     teammate_variance_std: float = Field(default=0.13, ge=0.0)
@@ -942,6 +960,9 @@ class BaselineRaceConfig(StrictConfigModel):
         default_factory=DefensiveSkillWeightsConfig
     )
     safety_car_trigger_lap: int = Field(default=10, ge=1)
+    sprint_compound: SprintCompoundDistributionConfig = Field(
+        default_factory=SprintCompoundDistributionConfig
+    )
     overtake_model: OvertakeModelConfig = Field(default_factory=OvertakeModelConfig)
     pit_stops: PitStopsConfig = Field(default_factory=PitStopsConfig)
     tire_strategy: TireStrategyConfig = Field(default_factory=TireStrategyConfig)

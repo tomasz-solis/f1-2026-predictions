@@ -441,7 +441,18 @@ baseline_predictor:
                                        # Monaco: 0.17, Bahrain: 0.24
 
     # Safety car luck (position swing when safety car deployed)
-    safety_car_luck_range: 0.25  # Uniform range: ±0.25
+    safety_car_luck_range: 0.08  # narrow per-lap residual; main SC effect is field compression
+
+    # Safety car mechanics.
+    # pit_loss_reduction_s: seconds cut from pit stop loss when pitting under SC/VSC.
+    # Under full SC cars slow to ~80 km/h; pit loss advantage is ~10-12s.
+    # Under VSC the gain is smaller (~4-6s) since pace is limited but not SC-slow.
+    sc_pit_loss_reduction_s: 12.0
+    vsc_pit_loss_reduction_s: 5.0
+    # Gap between cars after field compression when SC deploys.
+    sc_compression_gap_s: 0.60
+    # Fraction of tire-age increment applied during SC/VSC laps (pace is reduced).
+    sc_tire_wear_fraction: 0.65
 
     # Pace weight in race scoring
     pace_weight_base: 0.40      # Base pace weight
@@ -549,6 +560,18 @@ baseline_predictor:
         MEDIUM: 0.8
         HARD: 0.6
 
+    # Sprint race compound distribution.
+    # Based on 2024-2025 empirical data: MEDIUM ~88%, SOFT ~8%, HARD ~4%.
+    # Softs appear from back-of-grid drivers attacking early; hards at high-stress tracks.
+    sprint_compound:
+      base_distribution:
+        MEDIUM: 0.88
+        SOFT: 0.08
+        HARD: 0.04
+      soft_lower_grid_bonus: 0.06   # added to SOFT weight for grid_pos > 10
+      high_stress_threshold: 4.0    # stress above this shifts mass toward HARD
+      high_stress_hard_shift: 0.08  # how much weight moves from SOFT/MEDIUM to HARD
+
     # Fuel effect configuration
     fuel:
       effect_per_lap: 0.035            # seconds per lap per 10kg fuel
@@ -616,6 +639,14 @@ baseline_predictor:
         MEDIUM: 34                     # laps before cliff onset
         HARD: 42                       # laps before cliff onset
       cliff_multiplier: 2.8            # deg slope multiplied by this beyond max age
+      # Per-track cliff age scaling.
+      # Higher tire stress (Bahrain ~4.5) pulls cliff in; lower (Monaco ~1.8) extends it.
+      # stress_cliff_sensitivity: each unit above/below 3.0 shifts cliff age by this fraction.
+      # cliff_reference_temp_c: baseline track temperature for cliff age calculation.
+      # cliff_temp_sensitivity: fraction of cliff age lost per degree above reference.
+      stress_cliff_sensitivity: 0.10
+      cliff_reference_temp_c: 35.0
+      cliff_temp_sensitivity: 0.008
 
     # Lap time modeling
     lap_time:
