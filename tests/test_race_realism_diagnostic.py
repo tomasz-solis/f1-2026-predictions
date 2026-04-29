@@ -9,7 +9,7 @@ from src.predictors.baseline_2026 import Baseline2026Predictor
 
 @pytest.fixture
 def predictor():
-    return Baseline2026Predictor()
+    return Baseline2026Predictor(seed=42)
 
 
 def _quali_and_race(predictor: Baseline2026Predictor):
@@ -43,8 +43,8 @@ def test_diagnostic_grid_to_race_correlation_is_finite(predictor):
 def test_diagnostic_mean_position_change_is_bounded(predictor):
     qualifying, race = _quali_and_race(predictor)
 
-    grid_positions = {entry["driver"]: entry["position"] for entry in qualifying["grid"]}
-    race_positions = {entry["driver"]: entry["position"] for entry in race["finish_order"]}
+    grid_positions = {entry["driver"]: entry["median_position"] for entry in qualifying["grid"]}
+    race_positions = {entry["driver"]: entry["median_position"] for entry in race["finish_order"]}
     position_changes = [abs(grid_positions[d] - race_positions[d]) for d in grid_positions]
     mean_change = float(np.mean(position_changes))
 

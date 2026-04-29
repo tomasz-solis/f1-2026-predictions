@@ -1,7 +1,7 @@
 {
   "grid": [
     {
-      "confidence": 45.7,
+      "confidence": 44.6,
       "driver": "NOR",
       "median_position": 2,
       "p5": 1,
@@ -10,7 +10,7 @@
       "team": "McLaren"
     },
     {
-      "confidence": 47.3,
+      "confidence": 47.0,
       "driver": "VER",
       "median_position": 3,
       "p5": 1,
@@ -19,7 +19,7 @@
       "team": "Red Bull Racing"
     },
     {
-      "confidence": 45.4,
+      "confidence": 45.1,
       "driver": "RUS",
       "median_position": 3,
       "p5": 1,
@@ -28,7 +28,7 @@
       "team": "Mercedes"
     },
     {
-      "confidence": 45.2,
+      "confidence": 44.4,
       "driver": "PIA",
       "median_position": 4,
       "p5": 1,
@@ -37,7 +37,7 @@
       "team": "McLaren"
     },
     {
-      "confidence": 42.5,
+      "confidence": 42.4,
       "driver": "ANT",
       "median_position": 5,
       "p5": 1,
@@ -46,7 +46,7 @@
       "team": "Mercedes"
     },
     {
-      "confidence": 42.7,
+      "confidence": 42.0,
       "driver": "HAD",
       "median_position": 7,
       "p5": 2,
@@ -64,7 +64,7 @@
       "team": "Alpine"
     },
     {
-      "confidence": 42.4,
+      "confidence": 42.0,
       "driver": "HUL",
       "median_position": 8,
       "p5": 5,
@@ -73,7 +73,7 @@
       "team": "Audi"
     },
     {
-      "confidence": 42.4,
+      "confidence": 42.2,
       "driver": "OCO",
       "median_position": 9,
       "p5": 3,
@@ -82,7 +82,7 @@
       "team": "Haas F1 Team"
     },
     {
-      "confidence": 40.1,
+      "confidence": 40.0,
       "driver": "BEA",
       "median_position": 9,
       "p5": 2,
@@ -91,7 +91,7 @@
       "team": "Haas F1 Team"
     },
     {
-      "confidence": 41.0,
+      "confidence": 40.7,
       "driver": "COL",
       "median_position": 9,
       "p5": 3,
@@ -100,16 +100,16 @@
       "team": "Alpine"
     },
     {
-      "confidence": 41.8,
+      "confidence": 41.6,
       "driver": "BOR",
       "median_position": 10,
       "p5": 4,
-      "p95": 14,
+      "p95": 13,
       "position": 12,
       "team": "Audi"
     },
     {
-      "confidence": 45.6,
+      "confidence": 45.2,
       "driver": "ALO",
       "median_position": 14,
       "p5": 11,
@@ -118,7 +118,7 @@
       "team": "Aston Martin"
     },
     {
-      "confidence": 43.8,
+      "confidence": 43.3,
       "driver": "LAW",
       "median_position": 15,
       "p5": 10,
@@ -127,7 +127,7 @@
       "team": "RB"
     },
     {
-      "confidence": 44.2,
+      "confidence": 43.7,
       "driver": "LIN",
       "median_position": 15,
       "p5": 11,
@@ -136,7 +136,7 @@
       "team": "RB"
     },
     {
-      "confidence": 42.9,
+      "confidence": 42.4,
       "driver": "LEC",
       "median_position": 16,
       "p5": 10,
@@ -145,16 +145,16 @@
       "team": "Ferrari"
     },
     {
-      "confidence": 46.9,
+      "confidence": 46.3,
       "driver": "STR",
       "median_position": 16,
       "p5": 12,
-      "p95": 18,
+      "p95": 19,
       "position": 17,
       "team": "Aston Martin"
     },
     {
-      "confidence": 44.1,
+      "confidence": 43.7,
       "driver": "HAM",
       "median_position": 17,
       "p5": 13,
@@ -163,7 +163,7 @@
       "team": "Ferrari"
     },
     {
-      "confidence": 46.3,
+      "confidence": 45.6,
       "driver": "ALB",
       "median_position": 19,
       "p5": 15,
@@ -172,7 +172,7 @@
       "team": "Williams"
     },
     {
-      "confidence": 45.3,
+      "confidence": 44.8,
       "driver": "BOT",
       "median_position": 20,
       "p5": 14,
@@ -181,7 +181,7 @@
       "team": "Cadillac F1"
     },
     {
-      "confidence": 49.2,
+      "confidence": 48.6,
       "driver": "PER",
       "median_position": 20,
       "p5": 17,
@@ -190,7 +190,7 @@
       "team": "Cadillac F1"
     },
     {
-      "confidence": 50.3,
+      "confidence": 49.7,
       "driver": "SAI",
       "median_position": 21,
       "p5": 18,

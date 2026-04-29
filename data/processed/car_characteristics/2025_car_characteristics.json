@@ -1,529 +1,149 @@
 {
   "year": 2025,
-  "generated_at": "2026-04-21T09:04:41.907912+00:00",
-  "data_freshness": "BASELINE_PRESEASON",
-  "note": "Preseason 2025 prior built from 2024 race lap-time performance. Used for historical replay without target-season race leakage.",
-  "races_completed": 0,
+  "generated_at": "2026-04-29T18:23:27.878455+00:00",
+  "data_freshness": "DATA_DRIVEN",
+  "method": "Calculated from race lap times (median per team, normalized)",
+  "races_completed": 24,
   "teams": {
     "Red Bull Racing": {
-      "overall_performance": 0.748,
-      "uncertainty": 0.13,
-      "note": "2024 source rank P1, 24 race(s) analyzed; preseason strength scaled from normalized 2024 race pace.",
-      "last_updated": null,
-      "races_completed": 0,
-      "current_season_performance": [],
-      "testing_characteristics": {
-        "run_profile": "balanced",
-        "overall_pace": 0.845,
-        "top_speed": 0.416,
-        "slow_corner_performance": 0.799,
-        "medium_corner_performance": 0.855,
-        "fast_corner_performance": 0.784,
-        "consistency": 0.45,
-        "tire_deg_performance": 0.35
-      },
-      "testing_characteristics_profiles": {
-        "balanced": {
-          "run_profile": "balanced",
-          "overall_pace": 0.845,
-          "top_speed": 0.416,
-          "slow_corner_performance": 0.799,
-          "medium_corner_performance": 0.855,
-          "fast_corner_performance": 0.784,
-          "consistency": 0.45,
-          "tire_deg_performance": 0.35
-        },
-        "short_run": {
-          "run_profile": "short_run",
-          "overall_pace": 0.753,
-          "top_speed": 0.416,
-          "medium_corner_performance": 0.855,
-          "fast_corner_performance": 0.784,
-          "consistency": 0.45
-        },
-        "long_run": {
-          "run_profile": "long_run",
-          "overall_pace": 0.662,
-          "slow_corner_performance": 0.799,
-          "medium_corner_performance": 0.855,
-          "consistency": 0.45,
-          "tire_deg_performance": 0.35
-        }
-      },
-      "directionality": {
-        "max_speed": -0.0084,
-        "slow_corner_speed": 0.0299,
-        "medium_corner_speed": 0.0355,
-        "high_corner_speed": 0.0284
-      }
-    },
-    "Ferrari": {
-      "overall_performance": 0.736,
-      "uncertainty": 0.13,
-      "note": "2024 source rank P2, 23 race(s) analyzed; preseason strength scaled from normalized 2024 race pace.",
-      "last_updated": null,
-      "races_completed": 0,
-      "current_season_performance": [],
-      "testing_characteristics": {
-        "run_profile": "balanced",
-        "overall_pace": 0.825,
-        "top_speed": 0.482,
-        "slow_corner_performance": 0.845,
-        "medium_corner_performance": 0.772,
-        "fast_corner_performance": 0.81,
-        "consistency": 0.69,
-        "tire_deg_performance": 0.597
-      },
-      "testing_characteristics_profiles": {
-        "balanced": {
-          "run_profile": "balanced",
-          "overall_pace": 0.825,
-          "top_speed": 0.482,
-          "slow_corner_performance": 0.845,
-          "medium_corner_performance": 0.772,
-          "fast_corner_performance": 0.81,
-          "consistency": 0.69,
-          "tire_deg_performance": 0.597
-        },
-        "short_run": {
-          "run_profile": "short_run",
-          "overall_pace": 0.755,
-          "top_speed": 0.482,
-          "medium_corner_performance": 0.772,
-          "fast_corner_performance": 0.81,
-          "consistency": 0.69
-        },
-        "long_run": {
-          "run_profile": "long_run",
-          "overall_pace": 0.748,
-          "slow_corner_performance": 0.845,
-          "medium_corner_performance": 0.772,
-          "consistency": 0.69,
-          "tire_deg_performance": 0.597
-        }
-      },
-      "directionality": {
-        "max_speed": -0.0018,
-        "slow_corner_speed": 0.0345,
-        "medium_corner_speed": 0.0272,
-        "high_corner_speed": 0.031
-      }
-    },
-    "Mercedes": {
-      "overall_performance": 0.701,
-      "uncertainty": 0.13,
-      "note": "2024 source rank P4, 24 race(s) analyzed; preseason strength scaled from normalized 2024 race pace.",
-      "last_updated": null,
-      "races_completed": 0,
-      "current_season_performance": [],
-      "testing_characteristics": {
-        "run_profile": "balanced",
-        "overall_pace": 0.769,
-        "top_speed": 0.538,
-        "slow_corner_performance": 0.746,
-        "medium_corner_performance": 0.755,
-        "fast_corner_performance": 0.773,
-        "consistency": 0.508,
-        "tire_deg_performance": 0.543
-      },
-      "testing_characteristics_profiles": {
-        "balanced": {
-          "run_profile": "balanced",
-          "overall_pace": 0.769,
-          "top_speed": 0.538,
-          "slow_corner_performance": 0.746,
-          "medium_corner_performance": 0.755,
-          "fast_corner_performance": 0.773,
-          "consistency": 0.508,
-          "tire_deg_performance": 0.543
-        },
-        "short_run": {
-          "run_profile": "short_run",
-          "overall_pace": 0.723,
-          "top_speed": 0.538,
-          "medium_corner_performance": 0.755,
-          "fast_corner_performance": 0.773,
-          "consistency": 0.508
-        },
-        "long_run": {
-          "run_profile": "long_run",
-          "overall_pace": 0.673,
-          "slow_corner_performance": 0.746,
-          "medium_corner_performance": 0.755,
-          "consistency": 0.508,
-          "tire_deg_performance": 0.543
-        }
-      },
-      "directionality": {
-        "max_speed": 0.0038,
-        "slow_corner_speed": 0.0246,
-        "medium_corner_speed": 0.0255,
-        "high_corner_speed": 0.0273
-      }
-    },
-    "McLaren": {
-      "overall_performance": 0.759,
-      "uncertainty": 0.12,
-      "note": "2024 source rank P3, 24 race(s) analyzed; preseason strength scaled from normalized 2024 race pace.",
-      "last_updated": null,
-      "races_completed": 0,
-      "current_season_performance": [],
-      "testing_characteristics": {
-        "run_profile": "balanced",
-        "overall_pace": 0.861,
-        "top_speed": 0.409,
-        "slow_corner_performance": 0.807,
-        "medium_corner_performance": 0.834,
-        "fast_corner_performance": 0.857,
-        "consistency": 0.492,
-        "tire_deg_performance": 0.519
-      },
-      "testing_characteristics_profiles": {
-        "balanced": {
-          "run_profile": "balanced",
-          "overall_pace": 0.861,
-          "top_speed": 0.409,
-          "slow_corner_performance": 0.807,
-          "medium_corner_performance": 0.834,
-          "fast_corner_performance": 0.857,
-          "consistency": 0.492,
-          "tire_deg_performance": 0.519
-        },
-        "short_run": {
-          "run_profile": "short_run",
-          "overall_pace": 0.77,
-          "top_speed": 0.409,
-          "medium_corner_performance": 0.834,
-          "fast_corner_performance": 0.857,
-          "consistency": 0.492
-        },
-        "long_run": {
-          "run_profile": "long_run",
-          "overall_pace": 0.72,
-          "slow_corner_performance": 0.807,
-          "medium_corner_performance": 0.834,
-          "consistency": 0.492,
-          "tire_deg_performance": 0.519
-        }
-      },
-      "directionality": {
-        "max_speed": -0.0091,
-        "slow_corner_speed": 0.0307,
-        "medium_corner_speed": 0.0334,
-        "high_corner_speed": 0.0357
-      }
-    },
-    "Aston Martin": {
-      "overall_performance": 0.52,
-      "uncertainty": 0.16,
-      "note": "2024 source rank P5, 24 race(s) analyzed; preseason strength scaled from normalized 2024 race pace.",
-      "last_updated": null,
-      "races_completed": 0,
-      "current_season_performance": [],
-      "testing_characteristics": {
-        "run_profile": "balanced",
-        "overall_pace": 0.45,
-        "top_speed": 0.509,
-        "slow_corner_performance": 0.46,
-        "medium_corner_performance": 0.438,
-        "fast_corner_performance": 0.415,
-        "consistency": 0.451,
-        "tire_deg_performance": 0.521
-      },
-      "testing_characteristics_profiles": {
-        "balanced": {
-          "run_profile": "balanced",
-          "overall_pace": 0.45,
-          "top_speed": 0.509,
-          "slow_corner_performance": 0.46,
-          "medium_corner_performance": 0.438,
-          "fast_corner_performance": 0.415,
-          "consistency": 0.451,
-          "tire_deg_performance": 0.521
-        },
-        "short_run": {
-          "run_profile": "short_run",
-          "overall_pace": 0.458,
-          "top_speed": 0.509,
-          "medium_corner_performance": 0.438,
-          "fast_corner_performance": 0.415,
-          "consistency": 0.451
-        },
-        "long_run": {
-          "run_profile": "long_run",
-          "overall_pace": 0.468,
-          "slow_corner_performance": 0.46,
-          "medium_corner_performance": 0.438,
-          "consistency": 0.451,
-          "tire_deg_performance": 0.521
-        }
-      },
-      "directionality": {
-        "max_speed": 0.0009,
-        "slow_corner_speed": -0.004,
-        "medium_corner_speed": -0.0062,
-        "high_corner_speed": -0.0085
-      }
-    },
-    "Audi": {
-      "overall_performance": 0.382,
-      "uncertainty": 0.19,
-      "note": "2024 source rank P10, 24 race(s) analyzed; preseason strength scaled from normalized 2024 race pace.",
-      "last_updated": null,
-      "races_completed": 0,
-      "current_season_performance": [],
-      "testing_characteristics": {
-        "run_profile": "balanced",
-        "overall_pace": 0.13,
-        "top_speed": 0.348,
-        "slow_corner_performance": 0.175,
-        "medium_corner_performance": 0.124,
-        "fast_corner_performance": 0.165,
-        "consistency": 0.4,
-        "tire_deg_performance": 0.479
-      },
-      "testing_characteristics_profiles": {
-        "balanced": {
-          "run_profile": "balanced",
-          "overall_pace": 0.13,
-          "top_speed": 0.348,
-          "slow_corner_performance": 0.175,
-          "medium_corner_performance": 0.124,
-          "fast_corner_performance": 0.165,
-          "consistency": 0.4,
-          "tire_deg_performance": 0.479
-        },
-        "short_run": {
-          "run_profile": "short_run",
-          "overall_pace": 0.177,
-          "top_speed": 0.348,
-          "medium_corner_performance": 0.124,
-          "fast_corner_performance": 0.165,
-          "consistency": 0.4
-        },
-        "long_run": {
-          "run_profile": "long_run",
-          "overall_pace": 0.258,
-          "slow_corner_performance": 0.175,
-          "medium_corner_performance": 0.124,
-          "consistency": 0.4,
-          "tire_deg_performance": 0.479
-        }
-      },
-      "directionality": {
-        "max_speed": -0.0152,
-        "slow_corner_speed": -0.0325,
-        "medium_corner_speed": -0.0376,
-        "high_corner_speed": -0.0335
-      }
-    },
-    "Haas F1 Team": {
-      "overall_performance": 0.483,
-      "uncertainty": 0.16,
-      "note": "2024 source rank P6, 23 race(s) analyzed; preseason strength scaled from normalized 2024 race pace.",
-      "last_updated": null,
-      "races_completed": 0,
-      "current_season_performance": [],
-      "testing_characteristics": {
-        "run_profile": "balanced",
-        "overall_pace": 0.376,
-        "top_speed": 0.733,
-        "slow_corner_performance": 0.391,
-        "medium_corner_performance": 0.4,
-        "fast_corner_performance": 0.421,
-        "consistency": 0.478,
-        "tire_deg_performance": 0.52
-      },
-      "testing_characteristics_profiles": {
-        "balanced": {
-          "run_profile": "balanced",
-          "overall_pace": 0.376,
-          "top_speed": 0.733,
-          "slow_corner_performance": 0.391,
-          "medium_corner_performance": 0.4,
-          "fast_corner_performance": 0.421,
-          "consistency": 0.478,
-          "tire_deg_performance": 0.52
-        },
-        "short_run": {
-          "run_profile": "short_run",
-          "overall_pace": 0.452,
-          "top_speed": 0.733,
-          "medium_corner_performance": 0.4,
-          "fast_corner_performance": 0.421,
-          "consistency": 0.478
-        },
-        "long_run": {
-          "run_profile": "long_run",
-          "overall_pace": 0.427,
-          "slow_corner_performance": 0.391,
-          "medium_corner_performance": 0.4,
-          "consistency": 0.478,
-          "tire_deg_performance": 0.52
-        }
-      },
-      "directionality": {
-        "max_speed": 0.0233,
-        "slow_corner_speed": -0.0109,
-        "medium_corner_speed": -0.01,
-        "high_corner_speed": -0.0079
-      }
-    },
-    "RB": {
-      "overall_performance": 0.453,
-      "uncertainty": 0.17,
-      "note": "2024 source rank P7, 24 race(s) analyzed; preseason strength scaled from normalized 2024 race pace.",
-      "last_updated": null,
-      "races_completed": 0,
-      "current_season_performance": [],
-      "testing_characteristics": {
-        "run_profile": "balanced",
-        "overall_pace": 0.31,
-        "top_speed": 0.508,
-        "slow_corner_performance": 0.25,
-        "medium_corner_performance": 0.32,
-        "fast_corner_performance": 0.258,
-        "consistency": 0.586,
-        "tire_deg_performance": 0.61
-      },
-      "testing_characteristics_profiles": {
-        "balanced": {
-          "run_profile": "balanced",
-          "overall_pace": 0.31,
-          "top_speed": 0.508,
-          "slow_corner_performance": 0.25,
-          "medium_corner_performance": 0.32,
-          "fast_corner_performance": 0.258,
-          "consistency": 0.586,
-          "tire_deg_performance": 0.61
-        },
-        "short_run": {
-          "run_profile": "short_run",
-          "overall_pace": 0.344,
-          "top_speed": 0.508,
-          "medium_corner_performance": 0.32,
-          "fast_corner_performance": 0.258,
-          "consistency": 0.586
-        },
-        "long_run": {
-          "run_profile": "long_run",
-          "overall_pace": 0.426,
-          "slow_corner_performance": 0.25,
-          "medium_corner_performance": 0.32,
-          "consistency": 0.586,
-          "tire_deg_performance": 0.61
-        }
-      },
-      "directionality": {
-        "max_speed": 0.0008,
-        "slow_corner_speed": -0.025,
-        "medium_corner_speed": -0.018,
-        "high_corner_speed": -0.0242
-      }
-    },
-    "Williams": {
-      "overall_performance": 0.403,
-      "uncertainty": 0.18,
-      "note": "2024 source rank P9, 23 race(s) analyzed; preseason strength scaled from normalized 2024 race pace.",
-      "last_updated": null,
-      "races_completed": 0,
-      "current_season_performance": [],
-      "testing_characteristics": {
-        "run_profile": "balanced",
-        "overall_pace": 0.19,
-        "top_speed": 0.666,
-        "slow_corner_performance": 0.249,
-        "medium_corner_performance": 0.199,
-        "fast_corner_performance": 0.277,
-        "consistency": 0.498,
-        "tire_deg_performance": 0.465
-      },
-      "testing_characteristics_profiles": {
-        "balanced": {
-          "run_profile": "balanced",
-          "overall_pace": 0.19,
-          "top_speed": 0.666,
-          "slow_corner_performance": 0.249,
-          "medium_corner_performance": 0.199,
-          "fast_corner_performance": 0.277,
-          "consistency": 0.498,
-          "tire_deg_performance": 0.465
-        },
-        "short_run": {
-          "run_profile": "short_run",
-          "overall_pace": 0.294,
-          "top_speed": 0.666,
-          "medium_corner_performance": 0.199,
-          "fast_corner_performance": 0.277,
-          "consistency": 0.498
-        },
-        "long_run": {
-          "run_profile": "long_run",
-          "overall_pace": 0.305,
-          "slow_corner_performance": 0.249,
-          "medium_corner_performance": 0.199,
-          "consistency": 0.498,
-          "tire_deg_performance": 0.465
-        }
-      },
-      "directionality": {
-        "max_speed": 0.0166,
-        "slow_corner_speed": -0.0251,
-        "medium_corner_speed": -0.0301,
-        "high_corner_speed": -0.0223
-      }
+      "overall_performance": 0.993,
+      "uncertainty": 0.1,
+      "races_analyzed": 24,
+      "note": "Calculated from 24 races in 2025",
+      "normalized_overall_pace": 0.742,
+      "normalized_slow_corner_performance": 0.745,
+      "normalized_medium_corner_performance": 0.706,
+      "normalized_fast_corner_performance": 0.658,
+      "normalized_top_speed": 0.562,
+      "normalized_consistency": 0.288,
+      "normalized_tire_deg_performance": 0.376,
+      "championship_position": 2
     },
     "Alpine": {
-      "overall_performance": 0.423,
-      "uncertainty": 0.18,
-      "note": "2024 source rank P8, 24 race(s) analyzed; preseason strength scaled from normalized 2024 race pace.",
-      "last_updated": null,
-      "races_completed": 0,
-      "current_season_performance": [],
-      "testing_characteristics": {
-        "run_profile": "balanced",
-        "overall_pace": 0.24,
-        "top_speed": 0.406,
-        "slow_corner_performance": 0.278,
-        "medium_corner_performance": 0.299,
-        "fast_corner_performance": 0.24,
-        "consistency": 0.453,
-        "tire_deg_performance": 0.398
-      },
-      "testing_characteristics_profiles": {
-        "balanced": {
-          "run_profile": "balanced",
-          "overall_pace": 0.24,
-          "top_speed": 0.406,
-          "slow_corner_performance": 0.278,
-          "medium_corner_performance": 0.299,
-          "fast_corner_performance": 0.24,
-          "consistency": 0.453,
-          "tire_deg_performance": 0.398
-        },
-        "short_run": {
-          "run_profile": "short_run",
-          "overall_pace": 0.273,
-          "top_speed": 0.406,
-          "medium_corner_performance": 0.299,
-          "fast_corner_performance": 0.24,
-          "consistency": 0.453
-        },
-        "long_run": {
-          "run_profile": "long_run",
-          "overall_pace": 0.311,
-          "slow_corner_performance": 0.278,
-          "medium_corner_performance": 0.299,
-          "consistency": 0.453,
-          "tire_deg_performance": 0.398
-        }
-      },
-      "directionality": {
-        "max_speed": -0.0094,
-        "slow_corner_speed": -0.0222,
-        "medium_corner_speed": -0.0201,
-        "high_corner_speed": -0.026
-      }
+      "overall_performance": 0.981,
+      "uncertainty": 0.1,
+      "races_analyzed": 23,
+      "note": "Calculated from 23 races in 2025",
+      "normalized_overall_pace": 0.211,
+      "normalized_slow_corner_performance": 0.222,
+      "normalized_medium_corner_performance": 0.211,
+      "normalized_fast_corner_performance": 0.266,
+      "normalized_top_speed": 0.332,
+      "normalized_consistency": 0.493,
+      "normalized_tire_deg_performance": 0.373,
+      "championship_position": 10
+    },
+    "Mercedes": {
+      "overall_performance": 0.992,
+      "uncertainty": 0.1,
+      "races_analyzed": 23,
+      "note": "Calculated from 23 races in 2025",
+      "normalized_overall_pace": 0.738,
+      "normalized_slow_corner_performance": 0.773,
+      "normalized_medium_corner_performance": 0.688,
+      "normalized_fast_corner_performance": 0.738,
+      "normalized_top_speed": 0.51,
+      "normalized_consistency": 0.628,
+      "normalized_tire_deg_performance": 0.528,
+      "championship_position": 4
+    },
+    "Aston Martin": {
+      "overall_performance": 0.983,
+      "uncertainty": 0.1,
+      "races_analyzed": 24,
+      "note": "Calculated from 24 races in 2025",
+      "normalized_overall_pace": 0.3,
+      "normalized_slow_corner_performance": 0.286,
+      "normalized_medium_corner_performance": 0.35,
+      "normalized_fast_corner_performance": 0.294,
+      "normalized_top_speed": 0.491,
+      "normalized_consistency": 0.5,
+      "normalized_tire_deg_performance": 0.521,
+      "championship_position": 7
+    },
+    "Ferrari": {
+      "overall_performance": 0.993,
+      "uncertainty": 0.1,
+      "races_analyzed": 24,
+      "note": "Calculated from 24 races in 2025",
+      "normalized_overall_pace": 0.726,
+      "normalized_slow_corner_performance": 0.7,
+      "normalized_medium_corner_performance": 0.73,
+      "normalized_fast_corner_performance": 0.74,
+      "normalized_top_speed": 0.407,
+      "normalized_consistency": 0.546,
+      "normalized_tire_deg_performance": 0.445,
+      "championship_position": 3
+    },
+    "Williams": {
+      "overall_performance": 0.987,
+      "uncertainty": 0.1,
+      "races_analyzed": 23,
+      "note": "Calculated from 23 races in 2025",
+      "normalized_overall_pace": 0.491,
+      "normalized_slow_corner_performance": 0.467,
+      "normalized_medium_corner_performance": 0.442,
+      "normalized_fast_corner_performance": 0.482,
+      "normalized_top_speed": 0.718,
+      "normalized_consistency": 0.361,
+      "normalized_tire_deg_performance": 0.5,
+      "championship_position": 5
+    },
+    "Haas F1 Team": {
+      "overall_performance": 0.983,
+      "uncertainty": 0.1,
+      "races_analyzed": 24,
+      "note": "Calculated from 24 races in 2025",
+      "normalized_overall_pace": 0.287,
+      "normalized_slow_corner_performance": 0.342,
+      "normalized_medium_corner_performance": 0.298,
+      "normalized_fast_corner_performance": 0.312,
+      "normalized_top_speed": 0.611,
+      "normalized_consistency": 0.589,
+      "normalized_tire_deg_performance": 0.621,
+      "championship_position": 8
+    },
+    "McLaren": {
+      "overall_performance": 1.0,
+      "uncertainty": 0.1,
+      "races_analyzed": 23,
+      "note": "Calculated from 23 races in 2025",
+      "normalized_overall_pace": 0.971,
+      "normalized_slow_corner_performance": 0.889,
+      "normalized_medium_corner_performance": 0.957,
+      "normalized_fast_corner_performance": 0.966,
+      "normalized_top_speed": 0.414,
+      "normalized_consistency": 0.651,
+      "normalized_tire_deg_performance": 0.591,
+      "championship_position": 1
+    },
+    "Racing Bulls": {
+      "overall_performance": 0.984,
+      "uncertainty": 0.1,
+      "races_analyzed": 22,
+      "note": "Calculated from 22 races in 2025",
+      "normalized_overall_pace": 0.288,
+      "normalized_slow_corner_performance": 0.294,
+      "normalized_medium_corner_performance": 0.348,
+      "normalized_fast_corner_performance": 0.289,
+      "normalized_top_speed": 0.408,
+      "normalized_consistency": 0.476,
+      "normalized_tire_deg_performance": 0.519,
+      "championship_position": 6
+    },
+    "Kick Sauber": {
+      "overall_performance": 0.982,
+      "uncertainty": 0.1,
+      "races_analyzed": 22,
+      "note": "Calculated from 22 races in 2025",
+      "normalized_overall_pace": 0.223,
+      "normalized_slow_corner_performance": 0.259,
+      "normalized_medium_corner_performance": 0.248,
+      "normalized_fast_corner_performance": 0.235,
+      "normalized_top_speed": 0.541,
+      "normalized_consistency": 0.469,
+      "normalized_tire_deg_performance": 0.54,
+      "championship_position": 9
     }
   }
 }

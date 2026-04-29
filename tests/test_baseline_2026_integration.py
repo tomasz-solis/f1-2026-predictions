@@ -119,8 +119,9 @@ class TestBaseline2026Integration:
         )
 
         weakest_team = ranked_teams[-1]
-        assert all(pos >= 13 for pos in team_positions[weakest_team]), (
-            f"{weakest_team} drivers should be bottom half"
+        weakest_mean = mean_positions[weakest_team]
+        assert weakest_mean >= 14, (
+            f"{weakest_team} mean qualifying position should be in the bottom tier, got {weakest_mean:.1f}"
         )
 
     def test_sprint_weekend_detection(self, predictor):

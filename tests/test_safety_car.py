@@ -39,6 +39,12 @@ def _base_race_params() -> dict:
         "sc_probability": 0.0,
         "safety_car_trigger_lap": 10,
         "safety_car_luck_range": 0.0,
+        "vsc_probability": 0.0,
+        "multi_sc_prob": 0.0,
+        "sc_pit_loss_reduction_s": 12.0,
+        "vsc_pit_loss_reduction_s": 5.0,
+        "sc_compression_gap_s": 0.60,
+        "sc_tire_wear_fraction": 0.65,
         "teammate_variance_std": 0.0,
         "track_overtaking": 0.5,
         "overtake_model": {
@@ -125,11 +131,12 @@ class TestSafetyCarTrigger:
             assert r == ["A", "B"]
 
     def test_high_sc_probability_produces_variance(self):
-        """With high sc_probability, SC luck should add position variance."""
+        """With high sc_probability, field compression should create position variance."""
         params = _base_race_params()
         params["sc_probability"] = 1.0  # guaranteed to trigger on eligible laps
         params["safety_car_trigger_lap"] = 1  # eligible from lap 2
-        params["safety_car_luck_range"] = 1.5  # large range
+        params["safety_car_luck_range"] = 0.5  # boosted to detect variance in test
+        params["sc_compression_gap_s"] = 0.60
 
         driver_info = _two_driver_info()
         strategies = {"A": _strategy(), "B": _strategy()}

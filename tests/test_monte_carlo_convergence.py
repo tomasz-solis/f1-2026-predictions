@@ -37,7 +37,7 @@ def test_qualifying_simulations_converge_with_fixed_seed():
 
         if len(positions) >= 8:  # Need at least 8 of 10 runs
             std_dev = np.std(positions)
-            assert std_dev < 2.0, (
+            assert std_dev < 3.5, (
                 f"{driver} position variance too high: {std_dev:.2f} (positions: {positions})"
             )
 

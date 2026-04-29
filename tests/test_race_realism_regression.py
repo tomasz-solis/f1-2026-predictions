@@ -17,7 +17,7 @@ class TestRaceRealismRegression:
     @pytest.fixture
     def predictor(self):
         """Create predictor instance."""
-        return Baseline2026Predictor()
+        return Baseline2026Predictor(seed=42)
 
     def test_grid_to_race_correlation_minimum(self, predictor):
         """Grid-to-race correlation must be >= 0.75 in dry conditions.
@@ -36,8 +36,10 @@ class TestRaceRealismRegression:
         )
 
         # Extract positions
-        grid_positions = {entry["driver"]: entry["position"] for entry in quali["grid"]}
-        race_positions = {entry["driver"]: entry["position"] for entry in race["finish_order"]}
+        grid_positions = {entry["driver"]: entry["median_position"] for entry in quali["grid"]}
+        race_positions = {
+            entry["driver"]: entry["median_position"] for entry in race["finish_order"]
+        }
 
         drivers = sorted(grid_positions.keys())
         grid_pos = [grid_positions[d] for d in drivers]
@@ -65,8 +67,10 @@ class TestRaceRealismRegression:
             n_simulations=300,
         )
 
-        grid_positions = {entry["driver"]: entry["position"] for entry in quali["grid"]}
-        race_positions = {entry["driver"]: entry["position"] for entry in race["finish_order"]}
+        grid_positions = {entry["driver"]: entry["median_position"] for entry in quali["grid"]}
+        race_positions = {
+            entry["driver"]: entry["median_position"] for entry in race["finish_order"]
+        }
 
         position_changes = [
             abs(grid_positions[d] - race_positions[d]) for d in grid_positions.keys()
@@ -235,10 +239,14 @@ class TestRaceRealismRegression:
         )
 
         # Calculate position changes
-        grid_positions = {entry["driver"]: entry["position"] for entry in quali["grid"]}
+        grid_positions = {entry["driver"]: entry["median_position"] for entry in quali["grid"]}
 
-        sprint_positions = {entry["driver"]: entry["position"] for entry in sprint["finish_order"]}
-        race_positions = {entry["driver"]: entry["position"] for entry in race["finish_order"]}
+        sprint_positions = {
+            entry["driver"]: entry["median_position"] for entry in sprint["finish_order"]
+        }
+        race_positions = {
+            entry["driver"]: entry["median_position"] for entry in race["finish_order"]
+        }
 
         sprint_changes = [abs(grid_positions[d] - sprint_positions[d]) for d in grid_positions]
         race_changes = [abs(grid_positions[d] - race_positions[d]) for d in grid_positions]

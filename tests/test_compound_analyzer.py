@@ -130,13 +130,15 @@ def test_median_lap_seconds_series_empty():
 
 
 def test_estimate_compound_tire_deg(sample_team_laps):
-    """Test tire degradation estimation."""
+    """Test tire degradation estimation after fuel correction."""
     soft_laps = sample_team_laps[sample_team_laps["Compound"] == "SOFT"]
     deg = _estimate_compound_tire_deg(soft_laps)
 
-    # Should detect roughly 0.05 s/lap degradation
+    # After fuel correction (+0.045 s/lap), a synthetic ~0.05 s/lap deg stint
+    # should return roughly 0.05-0.15 s/lap. The fixture adds some lap noise so
+    # the upper bound is kept generous; the key check is that the slope is positive.
     assert deg is not None
-    assert 0.03 < deg < 0.08  # Allow some variance from noise
+    assert 0.03 < deg < 0.20  # fuel-corrected slope, must be positive
 
 
 def test_estimate_compound_tire_deg_insufficient_data():
