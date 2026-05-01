@@ -194,6 +194,15 @@ class TestTeamCharacteristicsSchema:
 
         validate_team_characteristics(data)
 
+    def test_valid_team_data_with_large_checkpoint_driver_delta(self):
+        """Allow practice-program driver deltas that exceed ten seconds."""
+        data = _team_payload()
+        data["teams"]["McLaren"]["checkpoint_driver_deltas_seconds"] = {
+            "short_run": {"NOR": -11.8853, "PIA": 11.8853},
+        }
+
+        validate_team_characteristics(data)
+
     def test_valid_team_data_with_blend_provenance_fields(self):
         """Allow replayed testing payloads to keep blend provenance details."""
         data = _team_payload()

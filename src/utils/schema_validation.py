@@ -189,6 +189,8 @@ _TESTING_CHARACTERISTICS_SCHEMA = {
     "additionalProperties": False,
 }
 
+_CHECKPOINT_DRIVER_DELTA_SECONDS_LIMIT = 30.0
+
 _CHECKPOINT_DRIVER_DELTAS_SCHEMA = {
     "type": "object",
     "propertyNames": {
@@ -197,7 +199,11 @@ _CHECKPOINT_DRIVER_DELTAS_SCHEMA = {
     "additionalProperties": {
         "type": "object",
         "patternProperties": {
-            "^[A-Z0-9_]+$": {"type": "number", "minimum": -10.0, "maximum": 10.0},
+            "^[A-Z0-9_]+$": {
+                "type": "number",
+                "minimum": -_CHECKPOINT_DRIVER_DELTA_SECONDS_LIMIT,
+                "maximum": _CHECKPOINT_DRIVER_DELTA_SECONDS_LIMIT,
+            },
         },
         "additionalProperties": False,
     },
