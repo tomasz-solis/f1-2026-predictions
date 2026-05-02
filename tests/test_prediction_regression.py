@@ -5,29 +5,60 @@ from __future__ import annotations
 import json
 import numbers
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from src.predictors.baseline_2026 import Baseline2026Predictor
-from src.utils.prediction_context import build_historical_prediction_context
+from src.utils.config_loader import Config
+from src.utils.prediction_context import PredictionContext
 
 GOLDEN_DIR = Path("data/test")
 REFERENCE_REGRESSION_ENV = sys.platform == "darwin" and sys.version_info[:2] == (3, 11)
 
 
+class _RegressionConfig:
+    """Config wrapper that keeps regression tests independent of live FastF1 state."""
+
+    _overrides = {
+        "baseline_predictor.race.track_temperature.session_weather_enabled": False,
+        "baseline_predictor.race.weather_features.session_weather_enabled": False,
+    }
+
+    def __init__(self) -> None:
+        """Initialize the default config used for non-overridden keys."""
+        self._base = Config()
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Return deterministic regression overrides before the default config."""
+        if key in self._overrides:
+            return self._overrides[key]
+        return self._base.get(key, default)
+
+
 def _build_test_predictor() -> Baseline2026Predictor:
     """Create the deterministic predictor used for golden fixtures."""
-    return Baseline2026Predictor(seed=42)
+    return Baseline2026Predictor(seed=42, config=cast(Config, _RegressionConfig()))
 
 
 def _historical_context(race_name: str, session_name: str) -> dict[str, Any]:
     """Build deterministic historical context kwargs for regression predictions."""
+    scheduled_sessions = {
+        ("Australian Grand Prix", "Q"): datetime(2026, 3, 7, 6, 0, tzinfo=UTC),
+        ("Australian Grand Prix", "R"): datetime(2026, 3, 8, 5, 0, tzinfo=UTC),
+        ("Chinese Grand Prix", "SQ"): datetime(2026, 3, 13, 7, 30, tzinfo=UTC),
+        ("Chinese Grand Prix", "SPRINT"): datetime(2026, 3, 14, 3, 0, tzinfo=UTC),
+        ("Chinese Grand Prix", "Q"): datetime(2026, 3, 14, 7, 0, tzinfo=UTC),
+        ("Chinese Grand Prix", "R"): datetime(2026, 3, 15, 7, 0, tzinfo=UTC),
+    }
+    target_session_datetime = scheduled_sessions[(race_name, session_name)]
     return {
-        "prediction_context": build_historical_prediction_context(
-            year=2026,
-            race_name=race_name,
-            target_session_name=session_name,
+        "prediction_context": PredictionContext(
+            mode="historical",
+            as_of_datetime=target_session_datetime,
+            target_session_datetime=target_session_datetime,
             seed=42,
+            season_year=2026,
         )
     }
 
@@ -119,6 +150,7 @@ def _qualifying_payload() -> dict[str, Any]:
         2026,
         "Australian Grand Prix",
         n_simulations=40,
+        practice_signal_mode="stored_profiles",
         **_historical_context("Australian Grand Prix", "Q"),
     )
     return {
@@ -137,6 +169,7 @@ def _race_payload() -> dict[str, Any]:
         2026,
         "Australian Grand Prix",
         n_simulations=40,
+        practice_signal_mode="stored_profiles",
         **_historical_context("Australian Grand Prix", "Q"),
     )
     result = predictor.predict_race(
@@ -164,6 +197,7 @@ def _sprint_qualifying_payload() -> dict[str, Any]:
         "Chinese Grand Prix",
         n_simulations=40,
         qualifying_stage="sprint",
+        practice_signal_mode="stored_profiles",
         **_historical_context("Chinese Grand Prix", "SQ"),
     )
     return {
@@ -184,6 +218,7 @@ def _sprint_race_payload() -> dict[str, Any]:
         "Chinese Grand Prix",
         n_simulations=40,
         qualifying_stage="sprint",
+        practice_signal_mode="stored_profiles",
         **_historical_context("Chinese Grand Prix", "SQ"),
     )
     result = predictor.predict_sprint_race(
@@ -211,6 +246,7 @@ def _china_main_qualifying_payload() -> dict[str, Any]:
         "Chinese Grand Prix",
         n_simulations=40,
         qualifying_stage="main",
+        practice_signal_mode="stored_profiles",
         **_historical_context("Chinese Grand Prix", "Q"),
     )
     return {
@@ -231,6 +267,7 @@ def _china_main_race_payload() -> dict[str, Any]:
         "Chinese Grand Prix",
         n_simulations=40,
         qualifying_stage="main",
+        practice_signal_mode="stored_profiles",
         **_historical_context("Chinese Grand Prix", "Q"),
     )
     result = predictor.predict_race(

@@ -582,6 +582,7 @@ baseline_predictor:
     # Track temperature resolution for tire model realism.
     # Final value can blend latest completed session weather with race-weather fallback.
     track_temperature:
+      session_weather_enabled: true
       dry_c: 36.0
       mixed_c: 29.0
       rain_c: 23.0
@@ -603,6 +604,7 @@ baseline_predictor:
     # Non-competitive (practice) weather features used to modulate race uncertainty.
     # The weather selector still defines scenario; these are context modifiers only.
     weather_features:
+      session_weather_enabled: true
       mismatch:
         chaos_boost: 0.18
         variance_boost: 0.10

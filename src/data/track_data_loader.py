@@ -283,6 +283,17 @@ def _weather_metric_median(weather_data: object, metric_token: str) -> float | N
     return float(values.median())
 
 
+def _get_loaded_weather_data(session: object) -> object | None:
+    """Return loaded FastF1 weather data, or None when the session lacks it."""
+    try:
+        weather_data = getattr(session, "weather_data", None)
+    except _TRACK_ERRORS:
+        return None
+    if weather_data is None or getattr(weather_data, "empty", False):
+        return None
+    return weather_data
+
+
 def _clamp_track_temperature_c(track_temp_c: float) -> float:
     """Clamp track temperature to a realistic range."""
     min_temp_c = float(_cfg_get("baseline_predictor.race.track_temperature.min_c", 5.0))
@@ -398,8 +409,8 @@ def _load_session_temperature_signal(
     if status_completed is False:
         return None
 
-    weather_data = getattr(session, "weather_data", None)
-    if weather_data is None or getattr(weather_data, "empty", False):
+    weather_data = _get_loaded_weather_data(session)
+    if weather_data is None:
         return None
 
     track_temp_c = _weather_metric_median(weather_data, "tracktemp")
@@ -509,8 +520,8 @@ def _load_session_weather_features(
     if status_completed is False:
         return None
 
-    weather_data = getattr(session, "weather_data", None)
-    if weather_data is None or getattr(weather_data, "empty", False):
+    weather_data = _get_loaded_weather_data(session)
+    if weather_data is None:
         return None
 
     track_temp_c = _weather_metric_median(weather_data, "tracktemp")
@@ -849,6 +860,16 @@ def resolve_track_temperature_profile(
             reason="missing_race_name",
         )
 
+    session_weather_enabled = bool(
+        _cfg_get("baseline_predictor.race.track_temperature.session_weather_enabled", True)
+    )
+    if not session_weather_enabled:
+        return _fallback_temperature_profile(
+            fallback_temp_c=fallback_temp_c,
+            weather=weather_key,
+            reason="session_weather_disabled",
+        )
+
     try:
         event = fastf1.get_event(year, race_name)
     except _TRACK_ERRORS as exc:
@@ -986,6 +1007,13 @@ def resolve_non_competitive_weather_features(
         "rainfall_signal": None,
     }
     if not race_name:
+        return fallback
+
+    session_weather_enabled = bool(
+        _cfg_get("baseline_predictor.race.weather_features.session_weather_enabled", True)
+    )
+    if not session_weather_enabled:
+        fallback["reason"] = "session_weather_disabled"
         return fallback
 
     try:

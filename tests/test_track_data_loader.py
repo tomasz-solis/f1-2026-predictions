@@ -384,6 +384,7 @@ def test_resolve_track_temperature_falls_back_when_fastf1_unavailable():
 
 
 def test_resolve_track_temperature_handles_unloaded_session_status():
+    """Unloaded FastF1 session status should not block weather temperature."""
     now_utc = datetime.now(UTC)
     event = MagicMock()
     event.get_session_date.side_effect = lambda session_name: {
@@ -420,6 +421,30 @@ def test_resolve_track_temperature_handles_unloaded_session_status():
         )
 
     assert resolved == pytest.approx(36.8)
+
+
+def test_resolve_track_temperature_profile_skips_fastf1_when_session_weather_disabled():
+    """Disabled session weather should use forecast fallback without FastF1 lookup."""
+    with (
+        patch(
+            "src.data.track_data_loader._cfg_get",
+            side_effect=lambda key, default=None: False
+            if key == "baseline_predictor.race.track_temperature.session_weather_enabled"
+            else default,
+        ),
+        patch("src.data.track_data_loader.fastf1.get_event") as get_event,
+    ):
+        profile = resolve_track_temperature_profile(
+            year=2026,
+            race_name="Bahrain Grand Prix",
+            weather="dry",
+            is_sprint=False,
+        )
+
+    assert profile["source"] == "forecast_fallback"
+    assert profile["reason"] == "session_weather_disabled"
+    assert profile["track_temperature_c"] == pytest.approx(36.0)
+    get_event.assert_not_called()
 
 
 def test_resolve_track_temperature_profile_reports_session_blend_metadata():
@@ -544,6 +569,7 @@ def test_resolve_non_competitive_weather_features_uses_latest_completed_practice
 
 
 def test_resolve_non_competitive_weather_features_falls_back_when_event_unavailable():
+    """Unavailable event metadata should return an unavailable weather-feature payload."""
     with patch(
         "src.data.track_data_loader.fastf1.get_event",
         side_effect=RuntimeError("network unavailable"),
@@ -556,3 +582,25 @@ def test_resolve_non_competitive_weather_features_falls_back_when_event_unavaila
 
     assert features["available"] is False
     assert features["reason"] == "event_load_failed"
+
+
+def test_resolve_non_competitive_weather_features_skips_fastf1_when_disabled():
+    """Disabled practice weather should return unavailable features without lookup."""
+    with (
+        patch(
+            "src.data.track_data_loader._cfg_get",
+            side_effect=lambda key, default=None: False
+            if key == "baseline_predictor.race.weather_features.session_weather_enabled"
+            else default,
+        ),
+        patch("src.data.track_data_loader.fastf1.get_event") as get_event,
+    ):
+        features = resolve_non_competitive_weather_features(
+            year=2026,
+            race_name="Bahrain Grand Prix",
+            is_sprint=False,
+        )
+
+    assert features["available"] is False
+    assert features["reason"] == "session_weather_disabled"
+    get_event.assert_not_called()

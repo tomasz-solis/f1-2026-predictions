@@ -250,7 +250,10 @@ class FPDataError(Enum):
 
 def _session_rain_fraction(session: Any) -> float | None:
     """Return the fraction of weather samples that reported rainfall."""
-    weather_data = getattr(session, "weather_data", None)
+    try:
+        weather_data = getattr(session, "weather_data", None)
+    except _FASTF1_ERRORS:
+        return None
     if not isinstance(weather_data, pd.DataFrame) or weather_data.empty:
         return None
     if "Rainfall" not in weather_data.columns:

@@ -679,6 +679,7 @@ class TrackTemperatureBlendConfig(StrictConfigModel):
 class TrackTemperatureConfig(StrictConfigModel):
     """Track-temperature defaults for the tire model."""
 
+    session_weather_enabled: bool = True
     dry_c: float = Field(default=36.0)
     mixed_c: float = Field(default=29.0)
     rain_c: float = Field(default=23.0)
@@ -699,6 +700,7 @@ class WeatherMismatchConfig(StrictConfigModel):
 class WeatherFeaturesConfig(StrictConfigModel):
     """Non-competitive weather modifiers carried into race predictions."""
 
+    session_weather_enabled: bool = True
     mismatch: WeatherMismatchConfig = Field(default_factory=WeatherMismatchConfig)
 
 
