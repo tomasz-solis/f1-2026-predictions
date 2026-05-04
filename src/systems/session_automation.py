@@ -26,8 +26,12 @@ from src.data.actual_results_fetcher import fetch_actual_session_results
 from src.persistence.artifact_store import ArtifactStore
 from src.persistence.config import should_read_db_first, should_write_to_db, should_write_to_file
 from src.persistence.runtime_state_store import RuntimeStateStore
-from src.utils.accuracy_snapshots import build_accuracy_snapshot_records
+from src.utils.accuracy_snapshots import (
+    accuracy_snapshot_artifact_key,
+    build_accuracy_snapshot_records,
+)
 from src.utils.accuracy_targets import (
+    explicit_target_actuals,
     explicit_target_predictions,
     fastf1_session_name,
     legacy_target_keys_for_prediction,
@@ -340,7 +344,7 @@ def _actual_sessions_for_prediction(
     later checkpoints are evaluated against main qualifying and race.
     """
     checkpoint_upper = str(checkpoint_session).strip().upper()
-    if is_sprint and checkpoint_upper in {"FP1", "SQ", "SPRINT"}:
+    if is_sprint and checkpoint_upper in {"PRE", "FP1", "SQ", "SPRINT"}:
         return "SQ", "SPRINT"
     return "Q", "R"
 
@@ -376,6 +380,58 @@ def _store_accuracy_snapshot(
     return len(snapshot_records)
 
 
+def _prediction_has_complete_target_actuals(
+    prediction: dict[str, Any],
+    *,
+    is_sprint: bool,
+) -> bool:
+    """Return True when every scoreable target already has actual rows."""
+    target_predictions = explicit_target_predictions(prediction)
+    if not target_predictions:
+        target_predictions = synthesize_legacy_targets(prediction, is_sprint=is_sprint)
+    if not target_predictions:
+        return False
+
+    target_actuals = explicit_target_actuals(prediction)
+    return all(bool(target_actuals.get(target_key)) for target_key in target_predictions)
+
+
+def _prediction_accuracy_snapshots_exist(
+    *,
+    year: int,
+    race_name: str,
+    session_name: str,
+    is_sprint: bool,
+    prediction: dict[str, Any],
+    artifact_store: ArtifactStore,
+) -> bool:
+    """Return True when all eligible target snapshots already exist."""
+    target_predictions = explicit_target_predictions(prediction)
+    if not target_predictions:
+        target_predictions = synthesize_legacy_targets(prediction, is_sprint=is_sprint)
+    eligible_targets = [
+        target_key
+        for target_key, payload in target_predictions.items()
+        if bool(payload.get("eligible_at_save", True))
+    ]
+    if not eligible_targets:
+        return False
+
+    return all(
+        artifact_store.load_artifact(
+            "accuracy_snapshot",
+            accuracy_snapshot_artifact_key(
+                year=year,
+                race_name=race_name,
+                checkpoint_session=session_name,
+                target_key=target_key,
+            ),
+        )
+        is not None
+        for target_key in eligible_targets
+    )
+
+
 def _reconcile_prediction_actuals(
     *,
     year: int,
@@ -405,6 +461,27 @@ def _reconcile_prediction_actuals(
         metadata = prediction.get("metadata", {})
         session_name = str(metadata.get("session_name", "")).strip().upper()
         if not session_name:
+            continue
+
+        if _prediction_has_complete_target_actuals(prediction, is_sprint=is_sprint):
+            if _prediction_accuracy_snapshots_exist(
+                year=year,
+                race_name=race_name,
+                session_name=session_name,
+                is_sprint=is_sprint,
+                prediction=prediction,
+                artifact_store=artifact_store,
+            ):
+                continue
+            snapshots += _store_accuracy_snapshot(
+                year=year,
+                race_name=race_name,
+                session_name=session_name,
+                is_sprint=is_sprint,
+                prediction_logger=prediction_logger,
+                metrics_calculator=metrics_calculator,
+                artifact_store=artifact_store,
+            )
             continue
 
         qualifying_actual_session, race_actual_session = _actual_sessions_for_prediction(
@@ -467,6 +544,61 @@ def _reconcile_prediction_actuals(
         )
 
     return reconciled, snapshots
+
+
+def reconcile_completed_prediction_accuracy(
+    *,
+    year: int,
+    lookback_days: int = 14,
+    lookahead_days: int = 0,
+    session_detector: SessionDetector | None = None,
+    prediction_logger: PredictionLogger | None = None,
+    metrics_calculator: PredictionMetrics | None = None,
+    artifact_store: ArtifactStore | None = None,
+) -> tuple[list[str], int]:
+    """Reconcile actuals and snapshots for recently completed race weekends."""
+    detector = session_detector or SessionDetector()
+    logger_inst = prediction_logger or PredictionLogger()
+    metrics = metrics_calculator or PredictionMetrics()
+    store = artifact_store or ArtifactStore(data_root="data")
+
+    reconciled_actuals: list[str] = []
+    accuracy_snapshots = 0
+
+    for race_name, race_is_sprint in _iter_candidate_events(
+        year,
+        lookback_days=max(1, int(lookback_days)),
+        lookahead_days=max(0, int(lookahead_days)),
+    ):
+        is_sprint = bool(race_is_sprint)
+        try:
+            is_sprint = is_sprint_weekend(year, race_name)
+        except ValueError as exc:
+            logger.warning(
+                "Could not refresh weekend format for %s %s; using schedule-window value %s: %s",
+                year,
+                race_name,
+                race_is_sprint,
+                exc,
+            )
+
+        race_state = detector.get_session_completion_state(year, race_name, "R")
+        if race_state != "completed":
+            continue
+
+        reconciled, snapshots = _reconcile_prediction_actuals(
+            year=year,
+            race_name=race_name,
+            is_sprint=is_sprint,
+            prediction_logger=logger_inst,
+            metrics_calculator=metrics,
+            artifact_store=store,
+        )
+        if reconciled > 0:
+            reconciled_actuals.append(f"{race_name}::{reconciled}")
+        accuracy_snapshots += snapshots
+
+    return reconciled_actuals, accuracy_snapshots
 
 
 def run_session_automation_cycle(

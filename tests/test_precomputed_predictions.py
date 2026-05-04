@@ -4,6 +4,26 @@ from src.dashboard import precomputed_predictions as store
 from src.utils.model_version import get_model_version
 
 
+def test_get_prediction_precompute_config_includes_accuracy_reconcile_settings(patcher):
+    """Precompute settings should expose automatic accuracy refresh controls."""
+    values = {
+        "dashboard.prediction_precompute.enabled": True,
+        "dashboard.prediction_precompute.horizon_races": 2,
+        "dashboard.prediction_precompute.weather_scenarios": ["dry"],
+        "dashboard.prediction_precompute.max_file_entries": 128,
+        "dashboard.prediction_precompute.reconcile_accuracy_after_warmup": True,
+        "dashboard.prediction_precompute.accuracy_reconcile_lookback_days": 6,
+        "dashboard.prediction_precompute.qualifying_n_simulations": 40,
+        "dashboard.prediction_precompute.race_n_simulations": 50,
+    }
+    patcher.setattr(store.config_loader, "get", lambda key, default=None: values.get(key, default))
+
+    config = store.get_prediction_precompute_config()
+
+    assert config["reconcile_accuracy_after_warmup"] is True
+    assert config["accuracy_reconcile_lookback_days"] == 6
+
+
 def test_save_and_load_precompute_horizon_index_file_roundtrip(patcher, tmp_path):
     """Horizon index should persist and load from file backend when DB is disabled."""
     horizon_path = tmp_path / "precompute_horizon_index.json"

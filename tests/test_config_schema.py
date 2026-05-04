@@ -75,6 +75,8 @@ def test_validate_config_accepts_default_yaml():
         validated.baseline_predictor.race.overtake_model.zone_front_probability_scale
         == pytest.approx(0.55)
     )
+    assert validated.dashboard.prediction_precompute.reconcile_accuracy_after_warmup is True
+    assert validated.dashboard.prediction_precompute.accuracy_reconcile_lookback_days == 14
 
 
 def test_validate_config_rejects_unknown_nested_keys():

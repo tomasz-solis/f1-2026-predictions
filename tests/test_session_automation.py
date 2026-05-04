@@ -114,6 +114,7 @@ def test_run_cycle_reconciles_sprint_actuals_and_writes_accuracy_snapshots(patch
     """Completed sprint weekends should reconcile saved checkpoints and write snapshots."""
     fetch_calls: list[str] = []
     accuracy_saves: list[dict] = []
+    logger_instances: list[object] = []
 
     class _Logger:
         def __init__(self):
@@ -132,6 +133,36 @@ def test_run_cycle_reconciles_sprint_actuals_and_writes_accuracy_snapshots(patch
                         "predicted_results": [{"position": 1, "driver": "VER", "team": "Red Bull"}]
                     },
                     "targets": {
+                        "PRE": {
+                            "sprint_qualifying": {
+                                "target_session": "SQ",
+                                "predicted_order": [
+                                    {"position": 1, "driver": "VER", "team": "Red Bull"}
+                                ],
+                                "eligible_at_save": True,
+                            },
+                            "sprint_race": {
+                                "target_session": "SPRINT",
+                                "predicted_order": [
+                                    {"position": 1, "driver": "VER", "team": "Red Bull"}
+                                ],
+                                "eligible_at_save": True,
+                            },
+                            "main_qualifying": {
+                                "target_session": "Q",
+                                "predicted_order": [
+                                    {"position": 1, "driver": "VER", "team": "Red Bull"}
+                                ],
+                                "eligible_at_save": True,
+                            },
+                            "grand_prix_race": {
+                                "target_session": "R",
+                                "predicted_order": [
+                                    {"position": 1, "driver": "VER", "team": "Red Bull"}
+                                ],
+                                "eligible_at_save": True,
+                            },
+                        },
                         "FP1": {
                             "sprint_qualifying": {
                                 "target_session": "SQ",
@@ -214,8 +245,9 @@ def test_run_cycle_reconciles_sprint_actuals_and_writes_accuracy_snapshots(patch
                     }.get(session, {}),
                     "actuals": {"qualifying": None, "race": None, "targets": {}},
                 }
-                for session in ["FP1", "SQ", "Sprint", "Q", "R"]
+                for session in ["PRE", "FP1", "SQ", "Sprint", "Q", "R"]
             }
+            logger_instances.append(self)
 
         def has_prediction_for_session(self, year: int, race_name: str, session_name: str) -> bool:
             del year, race_name
@@ -322,7 +354,7 @@ def test_run_cycle_reconciles_sprint_actuals_and_writes_accuracy_snapshots(patch
         "fetch_actual_session_results",
         lambda year, race_name, session_name: (
             fetch_calls.append(session_name)
-            or [{"position": 1, "driver": "VER", "team": "Red Bull"}]
+            or [{"position": 1, "driver": session_name, "team": "Red Bull"}]
         ),
     )
 
@@ -334,7 +366,11 @@ def test_run_cycle_reconciles_sprint_actuals_and_writes_accuracy_snapshots(patch
 
     assert summary.checked_events == 1
     assert summary.generated_predictions == []
-    assert summary.reconciled_actuals == ["Chinese Grand Prix::5"]
-    assert summary.accuracy_snapshots == 7
+    assert summary.reconciled_actuals == ["Chinese Grand Prix::6"]
+    assert summary.accuracy_snapshots == 11
     assert sorted(set(fetch_calls)) == ["Q", "R", "SQ", "Sprint"]
-    assert len(accuracy_saves) == 7
+    assert len(accuracy_saves) == 11
+    logger_inst = logger_instances[0]
+    pre_actuals = logger_inst._records["PRE"]["actuals"]
+    assert pre_actuals["qualifying"][0]["driver"] == "SQ"
+    assert pre_actuals["race"][0]["driver"] == "Sprint"

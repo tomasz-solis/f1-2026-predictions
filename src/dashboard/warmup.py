@@ -121,6 +121,8 @@ class WarmupSummary:
     practice_completed_sessions: list[str] = field(default_factory=list)
     practice_teams_updated: int = 0
     practice_retried_events: list[str] = field(default_factory=list)
+    reconciled_actuals: list[str] = field(default_factory=list)
+    accuracy_snapshots: int = 0
     errors: list[str] = field(default_factory=list)
     target_contexts: list[dict[str, Any]] = field(default_factory=list)
     db_verification_warnings: list[str] = field(default_factory=list)
@@ -147,6 +149,8 @@ class WarmupSummary:
             "practice_completed_sessions": list(self.practice_completed_sessions),
             "practice_teams_updated": int(self.practice_teams_updated),
             "practice_retried_events": list(self.practice_retried_events),
+            "reconciled_actuals": list(self.reconciled_actuals),
+            "accuracy_snapshots": int(self.accuracy_snapshots),
             "errors": list(self.errors),
             "target_contexts": list(self.target_contexts),
             "db_verification_warnings": list(self.db_verification_warnings),
@@ -935,6 +939,58 @@ def _stage_save_horizon_index(ctx: _WarmupRunState) -> None:
         logger.warning("Could not persist warmup horizon index: %s", exc)
 
 
+def _reconcile_completed_accuracy_for_summary(
+    *,
+    year: int,
+    settings: dict[str, Any],
+    detector: Any,
+    summary: WarmupSummary,
+    dry_run: bool,
+) -> None:
+    """Update completed-race accuracy and attach counts to a warmup summary."""
+    if dry_run:
+        return
+    if not bool(settings.get("reconcile_accuracy_after_warmup", False)):
+        return
+
+    try:
+        lookback_days = max(
+            1,
+            int(settings.get("accuracy_reconcile_lookback_days", 14)),
+        )
+    except (TypeError, ValueError):
+        lookback_days = 14
+
+    try:
+        from src.systems.session_automation import reconcile_completed_prediction_accuracy
+
+        reconciled_actuals, accuracy_snapshots = reconcile_completed_prediction_accuracy(
+            year=year,
+            lookback_days=lookback_days,
+            lookahead_days=0,
+            session_detector=detector,
+        )
+    except _WARMUP_ERRORS as exc:
+        error_message = f"accuracy_reconcile: {exc}"
+        summary.errors.append(error_message)
+        logger.warning("Warmup accuracy reconciliation failed: %s", exc)
+        return
+
+    summary.reconciled_actuals.extend(reconciled_actuals)
+    summary.accuracy_snapshots += int(accuracy_snapshots)
+
+
+def _stage_reconcile_completed_accuracy(ctx: _WarmupRunState) -> None:
+    """Stage 5: update prediction accuracy after completed races."""
+    _reconcile_completed_accuracy_for_summary(
+        year=ctx.year,
+        settings=ctx.settings,
+        detector=ctx.detector,
+        summary=ctx.summary,
+        dry_run=ctx.dry_run,
+    )
+
+
 def run_warmup_precompute_cycle(
     year: int,
     *,
@@ -954,6 +1010,8 @@ def run_warmup_precompute_cycle(
        features exist then generate per-weather predictions.
     4. ``_stage_save_horizon_index`` — persist the horizon index and mark
        which races have full weather coverage.
+    5. ``_stage_reconcile_completed_accuracy`` — attach completed-session
+       actuals and rebuild accuracy snapshots for recent races when enabled.
 
     Each stage reads and writes shared state through a ``_WarmupRunState``
     instance. The lock is acquired before stage 1 and released in the finally
@@ -978,8 +1036,21 @@ def run_warmup_precompute_cycle(
 
     targets = _resolve_warmup_targets(int(year), now_utc=run_now, horizon_races=horizon_races)
     if targets is None:
-        summary.status = "nothing_to_do"
         summary.reason = "no_upcoming_races"
+        detector = SessionDetector()
+        _reconcile_completed_accuracy_for_summary(
+            year=int(year),
+            settings=settings,
+            detector=detector,
+            summary=summary,
+            dry_run=bool(dry_run),
+        )
+        if summary.errors:
+            summary.status = "partial_success"
+        elif summary.reconciled_actuals or summary.accuracy_snapshots:
+            summary.status = "success"
+        else:
+            summary.status = "nothing_to_do"
         return summary
 
     summary.anchor_race_name = targets.anchor_race_name
@@ -999,7 +1070,6 @@ def run_warmup_precompute_cycle(
     summary.reason = checkpoint_context.reason
 
     if not checkpoint_context.checkpoint_ready:
-        summary.status = "not_ready"
         if not dry_run:
             _record_not_ready_status(
                 year=int(year),
@@ -1007,6 +1077,14 @@ def run_warmup_precompute_cycle(
                 context=checkpoint_context,
                 now_utc=run_now,
             )
+            _reconcile_completed_accuracy_for_summary(
+                year=int(year),
+                settings=settings,
+                detector=detector,
+                summary=summary,
+                dry_run=bool(dry_run),
+            )
+        summary.status = "partial_success" if summary.errors else "not_ready"
         logger.info(
             "Warmup skipped: anchor=%s expected=%s ready=%s reason=%s",
             targets.anchor_race_name,
@@ -1048,6 +1126,7 @@ def run_warmup_precompute_cycle(
         _stage_load_predictor(ctx)
         _stage_compute_predictions(ctx)
         _stage_save_horizon_index(ctx)
+        _stage_reconcile_completed_accuracy(ctx)
 
         if summary.errors:
             summary.status = "partial_success"

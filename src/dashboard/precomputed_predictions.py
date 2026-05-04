@@ -161,12 +161,27 @@ def get_prediction_precompute_config() -> dict[str, Any]:
         max_file_entries = max(16, int(raw_max_entries))
     except (TypeError, ValueError):
         max_file_entries = _DEFAULT_MAX_FILE_ENTRIES
+    raw_reconcile_lookback = config_loader.get(
+        "dashboard.prediction_precompute.accuracy_reconcile_lookback_days",
+        14,
+    )
+    try:
+        accuracy_reconcile_lookback_days = max(1, int(raw_reconcile_lookback))
+    except (TypeError, ValueError):
+        accuracy_reconcile_lookback_days = 14
 
     return {
         "enabled": enabled,
         "horizon_races": horizon_races,
         "weather_scenarios": weather_scenarios,
         "max_file_entries": max_file_entries,
+        "reconcile_accuracy_after_warmup": bool(
+            config_loader.get(
+                "dashboard.prediction_precompute.reconcile_accuracy_after_warmup",
+                True,
+            )
+        ),
+        "accuracy_reconcile_lookback_days": accuracy_reconcile_lookback_days,
         "qualifying_n_simulations": _resolve_simulation_count(
             config_loader.get("dashboard.prediction_precompute.qualifying_n_simulations", 100),
             default=100,

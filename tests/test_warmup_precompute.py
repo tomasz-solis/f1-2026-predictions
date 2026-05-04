@@ -251,6 +251,121 @@ def test_run_warmup_precompute_cycle_refreshes_practice_before_hashing(patcher):
     assert result.practice_teams_updated == 10
 
 
+def test_run_warmup_precompute_cycle_reconciles_accuracy_when_enabled(patcher):
+    """Warmup should refresh completed-race accuracy after precompute writes."""
+    from src.systems import session_automation
+
+    fixed_now = datetime(2026, 5, 4, 12, 0, tzinfo=UTC)
+    calls: list[dict] = []
+
+    patcher.setattr(warmup, "should_write_to_db", lambda: False)
+    patcher.setattr(warmup, "_refresh_anchor_practice_characteristics", lambda **kwargs: {})
+    patcher.setattr(
+        warmup,
+        "get_prediction_precompute_config",
+        lambda: {
+            "enabled": True,
+            "horizon_races": 3,
+            "weather_scenarios": ["dry"],
+            "max_file_entries": 2048,
+            "reconcile_accuracy_after_warmup": True,
+            "accuracy_reconcile_lookback_days": 9,
+        },
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_warmup_targets",
+        lambda year, now_utc, horizon_races: warmup.WarmupTargets(
+            anchor_race_name="Canadian Grand Prix",
+            anchor_is_sprint=False,
+            target_races=(),
+        ),
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_checkpoint_context",
+        lambda year, race_name, is_sprint, now_utc, session_detector: warmup.CheckpointContext(
+            checkpoint="PRE",
+            expected_checkpoint="PRE",
+            latest_ready_checkpoint="PRE",
+            checkpoint_ready=True,
+            reason="ready",
+            boundary_signature="boundary_sig",
+        ),
+    )
+    patcher.setattr(warmup, "get_artifact_versions", lambda year=2026: {"k": (1, "ts")})
+    patcher.setattr(warmup, "compute_artifact_hash", lambda artifact_versions: "artifact_hash")
+    patcher.setattr(warmup, "_load_predictor", lambda artifact_versions, year: object())
+    patcher.setattr(warmup, "save_precompute_horizon_index", lambda **kwargs: None)
+
+    def _reconcile_completed_prediction_accuracy(**kwargs):
+        calls.append(kwargs)
+        return ["Miami Grand Prix::1"], 4
+
+    patcher.setattr(
+        session_automation,
+        "reconcile_completed_prediction_accuracy",
+        _reconcile_completed_prediction_accuracy,
+    )
+
+    result = warmup.run_warmup_precompute_cycle(2026, now_utc=fixed_now)
+
+    assert result.status == "success"
+    assert result.reconciled_actuals == ["Miami Grand Prix::1"]
+    assert result.accuracy_snapshots == 4
+    assert len(calls) == 1
+    assert calls[0]["year"] == 2026
+    assert calls[0]["lookback_days"] == 9
+    assert calls[0]["lookahead_days"] == 0
+
+
+def test_run_warmup_precompute_cycle_reconciles_accuracy_without_upcoming_races(patcher):
+    """Final-race accuracy should still refresh when the warmup horizon is empty."""
+    from src.systems import session_automation
+
+    fixed_now = datetime(2026, 12, 15, 12, 0, tzinfo=UTC)
+    calls: list[dict] = []
+
+    class _Detector:
+        """Stub detector passed through to the reconciler."""
+
+    patcher.setattr(warmup, "SessionDetector", _Detector)
+    patcher.setattr(
+        warmup,
+        "get_prediction_precompute_config",
+        lambda: {
+            "enabled": True,
+            "horizon_races": 3,
+            "weather_scenarios": ["dry"],
+            "reconcile_accuracy_after_warmup": True,
+            "accuracy_reconcile_lookback_days": 14,
+        },
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_warmup_targets",
+        lambda year, now_utc, horizon_races: None,
+    )
+
+    def _reconcile_completed_prediction_accuracy(**kwargs):
+        calls.append(kwargs)
+        return ["Abu Dhabi Grand Prix::2"], 8
+
+    patcher.setattr(
+        session_automation,
+        "reconcile_completed_prediction_accuracy",
+        _reconcile_completed_prediction_accuracy,
+    )
+
+    result = warmup.run_warmup_precompute_cycle(2026, now_utc=fixed_now)
+
+    assert result.status == "success"
+    assert result.reason == "no_upcoming_races"
+    assert result.reconciled_actuals == ["Abu Dhabi Grand Prix::2"]
+    assert result.accuracy_snapshots == 8
+    assert isinstance(calls[0]["session_detector"], _Detector)
+
+
 def test_run_warmup_precompute_cycle_skips_target_with_unknown_weekend_type(patcher):
     """Warmup should skip a target race when its weekend format cannot be resolved."""
     fixed_now = datetime(2026, 3, 5, 12, 0, tzinfo=UTC)
