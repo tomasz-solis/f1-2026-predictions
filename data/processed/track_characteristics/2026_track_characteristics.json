@@ -12,6 +12,7 @@
     },
     "Miami Grand Prix": {
       "type": "street",
+      "has_sprint": true,
       "pit_stop_loss": 22.5,
       "safety_car_prob": 0.45,
       "vsc_prob": 0.25,
