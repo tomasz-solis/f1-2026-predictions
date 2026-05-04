@@ -104,7 +104,7 @@ python scripts/update_prediction_actuals.py "Bahrain Grand Prix" FP1 --year 2026
 
 This script now fetches actual results per stored target session and writes them into the matching prediction artifact.
 
-The accuracy page renders from stored predictions and snapshots first. If you want it to fetch newly completed results, use the **Refresh Actuals** control on that page; it refreshes actuals and rebuilds the snapshot artifacts the dashboard reads. Session automation still writes target-aware accuracy snapshots after reconciliation.
+The accuracy page renders from stored predictions and snapshots first. Scheduled workers own freshness: session automation reconciles actuals after race completion, and warmup also runs the same reconciliation after precompute when `dashboard.prediction_precompute.reconcile_accuracy_after_warmup` is enabled. The **Refresh Actuals** button remains a repair control, not the normal update path.
 
 To backfill missing snapshot artifacts from already stored prediction truth:
 

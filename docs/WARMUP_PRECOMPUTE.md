@@ -64,6 +64,8 @@ sessions are warmed quickly after the boundary flips:
 ```
 
 If you use multiple workers, keep the same cadence; warmup writes are idempotent.
+By default, each successful warmup also checks recently completed races and
+rebuilds prediction-accuracy snapshots when classified results are available.
 
 ## Supabase/Render note
 
@@ -76,4 +78,5 @@ For multi-instance deployments (Render web + worker), set `USE_DB_STORAGE` to a 
 `file_only` does not share warmup state across instances.
 
 The Streamlit request path is intentionally read-only. Rely on this worker to
-refresh warmed predictions instead of trying to recompute them during a user request.
+refresh warmed predictions and completed-race accuracy instead of trying to
+recompute them during a user request.

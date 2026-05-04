@@ -119,8 +119,9 @@ python scripts/warmup_precompute.py --year 2026 --require-db
 ```
 
 This worker is checkpoint-aware and idempotent. It warms the next 3 races,
-stores missing weather scenarios only, and updates the ready-race horizon index
-used by the race dropdown.
+stores missing weather scenarios only, updates the ready-race horizon index
+used by the race dropdown, and reconciles completed-race accuracy snapshots
+when `dashboard.prediction_precompute.reconcile_accuracy_after_warmup` is enabled.
 
 For production, keep the dashboard request path read-only so this warmup owns
 freshness outside the Streamlit request thread.
