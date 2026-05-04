@@ -935,17 +935,14 @@ def _render_accuracy_page_controls() -> tuple[int, bool]:
     _set_selected_season(selected_season)
 
     st.caption(
-        "Refresh completed qualifying, sprint, and race results, then rebuild the accuracy "
-        "cards and charts from the updated checkpoints."
+        "Scheduled workers refresh completed qualifying, sprint, and race results automatically. "
+        "Use the repair action only when stored artifacts need a forced rebuild."
     )
     refresh_requested = st.button(
-        "Refresh Actuals",
-        type="primary",
+        "Repair Accuracy Data",
+        type="secondary",
         width="stretch",
-        help=(
-            "Fetch newly completed qualifying, sprint, and race results for saved "
-            "predictions. This can take a bit longer than a normal page load."
-        ),
+        help=("Force a one-off actuals reconciliation and snapshot rebuild for saved predictions."),
     )
 
     return selected_season, refresh_requested
@@ -970,8 +967,8 @@ def render_prediction_accuracy_page() -> None:
             },
             {
                 "label": "Refresh",
-                "value": "Manual",
-                "meta": "Actuals update only when requested.",
+                "value": "Automatic",
+                "meta": "Workers reconcile completed races after warmup.",
                 "tone": "accent",
             },
             {

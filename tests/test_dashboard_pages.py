@@ -822,7 +822,7 @@ def test_save_prediction_if_enabled_handles_no_completed_sessions(patcher):
     assert "Prediction saved for accuracy tracking (checkpoint PRE)" in info_messages[0]
 
 
-def test_render_accuracy_page_controls_uses_full_width_primary_refresh_button(patcher):
+def test_render_accuracy_page_controls_uses_secondary_repair_button(patcher):
     button_calls: list[dict[str, object]] = []
     captions: list[str] = []
 
@@ -847,18 +847,15 @@ def test_render_accuracy_page_controls_uses_full_width_primary_refresh_button(pa
     assert refresh_requested is False
     assert button_calls == [
         {
-            "label": "Refresh Actuals",
-            "type": "primary",
+            "label": "Repair Accuracy Data",
+            "type": "secondary",
             "width": "stretch",
-            "help": (
-                "Fetch newly completed qualifying, sprint, and race results for saved "
-                "predictions. This can take a bit longer than a normal page load."
-            ),
+            "help": "Force a one-off actuals reconciliation and snapshot rebuild for saved predictions.",
         }
     ]
     assert captions == [
-        "Refresh completed qualifying, sprint, and race results, then rebuild the accuracy "
-        "cards and charts from the updated checkpoints."
+        "Scheduled workers refresh completed qualifying, sprint, and race results automatically. "
+        "Use the repair action only when stored artifacts need a forced rebuild."
     ]
 
 
@@ -1210,7 +1207,7 @@ def test_render_prediction_accuracy_page_refreshes_actuals_only_when_requested(p
     captions: list[str] = []
     patcher.setattr(pages.st, "success", lambda message: success_messages.append(str(message)))
     patcher.setattr(pages.st, "caption", lambda message: captions.append(str(message)))
-    patcher.setattr(pages.st, "button", lambda label, **_kwargs: label == "Refresh Actuals")
+    patcher.setattr(pages.st, "button", lambda label, **_kwargs: label == "Repair Accuracy Data")
 
     class _Pipeline:
         def __init__(self, year: int = 2026, *, reconcile_actuals_on_load: bool = False):
