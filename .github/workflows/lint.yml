@@ -26,7 +26,7 @@ jobs:
 
       - name: Run Ruff (lint)
         run: |
-          ruff check src tests scripts app.py predict_weekend.py
+          make lint RUFF=ruff
 
       - name: Check formatting (ruff-format)
         run: |
@@ -39,4 +39,4 @@ jobs:
 
       - name: Run mypy (full src)
         run: |
-          mypy src
+          make typecheck MYPY=mypy

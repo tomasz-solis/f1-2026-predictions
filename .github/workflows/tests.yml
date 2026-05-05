@@ -37,7 +37,7 @@ jobs:
 
     - name: Run tests
       run: |
-        pytest tests/ -v --cov=src --cov-report=xml --cov-report=term
+        make test-github-full PYTEST=pytest
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
@@ -64,12 +64,6 @@ jobs:
         pip install -r requirements.txt
         pip install pytest pytest-mock PyYAML
 
-    - name: Run deterministic historical evaluation smoke tests
+    - name: Run deterministic historical evaluation and race smoke tests
       run: |
-        pytest \
-          tests/test_prediction_regression.py \
-          tests/test_backtesting.py \
-          tests/test_backtest_review_packet.py \
-          tests/test_prediction_context_runtime.py \
-          tests/test_generate_evaluation_report.py \
-          -q
+        make test-github-smoke PYTEST=pytest

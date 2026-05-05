@@ -9,9 +9,15 @@ repos:
         exclude: ^notebooks/
   - repo: local
     hooks:
-      - id: mypy-dashboard-utils
-        name: mypy (dashboard/utils + predictor guard)
-        entry: .venv/bin/mypy --no-incremental src/dashboard src/utils src/predictors/baseline/data_mixin.py
+      - id: mypy-src
+        name: mypy (GitHub lint parity)
+        entry: .venv/bin/mypy --no-incremental src
+        language: system
+        pass_filenames: false
+        require_serial: true
+      - id: pytest-github-smoke
+        name: pytest (GitHub smoke parity)
+        entry: make test-github-smoke
         language: system
         pass_filenames: false
         require_serial: true
