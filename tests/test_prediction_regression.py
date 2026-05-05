@@ -103,6 +103,8 @@ def _assert_cross_environment_regression(
     row_key: str,
     max_position_delta: int,
     mean_position_delta: float,
+    top_overlap_count: int = 3,
+    min_top_overlap: int = 2,
 ) -> None:
     """Allow bounded drift when the same seeded model runs on a different environment.
 
@@ -136,10 +138,10 @@ def _assert_cross_environment_regression(
     assert int(golden_rows[payload_winner]["position"]) <= 3
     assert (
         len(
-            _top_driver_set(payload, row_key=row_key, count=3)
-            & _top_driver_set(golden_payload, row_key=row_key, count=3)
+            _top_driver_set(payload, row_key=row_key, count=top_overlap_count)
+            & _top_driver_set(golden_payload, row_key=row_key, count=top_overlap_count)
         )
-        >= 2
+        >= min_top_overlap
     )
 
 
@@ -295,6 +297,8 @@ def _assert_matches_or_update(
     row_key: str,
     max_position_delta: int,
     mean_position_delta: float,
+    top_overlap_count: int = 3,
+    min_top_overlap: int = 2,
 ) -> None:
     """Compare one payload to disk or rewrite the golden fixture if requested."""
     if update_golden_files or not golden_path.exists():
@@ -314,6 +318,8 @@ def _assert_matches_or_update(
         row_key=row_key,
         max_position_delta=max_position_delta,
         mean_position_delta=mean_position_delta,
+        top_overlap_count=top_overlap_count,
+        min_top_overlap=min_top_overlap,
     )
 
 
@@ -353,6 +359,8 @@ def test_sprint_qualifying_regression(update_golden_files):
         row_key="grid",
         max_position_delta=5,
         mean_position_delta=2.0,
+        top_overlap_count=5,
+        min_top_overlap=4,
     )
 
 
