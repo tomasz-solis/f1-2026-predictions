@@ -19,6 +19,18 @@ _MIN_COMPETITIVE_ENTRIES_BY_SESSION = {
     "Q": 18,
     "R": 18,
 }
+_QUALIFYING_LIKE_SESSIONS = {"Q", "SQ"}
+
+
+def _session_load_options(session_name: str) -> dict[str, bool]:
+    """Return the smallest FastF1 load options needed for final results."""
+    is_qualifying_like = str(session_name).strip().upper() in _QUALIFYING_LIKE_SESSIONS
+    return {
+        "laps": is_qualifying_like,
+        "telemetry": False,
+        "weather": False,
+        "messages": is_qualifying_like,
+    }
 
 
 def _coerce_optional_position(raw_position: Any) -> int | None:
@@ -158,7 +170,7 @@ def fetch_actual_session_results(
         )
         call_with_resilience(
             "fastf1_session_load_results",
-            lambda: session.load(),
+            lambda: session.load(**_session_load_options(session_name)),
             labels=labels,
         )
 

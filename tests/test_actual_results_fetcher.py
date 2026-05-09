@@ -32,11 +32,48 @@ def test_fetch_actual_session_results_canonicalizes_teams_and_positions():
     with patch("src.data.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
         results = fetch_actual_session_results(2026, "Bahrain Grand Prix", "Q")
 
+    mock_session.load.assert_called_once_with(
+        laps=True,
+        telemetry=False,
+        weather=False,
+        messages=True,
+    )
     assert results is not None
     assert results[0]["team"] == "Red Bull Racing"
     assert results[0]["position"] == 1
     assert results[1]["team"] == "Ferrari"
     assert results[1]["position"] == 2
+
+
+def test_fetch_actual_session_results_avoids_laps_for_race_like_sessions():
+    """Race-like sessions should not load laps when classification rows already carry positions."""
+    rows = [
+        {"Abbreviation": "NOR", "TeamName": "McLaren Formula 1 Team", "Position": 1},
+        {"Abbreviation": "VER", "TeamName": "Oracle Red Bull Racing", "Position": 2},
+    ]
+    rows.extend(
+        {
+            "Abbreviation": f"DRV{i}",
+            "TeamName": "Scuderia Ferrari",
+            "Position": i,
+        }
+        for i in range(3, 21)
+    )
+
+    mock_session = MagicMock()
+    mock_session.results = pd.DataFrame(rows)
+
+    with patch("src.data.actual_results_fetcher.fastf1.get_session", return_value=mock_session):
+        results = fetch_actual_session_results(2026, "Miami Grand Prix", "Sprint")
+
+    mock_session.load.assert_called_once_with(
+        laps=False,
+        telemetry=False,
+        weather=False,
+        messages=False,
+    )
+    assert results is not None
+    assert results[0]["driver"] == "NOR"
 
 
 def test_fetch_actual_session_results_fails_closed_on_malformed_row():
