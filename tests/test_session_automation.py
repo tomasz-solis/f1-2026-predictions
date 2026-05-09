@@ -110,6 +110,32 @@ def test_run_cycle_generates_prediction_for_latest_session(patcher):
     assert saved_predictions[0]["weather"] == "dry"
 
 
+def test_reconcile_prediction_actuals_uses_race_scoped_history_loader():
+    """Accuracy reconciliation should not load full-season prediction history per race."""
+    calls: list[tuple[int, str]] = []
+
+    class _Logger:
+        def get_predictions_for_race(self, year: int, race_name: str):
+            calls.append((year, race_name))
+            return []
+
+        def get_all_predictions(self, year: int):
+            del year
+            raise AssertionError("full-season prediction history should not be loaded")
+
+    reconciled, snapshots = automation._reconcile_prediction_actuals(
+        year=2026,
+        race_name="Miami Grand Prix",
+        is_sprint=True,
+        prediction_logger=_Logger(),
+        metrics_calculator=object(),
+        artifact_store=object(),
+    )
+
+    assert (reconciled, snapshots) == (0, 0)
+    assert calls == [(2026, "Miami Grand Prix")]
+
+
 def test_run_cycle_reconciles_sprint_actuals_and_writes_accuracy_snapshots(patcher):
     """Completed sprint weekends should reconcile saved checkpoints and write snapshots."""
     fetch_calls: list[str] = []

@@ -412,6 +412,7 @@ def test_get_all_predictions_merges_artifact_and_file_backends(
 ):
     """Mixed backend history should surface every unique saved checkpoint."""
     logger = PredictionLogger(predictions_dir=temp_predictions_dir)
+    list_calls: list[dict[str, object]] = []
 
     logger.save_prediction(
         year=2026,
@@ -422,30 +423,47 @@ def test_get_all_predictions_merges_artifact_and_file_backends(
         weather="dry",
     )
 
-    logger.artifact_store.list_artifacts = lambda *_args, **_kwargs: [
-        {
-            "data": {
-                "metadata": {
-                    "year": 2026,
-                    "race_name": "Australian Grand Prix",
-                    "session_name": "FP2",
-                    "predicted_at": "2026-03-16T12:00:00+00:00",
-                    "weather": "dry",
-                },
-                "qualifying": {
-                    "predicted_grid": [{"position": 1, "driver": "NOR", "team": "McLaren"}]
-                },
-                "race": {
-                    "predicted_results": [{"position": 1, "driver": "NOR", "team": "McLaren"}]
-                },
-                "targets": {},
-                "actuals": {"qualifying": None, "race": None, "targets": {}},
+    def _list_artifacts(artifact_type: str, key_prefix=None, limit: int = 100):
+        list_calls.append(
+            {
+                "artifact_type": artifact_type,
+                "key_prefix": key_prefix,
+                "limit": limit,
             }
-        }
-    ]
+        )
+        return [
+            {
+                "data": {
+                    "metadata": {
+                        "year": 2026,
+                        "race_name": "Australian Grand Prix",
+                        "session_name": "FP2",
+                        "predicted_at": "2026-03-16T12:00:00+00:00",
+                        "weather": "dry",
+                    },
+                    "qualifying": {
+                        "predicted_grid": [{"position": 1, "driver": "NOR", "team": "McLaren"}]
+                    },
+                    "race": {
+                        "predicted_results": [{"position": 1, "driver": "NOR", "team": "McLaren"}]
+                    },
+                    "targets": {},
+                    "actuals": {"qualifying": None, "race": None, "targets": {}},
+                }
+            }
+        ]
+
+    logger.artifact_store.list_artifacts = _list_artifacts
 
     predictions = logger.get_all_predictions(2026)
 
+    assert list_calls == [
+        {
+            "artifact_type": "prediction",
+            "key_prefix": "2026::",
+            "limit": 4096,
+        }
+    ]
     assert len(predictions) == 2
     assert {
         (
@@ -457,6 +475,87 @@ def test_get_all_predictions_merges_artifact_and_file_backends(
         ("Australian Grand Prix", "FP2"),
         ("Bahrain Grand Prix", "FP1"),
     }
+
+
+def test_get_predictions_for_race_limits_artifact_listing(temp_predictions_dir):
+    """Race-scoped history should use a DB prefix and filtered file fallback."""
+    logger = PredictionLogger(predictions_dir=temp_predictions_dir)
+    list_calls: list[dict[str, object]] = []
+    file_calls: list[tuple[int, str | None]] = []
+    miami_payload = {
+        "metadata": {
+            "year": 2026,
+            "race_name": "Miami Grand Prix",
+            "session_name": "SQ",
+            "predicted_at": "2026-05-02T12:00:00+00:00",
+            "weather": "dry",
+        },
+        "qualifying": {"predicted_grid": [{"position": 1, "driver": "VER", "team": "Red Bull"}]},
+        "race": {"predicted_results": [{"position": 1, "driver": "VER", "team": "Red Bull"}]},
+        "targets": {},
+        "actuals": {"qualifying": None, "race": None, "targets": {}},
+    }
+
+    def _list_artifacts(artifact_type: str, key_prefix=None, limit: int = 100):
+        list_calls.append(
+            {
+                "artifact_type": artifact_type,
+                "key_prefix": key_prefix,
+                "limit": limit,
+            }
+        )
+        return [{"data": miami_payload}]
+
+    def _load_files(year: int, *, race_name: str | None = None) -> list[dict]:
+        file_calls.append((year, race_name))
+        return []
+
+    logger.artifact_store.list_artifacts = _list_artifacts
+    logger._load_predictions_from_files = _load_files  # type: ignore[method-assign]
+
+    predictions = logger.get_predictions_for_race(2026, "Miami Grand Prix")
+
+    assert predictions == [miami_payload]
+    assert list_calls == [
+        {
+            "artifact_type": "prediction",
+            "key_prefix": "2026::Miami Grand Prix::",
+            "limit": 256,
+        }
+    ]
+    assert file_calls == [(2026, "Miami Grand Prix")]
+
+
+def test_get_predictions_for_race_filters_file_fallback(
+    temp_predictions_dir,
+    sample_quali_prediction,
+    sample_race_prediction,
+):
+    """Race-scoped history should still work when only local files are available."""
+    logger = PredictionLogger(predictions_dir=temp_predictions_dir)
+    logger.save_prediction(
+        year=2026,
+        race_name="Miami Grand Prix",
+        session_name="SQ",
+        qualifying_prediction=sample_quali_prediction,
+        race_prediction=sample_race_prediction,
+        weather="dry",
+    )
+    logger.save_prediction(
+        year=2026,
+        race_name="Monaco Grand Prix",
+        session_name="FP1",
+        qualifying_prediction=sample_quali_prediction,
+        race_prediction=sample_race_prediction,
+        weather="dry",
+    )
+    logger.artifact_store.list_artifacts = lambda *_args, **_kwargs: []
+
+    predictions = logger.get_predictions_for_race(2026, "Miami Grand Prix")
+
+    assert len(predictions) == 1
+    assert predictions[0]["metadata"]["race_name"] == "Miami Grand Prix"
+    assert predictions[0]["metadata"]["session_name"] == "SQ"
 
 
 def test_get_all_predictions_does_not_reload_files_when_listing_is_file_backed(

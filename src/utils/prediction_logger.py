@@ -184,7 +184,7 @@ class PredictionLogger:
         session_name: str,
     ) -> Path:
         """Build the normalized file path for one prediction payload."""
-        safe_race_name = race_name.lower().replace(" ", "_").replace("'", "")
+        safe_race_name = self._race_file_slug(race_name)
         return (
             self.predictions_dir
             / str(year)
@@ -373,11 +373,35 @@ class PredictionLogger:
 
     def get_all_predictions(self, year: int) -> list[dict[str, Any]]:
         """Load season predictions from both storage backends and deduplicate them."""
+        return self._load_prediction_history(year)
+
+    def get_predictions_for_race(self, year: int, race_name: str) -> list[dict[str, Any]]:
+        """Load saved predictions for one race without reading full-season history."""
+        return self._load_prediction_history(year, race_name=race_name)
+
+    def _load_prediction_history(
+        self,
+        year: int,
+        *,
+        race_name: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Load prediction history, optionally constrained to a single race."""
         target_year = int(year)
+        target_race_name = self._normalize_race_name(race_name) if race_name is not None else None
+        key_prefix = (
+            f"{target_year}::{target_race_name}::"
+            if target_race_name is not None
+            else f"{target_year}::"
+        )
+        listing_limit = 256 if target_race_name is not None else 4096
         predictions: list[dict[str, Any]] = []
 
         try:
-            artifact_rows = self.artifact_store.list_artifacts("prediction", limit=4096)
+            artifact_rows = self.artifact_store.list_artifacts(
+                "prediction",
+                key_prefix=key_prefix,
+                limit=listing_limit,
+            )
         except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
             logger.warning("Could not list prediction artifacts for %s: %s", year, exc)
             artifact_rows = []
@@ -394,10 +418,17 @@ class PredictionLogger:
                 continue
             if payload_year != target_year:
                 continue
+            if (
+                target_race_name is not None
+                and self._normalize_race_name(metadata.get("race_name", "")) != target_race_name
+            ):
+                continue
             predictions.append(payload)
 
         if not self._listing_rows_are_file_backed(artifact_rows):
-            predictions.extend(self._load_predictions_from_files(target_year))
+            predictions.extend(
+                self._load_predictions_from_files(target_year, race_name=target_race_name)
+            )
         return self._deduplicate_predictions(predictions)
 
     def reconcile_completed_prediction_actuals(self, year: int) -> int:
@@ -531,14 +562,25 @@ class PredictionLogger:
         )
         return filepath.exists()
 
-    def _load_predictions_from_files(self, year: int) -> list[dict[str, Any]]:
+    def _load_predictions_from_files(
+        self,
+        year: int,
+        *,
+        race_name: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Load season predictions from local files when listing from storage fails."""
         year_dir = self.predictions_dir / str(year)
         if not year_dir.exists():
             return []
 
+        target_race_name = self._normalize_race_name(race_name) if race_name is not None else None
+        race_dirs = (
+            [year_dir / self._race_file_slug(target_race_name)]
+            if target_race_name is not None
+            else list(year_dir.iterdir())
+        )
         predictions: list[dict[str, Any]] = []
-        for race_dir in year_dir.iterdir():
+        for race_dir in race_dirs:
             if not race_dir.is_dir():
                 continue
             for prediction_file in race_dir.glob("*.json"):
@@ -548,11 +590,23 @@ class PredictionLogger:
                 except (OSError, json.JSONDecodeError, TypeError) as exc:
                     logger.warning("Could not read prediction file %s: %s", prediction_file, exc)
                     continue
-                if self._validate_prediction_schema(payload):
-                    predictions.append(payload)
+                if not self._validate_prediction_schema(payload):
+                    continue
+                if (
+                    target_race_name is not None
+                    and self._normalize_race_name(payload.get("metadata", {}).get("race_name", ""))
+                    != target_race_name
+                ):
+                    continue
+                predictions.append(payload)
 
         predictions.sort(key=self._prediction_sort_key)
         return predictions
+
+    @staticmethod
+    def _race_file_slug(race_name: str) -> str:
+        """Return the directory/file slug used for prediction JSON files."""
+        return race_name.lower().replace(" ", "_").replace("'", "")
 
     @staticmethod
     def _listing_rows_are_file_backed(rows: list[dict[str, Any]]) -> bool:

@@ -432,6 +432,33 @@ def _prediction_accuracy_snapshots_exist(
     )
 
 
+def _normalized_race_name(value: Any) -> str:
+    """Normalize race names for session-automation comparisons."""
+    return " ".join(str(value).split()).strip()
+
+
+def _get_prediction_history_for_race(
+    prediction_logger: PredictionLogger,
+    *,
+    year: int,
+    race_name: str,
+) -> list[dict[str, Any]]:
+    """Load saved prediction history for one race with a full-history fallback."""
+    targeted_loader = getattr(prediction_logger, "get_predictions_for_race", None)
+    if callable(targeted_loader):
+        return targeted_loader(year, race_name)
+
+    target_race_name = _normalized_race_name(race_name)
+    race_predictions: list[dict[str, Any]] = []
+    for prediction in prediction_logger.get_all_predictions(year):
+        metadata = prediction.get("metadata")
+        if not isinstance(metadata, dict):
+            continue
+        if _normalized_race_name(metadata.get("race_name", "")) == target_race_name:
+            race_predictions.append(prediction)
+    return race_predictions
+
+
 def _reconcile_prediction_actuals(
     *,
     year: int,
@@ -451,11 +478,11 @@ def _reconcile_prediction_actuals(
     reconciled = 0
     snapshots = 0
 
-    race_predictions = [
-        prediction
-        for prediction in prediction_logger.get_all_predictions(year)
-        if str((prediction.get("metadata") or {}).get("race_name", "")).strip() == race_name
-    ]
+    race_predictions = _get_prediction_history_for_race(
+        prediction_logger,
+        year=year,
+        race_name=race_name,
+    )
 
     for prediction in race_predictions:
         metadata = prediction.get("metadata", {})
