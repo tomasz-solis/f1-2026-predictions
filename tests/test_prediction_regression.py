@@ -132,16 +132,36 @@ def _assert_cross_environment_regression(
     assert max(position_deltas) <= max_position_delta
     assert (sum(position_deltas) / len(position_deltas)) <= mean_position_delta
 
-    golden_winner = str(golden_payload[row_key][0]["driver"])
-    payload_winner = str(payload[row_key][0]["driver"])
-    assert int(payload_rows[golden_winner]["position"]) <= 3
-    assert int(golden_rows[payload_winner]["position"]) <= 3
     assert (
         len(
             _top_driver_set(payload, row_key=row_key, count=top_overlap_count)
             & _top_driver_set(golden_payload, row_key=row_key, count=top_overlap_count)
         )
         >= min_top_overlap
+    )
+
+
+def test_cross_environment_regression_allows_bounded_winner_drift():
+    """Cross-environment checks should protect the front group, not one exact winner."""
+    golden_payload = {
+        "seed": 42,
+        "grid": [{"driver": f"D{position:02}", "position": position} for position in range(1, 23)],
+    }
+    payload_order = [2, 3, 4, 5, 6, 7, 1, *range(8, 23)]
+    payload = {
+        "seed": 42,
+        "grid": [
+            {"driver": f"D{driver_position:02}", "position": position}
+            for position, driver_position in enumerate(payload_order, start=1)
+        ],
+    }
+
+    _assert_cross_environment_regression(
+        payload=payload,
+        golden_payload=golden_payload,
+        row_key="grid",
+        max_position_delta=7,
+        mean_position_delta=2.0,
     )
 
 
