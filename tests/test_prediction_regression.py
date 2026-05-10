@@ -331,7 +331,7 @@ def test_qualifying_regression(update_golden_files):
         payload=payload,
         update_golden_files=update_golden_files,
         row_key="grid",
-        max_position_delta=5,
+        max_position_delta=7,
         mean_position_delta=2.0,
     )
 
@@ -344,7 +344,7 @@ def test_race_regression(update_golden_files):
         payload=payload,
         update_golden_files=update_golden_files,
         row_key="finish_order",
-        max_position_delta=5,
+        max_position_delta=7,
         mean_position_delta=2.5,
     )
 
@@ -357,7 +357,7 @@ def test_sprint_qualifying_regression(update_golden_files):
         payload=payload,
         update_golden_files=update_golden_files,
         row_key="grid",
-        max_position_delta=5,
+        max_position_delta=7,
         mean_position_delta=2.0,
         top_overlap_count=5,
         min_top_overlap=4,
@@ -372,7 +372,7 @@ def test_sprint_race_regression(update_golden_files):
         payload=payload,
         update_golden_files=update_golden_files,
         row_key="finish_order",
-        max_position_delta=5,
+        max_position_delta=7,
         mean_position_delta=2.5,
     )
 

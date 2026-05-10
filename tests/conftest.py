@@ -79,6 +79,16 @@ def default_file_only_storage(monkeypatch):
     monkeypatch.setenv("USE_DB_STORAGE", "file_only")
 
 
+@pytest.fixture(autouse=True)
+def reset_fp_blending_circuit_breaker():
+    """Prevent FastF1 circuit-breaker state from leaking between tests."""
+    from src.utils.fp_blending import _circuit_breaker
+
+    _circuit_breaker.reset()
+    yield
+    _circuit_breaker.reset()
+
+
 @pytest.fixture(scope="session")
 def repo_driver_characteristics_2026_baseline() -> bytes | None:
     """Cache the tracked 2026 driver characteristics bytes for test isolation.
