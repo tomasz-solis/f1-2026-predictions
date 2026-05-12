@@ -165,6 +165,32 @@ def test_cross_environment_regression_allows_bounded_winner_drift():
     )
 
 
+def test_cross_environment_regression_accepts_wider_front_group_window():
+    """Cross-environment checks can guard a stable group when podium order drifts."""
+    golden_payload = {
+        "seed": 42,
+        "grid": [{"driver": f"D{position:02}", "position": position} for position in range(1, 23)],
+    }
+    payload_order = [4, 2, 6, 5, 1, 7, 3, 8, *range(9, 23)]
+    payload = {
+        "seed": 42,
+        "grid": [
+            {"driver": f"D{driver_position:02}", "position": position}
+            for position, driver_position in enumerate(payload_order, start=1)
+        ],
+    }
+
+    _assert_cross_environment_regression(
+        payload=payload,
+        golden_payload=golden_payload,
+        row_key="grid",
+        max_position_delta=7,
+        mean_position_delta=2.0,
+        top_overlap_count=8,
+        min_top_overlap=7,
+    )
+
+
 def _qualifying_payload() -> dict[str, Any]:
     """Build the fixed-seed qualifying payload used for regression checks."""
     predictor = _build_test_predictor()
@@ -344,7 +370,7 @@ def _assert_matches_or_update(
 
 
 def test_qualifying_regression(update_golden_files):
-    """Fixed-seed Australia qualifying output should stay stable."""
+    """Fixed-seed Australia qualifying output should keep the front group stable."""
     payload = _qualifying_payload()
     _assert_matches_or_update(
         golden_path=GOLDEN_DIR / "golden_qualifying_australia.json",
@@ -353,6 +379,8 @@ def test_qualifying_regression(update_golden_files):
         row_key="grid",
         max_position_delta=7,
         mean_position_delta=2.0,
+        top_overlap_count=8,
+        min_top_overlap=7,
     )
 
 
