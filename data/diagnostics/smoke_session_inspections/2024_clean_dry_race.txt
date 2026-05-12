@@ -1,0 +1,5 @@
+=== 2024 Bahrain Grand Prix (race) ===
+weather: samples=157, rain_true=0, rain_false=157, mixed=False
+lap counts: drivers=20, max_lap=57, partial_distance=10
+retirements: 0 driver(s)
+track status rows: SC_rows=0, VSC_rows=0, red_rows=0, yellow_rows=3

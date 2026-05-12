@@ -1,0 +1,184 @@
+{
+  "year": 2024,
+  "event_name": "Australian Grand Prix",
+  "session_kind": "race",
+  "weather": {
+    "n_samples": 144,
+    "n_rainfall_true": 0,
+    "n_rainfall_false": 144,
+    "rainfall_fraction": 0.0,
+    "has_dry_samples": true,
+    "has_rain_samples": false,
+    "is_mixed": false
+  },
+  "lap_counts": {
+    "by_driver": {
+      "ALB": 57,
+      "ALO": 58,
+      "BOT": 57,
+      "GAS": 57,
+      "HAM": 16,
+      "HUL": 58,
+      "LEC": 58,
+      "MAG": 57,
+      "NOR": 58,
+      "OCO": 57,
+      "PER": 58,
+      "PIA": 58,
+      "RIC": 57,
+      "RUS": 57,
+      "SAI": 58,
+      "STR": 58,
+      "TSU": 58,
+      "VER": 4,
+      "ZHO": 57
+    },
+    "by_team": {
+      "Ferrari": [
+        "SAI",
+        "LEC"
+      ],
+      "McLaren": [
+        "NOR",
+        "PIA"
+      ],
+      "Red Bull Racing": [
+        "PER",
+        "VER"
+      ],
+      "Aston Martin": [
+        "STR",
+        "ALO"
+      ],
+      "RB": [
+        "TSU",
+        "RIC"
+      ],
+      "Haas F1 Team": [
+        "HUL",
+        "MAG"
+      ],
+      "Williams": [
+        "ALB"
+      ],
+      "Alpine": [
+        "GAS",
+        "OCO"
+      ],
+      "Kick Sauber": [
+        "BOT",
+        "ZHO"
+      ],
+      "Mercedes": [
+        "RUS",
+        "HAM"
+      ]
+    },
+    "full_distance_drivers": [
+      "ALO",
+      "HUL",
+      "LEC",
+      "NOR",
+      "PER",
+      "PIA",
+      "SAI",
+      "STR",
+      "TSU"
+    ],
+    "partial_distance_drivers": [
+      "ALB",
+      "BOT",
+      "GAS",
+      "HAM",
+      "MAG",
+      "OCO",
+      "RIC",
+      "RUS",
+      "VER",
+      "ZHO"
+    ],
+    "max_observed_lap": 58
+  },
+  "retirements": {
+    "retired_drivers": {
+      "RUS": {
+        "driver_code": "RUS",
+        "team": "Mercedes",
+        "retirement_lap": 57,
+        "last_observed_lap": 57,
+        "classified_status": "Retired",
+        "is_early": false
+      },
+      "HAM": {
+        "driver_code": "HAM",
+        "team": "Mercedes",
+        "retirement_lap": 16,
+        "last_observed_lap": 16,
+        "classified_status": "Retired",
+        "is_early": false
+      },
+      "VER": {
+        "driver_code": "VER",
+        "team": "Red Bull Racing",
+        "retirement_lap": 4,
+        "last_observed_lap": 4,
+        "classified_status": "Retired",
+        "is_early": true
+      }
+    }
+  },
+  "track_status": {
+    "events": [
+      {
+        "status_code": "1",
+        "status_label": "green",
+        "start_time": "P0DT0H0M0S"
+      },
+      {
+        "status_code": "2",
+        "status_label": "yellow",
+        "start_time": "P0DT0H0M13.56S"
+      },
+      {
+        "status_code": "1",
+        "status_label": "green",
+        "start_time": "P0DT0H5M52.01S"
+      },
+      {
+        "status_code": "2",
+        "status_label": "yellow",
+        "start_time": "P0DT1H21M24.717S"
+      },
+      {
+        "status_code": "6",
+        "status_label": "vsc_deployed",
+        "start_time": "P0DT1H21M41.517S"
+      },
+      {
+        "status_code": "7",
+        "status_label": "vsc_ending",
+        "start_time": "P0DT1H22M45.787S"
+      },
+      {
+        "status_code": "1",
+        "status_label": "green",
+        "start_time": "P0DT1H23M0.69S"
+      },
+      {
+        "status_code": "2",
+        "status_label": "yellow",
+        "start_time": "P0DT2H17M8.699S"
+      },
+      {
+        "status_code": "6",
+        "status_label": "vsc_deployed",
+        "start_time": "P0DT2H17M19.578S"
+      }
+    ],
+    "n_safety_car_rows": 0,
+    "n_virtual_safety_car_rows": 3,
+    "n_red_flag_rows": 0,
+    "n_yellow_rows": 3
+  },
+  "qualifying": null
+}

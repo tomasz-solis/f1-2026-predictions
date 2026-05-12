@@ -1,0 +1,7 @@
+=== 2024 British Grand Prix (race) ===
+weather: samples=147, rain_true=51, rain_false=96, mixed=True
+lap counts: drivers=20, max_lap=52, partial_distance=8
+retirements: 2 driver(s)
+  RUS (Mercedes): last_lap=33, early=False, status=Retired
+  GAS (Alpine): last_lap=1, early=True, status=Did not start
+track status rows: SC_rows=0, VSC_rows=0, red_rows=0, yellow_rows=0

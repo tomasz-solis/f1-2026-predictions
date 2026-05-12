@@ -1,0 +1,161 @@
+{
+  "year": 2024,
+  "event_name": "Miami Grand Prix",
+  "session_kind": "race",
+  "weather": {
+    "n_samples": 150,
+    "n_rainfall_true": 0,
+    "n_rainfall_false": 150,
+    "rainfall_fraction": 0.0,
+    "has_dry_samples": true,
+    "has_rain_samples": false,
+    "is_mixed": false
+  },
+  "lap_counts": {
+    "by_driver": {
+      "ALB": 57,
+      "ALO": 57,
+      "BOT": 57,
+      "GAS": 57,
+      "HAM": 57,
+      "HUL": 57,
+      "LEC": 57,
+      "MAG": 57,
+      "NOR": 57,
+      "OCO": 57,
+      "PER": 57,
+      "PIA": 57,
+      "RIC": 57,
+      "RUS": 57,
+      "SAI": 57,
+      "SAR": 28,
+      "STR": 57,
+      "TSU": 57,
+      "VER": 57,
+      "ZHO": 57
+    },
+    "by_team": {
+      "McLaren": [
+        "NOR",
+        "PIA"
+      ],
+      "Red Bull Racing": [
+        "VER",
+        "PER"
+      ],
+      "Ferrari": [
+        "LEC",
+        "SAI"
+      ],
+      "Mercedes": [
+        "HAM",
+        "RUS"
+      ],
+      "RB": [
+        "TSU",
+        "RIC"
+      ],
+      "Aston Martin": [
+        "ALO",
+        "STR"
+      ],
+      "Alpine": [
+        "OCO",
+        "GAS"
+      ],
+      "Haas F1 Team": [
+        "HUL",
+        "MAG"
+      ],
+      "Kick Sauber": [
+        "ZHO",
+        "BOT"
+      ],
+      "Williams": [
+        "ALB",
+        "SAR"
+      ]
+    },
+    "full_distance_drivers": [
+      "ALB",
+      "ALO",
+      "BOT",
+      "GAS",
+      "HAM",
+      "HUL",
+      "LEC",
+      "MAG",
+      "NOR",
+      "OCO",
+      "PER",
+      "PIA",
+      "RIC",
+      "RUS",
+      "SAI",
+      "STR",
+      "TSU",
+      "VER",
+      "ZHO"
+    ],
+    "partial_distance_drivers": [
+      "SAR"
+    ],
+    "max_observed_lap": 57
+  },
+  "retirements": {
+    "retired_drivers": {
+      "SAR": {
+        "driver_code": "SAR",
+        "team": "Williams",
+        "retirement_lap": 28,
+        "last_observed_lap": 28,
+        "classified_status": "Retired",
+        "is_early": false
+      }
+    }
+  },
+  "track_status": {
+    "events": [
+      {
+        "status_code": "1",
+        "status_label": "green",
+        "start_time": "P0DT0H0M0S"
+      },
+      {
+        "status_code": "6",
+        "status_label": "vsc_deployed",
+        "start_time": "P0DT1H30M16.624S"
+      },
+      {
+        "status_code": "7",
+        "status_label": "vsc_ending",
+        "start_time": "P0DT1H30M57.133S"
+      },
+      {
+        "status_code": "1",
+        "status_label": "green",
+        "start_time": "P0DT1H31M8.221S"
+      },
+      {
+        "status_code": "2",
+        "status_label": "yellow",
+        "start_time": "P0DT1H38M59.677S"
+      },
+      {
+        "status_code": "4",
+        "status_label": "sc",
+        "start_time": "P0DT1H39M25.207S"
+      },
+      {
+        "status_code": "1",
+        "status_label": "green",
+        "start_time": "P0DT1H48M20.615S"
+      }
+    ],
+    "n_safety_car_rows": 1,
+    "n_virtual_safety_car_rows": 2,
+    "n_red_flag_rows": 0,
+    "n_yellow_rows": 1
+  },
+  "qualifying": null
+}

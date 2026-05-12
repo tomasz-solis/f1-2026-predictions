@@ -151,6 +151,14 @@ def test_retirements_lap_status_excluded() -> None:
     assert out.retired_drivers == {}
 
 
+def test_retirements_blank_status_excluded() -> None:
+    """Blank qualifying-style Status values are not treated as retirements."""
+    laps = pd.DataFrame({"Driver": ["VER"], "LapNumber": [17]})
+    results = _make_results([("VER", "Red Bull", "")])
+    out = summarize_retirements(results, laps)
+    assert out.retired_drivers == {}
+
+
 def test_retirements_early_dnf_flagged() -> None:
     """A retirement at or before the early threshold is flagged is_early=True."""
     laps = pd.DataFrame({"Driver": ["ALO"], "LapNumber": [3]})
@@ -160,6 +168,7 @@ def test_retirements_early_dnf_flagged() -> None:
     rec = out.retired_drivers["ALO"]
     assert rec.is_early is True
     assert rec.retirement_lap == 3
+    assert rec.last_observed_lap == 3
     assert rec.classified_status == "Engine"
 
 
@@ -181,14 +190,15 @@ def test_retirements_threshold_is_inclusive() -> None:
 
 
 def test_retirements_no_lap_data_keeps_record_with_none_lap() -> None:
-    """A retired driver with no laps still appears with last_lap=None."""
+    """A retired driver with no laps is an early no-comparison case."""
     laps = pd.DataFrame({"Driver": [], "LapNumber": []}).astype({"Driver": str, "LapNumber": int})
     results = _make_results([("BOT", "Stake", "Accident")])
     out = summarize_retirements(results, laps)
     assert "BOT" in out.retired_drivers
     rec = out.retired_drivers["BOT"]
     assert rec.retirement_lap is None
-    assert rec.is_early is False
+    assert rec.last_observed_lap is None
+    assert rec.is_early is True
 
 
 # ---------------------------------------------------------------------------
@@ -197,7 +207,7 @@ def test_retirements_no_lap_data_keeps_record_with_none_lap() -> None:
 
 
 def test_track_status_counts_safety_car_and_vsc() -> None:
-    """Status codes 4 and 6/7 are counted as SC and VSC respectively."""
+    """Status codes 4 and 6/7 are counted as SC and VSC rows."""
     track = pd.DataFrame(
         {
             "Status": ["1", "4", "1", "6", "7", "1"],
@@ -207,9 +217,9 @@ def test_track_status_counts_safety_car_and_vsc() -> None:
         }
     )
     out = summarize_track_status(track)
-    assert out.n_safety_car == 1
-    assert out.n_virtual_safety_car == 2
-    assert out.n_red_flag == 0
+    assert out.n_safety_car_rows == 1
+    assert out.n_virtual_safety_car_rows == 2
+    assert out.n_red_flag_rows == 0
     assert len(out.events) == 6
 
 
@@ -256,7 +266,7 @@ def test_track_status_empty_dataframe() -> None:
     track = pd.DataFrame({"Status": [], "Time": pd.to_timedelta([])})
     out = summarize_track_status(track)
     assert out.events == []
-    assert out.n_safety_car == 0
+    assert out.n_safety_car_rows == 0
 
 
 # ---------------------------------------------------------------------------

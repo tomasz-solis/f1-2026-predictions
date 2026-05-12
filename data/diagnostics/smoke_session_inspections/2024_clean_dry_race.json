@@ -1,0 +1,152 @@
+{
+  "year": 2024,
+  "event_name": "Bahrain Grand Prix",
+  "session_kind": "race",
+  "weather": {
+    "n_samples": 157,
+    "n_rainfall_true": 0,
+    "n_rainfall_false": 157,
+    "rainfall_fraction": 0.0,
+    "has_dry_samples": true,
+    "has_rain_samples": false,
+    "is_mixed": false
+  },
+  "lap_counts": {
+    "by_driver": {
+      "ALB": 56,
+      "ALO": 57,
+      "BOT": 56,
+      "GAS": 56,
+      "HAM": 57,
+      "HUL": 56,
+      "LEC": 57,
+      "MAG": 56,
+      "NOR": 57,
+      "OCO": 56,
+      "PER": 57,
+      "PIA": 57,
+      "RIC": 56,
+      "RUS": 57,
+      "SAI": 57,
+      "SAR": 55,
+      "STR": 57,
+      "TSU": 56,
+      "VER": 57,
+      "ZHO": 56
+    },
+    "by_team": {
+      "Red Bull Racing": [
+        "VER",
+        "PER"
+      ],
+      "Ferrari": [
+        "SAI",
+        "LEC"
+      ],
+      "Mercedes": [
+        "RUS",
+        "HAM"
+      ],
+      "McLaren": [
+        "NOR",
+        "PIA"
+      ],
+      "Aston Martin": [
+        "ALO",
+        "STR"
+      ],
+      "Kick Sauber": [
+        "ZHO",
+        "BOT"
+      ],
+      "Haas F1 Team": [
+        "MAG",
+        "HUL"
+      ],
+      "RB": [
+        "RIC",
+        "TSU"
+      ],
+      "Williams": [
+        "ALB",
+        "SAR"
+      ],
+      "Alpine": [
+        "OCO",
+        "GAS"
+      ]
+    },
+    "full_distance_drivers": [
+      "ALO",
+      "HAM",
+      "LEC",
+      "NOR",
+      "PER",
+      "PIA",
+      "RUS",
+      "SAI",
+      "STR",
+      "VER"
+    ],
+    "partial_distance_drivers": [
+      "ALB",
+      "BOT",
+      "GAS",
+      "HUL",
+      "MAG",
+      "OCO",
+      "RIC",
+      "SAR",
+      "TSU",
+      "ZHO"
+    ],
+    "max_observed_lap": 57
+  },
+  "retirements": {
+    "retired_drivers": {}
+  },
+  "track_status": {
+    "events": [
+      {
+        "status_code": "1",
+        "status_label": "green",
+        "start_time": "P0DT0H10M6.01S"
+      },
+      {
+        "status_code": "2",
+        "status_label": "yellow",
+        "start_time": "P0DT1H0M16.4S"
+      },
+      {
+        "status_code": "1",
+        "status_label": "green",
+        "start_time": "P0DT1H0M20.89S"
+      },
+      {
+        "status_code": "2",
+        "status_label": "yellow",
+        "start_time": "P0DT1H0M46.461S"
+      },
+      {
+        "status_code": "1",
+        "status_label": "green",
+        "start_time": "P0DT1H0M53.481S"
+      },
+      {
+        "status_code": "2",
+        "status_label": "yellow",
+        "start_time": "P0DT1H15M24.819S"
+      },
+      {
+        "status_code": "1",
+        "status_label": "green",
+        "start_time": "P0DT1H16M15.962S"
+      }
+    ],
+    "n_safety_car_rows": 0,
+    "n_virtual_safety_car_rows": 0,
+    "n_red_flag_rows": 0,
+    "n_yellow_rows": 3
+  },
+  "qualifying": null
+}

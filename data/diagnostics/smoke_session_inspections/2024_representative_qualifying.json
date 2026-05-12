@@ -1,0 +1,278 @@
+{
+  "year": 2024,
+  "event_name": "Bahrain Grand Prix",
+  "session_kind": "qualifying",
+  "weather": {
+    "n_samples": 77,
+    "n_rainfall_true": 0,
+    "n_rainfall_false": 77,
+    "rainfall_fraction": 0.0,
+    "has_dry_samples": true,
+    "has_rain_samples": false,
+    "is_mixed": false
+  },
+  "lap_counts": {
+    "by_driver": {
+      "ALB": 12,
+      "ALO": 14,
+      "BOT": 6,
+      "GAS": 9,
+      "HAM": 18,
+      "HUL": 18,
+      "LEC": 19,
+      "MAG": 12,
+      "NOR": 15,
+      "OCO": 9,
+      "PER": 17,
+      "PIA": 18,
+      "RIC": 12,
+      "RUS": 17,
+      "SAI": 18,
+      "SAR": 6,
+      "STR": 12,
+      "TSU": 12,
+      "VER": 17,
+      "ZHO": 6
+    },
+    "by_team": {
+      "Red Bull Racing": [
+        "VER",
+        "PER"
+      ],
+      "Ferrari": [
+        "LEC",
+        "SAI"
+      ],
+      "Mercedes": [
+        "RUS",
+        "HAM"
+      ],
+      "Aston Martin": [
+        "ALO",
+        "STR"
+      ],
+      "McLaren": [
+        "NOR",
+        "PIA"
+      ],
+      "Haas F1 Team": [
+        "HUL",
+        "MAG"
+      ],
+      "RB": [
+        "TSU",
+        "RIC"
+      ],
+      "Williams": [
+        "ALB",
+        "SAR"
+      ],
+      "Kick Sauber": [
+        "BOT",
+        "ZHO"
+      ],
+      "Alpine": [
+        "OCO",
+        "GAS"
+      ]
+    },
+    "full_distance_drivers": [
+      "LEC"
+    ],
+    "partial_distance_drivers": [
+      "ALB",
+      "ALO",
+      "BOT",
+      "GAS",
+      "HAM",
+      "HUL",
+      "MAG",
+      "NOR",
+      "OCO",
+      "PER",
+      "PIA",
+      "RIC",
+      "RUS",
+      "SAI",
+      "SAR",
+      "STR",
+      "TSU",
+      "VER",
+      "ZHO"
+    ],
+    "max_observed_lap": 19
+  },
+  "retirements": {
+    "retired_drivers": {}
+  },
+  "track_status": {
+    "events": [
+      {
+        "status_code": "1",
+        "status_label": "green",
+        "start_time": "P0DT0H6M7.029S"
+      }
+    ],
+    "n_safety_car_rows": 0,
+    "n_virtual_safety_car_rows": 0,
+    "n_red_flag_rows": 0,
+    "n_yellow_rows": 0
+  },
+  "qualifying": {
+    "by_driver": {
+      "VER": {
+        "driver_code": "VER",
+        "team": "Red Bull Racing",
+        "reached_q1": true,
+        "reached_q2": true,
+        "reached_q3": true
+      },
+      "LEC": {
+        "driver_code": "LEC",
+        "team": "Ferrari",
+        "reached_q1": true,
+        "reached_q2": true,
+        "reached_q3": true
+      },
+      "RUS": {
+        "driver_code": "RUS",
+        "team": "Mercedes",
+        "reached_q1": true,
+        "reached_q2": true,
+        "reached_q3": true
+      },
+      "SAI": {
+        "driver_code": "SAI",
+        "team": "Ferrari",
+        "reached_q1": true,
+        "reached_q2": true,
+        "reached_q3": true
+      },
+      "PER": {
+        "driver_code": "PER",
+        "team": "Red Bull Racing",
+        "reached_q1": true,
+        "reached_q2": true,
+        "reached_q3": true
+      },
+      "ALO": {
+        "driver_code": "ALO",
+        "team": "Aston Martin",
+        "reached_q1": true,
+        "reached_q2": true,
+        "reached_q3": true
+      },
+      "NOR": {
+        "driver_code": "NOR",
+        "team": "McLaren",
+        "reached_q1": true,
+        "reached_q2": true,
+        "reached_q3": true
+      },
+      "PIA": {
+        "driver_code": "PIA",
+        "team": "McLaren",
+        "reached_q1": true,
+        "reached_q2": true,
+        "reached_q3": true
+      },
+      "HAM": {
+        "driver_code": "HAM",
+        "team": "Mercedes",
+        "reached_q1": true,
+        "reached_q2": true,
+        "reached_q3": true
+      },
+      "HUL": {
+        "driver_code": "HUL",
+        "team": "Haas F1 Team",
+        "reached_q1": true,
+        "reached_q2": true,
+        "reached_q3": true
+      },
+      "TSU": {
+        "driver_code": "TSU",
+        "team": "RB",
+        "reached_q1": true,
+        "reached_q2": true,
+        "reached_q3": false
+      },
+      "STR": {
+        "driver_code": "STR",
+        "team": "Aston Martin",
+        "reached_q1": true,
+        "reached_q2": true,
+        "reached_q3": false
+      },
+      "ALB": {
+        "driver_code": "ALB",
+        "team": "Williams",
+        "reached_q1": true,
+        "reached_q2": true,
+        "reached_q3": false
+      },
+      "RIC": {
+        "driver_code": "RIC",
+        "team": "RB",
+        "reached_q1": true,
+        "reached_q2": true,
+        "reached_q3": false
+      },
+      "MAG": {
+        "driver_code": "MAG",
+        "team": "Haas F1 Team",
+        "reached_q1": true,
+        "reached_q2": true,
+        "reached_q3": false
+      },
+      "BOT": {
+        "driver_code": "BOT",
+        "team": "Kick Sauber",
+        "reached_q1": true,
+        "reached_q2": false,
+        "reached_q3": false
+      },
+      "ZHO": {
+        "driver_code": "ZHO",
+        "team": "Kick Sauber",
+        "reached_q1": true,
+        "reached_q2": false,
+        "reached_q3": false
+      },
+      "SAR": {
+        "driver_code": "SAR",
+        "team": "Williams",
+        "reached_q1": true,
+        "reached_q2": false,
+        "reached_q3": false
+      },
+      "OCO": {
+        "driver_code": "OCO",
+        "team": "Alpine",
+        "reached_q1": true,
+        "reached_q2": false,
+        "reached_q3": false
+      },
+      "GAS": {
+        "driver_code": "GAS",
+        "team": "Alpine",
+        "reached_q1": true,
+        "reached_q2": false,
+        "reached_q3": false
+      }
+    },
+    "teams_with_q3": [
+      "Aston Martin",
+      "Ferrari",
+      "Haas F1 Team",
+      "McLaren",
+      "Mercedes",
+      "Red Bull Racing"
+    ],
+    "teams_with_q1_eliminated": [
+      "Alpine",
+      "Kick Sauber"
+    ],
+    "teams_with_split_segments": []
+  }
+}

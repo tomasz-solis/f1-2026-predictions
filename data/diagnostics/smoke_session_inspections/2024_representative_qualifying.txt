@@ -1,0 +1,6 @@
+=== 2024 Bahrain Grand Prix (qualifying) ===
+weather: samples=77, rain_true=0, rain_false=77, mixed=False
+lap counts: drivers=20, max_lap=19, partial_distance=19
+retirements: 0 driver(s)
+track status rows: SC_rows=0, VSC_rows=0, red_rows=0, yellow_rows=0
+qualifying: teams_q3=6, teams_q1_only=2, teams_split=0

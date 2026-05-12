@@ -63,7 +63,7 @@ class RetirementRecord:
     driver_code: str
     team: str
     retirement_lap: int | None
-    last_completed_lap: int | None
+    last_observed_lap: int | None
     classified_status: str
     is_early: bool
 
@@ -89,10 +89,10 @@ class TrackStatusSummary:
     """Summary of track-status events for one session."""
 
     events: list[TrackStatusEvent]
-    n_safety_car: int
-    n_virtual_safety_car: int
-    n_red_flag: int
-    n_yellow: int
+    n_safety_car_rows: int
+    n_virtual_safety_car_rows: int
+    n_red_flag_rows: int
+    n_yellow_rows: int
 
 
 @dataclass
@@ -244,12 +244,12 @@ def summarize_retirements(
     *,
     early_threshold_lap: int = 10,
 ) -> RetirementSummary:
-    """Drivers who did not finish, with last-completed-lap evidence.
+    """Drivers who did not finish, with last-observed-lap evidence.
 
     A driver is treated as retired when the FastF1 result ``Status`` is
-    not ``"Finished"`` and does not contain ``"Lap"`` (matching the
-    project's existing DNF convention; classified lapped finishers are
-    not retirements).
+    populated, is not ``"Finished"``, and does not contain ``"Lap"``
+    (matching the project's existing DNF convention; classified lapped
+    finishers are not retirements). Blank qualifying statuses are ignored.
 
     Parameters
     ----------
@@ -260,7 +260,7 @@ def summarize_retirements(
         Mirrors ``session.laps``. Required columns: ``Driver``,
         ``LapNumber``.
     early_threshold_lap:
-        Drivers whose last completed lap is at or below this number are
+        Drivers whose last observed lap is at or below this number are
         flagged ``is_early``. Default 10 matches the smoke-session
         early-DNF category.
 
@@ -281,19 +281,24 @@ def summarize_retirements(
 
     retirements: dict[str, RetirementRecord] = {}
     for _, row in results_df.iterrows():
-        status = str(row["Status"])
+        raw_status = row["Status"]
+        if pd.isna(raw_status):
+            continue
+        status = str(raw_status).strip()
+        if not status:
+            continue
         if status == "Finished" or "Lap" in status:
             continue
 
         driver = str(row["Abbreviation"])
         last_lap = last_lap_by_driver.get(driver)
-        is_early = last_lap is not None and last_lap <= early_threshold_lap
+        is_early = last_lap is None or last_lap <= early_threshold_lap
 
         retirements[driver] = RetirementRecord(
             driver_code=driver,
             team=str(row["TeamName"]),
             retirement_lap=last_lap,
-            last_completed_lap=last_lap,
+            last_observed_lap=last_lap,
             classified_status=status,
             is_early=bool(is_early),
         )
@@ -351,10 +356,10 @@ def summarize_track_status(track_status_df: pd.DataFrame) -> TrackStatusSummary:
 
     return TrackStatusSummary(
         events=events,
-        n_safety_car=n_sc,
-        n_virtual_safety_car=n_vsc,
-        n_red_flag=n_red,
-        n_yellow=n_yellow,
+        n_safety_car_rows=n_sc,
+        n_virtual_safety_car_rows=n_vsc,
+        n_red_flag_rows=n_red,
+        n_yellow_rows=n_yellow,
     )
 
 

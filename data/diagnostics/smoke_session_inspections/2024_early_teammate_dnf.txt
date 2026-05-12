@@ -1,0 +1,8 @@
+=== 2024 Australian Grand Prix (race) ===
+weather: samples=144, rain_true=0, rain_false=144, mixed=False
+lap counts: drivers=19, max_lap=58, partial_distance=10
+retirements: 3 driver(s)
+  RUS (Mercedes): last_lap=57, early=False, status=Retired
+  HAM (Mercedes): last_lap=16, early=False, status=Retired
+  VER (Red Bull Racing): last_lap=4, early=True, status=Retired
+track status rows: SC_rows=0, VSC_rows=3, red_rows=0, yellow_rows=3

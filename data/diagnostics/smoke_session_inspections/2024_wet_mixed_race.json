@@ -1,0 +1,139 @@
+{
+  "year": 2024,
+  "event_name": "British Grand Prix",
+  "session_kind": "race",
+  "weather": {
+    "n_samples": 147,
+    "n_rainfall_true": 51,
+    "n_rainfall_false": 96,
+    "rainfall_fraction": 0.3469387755102041,
+    "has_dry_samples": true,
+    "has_rain_samples": true,
+    "is_mixed": true
+  },
+  "lap_counts": {
+    "by_driver": {
+      "ALB": 52,
+      "ALO": 52,
+      "BOT": 51,
+      "GAS": 1,
+      "HAM": 52,
+      "HUL": 52,
+      "LEC": 51,
+      "MAG": 52,
+      "NOR": 52,
+      "OCO": 50,
+      "PER": 50,
+      "PIA": 52,
+      "RIC": 51,
+      "RUS": 33,
+      "SAI": 52,
+      "SAR": 52,
+      "STR": 52,
+      "TSU": 52,
+      "VER": 52,
+      "ZHO": 50
+    },
+    "by_team": {
+      "Mercedes": [
+        "HAM",
+        "RUS"
+      ],
+      "Red Bull Racing": [
+        "VER",
+        "PER"
+      ],
+      "McLaren": [
+        "NOR",
+        "PIA"
+      ],
+      "Ferrari": [
+        "SAI",
+        "LEC"
+      ],
+      "Haas F1 Team": [
+        "HUL",
+        "MAG"
+      ],
+      "Aston Martin": [
+        "STR",
+        "ALO"
+      ],
+      "Williams": [
+        "ALB",
+        "SAR"
+      ],
+      "RB": [
+        "TSU",
+        "RIC"
+      ],
+      "Kick Sauber": [
+        "BOT",
+        "ZHO"
+      ],
+      "Alpine": [
+        "OCO",
+        "GAS"
+      ]
+    },
+    "full_distance_drivers": [
+      "ALB",
+      "ALO",
+      "HAM",
+      "HUL",
+      "MAG",
+      "NOR",
+      "PIA",
+      "SAI",
+      "SAR",
+      "STR",
+      "TSU",
+      "VER"
+    ],
+    "partial_distance_drivers": [
+      "BOT",
+      "GAS",
+      "LEC",
+      "OCO",
+      "PER",
+      "RIC",
+      "RUS",
+      "ZHO"
+    ],
+    "max_observed_lap": 52
+  },
+  "retirements": {
+    "retired_drivers": {
+      "RUS": {
+        "driver_code": "RUS",
+        "team": "Mercedes",
+        "retirement_lap": 33,
+        "last_observed_lap": 33,
+        "classified_status": "Retired",
+        "is_early": false
+      },
+      "GAS": {
+        "driver_code": "GAS",
+        "team": "Alpine",
+        "retirement_lap": 1,
+        "last_observed_lap": 1,
+        "classified_status": "Did not start",
+        "is_early": true
+      }
+    }
+  },
+  "track_status": {
+    "events": [
+      {
+        "status_code": "1",
+        "status_label": "green",
+        "start_time": "P0DT0H6M27.196S"
+      }
+    ],
+    "n_safety_car_rows": 0,
+    "n_virtual_safety_car_rows": 0,
+    "n_red_flag_rows": 0,
+    "n_yellow_rows": 0
+  },
+  "qualifying": null
+}

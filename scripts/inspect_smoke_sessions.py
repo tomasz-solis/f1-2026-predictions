@@ -28,15 +28,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
-from src.diagnostics.smoke_inspector.inspector import (
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.diagnostics.smoke_inspector.inspector import (  # noqa: E402
     SessionInspection,
     inspect_session,
 )
-from src.diagnostics.smoke_inspector.loader import load_session
+from src.diagnostics.smoke_inspector.loader import load_session  # noqa: E402
 
 SMOKE_SESSIONS: list[dict[str, Any]] = [
     {
@@ -111,10 +116,10 @@ def format_text_summary(inspection: SessionInspection) -> str:
             f"early={rec.is_early}, status={rec.classified_status}"
         )
     lines.append(
-        f"track status rows: SC_rows={inspection.track_status.n_safety_car}, "
-        f"VSC_rows={inspection.track_status.n_virtual_safety_car}, "
-        f"red_rows={inspection.track_status.n_red_flag}, "
-        f"yellow_rows={inspection.track_status.n_yellow}"
+        f"track status rows: SC_rows={inspection.track_status.n_safety_car_rows}, "
+        f"VSC_rows={inspection.track_status.n_virtual_safety_car_rows}, "
+        f"red_rows={inspection.track_status.n_red_flag_rows}, "
+        f"yellow_rows={inspection.track_status.n_yellow_rows}"
     )
     if inspection.qualifying is not None:
         lines.append(

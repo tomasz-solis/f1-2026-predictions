@@ -1,0 +1,6 @@
+=== 2024 Miami Grand Prix (race) ===
+weather: samples=150, rain_true=0, rain_false=150, mixed=False
+lap counts: drivers=20, max_lap=57, partial_distance=1
+retirements: 1 driver(s)
+  SAR (Williams): last_lap=28, early=False, status=Retired
+track status rows: SC_rows=1, VSC_rows=2, red_rows=0, yellow_rows=1
