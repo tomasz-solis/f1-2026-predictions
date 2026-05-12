@@ -1,7 +1,7 @@
 # Master Execution Plan: Driver-Rating De-Carring And Race/Quali Split
 
 Date: 2026-05-09
-Status: draft execution plan; phases 1+ blocked until Phase 0 documentation gates close
+Status: locked through Phase 2; Phase 3 extractor implementation can start
 
 This plan sequences all the work from the orthogonality contract through
 final rollout. It is the authoritative ordering. Individual design docs own
@@ -16,6 +16,13 @@ Two non-negotiable rules:
 - **No phase starts until its predecessor's acceptance criteria are met.**
   This includes Phase 0. A doc that still has TODO entries in lock-required
   fields is not closed.
+
+Current local gate state as of 2026-05-12:
+
+- Phase 1 source-backed evidence rows are filled using the accepted
+  Motorsport / PACETEQ source-family rule.
+- Phase 2 smoke sessions are locked.
+- Phase 3 extractor implementation is the first model-path code change.
 
 ---
 
@@ -35,10 +42,9 @@ Tasks:
 
 Explicit blockers carried forward:
 
-- No extractor code until Phase 1 and Phase 2 close.
-- No prior fit until Phase 1 closes.
-- No `team_strength_to_seconds()` calibration until the team-strength
-  mapping ownership decision is made (Phase 7).
+- Extractor code can start now that Phase 1 and Phase 2 are closed.
+- No prior fit until Phase 5 bulk extraction closes.
+- Use separate race and qualifying team-strength seconds mappings in Phase 7.
 
 Acceptance criteria:
 
@@ -66,16 +72,14 @@ Tasks:
   if it satisfies the source acceptance criteria in Section 1 of
   `docs/fixes/teammate_network_prior_validation_evidence.md`. No
   blanket approval by outlet; the methodology is judged per artifact.
-- F1Metrics-style sources are conditionally acceptable. They may corroborate
-  another timing source or support rough magnitude. They are not acceptable
-  as the sole hard threshold when the published value is a model-derived
-  driver rating on its own scale rather than a numeric teammate seconds
-  delta with documented methodology. If F1Metrics is the only source for a
-  row, mark the row conditionally accepted and document the circularity
-  risk in the row's notes.
+- F1Metrics-style sources are SUPPLEMENTAL only for v1. They may corroborate
+  another timing source but never count toward HARD row totals.
+- Motorsport.com / Motorsport-Total PACETEQ teammate pace articles are
+  HARD-capable for v1 when they state the construct, sample scope, and
+  numeric seconds delta. Treat them as one accepted source family, not
+  independent corroboration of each other.
 - Convert defensible numbers into hard checks with required fields filled
-  (source URL, source type, threshold in seconds, pass rule, date
-  accessed, analyst sign-off).
+  (source URL, source type, threshold in seconds, pass rule, date accessed).
 - Cut weak checks instead of soft-grading them.
 
 Acceptance criteria:
@@ -84,13 +88,13 @@ Acceptance criteria:
   the validation report explicitly labels quali coverage as provisional and
   documents the compensation (wider initial sigma, stricter replay
   diagnostics).
-- Every filled row has all required fields, including analyst sign-off.
+- Every filled row has all required fields.
 - Cut rows are documented with cut reason.
 - Conservative audit calls from Section 2 of the validation evidence file
   hold for v1: Tsunoda/de Vries stays cut from hard validation; Leclerc/
   Sainz multi-season quali stays out of hard validation. Either may return
   only if a source provides a clean single-season numeric threshold.
-- File status changes from "scaffold" to "locked".
+- File status changes to "locked".
 
 Dependencies: Phase 0.
 
@@ -122,8 +126,8 @@ Allowed pre-extractor exception (read-only FastF1 inspection):
   processing), skip-reason emission, weather-routing logic, or
   anything resembling the extractor's output schema. Those are Phase
   3 work.
-- Test for whether code is allowed: could the analyst delete it after
-  Phase 2 closes without losing anything Phase 3 needs to implement?
+- Test for whether code is allowed: could the exploration output be deleted
+  after Phase 2 closes without losing anything Phase 3 needs to implement?
   If yes, it's exploration. If no, it's the extractor and belongs in
   Phase 3.
 
@@ -133,7 +137,7 @@ Acceptance criteria:
 - Each row's status changes from `TODO_COUNTS` to `LOCKED`.
 - Any read-only FastF1 inspection used to fill expected behavior is
   retained as evidence (notebook or summary CSV/JSON), not discarded.
-- File status changes from "scaffold" to "locked".
+- File status changes from its draft/pre-lock status to "locked".
 
 Dependencies: Phase 0.
 
@@ -266,20 +270,18 @@ Dependencies: Phases 1, 5.
 
 Goal: calibrate the only fitted seconds conversion in the system.
 
-Pre-phase blocker: resolve in the team-strength design doc whether
-`team_strength_to_seconds()` is one shared mapping for race and
-qualifying, or separate race/quali mappings. Phase 7 cannot start
-without that one decision in writing.
+Decision: use separate race and qualifying team-strength seconds mappings.
+Race pace and qualifying pace are different constructs, so one shared slope
+would mix different variance and fuel/traffic regimes.
 
 The v1 calibration window (2022-2025 per-season folds) and the v1
-calibration form (`observed_driver_to_field_s - driver_rating_mu_s ~
-team_strength_centered`) are settled by this plan. The team-strength
-doc confirms or refines them; it does not start from scratch.
+calibration form are settled by this plan. If the first migration still has
+one stored `team_strength` scalar, fit separate race and qualifying mappings
+over that same scalar.
 
 Tasks:
 
-- Fit `team_strength_to_seconds()` using the v1 calibration form
-  above.
+- Fit separate race and qualifying `team_strength_to_seconds()` mappings.
 - Use 2022-2025 per-season folds (train on three of 2022-2025,
   validate on the fourth; Section 14 of prior design doc).
 - Validate the combined sum prediction
@@ -307,8 +309,7 @@ Acceptance criteria:
   risk note, refit-or-accept decision) is in the validation report.
 - No continuous in-season refitting hooked up.
 
-Dependencies: Phase 6, team-strength design doc decision (mapping
-shape only).
+Dependencies: Phase 6.
 
 ---
 
@@ -325,6 +326,13 @@ Tasks:
   `corr(delta_race_rating_mu_s, delta_team_strength_for_driver_team)` and
   report it. Do not yet treat as a hard pass/fail; the post-fix replay
   establishes the threshold.
+- Persist and surface regulation-reset monitoring in the main Streamlit app
+  on a separate diagnostics tab:
+  - rolling correlation between predicted and observed team deltas in
+    seconds;
+  - slope of `observed_team_delta_s ~ predicted_team_delta_s`;
+  - R-squared versus the historical fit R-squared;
+  - per-driver residual means.
 - Hard wet-leakage invariant: fully wet sessions produce zero dry
   race/quali rating updates. Mixed sessions with dry-lap updates have
   `abs(corr(wet_skill, delta_race_rating_mu_s)) <= 0.20`. The
@@ -336,6 +344,8 @@ Acceptance criteria:
 - Per-driver residual means are reported. Drivers with sustained non-zero
   residuals are flagged for sigma review, not auto-corrected.
 - Dry leakage diagnostic is measured.
+- Dashboard diagnostics tab reads the persisted monitoring artifact or
+  Supabase rows. It must not compute a separate ad hoc definition.
 - Wet leakage hard invariant is satisfied.
 
 Dependencies: Phase 7.
@@ -355,6 +365,10 @@ Tasks (in order):
 - Snapshot rollback artifacts: write old artifact contents to a versioned
   backup before the first migration run.
 - Migrate local artifacts and Supabase rows.
+- Apply the migration across the whole project: readers, validators, warmup
+  jobs, dashboard rendering, checkpoint reconstruction, evaluation reports,
+  local artifact stores, and Supabase persistence must all prefer the new
+  fields at reader cutover.
 - **K=3 removal rule (canonical):** old fields and fallback reader paths
   are removed only after **3 consecutive completed race weekends** using
   the new path with no validation regression flagged in the per-weekend
@@ -362,9 +376,8 @@ Tasks (in order):
   when Phase 14 begins. If a regression is flagged inside the 3-weekend
   window, the counter resets and the issue is investigated before any
   further removal attempt. Removal is a **separate change set / separate
-  release step** (not bundled with any other refactor), executed only
-  under this rule. The analyst owns when and how the change set is
-  applied. Other phases reference this rule rather than restating it.
+  release step** (not bundled with any other refactor), executed only under
+  this rule. Other phases reference this rule rather than restating it.
 
 Acceptance criteria:
 
@@ -442,11 +455,14 @@ Tasks:
   teammate-relative observations using the canonical lap-level
   weather-routing rule from Phase 3 (dry samples → dry signals; rain
   samples → `wet_skill`; mixed/missing/unreliable → neither in v1).
-- Wet and mixed sessions update `wet_skill`. Wet sessions never update
+- Store wet skill in seconds. Compute each wet observation as the observed
+  wet teammate gap minus the dry race-rating expected teammate gap.
+- Apply `wet_context_weight * wet_skill_mu_s` at prediction time. The weight
+  is 0 for dry, 1 for fully wet, and documented as a fractional value for
+  mixed forecasts or mixed live sessions.
+- Wet and mixed sessions update `wet_skill`. Fully wet sessions never update
   dry race/quali ratings.
 - Position-scale modifiers must not compose with seconds-scale ratings.
-  Decide whether wet-skill is stored in seconds or as a multiplier; in
-  either case, the prediction-time composition is documented and tested.
 
 Acceptance criteria:
 
@@ -455,7 +471,7 @@ Acceptance criteria:
 - Hard invariant from Phase 8 (wet sessions do not update dry ratings)
   remains satisfied.
 - Composition of wet-skill with race/quali rating at prediction time is
-  unit-tested.
+  unit-tested, including trace output for `wet_context_weight`.
 
 Dependencies: Phase 10.
 

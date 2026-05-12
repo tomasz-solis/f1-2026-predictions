@@ -1,23 +1,28 @@
 # Teammate-Network Prior Design
 
 Date: 2026-05-09
-Status: draft pending validation evidence and smoke-session lock
+Status: locked for Phase 3 extractor implementation
 
 This document defines the historical teammate-network prior used by the
 driver-rating de-carring work. It also defines the matched-lap observation
 contract shared by the prior builder and the live updater.
 
-This doc is **not locked**. Implementation of the matched-lap extractor and
-the prior builder is blocked until two companion artifacts are filled with
-real content:
+The companion gates are filled and locked:
 
 - `docs/fixes/teammate_network_prior_validation_evidence.md`
 - `docs/fixes/matched_lap_extractor_smoke_sessions.md`
 
+Current gate state as of 2026-05-12:
+
+- Phase 1 source-backed magnitude rows are filled in the validation evidence
+  doc, using the accepted Motorsport / PACETEQ source-family rule.
+- Phase 2 smoke-session rows are locked.
+- Phase 3 extractor code can start from this contract.
+
 Direction-only checks are not validation evidence. Source-backed magnitude
-checks are. Until the validation evidence file has source-backed entries,
-there is no acceptance criterion to grade the prior fit against, and the
-extractor is the wrong place to start.
+checks are. The validation evidence file now gives the prior fit an acceptance
+criterion, and the smoke-session file now gives the extractor smoke tests
+locked expected behavior.
 
 ## 1. Purpose
 
@@ -69,7 +74,33 @@ It is never the same-session subtraction anchor. An implementation that
 subtracts predicted or posterior team_strength from absolute driver
 pace is disallowed by this contract.
 
-## 1.6 Known Limits
+## 1.6 Active-Season Learning Policy
+
+The system should keep learning during the season, but the main in-season
+learner is `team_strength`, not large driver-skill movement.
+
+After each completed race weekend, the runtime update flow recomputes or
+updates team strength from observed team-vs-field evidence. That updated
+team state feeds the next prediction checkpoint. This is the mechanism that
+lets the model learn that a car package has improved, regressed, or changed
+track-type behavior during the season.
+
+Driver skill in seconds is intentionally slower-moving:
+
+- within-season race and qualifying driver ratings may update from clean
+  teammate-relative evidence, but with conservative noise and shrinkage;
+- one weekend should not cause a dramatic driver-skill jump unless the
+  evidence is repeated and clean;
+- full teammate-network rejudgment is an offline operation, normally after
+  the season, during a season break, or on demand during a longer pause such
+  as summer break.
+
+This is why Section 1.5 updates `team_strength` before computing
+same-session driver residuals. Team strength captures shared car movement for
+future predictions, while same-session driver residuals stay anchored to the
+observed team median so car error does not leak into driver skill.
+
+## 1.7 Known Limits
 
 These are not blockers; they are open risks that should sit visibly so
 they are not rediscovered as bugs later.
@@ -161,8 +192,15 @@ to the separate `wet_skill` path.
 Sprint and sprint-qualifying sessions are excluded from the v1 prior. They
 can be added later as separate, lower-confidence evidence.
 
-Practice sessions are excluded. Run programs are not comparable enough for
-this prior.
+Race-weekend practice sessions are excluded from the offline
+teammate-network prior fit because run programs are not comparable enough for
+source-backed driver residuals. They are **not** excluded from the live
+prediction system. FP1/FP2/FP3 remain valid runtime evidence for car features,
+session pace blending, confidence, and team-strength updates when the local
+feature logic marks them usable.
+
+Pre-season testing is a separate case. It can provide car-feature hints and
+uncertainty signals, but it must not directly impose a manufacturer order.
 
 ## 4. Matched-Lap Extractor Spec
 
@@ -594,6 +632,13 @@ mean. `sigma_s` is the bootstrap or fallback uncertainty, also in seconds.
 Driver ratings are stored in seconds natively. There is no
 `driver_rating_to_seconds()` mapping in v1.
 
+There should not be a default v2 plan to add `driver_rating_to_seconds()`.
+Adding that mapping would make driver ratings less interpretable and could
+hide model error inside a second conversion layer. Revisit this only if
+held-out replay shows a stable, repeatable nonlinearity in driver residuals
+that cannot be explained by team strength, weather, track type, or input
+quality.
+
 The forward model for dry sessions is:
 
 ```text
@@ -601,31 +646,90 @@ observed_driver_to_field_s =
     observed_field_median_s - observed_driver_median_s
 
 predicted_driver_to_field_s =
-    team_strength_to_seconds(team_strength)
+    team_strength_to_seconds(session_kind, team_strength)
     + driver_rating_mu_s
 ```
 
-Only `team_strength_to_seconds()` requires a mapping. The driver side is
-fixed by construction.
+Only team strength requires a mapping. The driver side is fixed by
+construction.
 
-Calibration equation (single-mapping form):
+Decision: use separate race and qualifying team-strength seconds mappings.
+Race pace and qualifying pace are different constructs with different
+variance, tire state, traffic, and fuel-load behavior. A shared mapping would
+look simpler but would force two different signals through one slope.
+
+Calibration equations:
 
 ```text
-observed_driver_to_field_s - driver_rating_mu_s
+race_observed_driver_to_field_s - race_rating_mu_s
+    ~ race_team_strength_centered
+
+quali_observed_driver_to_field_s - quali_rating_mu_s
+    ~ quali_team_strength_centered
+
+race_team_strength_centered = race_team_strength - 0.5
+quali_team_strength_centered = quali_team_strength - 0.5
+```
+
+If the stored team-strength artifact has only one `team_strength` value in
+the first migration step, fit two mappings over that same scalar:
+
+```text
+race_observed_driver_to_field_s - race_rating_mu_s
+    ~ team_strength_centered
+
+quali_observed_driver_to_field_s - quali_rating_mu_s
     ~ team_strength_centered
 
 team_strength_centered = team_strength - 0.5
 ```
 
-Fit `team_strength_to_seconds()` once on historical data and freeze it for
-the model version. Do not continuously refit it during the active season.
+Fit the mappings once on historical data and freeze them for the model
+version. Do not continuously refit them during the active season. In-season
+learning updates team-strength state; it does not rewrite the mapping slope
+unless a deliberate model-version recalibration is run.
 
-Blocker before this step:
+## 10.5 Wet-Skill Calculation Method
 
-> Decide in the team-strength design whether there is one shared
-> team-strength mapping for race and qualifying, or separate race-team and
-> quali-team mappings. Do not start `team_strength_to_seconds()` calibration
-> until that decision is resolved in the team-strength mapping doc.
+Wet skill is a teammate-relative seconds delta that measures how much a driver
+gains or loses in wet conditions compared with their dry race baseline. It is
+not a finishing-position adjustment and it is not a global "good in rain"
+rating detached from teammate evidence.
+
+For a wet matched-lap aggregate:
+
+```text
+wet_gap_s = theta_reference_wet - theta_comparison_wet
+
+dry_expected_gap_s =
+    race_rating_mu_s(reference) - race_rating_mu_s(comparison)
+
+wet_skill_observation_s = wet_gap_s - dry_expected_gap_s
+```
+
+Positive `wet_skill_observation_s` means the reference driver gained pace in
+the wet relative to the dry expectation. The wet-skill updater consumes one
+aggregate row per teammate pair, using the same reference/comparison ordering
+as the dry extractor.
+
+For prediction, the wet component is applied only when the race/weather
+context says wet evidence should matter:
+
+```text
+predicted_driver_to_field_s =
+    team_strength_to_seconds("race", team_strength)
+    + race_rating_mu_s
+    + wet_context_weight * wet_skill_mu_s
+```
+
+`wet_context_weight` is 0 for dry conditions, 1 for fully wet conditions, and
+a documented fractional value for mixed forecasts or mixed live sessions. The
+implementation must record the chosen weight and weather source in trace.
+
+Fully wet sessions update `wet_skill` only. They must not update dry race or
+qualifying ratings. Mixed sessions may update dry ratings from reliable dry
+laps and wet skill from reliable wet laps; mixed, missing, or unreliable lap
+intervals feed neither path.
 
 ## 11. Regulation-Reset Monitoring
 
@@ -640,13 +744,21 @@ Trace diagnostics must monitor:
 - R-squared versus the historical fit R-squared;
 - per-driver residual means.
 
+These diagnostics should be surfaced in the main Streamlit app on a separate
+monitoring tab, not only written to offline reports. The tab should show the
+current rolling window, historical reference band, latest slope/R-squared,
+driver residual outliers, and whether the current model version is inside the
+expected range. The dashboard reads these diagnostics from the same persisted
+artifact path and Supabase tables used by background jobs; it must not compute
+an incompatible version ad hoc.
+
 If 2026 shows sustained scale drift, the remedy is a one-time
 between-season or model-version refit, not continuous in-season refitting.
 
 ## 12. Validation Gates
 
-Two validation gates must be filled with real content before extractor
-implementation starts.
+Two validation gates must be filled and locked with real content before
+extractor implementation starts.
 
 ### 12.1 Source-Backed Magnitude Checks
 
@@ -669,6 +781,10 @@ A check is "hard" only when every required field is filled:
 Gut-feel magnitude checks do not enter the validation report. Direction-only
 checks (sign of teammate gap) are unit tests in `tests/test_prior_signs.py`,
 not validation evidence.
+
+Current state: filled on 2026-05-12, not final-locked. The validation doc now
+contains 7 HARD race rows, 6 HARD qualifying rows, one supplemental near-zero
+row, and documented cuts.
 
 ### 12.2 Extractor Smoke Sessions
 
@@ -700,6 +816,8 @@ validation claim.
 
 These are smoke checks for extractor correctness, not full validation of
 the prior.
+
+Current state: locked on 2026-05-12.
 
 ## 13. Bulk Extraction Diagnostic Dump
 
@@ -792,6 +910,14 @@ must happen in this order:
 `_DRIVER_BAYESIAN_SCHEMA` currently has `additionalProperties: False`, so
 the schema must accept the new fields before any writer persists them.
 
+Implementation must update the whole project, not just the immediate writer.
+Readers, validators, warmup jobs, dashboard rendering, evaluation reports,
+checkpoint reconstruction, local artifact stores, and Supabase persistence
+must all prefer the new artifacts once the migration phase reaches reader
+cutover. Deprecated fields may exist only as temporary fallback during the
+declared migration window. Supabase tables and local JSON artifacts must carry
+the same field names, units, and version metadata.
+
 ## 18. Implementation Order Within This Doc
 
 This doc owns steps 1 through 7. Steps 8 onward are downstream
@@ -799,9 +925,10 @@ dependencies; they live in the master execution plan
 (`docs/fixes/master_execution_plan.md`).
 
 1. Lock this design doc after the companion validation gates are filled.
-2. Fill the source-backed magnitude evidence file.
-3. Fill the named extractor smoke-sessions file.
-4. Implement the matched-lap extractor from this spec.
+2. Fill the source-backed magnitude evidence file. Done on 2026-05-12.
+3. Fill the named extractor smoke-sessions file. Done on 2026-05-12.
+4. Implement the matched-lap extractor from this spec. This is the first
+   code-changing step.
 5. Run extractor smoke checks on the locked validation sessions.
 6. Run the 2022-2025 bulk extraction.
 7. Review the extraction diagnostic dump and fit race/quali
