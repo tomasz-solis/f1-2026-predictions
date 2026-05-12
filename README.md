@@ -9,6 +9,31 @@ its predictions across each weekend as new session data arrives.
 
 That constraint shapes every design decision in here.
 
+## Planned Model Fixes
+
+The next planned model change is the driver-rating de-carring and
+race/qualifying split described in `docs/fixes/`. The work is intentionally
+staged because it touches historical extraction, validation, local artifacts,
+Supabase persistence, dashboard diagnostics, and live prediction readers.
+
+Current planned direction:
+
+- keep active-season learning focused mainly on `team_strength`, which should
+  move as new race weekends complete;
+- split driver residuals into `race_rating_mu_s` and `quali_rating_mu_s`,
+  stored directly in seconds;
+- keep driver ratings slow-moving during the season, with full teammate-network
+  refits after the season, during longer breaks, or on demand;
+- use separate race and qualifying team-strength-to-seconds mappings;
+- migrate local JSON artifacts and Supabase rows together, so code reads the
+  new artifacts instead of silently falling back to deprecated fields;
+- add a dashboard diagnostics tab for team-strength scale drift, R-squared,
+  slope, and per-driver residual monitoring.
+
+This is a multi-day to multi-week change set. The current plan is to implement
+it in phases, with the matched-lap extractor first and live updater changes
+last.
+
 ---
 
 ## The Engineering Problem
@@ -269,4 +294,5 @@ recommendation output for ablations.
 
 ## Stack
 
-Python 3.11 · FastF1 · Streamlit · Supabase · Render · uv · pre-commit · mypy · pytest · GitHub Actions
+Python 3.11 · FastF1 · Streamlit · Supabase · Render · uv · pre-commit ·
+mypy · pytest · GitHub Actions
