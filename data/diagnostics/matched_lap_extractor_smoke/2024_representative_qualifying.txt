@@ -1,0 +1,7 @@
+=== 2024 Bahrain Grand Prix (representative_qualifying) ===
+status: pass
+matched_pairs=28, skipped_pairs=2
+weather_counts={'dry': 28}
+skip_counts={'insufficient_matched_pairs': 2}
+filter_totals=non_green=0, sc_vsc=0, pit=182, stint_outlier=0, weather_unreliable=0, weather_mode_excluded=0
+- checks satisfied

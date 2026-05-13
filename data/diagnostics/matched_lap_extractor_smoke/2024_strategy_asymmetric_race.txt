@@ -1,0 +1,7 @@
+=== 2024 Miami Grand Prix (strategy_asymmetric_race) ===
+status: pass
+matched_pairs=256, skipped_pairs=0
+weather_counts={'dry': 256}
+skip_counts={}
+filter_totals=non_green=130, sc_vsc=130, pit=56, stint_outlier=103, weather_unreliable=0, weather_mode_excluded=0
+- checks satisfied

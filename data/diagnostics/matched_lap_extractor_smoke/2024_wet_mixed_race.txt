@@ -1,0 +1,7 @@
+=== 2024 British Grand Prix (wet_mixed_race) ===
+status: pass
+matched_pairs=257, skipped_pairs=1
+weather_counts={'dry': 155, 'wet': 102}
+skip_counts={'missing_lap_time_data': 1}
+filter_totals=non_green=0, sc_vsc=0, pit=92, stint_outlier=88, weather_unreliable=24, weather_mode_excluded=0
+- checks satisfied

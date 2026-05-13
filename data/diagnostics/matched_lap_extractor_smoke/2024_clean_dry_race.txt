@@ -1,0 +1,7 @@
+=== 2024 Bahrain Grand Prix (clean_dry_race) ===
+status: pass
+matched_pairs=371, skipped_pairs=0
+weather_counts={'dry': 371}
+skip_counts={}
+filter_totals=non_green=42, sc_vsc=0, pit=86, stint_outlier=95, weather_unreliable=0, weather_mode_excluded=0
+- checks satisfied

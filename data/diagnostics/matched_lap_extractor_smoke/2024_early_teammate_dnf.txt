@@ -1,0 +1,7 @@
+=== 2024 Australian Grand Prix (early_teammate_dnf) ===
+status: pass
+matched_pairs=231, skipped_pairs=3
+weather_counts={'dry': 231}
+skip_counts={'insufficient_matched_pairs': 2, 'single_car_session': 1}
+filter_totals=non_green=58, sc_vsc=54, pit=70, stint_outlier=82, weather_unreliable=0, weather_mode_excluded=0
+- checks satisfied
