@@ -118,6 +118,7 @@ FILTER_DIAGNOSTIC_COLUMNS: tuple[str, ...] = (
     "stint_outlier_laps",
     "lap_level_weather_unreliable_laps",
     "weather_mode_excluded_laps",
+    "non_quick_qualifying_laps",
     "valid_laps",
     "candidate_matched_pairs",
     "matched_pair_rows",
@@ -138,6 +139,7 @@ class MatchedLapConfig:
     bootstrap_samples: int = 1000
     bootstrap_random_seed: int = 2026
     matched_gap_se_floor_s: float = 0.02
+    qualifying_quicklap_threshold: float = 1.07
 
 
 @dataclass(frozen=True)
@@ -264,6 +266,22 @@ def aggregate_matched_teammate_laps(
     for group_key, group in matched.groupby(group_columns, dropna=False):
         key_data = dict(zip(group_columns, group_key, strict=True))
         gaps = group["matched_gap_s"].astype(float).to_numpy()
+        min_pairs = (
+            config.min_matched_pairs_quali
+            if key_data["session_kind"] == "qualifying"
+            else config.min_matched_pairs_race
+        )
+        if len(gaps) < min_pairs:
+            aggregate_rows.append(
+                {
+                    **key_data,
+                    "matched_gap_median_s": pd.NA,
+                    "matched_gap_se_s": pd.NA,
+                    "n_matched_pairs": int(len(gaps)),
+                    "skip_reason": SKIP_INSUFFICIENT_MATCHED_PAIRS,
+                }
+            )
+            continue
         aggregate_rows.append(
             {
                 **key_data,
@@ -359,7 +377,11 @@ def diagnose_matched_lap_filters(
         )
         if session_kind == "qualifying":
             prepared["quali_segment"] = _qualifying_segments(prepared, _session_status(session))
-            valid = _valid_qualifying_laps(prepared, weather_mode=weather_mode)
+            valid = _valid_qualifying_laps(
+                prepared,
+                weather_mode=weather_mode,
+                config=config,
+            )
             candidate_matched_pairs = _qualifying_candidate_match_count(
                 valid,
                 reference_driver,
@@ -579,7 +601,7 @@ def _qualifying_pair_rows(
     if not common_segments:
         return [], SKIP_NO_COMMON_QUALI_SEGMENT
 
-    valid = _valid_qualifying_laps(prepared, weather_mode=weather_mode)
+    valid = _valid_qualifying_laps(prepared, weather_mode=weather_mode, config=config)
     if valid.empty:
         return [], _empty_valid_lap_reason(
             prepared,
@@ -811,10 +833,26 @@ def _valid_race_laps(
     return prepared[mask].copy()
 
 
-def _valid_qualifying_laps(prepared: pd.DataFrame, *, weather_mode: WeatherMode) -> pd.DataFrame:
+def _valid_qualifying_laps(
+    prepared: pd.DataFrame,
+    *,
+    weather_mode: WeatherMode,
+    config: MatchedLapConfig,
+) -> pd.DataFrame:
     """Filter qualifying laps to comparable push laps in reliable weather."""
+    base_mask = _qualifying_base_lap_mask(prepared, weather_mode=weather_mode)
+    quicklap_mask = _qualifying_quicklap_mask(prepared, base_mask=base_mask, config=config)
+    return prepared[base_mask & quicklap_mask].copy()
+
+
+def _qualifying_base_lap_mask(
+    prepared: pd.DataFrame,
+    *,
+    weather_mode: WeatherMode,
+) -> pd.Series:
+    """Return qualifying laps that clear non-pace data-quality filters."""
     allowed_weather = _allowed_weather_buckets(weather_mode)
-    mask = (
+    return (
         prepared["lap_time_s"].notna()
         & prepared["Compound"].notna()
         & prepared["quali_segment"].notna()
@@ -824,7 +862,45 @@ def _valid_qualifying_laps(prepared: pd.DataFrame, *, weather_mode: WeatherMode)
         & prepared["track_status_bucket"].isin([TRACK_GREEN, TRACK_UNKNOWN])
         & prepared["weather_bucket"].isin(allowed_weather)
     )
-    return prepared[mask].copy()
+
+
+def _qualifying_quicklap_mask(
+    prepared: pd.DataFrame,
+    *,
+    base_mask: pd.Series,
+    config: MatchedLapConfig,
+) -> pd.Series:
+    """Return qualifying laps inside the configured quick-lap threshold."""
+    if config.qualifying_quicklap_threshold <= 1.0:
+        raise ValueError("qualifying_quicklap_threshold must be greater than 1.0")
+
+    mask = pd.Series(False, index=prepared.index)
+    base = prepared[base_mask].copy()
+    if base.empty:
+        return mask
+
+    for _, group in base.groupby(["quali_segment", "weather_bucket"], dropna=False):
+        best_lap_s = pd.to_numeric(group["lap_time_s"], errors="coerce").min()
+        if pd.isna(best_lap_s):
+            continue
+        threshold_s = float(best_lap_s) * config.qualifying_quicklap_threshold
+        mask.loc[group.index] = pd.to_numeric(group["lap_time_s"], errors="coerce") < threshold_s
+    return mask
+
+
+def _non_quick_qualifying_lap_count(
+    prepared: pd.DataFrame,
+    *,
+    session_kind: SessionKind,
+    weather_mode: WeatherMode,
+    config: MatchedLapConfig,
+) -> int:
+    """Count qualifying laps filtered only by the quick-lap threshold."""
+    if session_kind != "qualifying" or "quali_segment" not in prepared.columns:
+        return 0
+    base_mask = _qualifying_base_lap_mask(prepared, weather_mode=weather_mode)
+    quicklap_mask = _qualifying_quicklap_mask(prepared, base_mask=base_mask, config=config)
+    return int((base_mask & ~quicklap_mask).sum())
 
 
 def _stint_outlier_mask_with_config(laps: pd.DataFrame, config: MatchedLapConfig) -> pd.Series:
@@ -1161,6 +1237,7 @@ def _filter_diagnostic_row(
             "stint_outlier_laps": 0,
             "lap_level_weather_unreliable_laps": 0,
             "weather_mode_excluded_laps": 0,
+            "non_quick_qualifying_laps": 0,
             "valid_laps": 0,
             "candidate_matched_pairs": 0,
             "matched_pair_rows": (
@@ -1205,6 +1282,12 @@ def _filter_diagnostic_row(
             prepared["weather_bucket"].eq(WEATHER_UNRELIABLE).sum()
         ),
         "weather_mode_excluded_laps": int(weather_mode_excluded.sum()),
+        "non_quick_qualifying_laps": _non_quick_qualifying_lap_count(
+            prepared,
+            session_kind=session_kind,
+            weather_mode=weather_mode,
+            config=config,
+        ),
         "valid_laps": int(len(valid)),
         "candidate_matched_pairs": int(candidate_matched_pairs),
         "matched_pair_rows": (

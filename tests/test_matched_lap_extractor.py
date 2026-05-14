@@ -383,6 +383,80 @@ def test_qualifying_without_common_segment_is_skipped() -> None:
     assert out["skip_reason"].tolist() == [SKIP_NO_COMMON_QUALI_SEGMENT]
 
 
+def test_qualifying_excludes_non_quick_laps_before_pairing() -> None:
+    """Qualifying matching ignores slow cooldown laps that still look accurate."""
+    laps = pd.DataFrame(
+        [
+            _quali_lap(
+                driver="AAA",
+                team="Example",
+                lap_number=10,
+                lap_time_s=90.0,
+                segment="Q1",
+            ),
+            _quali_lap(
+                driver="BBB",
+                team="Example",
+                lap_number=10,
+                lap_time_s=90.2,
+                segment="Q1",
+            ),
+            _quali_lap(
+                driver="AAA",
+                team="Example",
+                lap_number=11,
+                lap_time_s=90.1,
+                segment="Q1",
+            ),
+            _quali_lap(
+                driver="BBB",
+                team="Example",
+                lap_number=11,
+                lap_time_s=90.3,
+                segment="Q1",
+            ),
+            _quali_lap(
+                driver="AAA",
+                team="Example",
+                lap_number=12,
+                lap_time_s=150.0,
+                segment="Q1",
+            ),
+            _quali_lap(
+                driver="BBB",
+                team="Example",
+                lap_number=12,
+                lap_time_s=90.4,
+                segment="Q1",
+            ),
+        ]
+    )
+    session = _Session(
+        laps=laps,
+        weather_data=_weather_for_laps(range(10, 13)),
+        session_name="Qualifying",
+    )
+    config = MatchedLapConfig(min_matched_pairs_quali=2)
+
+    out = extract_matched_teammate_laps(
+        session,
+        session_kind="qualifying",
+        weather_mode="dry",
+        config=config,
+    )
+    diagnostics = diagnose_matched_lap_filters(
+        session,
+        session_kind="qualifying",
+        weather_mode="dry",
+        config=config,
+    )
+
+    assert set(out["row_type"]) == {"matched_pair"}
+    assert out["reference_lap_number"].tolist() == [10, 11]
+    assert out["comparison_lap_number"].tolist() == [10, 11]
+    assert diagnostics.loc[0, "non_quick_qualifying_laps"] == 1
+
+
 def test_aggregate_matched_laps_keeps_one_pair_observation_with_bootstrap_se() -> None:
     """Aggregation keeps one teammate-pair row and carries the signed median."""
     laps = _race_laps(lap_numbers=range(1, 7))
@@ -401,6 +475,38 @@ def test_aggregate_matched_laps_keeps_one_pair_observation_with_bootstrap_se() -
     assert aggregate.loc[0, "n_matched_pairs"] == 4
     assert aggregate.loc[0, "matched_gap_median_s"] == pytest.approx(0.5)
     assert aggregate.loc[0, "matched_gap_se_s"] >= config.matched_gap_se_floor_s
+
+
+def test_aggregate_matched_laps_gates_weather_buckets_independently() -> None:
+    """Sparse dry/wet buckets are skipped even when the raw pair clears the total."""
+    laps = _race_laps(lap_numbers=range(1, 6))
+    weather = _weather_for_laps(
+        range(1, 6),
+        rainfall_by_lap={
+            2: [False],
+            3: [True],
+            4: [False, True],
+        },
+    )
+    session = _Session(laps=laps, weather_data=weather)
+    config = MatchedLapConfig(min_matched_pairs_race=2)
+    raw = extract_matched_teammate_laps(
+        session,
+        session_kind="race",
+        weather_mode="mixed",
+        config=config,
+    )
+
+    aggregate = aggregate_matched_teammate_laps(raw, config=config)
+
+    assert sorted(aggregate["weather_bucket"].tolist()) == ["dry", "wet"]
+    assert aggregate["n_matched_pairs"].tolist() == [1, 1]
+    assert aggregate["skip_reason"].tolist() == [
+        SKIP_INSUFFICIENT_MATCHED_PAIRS,
+        SKIP_INSUFFICIENT_MATCHED_PAIRS,
+    ]
+    assert aggregate["matched_gap_median_s"].isna().all()
+    assert aggregate["matched_gap_se_s"].isna().all()
 
 
 def test_filter_diagnostics_expose_routine_filter_counts() -> None:
