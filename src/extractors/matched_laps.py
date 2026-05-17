@@ -413,6 +413,84 @@ def diagnose_matched_lap_filters(
     return pd.DataFrame(rows, columns=FILTER_DIAGNOSTIC_COLUMNS)
 
 
+def probe_qualifying_pair_constructs(
+    session: Any,
+    *,
+    reference_driver: str,
+    comparison_driver: str,
+    weather_mode: WeatherMode,
+    target_weather_bucket: Literal["dry", "wet"],
+    config: MatchedLapConfig,
+) -> dict[str, Any]:
+    """Summarize qualifying construct variants for one ordered teammate pair.
+
+    Returned deltas follow the extractor sign convention: positive means the
+    requested ``reference_driver`` was faster than ``comparison_driver``.
+    """
+    if weather_mode not in {"dry", "wet", "mixed", "unknown"}:
+        raise ValueError(f"Unsupported weather_mode: {weather_mode!r}")
+    if target_weather_bucket not in {WEATHER_DRY, WEATHER_WET}:
+        raise ValueError(f"Unsupported target weather bucket: {target_weather_bucket!r}")
+
+    laps = _session_laps(session)
+    pair_laps = laps[laps["Driver"].isin([reference_driver, comparison_driver])].copy()
+    if pair_laps.empty or set(pair_laps["Driver"]) != {reference_driver, comparison_driver}:
+        return _empty_qualifying_construct_probe(
+            pair_present=False,
+            target_weather_bucket=target_weather_bucket,
+        )
+
+    prepared = _prepare_laps(
+        pair_laps,
+        weather_data=_session_weather(session),
+        session_status=_session_status(session),
+    )
+    prepared["quali_segment"] = _qualifying_segments(prepared, _session_status(session))
+    valid = _valid_qualifying_laps(prepared, weather_mode=weather_mode, config=config)
+    valid_target = valid[valid["weather_bucket"].eq(target_weather_bucket)].copy()
+
+    common_segments = _common_quali_segments(prepared, reference_driver, comparison_driver)
+    valid_common_segments = _common_quali_segments(
+        valid_target,
+        reference_driver,
+        comparison_driver,
+    )
+    matches, chosen_segments = _selected_qualifying_matches(
+        valid,
+        common_segments=common_segments,
+        reference_driver=reference_driver,
+        comparison_driver=comparison_driver,
+        config=config,
+    )
+    target_matches = _matches_for_weather_bucket(matches, target_weather_bucket)
+    current_delta = _median_match_delta(
+        target_matches,
+        min_pairs=config.min_matched_pairs_quali,
+    )
+    highest_common_segment = _highest_common_qualifying_segment(valid_common_segments)
+
+    return {
+        "pair_present": True,
+        "target_weather_bucket": target_weather_bucket,
+        "common_segments": sorted(common_segments),
+        "valid_common_segments": sorted(valid_common_segments),
+        "chosen_segments": chosen_segments,
+        "current_construct_n_pairs": int(len(target_matches)),
+        "current_construct_delta_s": current_delta,
+        "highest_common_segment": highest_common_segment,
+        "highest_common_best_delta_s": _best_lap_delta(
+            valid_target[valid_target["quali_segment"].eq(highest_common_segment)],
+            reference_driver=reference_driver,
+            comparison_driver=comparison_driver,
+        ),
+        "any_valid_best_delta_s": _best_lap_delta(
+            valid_target,
+            reference_driver=reference_driver,
+            comparison_driver=comparison_driver,
+        ),
+    }
+
+
 def _session_laps(session: Any) -> pd.DataFrame:
     """Return a copy of session laps or an empty frame when absent."""
     laps = getattr(session, "laps", None)
@@ -611,24 +689,16 @@ def _qualifying_pair_rows(
             config=config,
         )
 
-    matched_frames: list[pd.DataFrame] = []
-    for segment in ("Q3", "Q2", "Q1"):
-        if segment not in common_segments:
-            continue
-        segment_matches = _pair_qualifying_laps(
-            valid[valid["quali_segment"] == segment],
-            reference_driver,
-            comparison_driver,
-        )
-        if not segment_matches.empty:
-            matched_frames.append(segment_matches)
-        if sum(len(frame) for frame in matched_frames) >= config.min_matched_pairs_quali:
-            break
-
-    if not matched_frames:
+    matches, _ = _selected_qualifying_matches(
+        valid,
+        common_segments=common_segments,
+        reference_driver=reference_driver,
+        comparison_driver=comparison_driver,
+        config=config,
+    )
+    if matches.empty:
         return [], _no_match_reason(valid, prepared, weather_mode)
 
-    matches = pd.concat(matched_frames, ignore_index=True)
     if len(matches) < config.min_matched_pairs_quali:
         return [], SKIP_INSUFFICIENT_MATCHED_PAIRS
 
@@ -1021,6 +1091,96 @@ def _pair_qualifying_laps(
     )
 
 
+def _selected_qualifying_matches(
+    valid: pd.DataFrame,
+    *,
+    common_segments: set[str],
+    reference_driver: str,
+    comparison_driver: str,
+    config: MatchedLapConfig,
+) -> tuple[pd.DataFrame, list[str]]:
+    """Return the exact qualifying matches selected by the extractor."""
+    matched_frames: list[pd.DataFrame] = []
+    chosen_segments: list[str] = []
+    for segment in ("Q3", "Q2", "Q1"):
+        if segment not in common_segments:
+            continue
+        segment_matches = _pair_qualifying_laps(
+            valid[valid["quali_segment"].eq(segment)],
+            reference_driver,
+            comparison_driver,
+        )
+        if not segment_matches.empty:
+            matched_frames.append(segment_matches)
+            chosen_segments.append(segment)
+        if sum(len(frame) for frame in matched_frames) >= config.min_matched_pairs_quali:
+            break
+
+    if not matched_frames:
+        return pd.DataFrame(columns=["reference", "comparison"]), []
+    return pd.concat(matched_frames, ignore_index=True), chosen_segments
+
+
+def _matches_for_weather_bucket(matches: pd.DataFrame, weather_bucket: str) -> pd.DataFrame:
+    """Return qualifying matches whose reference lap belongs to one weather bucket."""
+    if matches.empty:
+        return matches.copy()
+    mask = matches["reference"].map(lambda row: row["weather_bucket"]).eq(weather_bucket)
+    return matches[mask].copy()
+
+
+def _median_match_delta(matches: pd.DataFrame, *, min_pairs: int) -> float | None:
+    """Return the median comparison-minus-reference gap for enough matches."""
+    if len(matches) < min_pairs:
+        return None
+    gaps = [
+        float(row["comparison"]["lap_time_s"]) - float(row["reference"]["lap_time_s"])
+        for _, row in matches.iterrows()
+    ]
+    return float(np.median(gaps))
+
+
+def _highest_common_qualifying_segment(common_segments: set[str]) -> str | None:
+    """Return the highest qualifying segment shared by both drivers."""
+    return next((segment for segment in ("Q3", "Q2", "Q1") if segment in common_segments), None)
+
+
+def _best_lap_delta(
+    valid: pd.DataFrame,
+    *,
+    reference_driver: str,
+    comparison_driver: str,
+) -> float | None:
+    """Return best-comparison minus best-reference lap time for valid rows."""
+    if valid.empty:
+        return None
+    reference_best = valid.loc[valid["Driver"].eq(reference_driver), "lap_time_s"].min()
+    comparison_best = valid.loc[valid["Driver"].eq(comparison_driver), "lap_time_s"].min()
+    if pd.isna(reference_best) or pd.isna(comparison_best):
+        return None
+    return float(comparison_best - reference_best)
+
+
+def _empty_qualifying_construct_probe(
+    *,
+    pair_present: bool,
+    target_weather_bucket: str,
+) -> dict[str, Any]:
+    """Return an empty qualifying construct-probe payload."""
+    return {
+        "pair_present": pair_present,
+        "target_weather_bucket": target_weather_bucket,
+        "common_segments": [],
+        "valid_common_segments": [],
+        "chosen_segments": [],
+        "current_construct_n_pairs": 0,
+        "current_construct_delta_s": None,
+        "highest_common_segment": None,
+        "highest_common_best_delta_s": None,
+        "any_valid_best_delta_s": None,
+    }
+
+
 def _qualifying_candidate_match_count(
     valid: pd.DataFrame,
     reference_driver: str,
@@ -1028,20 +1188,15 @@ def _qualifying_candidate_match_count(
     config: MatchedLapConfig,
 ) -> int:
     """Count qualifying matches the extractor would consider before gating."""
-    matched_count = 0
     common_segments = _common_quali_segments(valid, reference_driver, comparison_driver)
-    for segment in ("Q3", "Q2", "Q1"):
-        if segment not in common_segments:
-            continue
-        segment_matches = _pair_qualifying_laps(
-            valid[valid["quali_segment"] == segment],
-            reference_driver,
-            comparison_driver,
-        )
-        matched_count += len(segment_matches)
-        if matched_count >= config.min_matched_pairs_quali:
-            break
-    return matched_count
+    matches, _ = _selected_qualifying_matches(
+        valid,
+        common_segments=common_segments,
+        reference_driver=reference_driver,
+        comparison_driver=comparison_driver,
+        config=config,
+    )
+    return int(len(matches))
 
 
 def _pair_by_keys(

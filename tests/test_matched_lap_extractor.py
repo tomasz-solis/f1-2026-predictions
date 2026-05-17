@@ -17,6 +17,7 @@ from src.extractors.matched_laps import (
     aggregate_matched_teammate_laps,
     diagnose_matched_lap_filters,
     extract_matched_teammate_laps,
+    probe_qualifying_pair_constructs,
 )
 
 
@@ -455,6 +456,75 @@ def test_qualifying_excludes_non_quick_laps_before_pairing() -> None:
     assert out["reference_lap_number"].tolist() == [10, 11]
     assert out["comparison_lap_number"].tolist() == [10, 11]
     assert diagnostics.loc[0, "non_quick_qualifying_laps"] == 1
+
+
+def test_qualifying_construct_probe_exposes_current_and_best_lap_views() -> None:
+    """The construct probe separates the multi-run median from best-lap gaps."""
+    rows = [
+        _quali_lap(
+            driver="AAA",
+            team="Example",
+            lap_number=10,
+            lap_time_s=89.0,
+            segment="Q2",
+        ),
+        _quali_lap(
+            driver="BBB",
+            team="Example",
+            lap_number=10,
+            lap_time_s=89.4,
+            segment="Q2",
+        ),
+        _quali_lap(
+            driver="AAA",
+            team="Example",
+            lap_number=11,
+            lap_time_s=89.1,
+            segment="Q2",
+        ),
+        _quali_lap(
+            driver="BBB",
+            team="Example",
+            lap_number=11,
+            lap_time_s=89.5,
+            segment="Q2",
+        ),
+        _quali_lap(
+            driver="AAA",
+            team="Example",
+            lap_number=20,
+            lap_time_s=88.0,
+            segment="Q3",
+        ),
+        _quali_lap(
+            driver="BBB",
+            team="Example",
+            lap_number=20,
+            lap_time_s=88.5,
+            segment="Q3",
+        ),
+    ]
+    session = _Session(
+        laps=pd.DataFrame(rows),
+        weather_data=_weather_for_laps(range(10, 21)),
+        session_name="Qualifying",
+    )
+
+    probe = probe_qualifying_pair_constructs(
+        session,
+        reference_driver="AAA",
+        comparison_driver="BBB",
+        weather_mode="mixed",
+        target_weather_bucket="dry",
+        config=MatchedLapConfig(min_matched_pairs_quali=3),
+    )
+
+    assert probe["chosen_segments"] == ["Q3", "Q2"]
+    assert probe["current_construct_n_pairs"] == 3
+    assert probe["current_construct_delta_s"] == pytest.approx(0.4)
+    assert probe["highest_common_segment"] == "Q3"
+    assert probe["highest_common_best_delta_s"] == pytest.approx(0.5)
+    assert probe["any_valid_best_delta_s"] == pytest.approx(0.5)
 
 
 def test_aggregate_matched_laps_keeps_one_pair_observation_with_bootstrap_se() -> None:
