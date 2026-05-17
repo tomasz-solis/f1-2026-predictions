@@ -185,33 +185,42 @@ The WLS weights are not a small detail:
 
 Those are not equivalent sample summaries.
 
-## Exploratory Construct Probe
+## Reproducible Construct Probe
 
-I also reloaded the cached qualifying sessions on 2026-05-16 and recomputed
-two alternative statistics:
+On 2026-05-17 I added a dedicated offline diagnostic runner:
+
+- `scripts/probe_teammate_network_constructs.py`
+
+It reloads the cached qualifying sessions, recomputes the current extractor
+construct, and reports two alternative statistics beside it:
 
 - `highest_common_best`: best lap gap in the highest common segment;
 - `any_valid_best`: best valid lap gap anywhere in the session.
 
-This is exploratory only, not artifact-grade evidence. The current FastF1 cache
-did not reproduce every historical weather bucket exactly as the stored Phase 5
-artifact, so these numbers should guide diagnosis, not replace the versioned
-artifact.
+The fresh offline recomputation now reproduces every stored Phase 5 qualifying
+delta to within `1ms` for the audited HARD rows: `0` artifact/cache mismatch
+rows across all six checks. That matters because it removes the earlier concern
+that the alternative-statistic comparison was resting on a drifting cache read.
 
-The pattern is still useful:
+Generated evidence:
 
-| Pair-season | Local extractor equal-session mean | Highest common best | Any valid best |
-| --- | ---: | ---: | ---: |
-| `VER-PER 2023` | `0.543s` | `0.672s` | `0.839s` |
-| `VER-PER 2024` | `0.507s` | `0.467s` | `0.610s` |
-| `RUS-HAM 2024` | `0.083s` | `0.345s` | `0.353s` |
-| `ALB-SAR 2023` | `0.418s` | `0.554s` | `1.236s` |
-| `ALB-SAR 2024` | `0.402s` | `0.380s` | `0.636s` |
+- `data/diagnostics/teammate_network_construct_probe/qualifying_construct_probe.md`
+- `data/diagnostics/teammate_network_construct_probe/qualifying_construct_probe.json`
+- `data/diagnostics/teammate_network_construct_probe/qualifying_session_rows.csv`
+
+| Pair-season | HARD threshold | Phase 5 WLS | Phase 5 equal mean | Highest common best | Any valid best |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `VER-PER 2022` | `0.290s` | `0.361s` | `0.157s` | `0.189s` | `0.210s` |
+| `VER-PER 2023` | `0.621s` | `0.363s` | `0.543s` | `0.672s` | `0.839s` |
+| `VER-PER 2024` | `0.660s` | `0.462s` | `0.507s` | `0.467s` | `0.610s` |
+| `RUS-HAM 2024` | `0.230s` | `0.113s` | `0.083s` | `0.345s` | `0.353s` |
+| `ALB-SAR 2023` | `0.522s` | `0.412s` | `0.418s` | `0.554s` | `1.236s` |
+| `ALB-SAR 2024` | `0.660s` | `0.222s` | `0.402s` | `0.380s` | `0.636s` |
 
 Interpretation:
 
 - changing only the qualifying statistic can move a season summary by several
-  tenths;
+  tenths while the underlying cached session set stays fixed;
 - `RUS-HAM 2024` is the clearest example: the local multi-run median and a
   single-best-lap statistic tell materially different stories;
 - `ALB-SAR 2024` shows why the current Phase 5 sample is too thin to grade a
@@ -320,11 +329,8 @@ mismatch.
 
 ### 1. Stop treating the current HARD qualifying rows as acceptance gates
 
-Keep them in the report, but relabel them as one of:
-
-- `EXTERNAL_CONTEXT`;
-- `PEAK_QUALI_CONTEXT`;
-- or `SUPPLEMENTAL`.
+Implemented on 2026-05-17: the current PACETEQ qualifying rows are now
+reported as `EXTERNAL_CONTEXT`, not HARD gates.
 
 Do not relax the numbers just to turn the Phase 6 boolean green.
 
