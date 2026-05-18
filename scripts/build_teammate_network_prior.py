@@ -60,7 +60,10 @@ class ValidationCheck:
     tier: str = "HARD"
 
 
-HARD_VALIDATION_CHECKS: tuple[ValidationCheck, ...] = (
+HARD_VALIDATION_CHECKS: tuple[ValidationCheck, ...] = ()
+
+
+CONTEXT_CHECKS: tuple[ValidationCheck, ...] = (
     ValidationCheck(
         check_id="verstappen_perez_race_2022",
         network_key="race_network",
@@ -70,6 +73,7 @@ HARD_VALIDATION_CHECKS: tuple[ValidationCheck, ...] = (
         source="Motorsport.com / PACETEQ Perez trend",
         source_type="teammate race-pace delta",
         scope="Red Bull race pace, 2022 only",
+        tier="EXTERNAL_CONTEXT",
     ),
     ValidationCheck(
         check_id="verstappen_perez_race_2023",
@@ -80,6 +84,7 @@ HARD_VALIDATION_CHECKS: tuple[ValidationCheck, ...] = (
         source="Motorsport.com / PACETEQ 2023 review",
         source_type="teammate race-pace delta",
         scope="Red Bull race pace, 2023 only",
+        tier="EXTERNAL_CONTEXT",
     ),
     ValidationCheck(
         check_id="verstappen_perez_race_2024",
@@ -90,6 +95,7 @@ HARD_VALIDATION_CHECKS: tuple[ValidationCheck, ...] = (
         source="Motorsport-Total / PACETEQ Red Bull duel",
         source_type="teammate race-pace delta",
         scope="Red Bull race pace, 2024 only",
+        tier="EXTERNAL_CONTEXT",
     ),
     ValidationCheck(
         check_id="alonso_stroll_race_2023",
@@ -100,6 +106,7 @@ HARD_VALIDATION_CHECKS: tuple[ValidationCheck, ...] = (
         source="Motorsport.com / PACETEQ 2023 review",
         source_type="teammate race-pace delta",
         scope="Aston Martin race pace, 2023 only",
+        tier="EXTERNAL_CONTEXT",
     ),
     ValidationCheck(
         check_id="alonso_stroll_race_2024",
@@ -110,6 +117,7 @@ HARD_VALIDATION_CHECKS: tuple[ValidationCheck, ...] = (
         source="Motorsport-Total / PACETEQ Aston Martin duel",
         source_type="teammate race-pace delta",
         scope="Aston Martin race pace, 2024 only",
+        tier="EXTERNAL_CONTEXT",
     ),
     ValidationCheck(
         check_id="albon_sargeant_race_2023",
@@ -120,6 +128,7 @@ HARD_VALIDATION_CHECKS: tuple[ValidationCheck, ...] = (
         source="Motorsport.com / PACETEQ 2023 review",
         source_type="teammate race-pace delta",
         scope="Williams race pace, 2023 only",
+        tier="EXTERNAL_CONTEXT",
     ),
     ValidationCheck(
         check_id="albon_sargeant_race_2024",
@@ -130,6 +139,7 @@ HARD_VALIDATION_CHECKS: tuple[ValidationCheck, ...] = (
         source="Motorsport-Total / PACETEQ Williams duel",
         source_type="teammate race-pace delta",
         scope="Williams race pace, 2024 Sargeant sample",
+        tier="EXTERNAL_CONTEXT",
     ),
     ValidationCheck(
         check_id="verstappen_perez_quali_2022",
@@ -140,6 +150,7 @@ HARD_VALIDATION_CHECKS: tuple[ValidationCheck, ...] = (
         source="Motorsport.com / PACETEQ Perez trend",
         source_type="teammate qualifying delta",
         scope="Red Bull qualifying, 2022",
+        tier="EXTERNAL_CONTEXT",
     ),
     ValidationCheck(
         check_id="verstappen_perez_quali_2023",
@@ -150,6 +161,7 @@ HARD_VALIDATION_CHECKS: tuple[ValidationCheck, ...] = (
         source="Motorsport.com / PACETEQ 2023 review",
         source_type="teammate qualifying delta",
         scope="Red Bull qualifying, 2023",
+        tier="EXTERNAL_CONTEXT",
     ),
     ValidationCheck(
         check_id="verstappen_perez_quali_2024",
@@ -160,6 +172,7 @@ HARD_VALIDATION_CHECKS: tuple[ValidationCheck, ...] = (
         source="Motorsport-Total / PACETEQ Red Bull duel",
         source_type="teammate qualifying delta",
         scope="Red Bull qualifying, 2024",
+        tier="EXTERNAL_CONTEXT",
     ),
     ValidationCheck(
         check_id="russell_hamilton_quali_2024",
@@ -170,6 +183,7 @@ HARD_VALIDATION_CHECKS: tuple[ValidationCheck, ...] = (
         source="Motorsport-Total / PACETEQ Mercedes duel",
         source_type="teammate qualifying delta",
         scope="Mercedes qualifying, 2024 only",
+        tier="EXTERNAL_CONTEXT",
     ),
     ValidationCheck(
         check_id="albon_sargeant_quali_2023",
@@ -180,6 +194,7 @@ HARD_VALIDATION_CHECKS: tuple[ValidationCheck, ...] = (
         source="Motorsport.com / PACETEQ 2023 review",
         source_type="teammate qualifying delta",
         scope="Williams qualifying, 2023 only",
+        tier="EXTERNAL_CONTEXT",
     ),
     ValidationCheck(
         check_id="albon_sargeant_quali_2024",
@@ -190,6 +205,7 @@ HARD_VALIDATION_CHECKS: tuple[ValidationCheck, ...] = (
         source="Motorsport-Total / PACETEQ Williams duel",
         source_type="teammate qualifying delta",
         scope="Williams qualifying, 2024 Sargeant sample",
+        tier="EXTERNAL_CONTEXT",
     ),
 )
 
@@ -435,6 +451,10 @@ def evaluate_validation(
         _evaluate_check(check, artifact, observations=fit_rows, config=fit_config)
         for check in HARD_VALIDATION_CHECKS
     ]
+    context_results = [
+        _evaluate_check(check, artifact, observations=fit_rows, config=fit_config)
+        for check in CONTEXT_CHECKS
+    ]
     supplemental_results = [
         _evaluate_check(check, artifact, observations=fit_rows, config=fit_config)
         for check in SUPPLEMENTAL_CHECKS
@@ -442,8 +462,10 @@ def evaluate_validation(
     hard_race = [row for row in hard_results if row["network_key"] == "race_network"]
     hard_quali = [row for row in hard_results if row["network_key"] == "quali_network"]
     failed_hard = [row["check_id"] for row in hard_results if not bool(row["passed"])]
+    hard_validation_state = "ready" if hard_results else "provisional_no_same_construct_hard_checks"
     return {
         "source_backed_checks": hard_results,
+        "context_checks": context_results,
         "supplemental_checks": supplemental_results,
         "cut_checks": list(CUT_CHECKS),
         "hard_race_passed": _passed_count(hard_race),
@@ -451,10 +473,19 @@ def evaluate_validation(
         "hard_quali_passed": _passed_count(hard_quali),
         "hard_quali_total": len(hard_quali),
         "failed_hard_check_ids": failed_hard,
-        "all_hard_checks_passed": all(bool(row["passed"]) for row in hard_results),
+        "hard_validation_state": hard_validation_state,
+        "all_hard_checks_passed": bool(hard_results)
+        and all(bool(row["passed"]) for row in hard_results),
+        "validation_contract_note": (
+            "No PACETEQ rows currently count as HARD because the construct audit did "
+            "not prove a same-construct match for either the current paired race "
+            "residual or the current multi-run qualifying residual. These rows remain "
+            "EXTERNAL_CONTEXT until genuinely aligned evidence is sourced."
+        ),
         "quali_validation_note": (
-            "Qualifying validation has fewer HARD rows than race validation; the artifact "
-            "keeps a wider qualifying sigma floor and later replay diagnostics must stay strict."
+            "Qualifying validation is provisional: the available external qualifying rows "
+            "are reported as EXTERNAL_CONTEXT because they do not yet match the current "
+            "multi-run qualifying construct closely enough to gate the fit."
         ),
         "smoke_only_note": (
             "Direction-only smoke checks are excluded from the HARD pass count and belong in tests."
@@ -497,6 +528,7 @@ def format_prior_summary(artifact: dict[str, Any], *, written_paths: dict[str, s
                 f"race {validation['hard_race_passed']}/{validation['hard_race_total']}, "
                 f"quali {validation['hard_quali_passed']}/{validation['hard_quali_total']}"
             ),
+            f"- HARD validation state: {validation['hard_validation_state']}",
             f"- All HARD checks passed: {validation['all_hard_checks_passed']}",
             f"- Wrote: {written_paths['latest']}",
             f"- Timestamped: {written_paths['timestamped']}",
@@ -511,6 +543,7 @@ def format_validation_report(artifact: dict[str, Any]) -> str:
     hard_checks = list(validation["source_backed_checks"])
     race_checks = [row for row in hard_checks if row["network_key"] == "race_network"]
     quali_checks = [row for row in hard_checks if row["network_key"] == "quali_network"]
+    context_checks = list(validation.get("context_checks", []))
     lines = [
         "# Teammate-Network Prior Validation Report",
         "",
@@ -520,6 +553,8 @@ def format_validation_report(artifact: dict[str, Any]) -> str:
         "",
         f"- HARD race checks: {validation['hard_race_passed']}/{validation['hard_race_total']}",
         f"- HARD qualifying checks: {validation['hard_quali_passed']}/{validation['hard_quali_total']}",
+        f"- External context checks: {len(context_checks)}",
+        f"- HARD validation state: `{validation['hard_validation_state']}`",
         f"- All HARD checks passed: `{str(validation['all_hard_checks_passed']).lower()}`",
         (
             "- Failed HARD checks: "
@@ -534,6 +569,10 @@ def format_validation_report(artifact: dict[str, Any]) -> str:
         "",
         _format_validation_table(quali_checks),
         "",
+        "## External Context Checks",
+        "",
+        _format_validation_table(context_checks),
+        "",
         "## Supplemental Checks",
         "",
         _format_validation_table(list(validation["supplemental_checks"])),
@@ -544,6 +583,7 @@ def format_validation_report(artifact: dict[str, Any]) -> str:
         "",
         "## Notes",
         "",
+        f"- {validation['validation_contract_note']}",
         f"- {validation['quali_validation_note']}",
         f"- {validation['smoke_only_note']}",
         (

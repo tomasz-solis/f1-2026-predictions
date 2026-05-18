@@ -1,0 +1,206 @@
+{
+  "built_at": "2026-05-17T19:44:38.789767+00:00",
+  "config": {
+    "matched_lap_config": {
+      "min_matched_pairs_race": 8,
+      "min_matched_pairs_quali": 3,
+      "max_position_change_for_clean_lap": 2,
+      "traffic_stint_sigma_threshold": 1.5,
+      "tire_age_fallback_window_laps": 3,
+      "early_teammate_dnf_lap_threshold": 10,
+      "bootstrap_samples": 1000,
+      "bootstrap_random_seed": 2026,
+      "matched_gap_se_floor_s": 0.02,
+      "qualifying_quicklap_threshold": 1.07
+    },
+    "target_weather_bucket": "dry",
+    "source_observations": "data/processed/teammate_network_observations/latest/aggregated_observations.csv"
+  },
+  "summary": {
+    "pair_seasons": 52,
+    "pair_seasons_with_current_rows": 49,
+    "pair_seasons_with_peak_rows": 52,
+    "artifact_rows": 627,
+    "current_rows": 627,
+    "highest_common_best_rows": 880,
+    "any_valid_best_rows": 881,
+    "peak_row_gain_vs_current": 253,
+    "highest_common_best_abs_gt_1s_rows": 60,
+    "highest_common_best_abs_gt_2s_rows": 18,
+    "artifact_cache_delta_mismatch_count": 0,
+    "current_pair_season_sd_s": {
+      "count": 46,
+      "mean": 0.33517143117804843,
+      "median": 0.31691431921920243,
+      "p75": 0.41199964277239864,
+      "max": 0.8687077134729314
+    },
+    "highest_common_best_pair_season_sd_s": {
+      "count": 48,
+      "mean": 0.5284145935391568,
+      "median": 0.45970259551897913,
+      "p75": 0.6484948822968476,
+      "max": 1.3279235956023883
+    },
+    "any_valid_best_pair_season_sd_s": {
+      "count": 48,
+      "mean": 1.0966087635021895,
+      "median": 0.8543172464933952,
+      "p75": 1.3071325060146735,
+      "max": 8.907340723877239
+    },
+    "current_vs_peak_mean_shift_s": {
+      "count": 49,
+      "mean": 0.019501555628964825,
+      "median": 0.0008489130434809547,
+      "p75": 0.09652777777777288,
+      "max": 0.4901249999999961
+    },
+    "phase5_wls_vs_equal_abs_shift_s": {
+      "count": 49,
+      "mean": 0.06419137877340637,
+      "median": 0.044890650889001904,
+      "p75": 0.09404009376588196,
+      "max": 0.2375650462989921
+    },
+    "highest_common_segment_counts": {
+      "Q1": 357,
+      "Q2": 248,
+      "Q3": 275
+    }
+  },
+  "largest_peak_row_gains": [
+    {
+      "target_id": "2025:Aston Martin:ALO-STR",
+      "current_rows": 11,
+      "highest_common_best_rows": 23,
+      "peak_row_gain_vs_current": 12
+    },
+    {
+      "target_id": "2022:Williams:ALB-LAT",
+      "current_rows": 6,
+      "highest_common_best_rows": 18,
+      "peak_row_gain_vs_current": 12
+    },
+    {
+      "target_id": "2023:Haas F1 Team:HUL-MAG",
+      "current_rows": 10,
+      "highest_common_best_rows": 21,
+      "peak_row_gain_vs_current": 11
+    },
+    {
+      "target_id": "2025:Kick Sauber:BOR-HUL",
+      "current_rows": 10,
+      "highest_common_best_rows": 21,
+      "peak_row_gain_vs_current": 11
+    },
+    {
+      "target_id": "2025:Alpine:COL-GAS",
+      "current_rows": 7,
+      "highest_common_best_rows": 18,
+      "peak_row_gain_vs_current": 11
+    },
+    {
+      "target_id": "2024:Alpine:GAS-OCO",
+      "current_rows": 12,
+      "highest_common_best_rows": 22,
+      "peak_row_gain_vs_current": 10
+    },
+    {
+      "target_id": "2024:Kick Sauber:BOT-ZHO",
+      "current_rows": 11,
+      "highest_common_best_rows": 21,
+      "peak_row_gain_vs_current": 10
+    },
+    {
+      "target_id": "2025:Haas F1 Team:BEA-OCO",
+      "current_rows": 14,
+      "highest_common_best_rows": 23,
+      "peak_row_gain_vs_current": 9
+    },
+    {
+      "target_id": "2023:McLaren:NOR-PIA",
+      "current_rows": 14,
+      "highest_common_best_rows": 22,
+      "peak_row_gain_vs_current": 8
+    },
+    {
+      "target_id": "2023:Williams:ALB-SAR",
+      "current_rows": 13,
+      "highest_common_best_rows": 21,
+      "peak_row_gain_vs_current": 8
+    }
+  ],
+  "largest_abs_peak_session_deltas": [
+    {
+      "target_id": "2024:Alpine:GAS-OCO",
+      "race_name": "British Grand Prix",
+      "highest_common_segment": "Q1",
+      "current_construct_delta_s": null,
+      "highest_common_best_delta_s": -5.247
+    },
+    {
+      "target_id": "2023:Red Bull Racing:PER-VER",
+      "race_name": "Canadian Grand Prix",
+      "highest_common_segment": "Q2",
+      "current_construct_delta_s": -0.7309999999999945,
+      "highest_common_best_delta_s": -4.299000000000007
+    },
+    {
+      "target_id": "2023:Haas F1 Team:HUL-MAG",
+      "race_name": "Belgian Grand Prix",
+      "highest_common_segment": "Q1",
+      "current_construct_delta_s": null,
+      "highest_common_best_delta_s": -3.9080000000000013
+    },
+    {
+      "target_id": "2022:Red Bull Racing:PER-VER",
+      "race_name": "Singapore Grand Prix",
+      "highest_common_segment": "Q3",
+      "current_construct_delta_s": 3.1850000000000023,
+      "highest_common_best_delta_s": 3.734000000000009
+    },
+    {
+      "target_id": "2022:Williams:ALB-LAT",
+      "race_name": "Australian Grand Prix",
+      "highest_common_segment": "Q1",
+      "current_construct_delta_s": null,
+      "highest_common_best_delta_s": 3.434999999999988
+    },
+    {
+      "target_id": "2023:McLaren:NOR-PIA",
+      "race_name": "Mexico City Grand Prix",
+      "highest_common_segment": "Q1",
+      "current_construct_delta_s": null,
+      "highest_common_best_delta_s": -3.3130000000000024
+    },
+    {
+      "target_id": "2025:Alpine:COL-GAS",
+      "race_name": "Las Vegas Grand Prix",
+      "highest_common_segment": "Q2",
+      "current_construct_delta_s": null,
+      "highest_common_best_delta_s": -3.0760000000000076
+    },
+    {
+      "target_id": "2024:Mercedes:HAM-RUS",
+      "race_name": "Las Vegas Grand Prix",
+      "highest_common_segment": "Q3",
+      "current_construct_delta_s": 0.06400000000000006,
+      "highest_common_best_delta_s": -2.8689999999999998
+    },
+    {
+      "target_id": "2023:Haas F1 Team:HUL-MAG",
+      "race_name": "British Grand Prix",
+      "highest_common_segment": "Q1",
+      "current_construct_delta_s": null,
+      "highest_common_best_delta_s": 2.7750000000000057
+    },
+    {
+      "target_id": "2023:Alpine:GAS-OCO",
+      "race_name": "Belgian Grand Prix",
+      "highest_common_segment": "Q2",
+      "current_construct_delta_s": -0.49500000000000455,
+      "highest_common_best_delta_s": 2.7009999999999934
+    }
+  ]
+}

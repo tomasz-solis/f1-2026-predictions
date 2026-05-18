@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-05-18T05:27:03.661214+00:00",
+  "built_at": "2026-05-17T18:38:07.745102+00:00",
   "config": {
     "bootstrap_random_seed": 2026,
     "bootstrap_replicates": 1000,
@@ -1148,258 +1148,6 @@
     "all_hard_checks_passed": false,
     "context_checks": [
       {
-        "check_id": "verstappen_perez_race_2022",
-        "direct_pair_diagnostics": {
-          "all_years": {
-            "max_delta_s": 3.006,
-            "median_delta_s": 0.35399999999999915,
-            "min_delta_s": -2.0359999999999943,
-            "n_matched_pairs": 2011,
-            "n_observations": 60,
-            "weighted_mean_delta_s": 0.42060463376683266
-          },
-          "scope_year": 2022,
-          "source_scope": {
-            "max_delta_s": 2.271000000000001,
-            "median_delta_s": 0.284000000000006,
-            "min_delta_s": -2.0359999999999943,
-            "n_matched_pairs": 577,
-            "n_observations": 19,
-            "weighted_mean_delta_s": 0.28148651373510564
-          }
-        },
-        "failure_analysis": "passed",
-        "failure_reason": null,
-        "faster_driver": "VER",
-        "margin_s": 0.18660463376683253,
-        "network_key": "race_network",
-        "observed_delta_s": 0.42060463376683255,
-        "pass_rule": "VER_mu_s - PER_mu_s >= 0.234",
-        "passed": true,
-        "scope": "Red Bull race pace, 2022 only",
-        "slower_driver": "PER",
-        "source": "Motorsport.com / PACETEQ Perez trend",
-        "source_type": "teammate race-pace delta",
-        "threshold_s": 0.234,
-        "tier": "EXTERNAL_CONTEXT"
-      },
-      {
-        "check_id": "verstappen_perez_race_2023",
-        "direct_pair_diagnostics": {
-          "all_years": {
-            "max_delta_s": 3.006,
-            "median_delta_s": 0.35399999999999915,
-            "min_delta_s": -2.0359999999999943,
-            "n_matched_pairs": 2011,
-            "n_observations": 60,
-            "weighted_mean_delta_s": 0.42060463376683266
-          },
-          "scope_year": 2023,
-          "source_scope": {
-            "max_delta_s": 0.7169999999999987,
-            "median_delta_s": 0.33524999999999494,
-            "min_delta_s": -0.6920000000000073,
-            "n_matched_pairs": 718,
-            "n_observations": 20,
-            "weighted_mean_delta_s": 0.29480698872187316
-          }
-        },
-        "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
-        "failure_reason": "below_threshold",
-        "faster_driver": "VER",
-        "margin_s": -0.030395366233167465,
-        "network_key": "race_network",
-        "observed_delta_s": 0.42060463376683255,
-        "pass_rule": "VER_mu_s - PER_mu_s >= 0.451",
-        "passed": false,
-        "scope": "Red Bull race pace, 2023 only",
-        "slower_driver": "PER",
-        "source": "Motorsport.com / PACETEQ 2023 review",
-        "source_type": "teammate race-pace delta",
-        "threshold_s": 0.451,
-        "tier": "EXTERNAL_CONTEXT"
-      },
-      {
-        "check_id": "verstappen_perez_race_2024",
-        "direct_pair_diagnostics": {
-          "all_years": {
-            "max_delta_s": 3.006,
-            "median_delta_s": 0.35399999999999915,
-            "min_delta_s": -2.0359999999999943,
-            "n_matched_pairs": 2011,
-            "n_observations": 60,
-            "weighted_mean_delta_s": 0.42060463376683266
-          },
-          "scope_year": 2024,
-          "source_scope": {
-            "max_delta_s": 3.006,
-            "median_delta_s": 0.4615000000000009,
-            "min_delta_s": -0.3510000000000062,
-            "n_matched_pairs": 716,
-            "n_observations": 21,
-            "weighted_mean_delta_s": 0.6244792081143065
-          }
-        },
-        "failure_analysis": "pooled_prior_below_source_scope_direct_delta",
-        "failure_reason": "below_threshold",
-        "faster_driver": "VER",
-        "margin_s": -0.1393953662331675,
-        "network_key": "race_network",
-        "observed_delta_s": 0.42060463376683255,
-        "pass_rule": "VER_mu_s - PER_mu_s >= 0.56",
-        "passed": false,
-        "scope": "Red Bull race pace, 2024 only",
-        "slower_driver": "PER",
-        "source": "Motorsport-Total / PACETEQ Red Bull duel",
-        "source_type": "teammate race-pace delta",
-        "threshold_s": 0.56,
-        "tier": "EXTERNAL_CONTEXT"
-      },
-      {
-        "check_id": "alonso_stroll_race_2023",
-        "direct_pair_diagnostics": {
-          "all_years": {
-            "max_delta_s": 1.6140000000000043,
-            "median_delta_s": 0.2037499999999994,
-            "min_delta_s": -1.531000000000006,
-            "n_matched_pairs": 1930,
-            "n_observations": 60,
-            "weighted_mean_delta_s": 0.2964549136348744
-          },
-          "scope_year": 2023,
-          "source_scope": {
-            "max_delta_s": 1.6140000000000043,
-            "median_delta_s": 0.3945000000000007,
-            "min_delta_s": -1.531000000000006,
-            "n_matched_pairs": 658,
-            "n_observations": 20,
-            "weighted_mean_delta_s": 0.4127353007837691
-          }
-        },
-        "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
-        "failure_reason": "below_threshold",
-        "faster_driver": "ALO",
-        "margin_s": -0.19453067604711421,
-        "network_key": "race_network",
-        "observed_delta_s": 0.2914693239528858,
-        "pass_rule": "ALO_mu_s - STR_mu_s >= 0.486",
-        "passed": false,
-        "scope": "Aston Martin race pace, 2023 only",
-        "slower_driver": "STR",
-        "source": "Motorsport.com / PACETEQ 2023 review",
-        "source_type": "teammate race-pace delta",
-        "threshold_s": 0.486,
-        "tier": "EXTERNAL_CONTEXT"
-      },
-      {
-        "check_id": "alonso_stroll_race_2024",
-        "direct_pair_diagnostics": {
-          "all_years": {
-            "max_delta_s": 1.6140000000000043,
-            "median_delta_s": 0.2037499999999994,
-            "min_delta_s": -1.531000000000006,
-            "n_matched_pairs": 1930,
-            "n_observations": 60,
-            "weighted_mean_delta_s": 0.2964549136348744
-          },
-          "scope_year": 2024,
-          "source_scope": {
-            "max_delta_s": 1.589500000000008,
-            "median_delta_s": 0.17300000000000182,
-            "min_delta_s": -1.1060000000000088,
-            "n_matched_pairs": 657,
-            "n_observations": 20,
-            "weighted_mean_delta_s": 0.22272588265761722
-          }
-        },
-        "failure_analysis": "passed",
-        "failure_reason": null,
-        "faster_driver": "ALO",
-        "margin_s": 0.04146932395288577,
-        "network_key": "race_network",
-        "observed_delta_s": 0.2914693239528858,
-        "pass_rule": "ALO_mu_s - STR_mu_s >= 0.25",
-        "passed": true,
-        "scope": "Aston Martin race pace, 2024 only",
-        "slower_driver": "STR",
-        "source": "Motorsport-Total / PACETEQ Aston Martin duel",
-        "source_type": "teammate race-pace delta",
-        "threshold_s": 0.25,
-        "tier": "EXTERNAL_CONTEXT"
-      },
-      {
-        "check_id": "albon_sargeant_race_2023",
-        "direct_pair_diagnostics": {
-          "all_years": {
-            "max_delta_s": 1.1310000000000002,
-            "median_delta_s": 0.16099999999999776,
-            "min_delta_s": -1.1030000000000086,
-            "n_matched_pairs": 949,
-            "n_observations": 30,
-            "weighted_mean_delta_s": 0.2489440594751114
-          },
-          "scope_year": 2023,
-          "source_scope": {
-            "max_delta_s": 1.1310000000000002,
-            "median_delta_s": 0.1219999999999998,
-            "min_delta_s": -1.1030000000000086,
-            "n_matched_pairs": 564,
-            "n_observations": 17,
-            "weighted_mean_delta_s": 0.2566761139430585
-          }
-        },
-        "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
-        "failure_reason": "below_threshold",
-        "faster_driver": "ALB",
-        "margin_s": -0.04405594052488876,
-        "network_key": "race_network",
-        "observed_delta_s": 0.24894405947511122,
-        "pass_rule": "ALB_mu_s - SAR_mu_s >= 0.293",
-        "passed": false,
-        "scope": "Williams race pace, 2023 only",
-        "slower_driver": "SAR",
-        "source": "Motorsport.com / PACETEQ 2023 review",
-        "source_type": "teammate race-pace delta",
-        "threshold_s": 0.293,
-        "tier": "EXTERNAL_CONTEXT"
-      },
-      {
-        "check_id": "albon_sargeant_race_2024",
-        "direct_pair_diagnostics": {
-          "all_years": {
-            "max_delta_s": 1.1310000000000002,
-            "median_delta_s": 0.16099999999999776,
-            "min_delta_s": -1.1030000000000086,
-            "n_matched_pairs": 949,
-            "n_observations": 30,
-            "weighted_mean_delta_s": 0.2489440594751114
-          },
-          "scope_year": 2024,
-          "source_scope": {
-            "max_delta_s": 0.6280000000000001,
-            "median_delta_s": 0.2620000000000004,
-            "min_delta_s": -0.0614999999999952,
-            "n_matched_pairs": 385,
-            "n_observations": 13,
-            "weighted_mean_delta_s": 0.2282761578963847
-          }
-        },
-        "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
-        "failure_reason": "below_threshold",
-        "faster_driver": "ALB",
-        "margin_s": -0.13105594052488878,
-        "network_key": "race_network",
-        "observed_delta_s": 0.24894405947511122,
-        "pass_rule": "ALB_mu_s - SAR_mu_s >= 0.38",
-        "passed": false,
-        "scope": "Williams race pace, 2024 Sargeant sample",
-        "slower_driver": "SAR",
-        "source": "Motorsport-Total / PACETEQ Williams duel",
-        "source_type": "teammate race-pace delta",
-        "threshold_s": 0.38,
-        "tier": "EXTERNAL_CONTEXT"
-      },
-      {
         "check_id": "verstappen_perez_quali_2022",
         "direct_pair_diagnostics": {
           "all_years": {
@@ -1643,15 +1391,273 @@
         "status": "SMOKE_ONLY"
       }
     ],
-    "failed_hard_check_ids": [],
+    "failed_hard_check_ids": [
+      "verstappen_perez_race_2023",
+      "verstappen_perez_race_2024",
+      "alonso_stroll_race_2023",
+      "albon_sargeant_race_2023",
+      "albon_sargeant_race_2024"
+    ],
     "hard_quali_passed": 0,
     "hard_quali_total": 0,
-    "hard_race_passed": 0,
-    "hard_race_total": 0,
-    "hard_validation_state": "provisional_no_same_construct_hard_checks",
+    "hard_race_passed": 2,
+    "hard_race_total": 7,
     "quali_validation_note": "Qualifying validation is provisional: the available external qualifying rows are reported as EXTERNAL_CONTEXT because they do not yet match the current multi-run qualifying construct closely enough to gate the fit.",
     "smoke_only_note": "Direction-only smoke checks are excluded from the HARD pass count and belong in tests.",
-    "source_backed_checks": [],
+    "source_backed_checks": [
+      {
+        "check_id": "verstappen_perez_race_2022",
+        "direct_pair_diagnostics": {
+          "all_years": {
+            "max_delta_s": 3.006,
+            "median_delta_s": 0.35399999999999915,
+            "min_delta_s": -2.0359999999999943,
+            "n_matched_pairs": 2011,
+            "n_observations": 60,
+            "weighted_mean_delta_s": 0.42060463376683266
+          },
+          "scope_year": 2022,
+          "source_scope": {
+            "max_delta_s": 2.271000000000001,
+            "median_delta_s": 0.284000000000006,
+            "min_delta_s": -2.0359999999999943,
+            "n_matched_pairs": 577,
+            "n_observations": 19,
+            "weighted_mean_delta_s": 0.28148651373510564
+          }
+        },
+        "failure_analysis": "passed",
+        "failure_reason": null,
+        "faster_driver": "VER",
+        "margin_s": 0.18660463376683253,
+        "network_key": "race_network",
+        "observed_delta_s": 0.42060463376683255,
+        "pass_rule": "VER_mu_s - PER_mu_s >= 0.234",
+        "passed": true,
+        "scope": "Red Bull race pace, 2022 only",
+        "slower_driver": "PER",
+        "source": "Motorsport.com / PACETEQ Perez trend",
+        "source_type": "teammate race-pace delta",
+        "threshold_s": 0.234,
+        "tier": "HARD"
+      },
+      {
+        "check_id": "verstappen_perez_race_2023",
+        "direct_pair_diagnostics": {
+          "all_years": {
+            "max_delta_s": 3.006,
+            "median_delta_s": 0.35399999999999915,
+            "min_delta_s": -2.0359999999999943,
+            "n_matched_pairs": 2011,
+            "n_observations": 60,
+            "weighted_mean_delta_s": 0.42060463376683266
+          },
+          "scope_year": 2023,
+          "source_scope": {
+            "max_delta_s": 0.7169999999999987,
+            "median_delta_s": 0.33524999999999494,
+            "min_delta_s": -0.6920000000000073,
+            "n_matched_pairs": 718,
+            "n_observations": 20,
+            "weighted_mean_delta_s": 0.29480698872187316
+          }
+        },
+        "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
+        "failure_reason": "below_threshold",
+        "faster_driver": "VER",
+        "margin_s": -0.030395366233167465,
+        "network_key": "race_network",
+        "observed_delta_s": 0.42060463376683255,
+        "pass_rule": "VER_mu_s - PER_mu_s >= 0.451",
+        "passed": false,
+        "scope": "Red Bull race pace, 2023 only",
+        "slower_driver": "PER",
+        "source": "Motorsport.com / PACETEQ 2023 review",
+        "source_type": "teammate race-pace delta",
+        "threshold_s": 0.451,
+        "tier": "HARD"
+      },
+      {
+        "check_id": "verstappen_perez_race_2024",
+        "direct_pair_diagnostics": {
+          "all_years": {
+            "max_delta_s": 3.006,
+            "median_delta_s": 0.35399999999999915,
+            "min_delta_s": -2.0359999999999943,
+            "n_matched_pairs": 2011,
+            "n_observations": 60,
+            "weighted_mean_delta_s": 0.42060463376683266
+          },
+          "scope_year": 2024,
+          "source_scope": {
+            "max_delta_s": 3.006,
+            "median_delta_s": 0.4615000000000009,
+            "min_delta_s": -0.3510000000000062,
+            "n_matched_pairs": 716,
+            "n_observations": 21,
+            "weighted_mean_delta_s": 0.6244792081143065
+          }
+        },
+        "failure_analysis": "pooled_prior_below_source_scope_direct_delta",
+        "failure_reason": "below_threshold",
+        "faster_driver": "VER",
+        "margin_s": -0.1393953662331675,
+        "network_key": "race_network",
+        "observed_delta_s": 0.42060463376683255,
+        "pass_rule": "VER_mu_s - PER_mu_s >= 0.56",
+        "passed": false,
+        "scope": "Red Bull race pace, 2024 only",
+        "slower_driver": "PER",
+        "source": "Motorsport-Total / PACETEQ Red Bull duel",
+        "source_type": "teammate race-pace delta",
+        "threshold_s": 0.56,
+        "tier": "HARD"
+      },
+      {
+        "check_id": "alonso_stroll_race_2023",
+        "direct_pair_diagnostics": {
+          "all_years": {
+            "max_delta_s": 1.6140000000000043,
+            "median_delta_s": 0.2037499999999994,
+            "min_delta_s": -1.531000000000006,
+            "n_matched_pairs": 1930,
+            "n_observations": 60,
+            "weighted_mean_delta_s": 0.2964549136348744
+          },
+          "scope_year": 2023,
+          "source_scope": {
+            "max_delta_s": 1.6140000000000043,
+            "median_delta_s": 0.3945000000000007,
+            "min_delta_s": -1.531000000000006,
+            "n_matched_pairs": 658,
+            "n_observations": 20,
+            "weighted_mean_delta_s": 0.4127353007837691
+          }
+        },
+        "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
+        "failure_reason": "below_threshold",
+        "faster_driver": "ALO",
+        "margin_s": -0.19453067604711421,
+        "network_key": "race_network",
+        "observed_delta_s": 0.2914693239528858,
+        "pass_rule": "ALO_mu_s - STR_mu_s >= 0.486",
+        "passed": false,
+        "scope": "Aston Martin race pace, 2023 only",
+        "slower_driver": "STR",
+        "source": "Motorsport.com / PACETEQ 2023 review",
+        "source_type": "teammate race-pace delta",
+        "threshold_s": 0.486,
+        "tier": "HARD"
+      },
+      {
+        "check_id": "alonso_stroll_race_2024",
+        "direct_pair_diagnostics": {
+          "all_years": {
+            "max_delta_s": 1.6140000000000043,
+            "median_delta_s": 0.2037499999999994,
+            "min_delta_s": -1.531000000000006,
+            "n_matched_pairs": 1930,
+            "n_observations": 60,
+            "weighted_mean_delta_s": 0.2964549136348744
+          },
+          "scope_year": 2024,
+          "source_scope": {
+            "max_delta_s": 1.589500000000008,
+            "median_delta_s": 0.17300000000000182,
+            "min_delta_s": -1.1060000000000088,
+            "n_matched_pairs": 657,
+            "n_observations": 20,
+            "weighted_mean_delta_s": 0.22272588265761722
+          }
+        },
+        "failure_analysis": "passed",
+        "failure_reason": null,
+        "faster_driver": "ALO",
+        "margin_s": 0.04146932395288577,
+        "network_key": "race_network",
+        "observed_delta_s": 0.2914693239528858,
+        "pass_rule": "ALO_mu_s - STR_mu_s >= 0.25",
+        "passed": true,
+        "scope": "Aston Martin race pace, 2024 only",
+        "slower_driver": "STR",
+        "source": "Motorsport-Total / PACETEQ Aston Martin duel",
+        "source_type": "teammate race-pace delta",
+        "threshold_s": 0.25,
+        "tier": "HARD"
+      },
+      {
+        "check_id": "albon_sargeant_race_2023",
+        "direct_pair_diagnostics": {
+          "all_years": {
+            "max_delta_s": 1.1310000000000002,
+            "median_delta_s": 0.16099999999999776,
+            "min_delta_s": -1.1030000000000086,
+            "n_matched_pairs": 949,
+            "n_observations": 30,
+            "weighted_mean_delta_s": 0.2489440594751114
+          },
+          "scope_year": 2023,
+          "source_scope": {
+            "max_delta_s": 1.1310000000000002,
+            "median_delta_s": 0.1219999999999998,
+            "min_delta_s": -1.1030000000000086,
+            "n_matched_pairs": 564,
+            "n_observations": 17,
+            "weighted_mean_delta_s": 0.2566761139430585
+          }
+        },
+        "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
+        "failure_reason": "below_threshold",
+        "faster_driver": "ALB",
+        "margin_s": -0.04405594052488876,
+        "network_key": "race_network",
+        "observed_delta_s": 0.24894405947511122,
+        "pass_rule": "ALB_mu_s - SAR_mu_s >= 0.293",
+        "passed": false,
+        "scope": "Williams race pace, 2023 only",
+        "slower_driver": "SAR",
+        "source": "Motorsport.com / PACETEQ 2023 review",
+        "source_type": "teammate race-pace delta",
+        "threshold_s": 0.293,
+        "tier": "HARD"
+      },
+      {
+        "check_id": "albon_sargeant_race_2024",
+        "direct_pair_diagnostics": {
+          "all_years": {
+            "max_delta_s": 1.1310000000000002,
+            "median_delta_s": 0.16099999999999776,
+            "min_delta_s": -1.1030000000000086,
+            "n_matched_pairs": 949,
+            "n_observations": 30,
+            "weighted_mean_delta_s": 0.2489440594751114
+          },
+          "scope_year": 2024,
+          "source_scope": {
+            "max_delta_s": 0.6280000000000001,
+            "median_delta_s": 0.2620000000000004,
+            "min_delta_s": -0.0614999999999952,
+            "n_matched_pairs": 385,
+            "n_observations": 13,
+            "weighted_mean_delta_s": 0.2282761578963847
+          }
+        },
+        "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
+        "failure_reason": "below_threshold",
+        "faster_driver": "ALB",
+        "margin_s": -0.13105594052488878,
+        "network_key": "race_network",
+        "observed_delta_s": 0.24894405947511122,
+        "pass_rule": "ALB_mu_s - SAR_mu_s >= 0.38",
+        "passed": false,
+        "scope": "Williams race pace, 2024 Sargeant sample",
+        "slower_driver": "SAR",
+        "source": "Motorsport-Total / PACETEQ Williams duel",
+        "source_type": "teammate race-pace delta",
+        "threshold_s": 0.38,
+        "tier": "HARD"
+      }
+    ],
     "supplemental_checks": [
       {
         "check_id": "bottas_zhou_race_2024",
@@ -1689,7 +1695,6 @@
         "threshold_s": 0.01,
         "tier": "SUPPLEMENTAL"
       }
-    ],
-    "validation_contract_note": "No PACETEQ rows currently count as HARD because the construct audit did not prove a same-construct match for either the current paired race residual or the current multi-run qualifying residual. These rows remain EXTERNAL_CONTEXT until genuinely aligned evidence is sourced."
+    ]
   }
 }

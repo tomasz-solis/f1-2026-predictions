@@ -418,6 +418,7 @@ def probe_qualifying_pair_constructs(
     *,
     reference_driver: str,
     comparison_driver: str,
+    team: str | None = None,
     weather_mode: WeatherMode,
     target_weather_bucket: Literal["dry", "wet"],
     config: MatchedLapConfig,
@@ -426,6 +427,7 @@ def probe_qualifying_pair_constructs(
 
     Returned deltas follow the extractor sign convention: positive means the
     requested ``reference_driver`` was faster than ``comparison_driver``.
+    ``team`` narrows the probe to one stored teammate context when supplied.
     """
     if weather_mode not in {"dry", "wet", "mixed", "unknown"}:
         raise ValueError(f"Unsupported weather_mode: {weather_mode!r}")
@@ -434,6 +436,8 @@ def probe_qualifying_pair_constructs(
 
     laps = _session_laps(session)
     pair_laps = laps[laps["Driver"].isin([reference_driver, comparison_driver])].copy()
+    if team is not None and "Team" in pair_laps.columns:
+        pair_laps = pair_laps[pair_laps["Team"].eq(team)].copy()
     if pair_laps.empty or set(pair_laps["Driver"]) != {reference_driver, comparison_driver}:
         return _empty_qualifying_construct_probe(
             pair_present=False,
@@ -487,6 +491,72 @@ def probe_qualifying_pair_constructs(
             valid_target,
             reference_driver=reference_driver,
             comparison_driver=comparison_driver,
+        ),
+    }
+
+
+def probe_race_pair_constructs(
+    session: Any,
+    *,
+    reference_driver: str,
+    comparison_driver: str,
+    team: str | None = None,
+    weather_mode: WeatherMode,
+    target_weather_bucket: Literal["dry", "wet"],
+    config: MatchedLapConfig,
+) -> dict[str, Any]:
+    """Summarize race construct variants for one ordered teammate pair.
+
+    Returned deltas follow the extractor sign convention: positive means the
+    requested ``reference_driver`` was faster than ``comparison_driver``.
+    ``team`` narrows the probe to one stored teammate context when supplied.
+    """
+    if weather_mode not in {"dry", "wet", "mixed", "unknown"}:
+        raise ValueError(f"Unsupported weather_mode: {weather_mode!r}")
+    if target_weather_bucket not in {WEATHER_DRY, WEATHER_WET}:
+        raise ValueError(f"Unsupported target weather bucket: {target_weather_bucket!r}")
+
+    laps = _session_laps(session)
+    pair_laps = laps[laps["Driver"].isin([reference_driver, comparison_driver])].copy()
+    if team is not None and "Team" in pair_laps.columns:
+        pair_laps = pair_laps[pair_laps["Team"].eq(team)].copy()
+    if pair_laps.empty or set(pair_laps["Driver"]) != {reference_driver, comparison_driver}:
+        return _empty_race_construct_probe(
+            pair_present=False,
+            target_weather_bucket=target_weather_bucket,
+        )
+
+    prepared = _prepare_laps(
+        pair_laps,
+        weather_data=_session_weather(session),
+        session_status=pd.DataFrame(),
+    )
+    valid = _valid_race_laps(prepared, weather_mode=weather_mode, config=config)
+    valid_target = valid[valid["weather_bucket"].eq(target_weather_bucket)].copy()
+    matches = _pair_race_laps(valid, reference_driver, comparison_driver)
+    target_matches = _matches_for_weather_bucket(matches, target_weather_bucket)
+
+    return {
+        "pair_present": True,
+        "target_weather_bucket": target_weather_bucket,
+        "current_construct_n_pairs": int(len(target_matches)),
+        "current_construct_delta_s": _median_match_delta(
+            target_matches,
+            min_pairs=config.min_matched_pairs_race,
+        ),
+        "valid_reference_laps": int(valid_target["Driver"].eq(reference_driver).sum()),
+        "valid_comparison_laps": int(valid_target["Driver"].eq(comparison_driver).sum()),
+        "broad_valid_median_delta_s": _driver_lap_center_delta(
+            valid_target,
+            reference_driver=reference_driver,
+            comparison_driver=comparison_driver,
+            reducer="median",
+        ),
+        "broad_valid_mean_delta_s": _driver_lap_center_delta(
+            valid_target,
+            reference_driver=reference_driver,
+            comparison_driver=comparison_driver,
+            reducer="mean",
         ),
     }
 
@@ -1122,7 +1192,7 @@ def _selected_qualifying_matches(
 
 
 def _matches_for_weather_bucket(matches: pd.DataFrame, weather_bucket: str) -> pd.DataFrame:
-    """Return qualifying matches whose reference lap belongs to one weather bucket."""
+    """Return matched laps whose reference lap belongs to one weather bucket."""
     if matches.empty:
         return matches.copy()
     mask = matches["reference"].map(lambda row: row["weather_bucket"]).eq(weather_bucket)
@@ -1161,6 +1231,30 @@ def _best_lap_delta(
     return float(comparison_best - reference_best)
 
 
+def _driver_lap_center_delta(
+    valid: pd.DataFrame,
+    *,
+    reference_driver: str,
+    comparison_driver: str,
+    reducer: Literal["mean", "median"],
+) -> float | None:
+    """Return comparison-minus-reference lap-center delta for valid rows."""
+    if valid.empty:
+        return None
+    grouped = valid.groupby("Driver", dropna=False)["lap_time_s"]
+    if reducer == "mean":
+        centers = grouped.mean()
+    elif reducer == "median":
+        centers = grouped.median()
+    else:
+        raise ValueError(f"Unsupported reducer: {reducer!r}")
+    reference_center = centers.get(reference_driver)
+    comparison_center = centers.get(comparison_driver)
+    if pd.isna(reference_center) or pd.isna(comparison_center):
+        return None
+    return float(comparison_center - reference_center)
+
+
 def _empty_qualifying_construct_probe(
     *,
     pair_present: bool,
@@ -1178,6 +1272,24 @@ def _empty_qualifying_construct_probe(
         "highest_common_segment": None,
         "highest_common_best_delta_s": None,
         "any_valid_best_delta_s": None,
+    }
+
+
+def _empty_race_construct_probe(
+    *,
+    pair_present: bool,
+    target_weather_bucket: str,
+) -> dict[str, Any]:
+    """Return an empty race construct-probe payload."""
+    return {
+        "pair_present": pair_present,
+        "target_weather_bucket": target_weather_bucket,
+        "current_construct_n_pairs": 0,
+        "current_construct_delta_s": None,
+        "valid_reference_laps": 0,
+        "valid_comparison_laps": 0,
+        "broad_valid_median_delta_s": None,
+        "broad_valid_mean_delta_s": None,
     }
 
 

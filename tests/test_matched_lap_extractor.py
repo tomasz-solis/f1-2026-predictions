@@ -18,6 +18,7 @@ from src.extractors.matched_laps import (
     diagnose_matched_lap_filters,
     extract_matched_teammate_laps,
     probe_qualifying_pair_constructs,
+    probe_race_pair_constructs,
 )
 
 
@@ -525,6 +526,87 @@ def test_qualifying_construct_probe_exposes_current_and_best_lap_views() -> None
     assert probe["highest_common_segment"] == "Q3"
     assert probe["highest_common_best_delta_s"] == pytest.approx(0.5)
     assert probe["any_valid_best_delta_s"] == pytest.approx(0.5)
+
+
+def test_qualifying_construct_probe_respects_requested_team() -> None:
+    """Team scoping prevents a probe from comparing drivers on different teams."""
+    rows = [
+        _quali_lap(
+            driver="AAA",
+            team="Team A",
+            lap_number=10,
+            lap_time_s=89.0,
+            segment="Q2",
+        ),
+        _quali_lap(
+            driver="BBB",
+            team="Team B",
+            lap_number=10,
+            lap_time_s=89.4,
+            segment="Q2",
+        ),
+    ]
+    session = _Session(
+        laps=pd.DataFrame(rows),
+        weather_data=_weather_for_laps(range(10, 11)),
+        session_name="Qualifying",
+    )
+
+    probe = probe_qualifying_pair_constructs(
+        session,
+        reference_driver="AAA",
+        comparison_driver="BBB",
+        team="Team A",
+        weather_mode="mixed",
+        target_weather_bucket="dry",
+        config=MatchedLapConfig(min_matched_pairs_quali=1),
+    )
+
+    assert probe["pair_present"] is False
+    assert probe["current_construct_delta_s"] is None
+
+
+def test_race_construct_probe_exposes_paired_and_broad_views() -> None:
+    """Race probes keep strict matched evidence separate from broad valid-lap pace."""
+    rows = [
+        _race_lap(driver="AAA", team="Example", lap_number=1, lap_time_s=90.0),
+        _race_lap(driver="BBB", team="Example", lap_number=1, lap_time_s=90.4),
+        _race_lap(driver="AAA", team="Example", lap_number=2, lap_time_s=90.0),
+        _race_lap(driver="BBB", team="Example", lap_number=2, lap_time_s=90.4),
+        _race_lap(driver="AAA", team="Example", lap_number=3, lap_time_s=91.0),
+        _race_lap(
+            driver="BBB",
+            team="Example",
+            lap_number=3,
+            lap_time_s=90.6,
+            compound="HARD",
+        ),
+        _race_lap(driver="AAA", team="Example", lap_number=4, lap_time_s=91.0),
+        _race_lap(driver="BBB", team="Example", lap_number=4, lap_time_s=90.6),
+    ]
+    session = _Session(
+        laps=pd.DataFrame(rows),
+        weather_data=_weather_for_laps(range(1, 5)),
+        session_name="Race",
+    )
+
+    probe = probe_race_pair_constructs(
+        session,
+        reference_driver="AAA",
+        comparison_driver="BBB",
+        team="Example",
+        weather_mode="mixed",
+        target_weather_bucket="dry",
+        config=MatchedLapConfig(min_matched_pairs_race=1),
+    )
+
+    assert probe["pair_present"] is True
+    assert probe["current_construct_n_pairs"] == 1
+    assert probe["current_construct_delta_s"] == pytest.approx(0.4)
+    assert probe["valid_reference_laps"] == 2
+    assert probe["valid_comparison_laps"] == 2
+    assert probe["broad_valid_median_delta_s"] == pytest.approx(0.0)
+    assert probe["broad_valid_mean_delta_s"] == pytest.approx(0.0)
 
 
 def test_aggregate_matched_laps_keeps_one_pair_observation_with_bootstrap_se() -> None:

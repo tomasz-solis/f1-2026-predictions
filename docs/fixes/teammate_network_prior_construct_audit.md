@@ -1,6 +1,6 @@
 # Teammate-Network Prior Construct Audit
 
-Date: 2026-05-16
+Date: 2026-05-17
 Status: Phase 6 audit note
 
 ## Purpose
@@ -226,6 +226,86 @@ Interpretation:
 - `ALB-SAR 2024` shows why the current Phase 5 sample is too thin to grade a
   full-period external season row cleanly.
 
+## Network-Wide Peak Probe
+
+On 2026-05-17 I extended the diagnostic from the six audited rows to every
+stored dry qualifying pair-season:
+
+- `scripts/probe_teammate_network_peak_constructs.py`
+
+Generated evidence:
+
+- `data/diagnostics/teammate_network_construct_probe/qualifying_network_peak_probe.md`
+- `data/diagnostics/teammate_network_construct_probe/qualifying_network_peak_probe.json`
+- `data/diagnostics/teammate_network_construct_probe/qualifying_network_pair_seasons.csv`
+- `data/diagnostics/teammate_network_construct_probe/qualifying_network_session_rows.csv`
+
+The wider result is mixed, not a simple vote for replacing the current
+extractor:
+
+| Measure | Current construct | Highest-common best | Any-valid best |
+| --- | ---: | ---: | ---: |
+| Session rows | `627` | `880` | `881` |
+| Pair-seasons with at least one row | `49` | `52` | `52` |
+| Median within-pair-season SD | `0.317s` | `0.460s` | `0.854s` |
+| P75 within-pair-season SD | `0.412s` | `0.648s` | `1.307s` |
+
+`highest_common_best` recovers `253` extra session rows and even supplies rows
+for three pair-seasons where the current construct has none:
+
+- `2022:Williams:DEV-LAT`;
+- `2024:Alpine:DOO-GAS`;
+- `2025:Red Bull Racing:LAW-VER`.
+
+That coverage gain is real. So is the noise cost:
+
+- `60` highest-common-best session rows have an absolute delta above `1s`;
+- `18` have an absolute delta above `2s`;
+- the largest session outliers include `2024:Alpine:GAS-OCO` at `-5.247s`
+  in Britain and `2023:Red Bull Racing:PER-VER` at `-4.299s` in Canada.
+
+Those are not believable skill measurements. They occur because a single
+best-lap statistic can still be driven by one compromised "valid" lap once the
+pair is reduced to a thin common segment. The current `1.07` quick-lap filter
+is wide enough that "best valid lap" is still not the same thing as "clean peak
+lap."
+
+The segment mix also matters:
+
+| Highest common segment | Rows |
+| --- | ---: |
+| `Q1` | `357` |
+| `Q2` | `248` |
+| `Q3` | `275` |
+
+More than two fifths of the recovered peak rows are Q1 rows. So even the
+stronger comparable-stage peak construct is not usually a Q3-only "when it
+matters" statistic. It is a cross-grid comparable-stage best-lap statistic.
+
+At pair-season level, the peak-minus-current equal-mean shift has:
+
+- median `0.001s`;
+- P75 `0.097s`;
+- max `0.490s`.
+
+That shape matters. Moving to `highest_common_best` does not apply one stable
+correction to the graph. It leaves the typical pair-season near where it was,
+while moving a minority of pair-seasons a lot. The Phase 5 WLS-versus-equal
+summary shift is itself non-trivial: median `0.045s`, P75 `0.094s`, max
+`0.238s`.
+
+The broader probe supports one conclusion strongly and another only weakly:
+
+- strongly supported: the current external qualifying rows should not be HARD
+  checks against the local multi-run estimator;
+- not yet supported: replacing the extractor wholesale with
+  `highest_common_best` is automatically better.
+
+If the project chooses a peak qualifying target, it still needs a tighter
+single-lap validity rule and a revised uncertainty model before that target is
+safe to fit as though it were just a higher-coverage version of the current
+construct.
+
 ## Row-By-Row Audit
 
 ### `verstappen_perez_quali_2023`
@@ -325,12 +405,69 @@ prior, has a direct source-scope local delta below its threshold
 (`0.223s/lap` versus `0.250s/lap`). A pooled pass can hide direct construct
 mismatch.
 
+### Reproducible Race Probe
+
+On 2026-05-17 I added a race-side offline probe:
+
+- `scripts/probe_teammate_network_race_constructs.py`
+
+Generated evidence:
+
+- `data/diagnostics/teammate_network_construct_probe/race_construct_probe.md`
+- `data/diagnostics/teammate_network_construct_probe/race_construct_probe.json`
+- `data/diagnostics/teammate_network_construct_probe/race_session_rows.csv`
+
+It recomputes the current paired extractor view and compares it with broader
+valid-lap summaries that keep the local lap-quality filters but remove
+same-compound and same-stint-lap pairing.
+
+| Row | HARD threshold | Current equal mean | Broad valid-lap median | Broad valid-lap mean |
+| --- | ---: | ---: | ---: | ---: |
+| `verstappen_perez_race_2022` | `0.234s/lap` | `0.250s/lap` | `0.322s/lap` | `0.330s/lap` |
+| `verstappen_perez_race_2023` | `0.451s/lap` | `0.259s/lap` | `0.298s/lap` | `0.462s/lap` |
+| `verstappen_perez_race_2024` | `0.560s/lap` | `0.667s/lap` | `0.488s/lap` | `0.636s/lap` |
+| `alonso_stroll_race_2023` | `0.486s/lap` | `0.364s/lap` | `0.325s/lap` | `0.372s/lap` |
+| `alonso_stroll_race_2024` | `0.250s/lap` | `0.249s/lap` | `0.359s/lap` | `0.462s/lap` |
+| `albon_sargeant_race_2023` | `0.293s/lap` | `0.214s/lap` | `0.749s/lap` | `0.729s/lap` |
+| `albon_sargeant_race_2024` | `0.380s/lap` | `0.264s/lap` | `0.482s/lap` | `0.472s/lap` |
+
+Interpretation:
+
+- removing the strict pairing rules can move the season summary materially;
+- `VER-PER 2023`, `ALB-SAR 2023`, and `ALB-SAR 2024` move toward or beyond the
+  published source rows under the broad valid-lap mean;
+- `ALO-STR 2023` does not, so "the local extractor is simply too narrow" is
+  not a complete explanation for every failed race row.
+
+The broad probe is useful as a sensitivity test, but it is not a replacement
+construct. It produces obviously polluted session numbers when the two drivers
+do not have comparable retained lap sets:
+
+- `ALB-SAR 2023` at Zandvoort: broad valid-lap mean `11.082s/lap`, with only
+  six Sargeant laps left;
+- `ALO-STR 2024` in Qatar: broad valid-lap mean `4.935s/lap`, with only one
+  Stroll lap left;
+- `VER-PER 2023` in Japan: broad valid-lap mean `3.176s/lap`, with only seven
+  Perez laps left.
+
+Those rows show why the current paired extractor exists. They also show why a
+generic published "race pace" summary is not automatically the same object as a
+strict paired residual.
+
+The race-side conclusion is therefore narrower than the qualifying conclusion:
+
+- the current race rows still carry useful external information;
+- the current evidence does not prove they are same-construct acceptance gates
+  for the paired extractor;
+- the broad probe supports construct sensitivity, but not a clean alternate
+  estimator that should replace the current race residual.
+
 ## What Should Change Next
 
-### 1. Stop treating the current HARD qualifying rows as acceptance gates
+### 1. Stop treating the current PACETEQ rows as acceptance gates
 
-Implemented on 2026-05-17: the current PACETEQ qualifying rows are now
-reported as `EXTERNAL_CONTEXT`, not HARD gates.
+Implemented on 2026-05-17: the current PACETEQ race and qualifying rows are
+now reported as `EXTERNAL_CONTEXT`, not HARD gates.
 
 Do not relax the numbers just to turn the Phase 6 boolean green.
 
@@ -351,8 +488,9 @@ validating it against best-lap thresholds. Use same-phase comparable-session
 sources, locally reproducible replay checks, or a dedicated same-construct
 source set instead.
 
-The project needs to choose. Right now it has one implementation and a
-different validation target.
+Decision recorded on 2026-05-17: keep repeatable qualifying execution for v1.
+Peak qualifying should return later as a separate candidate model, not as a
+patch to make mismatched source rows pass.
 
 ### 3. Tighten the validation evidence schema
 
@@ -370,28 +508,45 @@ Every future source-backed row should record:
 Without those fields, "HARD" only means "the source has a number," not "the
 source can grade this model."
 
-### 4. Add a reproducible construct-probe runner
+### 4. Use the new construct probes before changing extractor semantics
 
-Before re-locking validation, add one local diagnostic runner that emits, for
-each teammate-season pair:
+Implemented on 2026-05-17:
 
-- current extractor median;
-- equal-session mean of current extractor rows;
-- highest-common-segment best-lap gap;
-- unrestricted best-valid-lap gap;
-- source-scope session count;
-- excluded-session reasons.
+- the locked-row probe compares current, highest-common-best, and any-valid-best
+  views for the audited external rows;
+- the network-wide probe measures coverage, segment mix, dispersion, weighting
+  shifts, and peak-session outliers across every stored qualifying pair-season.
 
-That will make future construct decisions explicit instead of rediscovering the
-same ambiguity through failed thresholds.
+The broader probe now makes the tradeoff explicit: the peak comparable view adds
+coverage, but it is also noisier and still admits implausible single-session
+outliers. If the project chooses a peak qualifying target, the next extractor
+work should tighten single-lap validity and redesign uncertainty before refit.
 
 ### 5. Re-audit the race rows before calling them HARD
 
-For race pace, find evidence that the source either:
+Implemented in part on 2026-05-17: the local race probe now shows that broader
+valid-lap summaries can move several rows materially, but also that those broad
+summaries become unreliable when retained lap counts are badly imbalanced.
+
+For race pace, the remaining decision still needs evidence that the source
+either:
 
 - uses effectively the same lap controls as the local paired extractor; or
 - is intentionally accepted as a broader contextual target, in which case it
   should not be a pass/fail gate for the narrow extractor.
+
+### 6. Summer-break revisit
+
+Reminder: revisit peak qualifying as a separate candidate-model track on
+`2026-07-27`, the first day of the 2026 F1 summer break after the Hungarian
+Grand Prix.
+
+The review question is not "how do we make the old PACETEQ thresholds pass?"
+It is:
+
+> does a peak-qualifying candidate with stricter single-lap validity, its own
+> uncertainty model, replay stability, and held-out-season evidence outperform
+> the v1 repeatable-execution model enough to justify a second model path?
 
 ## Bottom Line
 
@@ -402,4 +557,14 @@ too conservative." The stronger explanation is:
 > estimator against season-summary external rows that often measure best-lap or
 > broader pace constructs.
 
-That gap should be fixed in the contract before Phase 7 work continues.
+Decision recorded on 2026-05-17:
+
+- keep the current race and qualifying extractor semantics for v1;
+- treat the current Phase 6 boolean failure as a validation-contract failure,
+  not as proof that the extractor is wrong;
+- continue the pipeline with internal reproducibility checks, replay stability,
+  held-out-season diagnostics, and source-backed external rows only when the
+  construct match is genuinely aligned;
+- revisit peak qualifying later as a separate candidate model.
+
+That gap is now fixed in the contract before Phase 7 work continues.

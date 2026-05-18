@@ -3,8 +3,9 @@
 Date: 2026-05-09
 Status: locked
 
-This file records hard, source-backed validation checks for the
-teammate-network prior. It exists to prevent post-fit rationalisation.
+This file records hard, source-backed validation checks and non-gating
+external evidence for the teammate-network prior. It exists to prevent
+post-fit rationalisation.
 
 A row is not a hard validation check until every required field is filled:
 
@@ -119,15 +120,21 @@ itself a HARD source.
 
 ### 1.3.6 Motorsport / PACETEQ Source Family Rule
 
-**Decision (2026-05-12).** Motorsport.com and Motorsport-Total articles that
-publish PACETEQ teammate pace deltas are accepted as HARD-capable sources for
-this validation set when the article states the construct, season or sample
-scope, and numeric seconds delta.
+**Decision (2026-05-12, amended 2026-05-17).** Motorsport.com and
+Motorsport-Total articles that publish PACETEQ teammate pace deltas are useful
+external timing-analysis evidence, but they are not HARD-capable for the
+current v1 extractor unless the article proves a same-construct match.
 
-This decision treats those articles as external timing-analysis evidence,
-not as project-internal model output. PACETEQ's lap-filtering details are not
-fully reproduced in the article text, but the published construct and numeric
-teammate deltas are close enough to the prior's target quantities to count.
+The amendment follows the construct audit:
+
+- the current qualifying extractor measures a multi-run matched-lap median,
+  while the best-documented PACETEQ qualifying rows use best qualifying times;
+- the current race extractor measures a tightly paired same-compound,
+  same-stint-lap residual, while the PACETEQ race articles do not document an
+  equivalent pairing rule.
+
+PACETEQ rows therefore remain visible as `EXTERNAL_CONTEXT`, not acceptance
+gates, until genuinely aligned evidence is found.
 
 Limits:
 
@@ -139,6 +146,27 @@ Limits:
   checks even if the source family is accepted;
 - conflicting non-PACETEQ sources should be noted when they materially
   affect threshold choice.
+
+### 1.3.7 Construct Audit
+
+**Decision (2026-05-17).** The available PACETEQ race and qualifying rows are
+no longer HARD acceptance gates for the current v1 extractor.
+
+The qualifying mismatch is direct: the current local qualifying construct is a
+matched multi-run median over comparable quick laps, while the best-documented
+2024 PACETEQ rows use best qualifying times.
+
+The race mismatch is less explicit but still not proven safe: the current local
+race construct is a paired residual under same-compound and same-stint-lap
+controls, while the available PACETEQ articles do not document an equivalent
+lap-control contract.
+
+Those rows remain useful external context, but they are now classified as
+`EXTERNAL_CONTEXT` until the project either:
+
+- changes `quali_rating_mu_s` to mean peak qualifying skill; or
+- sources same-construct evidence for the current race and qualifying
+  extractors.
 
 ### 1.4 Construct Mismatch Categories
 
@@ -277,12 +305,15 @@ criteria in Section 1. Action codes:
 
 After applying the audit and the 2026-05-12 Phase 1 source research pass:
 
-- **Race**: 7 HARD rows survive if the Motorsport / PACETEQ source family is
-  accepted; 3 Bottas-Zhou rows are cut or supplemental; the Russell-Latifi 2022
-  row is cut as an impossible pairing/year; Tsunoda-De Vries remains cut.
-- **Quali**: 6 HARD rows survive if the Motorsport / PACETEQ source family is
-  accepted; Leclerc-Sainz remains smoke-only because the original relationship
-  was hedged and contested.
+- **Race**: 7 PACETEQ rows remain as `EXTERNAL_CONTEXT` after the 2026-05-17
+  construct audit; none currently counts as a HARD gate for the paired race
+  extractor. Three Bottas-Zhou rows are cut or supplemental; the
+  Russell-Latifi 2022 row is cut as an impossible pairing/year; Tsunoda-De
+  Vries remains cut.
+- **Quali**: 6 PACETEQ rows remain as `EXTERNAL_CONTEXT`; none currently
+  counts as a HARD gate for the multi-run qualifying extractor. Leclerc-Sainz
+  remains smoke-only because the original relationship was hedged and
+  contested.
 
 The filled Section 3 tables are now the source of truth for Phase 1 status.
 The scratch file at `docs/fixes/phase_1_source_research.md` remains research
@@ -298,6 +329,8 @@ Each row also acquires an `evidence_tier` value during Phase 1, per
 Section 6:
 
 - HARD — counts toward pass/fail in the validation report;
+- EXTERNAL_CONTEXT — useful external evidence that does not yet match the
+  fitted construct closely enough to gate the fit;
 - SUPPLEMENTAL — F1Metrics-style or partly model-derived; reported
   separately, does not count toward pass/fail;
 - SMOKE_ONLY — direction-only smoke check; does not appear in the
@@ -305,13 +338,13 @@ Section 6:
 - CUT — researched and rejected; cut reason recorded.
 
 The evidence_tier is recorded in the Status column. HARD rows count toward
-the validation report; SUPPLEMENTAL and CUT rows do not.
+the validation report; EXTERNAL_CONTEXT, SUPPLEMENTAL, and CUT rows do not.
 
 ### 3.1 Race Candidates (Post-Audit)
 
 `verstappen_perez_race_2022`
 
-- Status: HARD.
+- Status: EXTERNAL_CONTEXT.
 - Scope: Red Bull race pace, 2022 only.
 - Expected relationship: VER faster than PER.
 - Threshold: `0.234s/lap`.
@@ -323,7 +356,7 @@ the validation report; SUPPLEMENTAL and CUT rows do not.
 
 `verstappen_perez_race_2023`
 
-- Status: HARD.
+- Status: EXTERNAL_CONTEXT.
 - Scope: Red Bull race pace, 2023 only.
 - Expected relationship: VER faster than PER.
 - Threshold: `0.451s/lap`.
@@ -334,7 +367,7 @@ the validation report; SUPPLEMENTAL and CUT rows do not.
 
 `verstappen_perez_race_2024`
 
-- Status: HARD.
+- Status: EXTERNAL_CONTEXT.
 - Scope: Red Bull race pace, 2024 only.
 - Expected relationship: VER faster than PER.
 - Threshold: `0.56s/lap`.
@@ -346,7 +379,7 @@ the validation report; SUPPLEMENTAL and CUT rows do not.
 
 `alonso_stroll_race_2023`
 
-- Status: HARD.
+- Status: EXTERNAL_CONTEXT.
 - Scope: Aston Martin race pace, 2023 only.
 - Expected relationship: ALO faster than STR.
 - Threshold: `0.486s/lap`.
@@ -358,7 +391,7 @@ the validation report; SUPPLEMENTAL and CUT rows do not.
 
 `alonso_stroll_race_2024`
 
-- Status: HARD.
+- Status: EXTERNAL_CONTEXT.
 - Scope: Aston Martin race pace, 2024 only.
 - Expected relationship: ALO faster than STR.
 - Threshold: `0.25s/lap`.
@@ -370,7 +403,7 @@ the validation report; SUPPLEMENTAL and CUT rows do not.
 
 `albon_sargeant_race_2023`
 
-- Status: HARD.
+- Status: EXTERNAL_CONTEXT.
 - Scope: Williams race pace, 2023 only.
 - Expected relationship: ALB faster than SAR.
 - Threshold: `0.293s/lap`.
@@ -382,7 +415,7 @@ the validation report; SUPPLEMENTAL and CUT rows do not.
 
 `albon_sargeant_race_2024`
 
-- Status: HARD.
+- Status: EXTERNAL_CONTEXT.
 - Scope: Williams race pace, 2024 Sargeant sample.
 - Expected relationship: ALB faster than SAR.
 - Threshold: `0.38s/lap`.
@@ -425,9 +458,12 @@ the validation report; SUPPLEMENTAL and CUT rows do not.
 
 ### 3.2 Qualifying Candidates (Post-Audit)
 
+These rows remain visible because they are useful external comparisons, but
+the 2026-05-17 construct audit demoted them from HARD to `EXTERNAL_CONTEXT`.
+
 `verstappen_perez_quali_2022`
 
-- Status: HARD.
+- Status: EXTERNAL_CONTEXT.
 - Scope: Red Bull qualifying, 2022.
 - Expected relationship: VER faster than PER.
 - Threshold: `0.290s`.
@@ -438,7 +474,7 @@ the validation report; SUPPLEMENTAL and CUT rows do not.
 
 `verstappen_perez_quali_2023`
 
-- Status: HARD.
+- Status: EXTERNAL_CONTEXT.
 - Scope: Red Bull qualifying, 2023.
 - Expected relationship: VER faster than PER.
 - Threshold: `0.621s`.
@@ -451,7 +487,7 @@ the validation report; SUPPLEMENTAL and CUT rows do not.
 
 `verstappen_perez_quali_2024`
 
-- Status: HARD.
+- Status: EXTERNAL_CONTEXT.
 - Scope: Red Bull qualifying, 2024.
 - Expected relationship: VER faster than PER.
 - Threshold: `0.66s`.
@@ -464,7 +500,7 @@ the validation report; SUPPLEMENTAL and CUT rows do not.
 
 `russell_hamilton_quali_2024`
 
-- Status: HARD.
+- Status: EXTERNAL_CONTEXT.
 - Scope: Mercedes qualifying, 2024 only.
 - Expected relationship: RUS faster than HAM.
 - Threshold: `0.23s`.
@@ -477,7 +513,7 @@ the validation report; SUPPLEMENTAL and CUT rows do not.
 
 `albon_sargeant_quali_2023`
 
-- Status: HARD.
+- Status: EXTERNAL_CONTEXT.
 - Scope: Williams qualifying, 2023 only.
 - Expected relationship: ALB faster than SAR.
 - Threshold: `0.522s`.
@@ -489,7 +525,7 @@ the validation report; SUPPLEMENTAL and CUT rows do not.
 
 `albon_sargeant_quali_2024`
 
-- Status: HARD.
+- Status: EXTERNAL_CONTEXT.
 - Scope: Williams qualifying, 2024 Sargeant sample.
 - Expected relationship: ALB faster than SAR.
 - Threshold: `0.66s`.
@@ -602,6 +638,9 @@ edited:
 HARD             — independent numeric seconds delta, methodology
                    stated or accepted under the Motorsport / PACETEQ
                    source-family rule. Counts toward pass/fail.
+EXTERNAL_CONTEXT — independent numeric seconds delta with useful context,
+                   but not a proven same-construct match for the current
+                   fitted target. Reported separately.
 SUPPLEMENTAL     — F1Metrics-style or partly model-derived; methodology
                    stated; or accepted-source evidence too near zero to
                    carry a hard threshold. Reported separately.
@@ -612,17 +651,18 @@ CUT              — researched and rejected; cut reason recorded.
 ```
 
 The validation report counts only HARD rows toward "passed/failed".
-SUPPLEMENTAL rows appear in a separate section. SMOKE_ONLY rows do not
-appear in the validation report at all.
+EXTERNAL_CONTEXT and SUPPLEMENTAL rows appear in separate sections.
+SMOKE_ONLY rows do not appear in the validation report at all.
 
 The prior validation report must state:
 
 - HARD race checks passed and failed, with thresholds and sources;
 - HARD quali checks passed and failed, with thresholds and sources;
+- EXTERNAL_CONTEXT rows reported separately (not counted toward pass/fail);
 - SUPPLEMENTAL rows reported separately (not counted toward pass/fail);
 - which candidate checks were CUT before fitting and why;
-- whether quali validation is weaker than race validation, and how the
-  prior compensates (wider sigma, stricter replay);
+- whether HARD validation is provisional, and what internal diagnostics carry
+  the load while same-construct external evidence is absent;
 - that SMOKE_ONLY direction tests are excluded from the pass count.
 
 ## 6.5 Phase 1 Validation Set Provenance
@@ -631,6 +671,11 @@ Phase 1 source research closed on 2026-05-12 with the Motorsport / PACETEQ
 source-family rule in Section 1.3.6 accepted.
 
 Filled HARD rows:
+
+- Race pace: 0 rows after the 2026-05-17 construct audit.
+- Qualifying pace: 0 rows after the 2026-05-17 construct audit.
+
+External context rows:
 
 - Race pace: 7 rows.
   `verstappen_perez_race_2022`, `verstappen_perez_race_2023`,
@@ -659,10 +704,10 @@ Cut rows and replacements:
 - `albon_sargeant_race_2023_2024` and
   `albon_sargeant_quali_2023_2024`: replaced by season-specific rows.
 
-Coverage note: the lock-count requirement is met on row count, but the
-source base is concentrated in one accepted source family. That is a known
-tradeoff, not independent corroboration across seven race and six qualifying
-checks.
+Coverage note: HARD validation is now explicitly provisional for both race and
+qualifying because the available external rows are useful but not proven
+same-construct evidence for the current extractors. That is preferable to
+counting incompatible checks as validation coverage.
 
 ## 7. Lock Rules
 

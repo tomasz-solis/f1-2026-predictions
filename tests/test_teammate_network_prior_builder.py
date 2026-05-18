@@ -80,7 +80,7 @@ def test_network_fit_rejects_multiple_large_components() -> None:
 
 
 def test_prior_artifact_validation_reports_threshold_failures(tmp_path: Path) -> None:
-    """Validation checks report observed deltas and do not hide failures."""
+    """Ambiguous PACETEQ rows stay external and do not fake a hard pass."""
     artifact = {
         "race_network": {
             "drivers": {
@@ -95,13 +95,17 @@ def test_prior_artifact_validation_reports_threshold_failures(tmp_path: Path) ->
 
     validation = evaluate_validation(artifact)
 
-    first = validation["source_backed_checks"][0]
+    first = validation["context_checks"][0]
     assert first["check_id"] == "verstappen_perez_race_2022"
     assert first["observed_delta_s"] == pytest.approx(0.35)
     assert first["passed"] is True
     assert first["failure_analysis"] == "passed"
     assert validation["all_hard_checks_passed"] is False
-    assert "verstappen_perez_race_2023" in validation["failed_hard_check_ids"]
+    assert validation["failed_hard_check_ids"] == []
+    assert validation["hard_validation_state"] == "provisional_no_same_construct_hard_checks"
+    assert validation["hard_race_total"] == 0
+    assert validation["hard_quali_total"] == 0
+    assert validation["context_checks"][0]["tier"] == "EXTERNAL_CONTEXT"
     assert validation["supplemental_checks"][0]["tier"] == "SUPPLEMENTAL"
 
     written = write_prior_artifacts(
@@ -123,7 +127,7 @@ def test_prior_artifact_validation_reports_threshold_failures(tmp_path: Path) ->
 
 
 def test_validation_reports_direct_pair_diagnostics() -> None:
-    """Validation diagnostics expose whether direct source-scope rows clear."""
+    """External context diagnostics still expose direct source-scope rows."""
     observations = pd.DataFrame(
         [
             _aggregate_row(
@@ -156,7 +160,7 @@ def test_validation_reports_direct_pair_diagnostics() -> None:
 
     target = next(
         row
-        for row in validation["source_backed_checks"]
+        for row in validation["context_checks"]
         if row["check_id"] == "verstappen_perez_race_2024"
     )
     diagnostics = target["direct_pair_diagnostics"]
@@ -187,13 +191,16 @@ def test_validation_report_contains_failure_context() -> None:
                 }
             ],
             "supplemental_checks": [],
+            "context_checks": [],
             "cut_checks": [],
             "hard_race_passed": 0,
             "hard_race_total": 1,
             "hard_quali_passed": 0,
             "hard_quali_total": 0,
             "failed_hard_check_ids": ["example_check"],
+            "hard_validation_state": "ready",
             "all_hard_checks_passed": False,
+            "validation_contract_note": "Validation contract note.",
             "quali_validation_note": "Qualifying validation note.",
             "smoke_only_note": "Smoke-only note.",
         },
