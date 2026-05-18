@@ -684,6 +684,22 @@ quali_observed_driver_to_field_s - quali_rating_mu_s
 team_strength_centered = team_strength - 0.5
 ```
 
+The current v1 decision is to keep that one stored scalar rather than split it
+into separate short-run and long-run team-strength states. A conventional-
+weekend support probe over the currently cached 2022-2025 FP rows did not show
+the required accuracy gain from the split:
+
+- row-weighted combined MSE:
+  - `shared_long_run = 0.5049`
+  - `split_short_quali_long_race = 0.5077`
+- the split beat the best shared policy in only two of four combined held-out
+  folds;
+- the split beat the best shared policy in zero qualifying folds.
+
+That is evidence against adding state now, not evidence that qualifying and race
+car behavior are literally the same. Keep the state simple until the split wins
+on the actual prediction objective.
+
 Fit the mappings once on historical data and freeze them for the model
 version. Do not continuously refit them during the active season. In-season
 learning updates team-strength state; it does not rewrite the mapping slope
@@ -737,6 +753,14 @@ Freezing the seconds scale assumes the historical relationship between
 team-strength units and seconds is usable for 2026. This is a stability
 assumption, not a guarantee.
 
+The same rule applies to any future short-run/long-run state split. The
+pre-2026 conventional-weekend probe is only support evidence because it sits
+before the regulation reset and its historical per-season counts reflect local
+FP cache coverage as well as sprint-weekend history. The decisive transfer-era
+question is whether 2026 conventional weekends show a consistent MSE gain under
+the new rules. Until that evidence exists, the v1 model keeps one stored
+team-strength state and separate race/qualifying seconds mappings.
+
 Trace diagnostics must monitor:
 
 - rolling correlation between predicted and observed team deltas in seconds;
@@ -782,9 +806,10 @@ Gut-feel magnitude checks do not enter the validation report. Direction-only
 checks (sign of teammate gap) are unit tests in `tests/test_prior_signs.py`,
 not validation evidence.
 
-Current state: filled on 2026-05-12, not final-locked. The validation doc now
-contains 7 HARD race rows, 6 HARD qualifying rows, one supplemental near-zero
-row, and documented cuts.
+Current state: locked on 2026-05-12, then amended on 2026-05-17 after the
+construct audit. The validation doc contains 13 external PACETEQ context rows,
+one supplemental near-zero row, no same-construct HARD rows yet, and documented
+cuts.
 
 ### 12.2 Extractor Smoke Sessions
 

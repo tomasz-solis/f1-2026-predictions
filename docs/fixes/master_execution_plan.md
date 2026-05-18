@@ -17,12 +17,15 @@ Two non-negotiable rules:
   This includes Phase 0. A doc that still has TODO entries in lock-required
   fields is not closed.
 
-Current local gate state as of 2026-05-12:
+Current local gate state as of 2026-05-18:
 
-- Phase 1 source-backed evidence rows are filled using the accepted
-  Motorsport / PACETEQ source-family rule.
+- Phase 1 source-backed evidence rows were filled, then reclassified on
+  2026-05-17 after the construct audit: the current PACETEQ race and
+  qualifying rows remain `EXTERNAL_CONTEXT`, not HARD gates, until a
+  same-construct match is proven.
 - Phase 2 smoke sessions are locked.
-- Phase 3 extractor implementation is the first model-path code change.
+- Phases 3-6 have produced the extractor, historical observation artifacts,
+  construct probes, and the first prior fit. The next planned phase is Phase 7.
 
 ---
 
@@ -74,20 +77,19 @@ Tasks:
   blanket approval by outlet; the methodology is judged per artifact.
 - F1Metrics-style sources are SUPPLEMENTAL only for v1. They may corroborate
   another timing source but never count toward HARD row totals.
-- Motorsport.com / Motorsport-Total PACETEQ teammate pace articles are
-  HARD-capable for v1 when they state the construct, sample scope, and
-  numeric seconds delta. Treat them as one accepted source family, not
-  independent corroboration of each other.
+- Motorsport.com / Motorsport-Total PACETEQ teammate pace articles remain
+  useful external context, but they are not HARD-capable for the current v1
+  extractor unless a same-construct match is proven.
 - Convert defensible numbers into hard checks with required fields filled
   (source URL, source type, threshold in seconds, pass rule, date accessed).
 - Cut weak checks instead of soft-grading them.
 
 Acceptance criteria:
 
-- At least 3 race checks and 2 quali checks filled with real sources, OR
-  the validation report explicitly labels quali coverage as provisional and
-  documents the compensation (wider initial sigma, stricter replay
-  diagnostics).
+- At least 3 race checks and 2 quali checks filled with real same-construct
+  sources, OR the validation report explicitly labels HARD validation as
+  provisional and documents the compensation through internal reproducibility,
+  stricter replay diagnostics, and held-out-season diagnostics.
 - Every filled row has all required fields.
 - Cut rows are documented with cut reason.
 - Conservative audit calls from Section 2 of the validation evidence file
@@ -249,13 +251,16 @@ Tasks:
   bootstrap.
 - Apply the population-SD fallback sigma rule for weak-evidence and
   unanchored drivers.
-- Validate against the locked validation evidence table (Phase 1).
+- Validate against the locked validation evidence table (Phase 1), while
+  keeping construct-mismatched rows as external context rather than pretending
+  they are acceptance gates.
 - Produce the output artifact per Section 9.
 
 Acceptance criteria:
 
-- Hard validation checks evaluated and reported. Failures are documented
-  with source threshold and observed value.
+- HARD validation state is reported explicitly. If no same-construct HARD rows
+  exist, the artifact must say so and remain provisional instead of treating an
+  empty HARD set as a pass.
 - Connected-component output matches the decision tree expectations.
   Multiple-large-components scenario triggers stop-and-inspect, not
   threshold relaxation.
@@ -279,6 +284,23 @@ calibration form are settled by this plan. If the first migration still has
 one stored `team_strength` scalar, fit separate race and qualifying mappings
 over that same scalar.
 
+Current state decision on the stored scalar: do **not** split it into
+independent short-run and long-run team-strength states in v1 yet. The
+pre-2026 conventional-weekend probe does not show the required accuracy gain:
+on the currently cached rows, `shared_long_run` beats the split policy on
+row-weighted combined MSE (`0.5049` versus `0.5077`), and the split wins only
+two of four combined held-out folds against the best shared policy. That is
+insufficient evidence for extra state. This is not a claim that race and
+qualifying pace are identical; it is a refusal to add a split before it proves
+useful on the model objective.
+
+The historical probe is support evidence only. Its per-season conventional
+weekend counts reflect the currently cached FP payloads as well as the sport's
+changing sprint-weekend usage, so they are not a clean season-calendar measure.
+For regulation-reset validity, 2026 conventional weekends are the real transfer
+test. Reopen the stored-state split only if 2026 evidence shows a consistent MSE
+gain rather than a one-off improvement.
+
 Tasks:
 
 - Fit separate race and qualifying `team_strength_to_seconds()` mappings.
@@ -297,6 +319,9 @@ Tasks:
     - document the transfer risk in the validation report;
     - decide between accepting wider intervals for 2026 and a one-time
       between-version refit. No continuous in-season refit.
+- Treat 2026 conventional-weekend evidence as the acceptance test for any
+  later short-run/long-run stored-state split. The pre-2026 probe can reject a
+  weak idea early; it cannot by itself prove transfer under the new regulations.
 - Freeze the mapping for the model version.
 
 Acceptance criteria:
