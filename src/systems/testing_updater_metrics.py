@@ -567,7 +567,14 @@ def _extract_braking_capability(valid_laps: pd.DataFrame) -> float | None:
         if callable(get_telemetry):
             try:
                 telemetry = get_telemetry()
-            except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
+            except (
+                AttributeError,
+                DataNotLoadedError,
+                KeyError,
+                RuntimeError,
+                TypeError,
+                ValueError,
+            ):
                 telemetry = None
 
         if telemetry is None:
@@ -575,7 +582,14 @@ def _extract_braking_capability(valid_laps: pd.DataFrame) -> float | None:
             if callable(get_car_data):
                 try:
                     telemetry = get_car_data()
-                except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
+                except (
+                    AttributeError,
+                    DataNotLoadedError,
+                    KeyError,
+                    RuntimeError,
+                    TypeError,
+                    ValueError,
+                ):
                     telemetry = None
 
         if not isinstance(telemetry, pd.DataFrame):

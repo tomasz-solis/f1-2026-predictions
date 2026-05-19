@@ -371,6 +371,46 @@ def test_extract_team_payload_attaches_braking_proxy_from_telemetry():
     assert payload["braking_profile"]["braking_pct"] == pytest.approx(40.0)
 
 
+def test_extract_team_payload_ignores_unloaded_braking_telemetry():
+    """Missing FastF1 telemetry should not abort practice refresh."""
+
+    class _UnloadedTelemetryLap:
+        def get_telemetry(self):
+            raise DataNotLoadedError("telemetry not loaded")
+
+        def get_car_data(self):
+            raise DataNotLoadedError("car data not loaded")
+
+    class _TelemetryLaps(pd.DataFrame):
+        _metadata = ["_lap_objects"]
+
+        def __init__(self, *args, lap_objects=None, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._lap_objects = list(lap_objects or [])
+
+        @property
+        def _constructor(self):
+            return _TelemetryLaps
+
+        def iterlaps(self, require=None):
+            del require
+            yield from enumerate(self._lap_objects)
+
+    laps = _TelemetryLaps(
+        {
+            "LapTime": [pd.to_timedelta("0:01:20"), pd.to_timedelta("0:01:21")],
+            "SpeedST": [310.0, 315.0],
+            "SpeedFL": [300.0, 301.0],
+        },
+        lap_objects=[_UnloadedTelemetryLap(), _UnloadedTelemetryLap()],
+    )
+
+    payload = _extract_team_payload(laps)
+
+    assert "braking_profile" not in payload
+    assert payload["speed_profile"]["top_speed"] == pytest.approx(312.5)
+
+
 def test_select_program_aware_laps_preserves_fastf1_laps_behaviour():
     """Representative lap selection should keep telemetry-capable lap containers."""
 
