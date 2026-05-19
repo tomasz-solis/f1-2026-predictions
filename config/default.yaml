@@ -14,7 +14,7 @@ grid:
   size: 22  # 11 teams x 2 drivers in the 2026 field
 
 model:
-  version: "2.0"
+  version: "2.1"
 
 # Bayesian Model Parameters
 bayesian:
@@ -203,6 +203,11 @@ baseline_predictor:
     # Compress team spread before scoring.
     # 1.0 = raw team deltas, lower = closer field.
     team_strength_compression: 0.60
+    # Converts the Phase 7 team-strength seconds delta into the existing
+    # qualifying latent-score scale. The value is anchored to the frozen race
+    # seconds slope so qualifying can use its own calibrated seconds spread
+    # without changing the rest of the scoring model.
+    team_strength_seconds_score_scale: 1.9707717329051126
 
     # Driver signal composition for qualifying
     driver_quali_pace_weight: 0.70
@@ -701,7 +706,9 @@ baseline_predictor:
       base: 0.28
       track_scale: 0.36
       min: 0.42
-      main_max: 0.62
+      # Capped from the 2026 completed-race movement check: the previous 0.62
+      # over-anchored full-distance median race order to predicted qualifying.
+      main_max: 0.57
       sprint_min: 0.85
       low_confidence_scale: 0.30
 

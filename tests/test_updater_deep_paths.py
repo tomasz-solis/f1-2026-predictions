@@ -725,6 +725,191 @@ def test_update_bayesian_driver_ratings_refreshes_quali_pace_from_qualifying_res
     assert payload["drivers"]["LEC"]["pace"]["quali_pace"] == pytest.approx(0.576, abs=1e-3)
 
 
+def test_update_bayesian_driver_ratings_persists_post_qualifying_session_state(patcher, tmp_path):
+    """Race+qualifying updates should both be counted in the stored posterior."""
+    from src.models.bayesian import DriverPrior
+
+    patcher.chdir(tmp_path)
+
+    race_results = pd.DataFrame(
+        {
+            "Abbreviation": ["LEC", "NOR"],
+            "Position": [1, 2],
+            "race_name": ["Bahrain Grand Prix", "Bahrain Grand Prix"],
+            "year": [2026, 2026],
+        }
+    )
+    qualifying_results = pd.DataFrame(
+        {
+            "Abbreviation": ["LEC", "NOR"],
+            "Position": [1, 2],
+            "race_name": ["Bahrain Grand Prix", "Bahrain Grand Prix"],
+            "year": [2026, 2026],
+        }
+    )
+
+    priors = {
+        "LEC": DriverPrior(
+            driver_number="16",
+            driver_code="LEC",
+            team="Ferrari",
+            team_tier="top",
+            mu=12.0,
+            sigma=2.0,
+        ),
+        "NOR": DriverPrior(
+            driver_number="4",
+            driver_code="NOR",
+            team="McLaren",
+            team_tier="top",
+            mu=12.0,
+            sigma=2.0,
+        ),
+    }
+    patcher.setattr("src.models.priors_factory.PriorsFactory.create_priors", lambda self: priors)
+    patcher.setattr("src.utils.lineups.load_current_lineups", lambda: None)
+
+    class _Store:
+        def __init__(self, data_root):
+            self.saved = []
+
+        def load_artifact(self, artifact_type, artifact_key):
+            if artifact_type == "driver_characteristics":
+                return {
+                    "version": 1,
+                    "drivers": {
+                        "LEC": {
+                            "racecraft": {"skill_score": 0.55, "overtaking_skill": 0.58},
+                            "pace": {"quali_pace": 0.60, "race_pace": 0.60},
+                            "dnf_risk": {"dnf_rate": 0.08},
+                            "bayesian": {
+                                "rating_mu": 12.0,
+                                "rating_sigma": 2.0,
+                                "sessions_observed": 3,
+                            },
+                        },
+                        "NOR": {
+                            "racecraft": {"skill_score": 0.60, "overtaking_skill": 0.61},
+                            "pace": {"quali_pace": 0.58, "race_pace": 0.64},
+                            "dnf_risk": {"dnf_rate": 0.07},
+                            "bayesian": {"rating_mu": 12.0, "rating_sigma": 2.0},
+                        },
+                    },
+                }
+            return None
+
+        def get_latest_version(self, artifact_type, artifact_key):
+            return 1
+
+        def save_artifact(self, artifact_type, artifact_key, data, version):
+            self.saved.append((artifact_type, artifact_key, data, version))
+
+    store = _Store("data")
+    patcher.setattr(updater, "ArtifactStore", lambda data_root: store)
+
+    def _config_get(key, default=None):
+        if key == "grid.size":
+            return 22
+        return default
+
+    patcher.setattr(updater.config_loader, "get", _config_get)
+
+    updater.update_bayesian_driver_ratings(race_results, qualifying_results=qualifying_results)
+
+    payload = store.saved[0][2]
+    assert payload["drivers"]["LEC"]["bayesian"]["sessions_observed"] == 5
+    assert payload["drivers"]["NOR"]["bayesian"]["sessions_observed"] == 2
+    assert payload["drivers"]["LEC"]["bayesian"]["last_session"] == "Qualifying_Bahrain Grand Prix"
+    assert payload["drivers"]["LEC"]["bayesian"]["rating_mu"] > 12.0
+
+
+def test_update_bayesian_driver_ratings_updates_dnf_rate_from_statuses(patcher, tmp_path):
+    """Finished and retired statuses should update DNF risk without hand tuning."""
+    from src.models.bayesian import DriverPrior
+
+    patcher.chdir(tmp_path)
+
+    race_results = pd.DataFrame(
+        {
+            "Abbreviation": ["LEC", "NOR"],
+            "Position": [1, 22],
+            "Status": ["Finished", "Retired"],
+            "race_name": ["Bahrain Grand Prix", "Bahrain Grand Prix"],
+            "year": [2026, 2026],
+        }
+    )
+
+    priors = {
+        "LEC": DriverPrior(
+            driver_number="16",
+            driver_code="LEC",
+            team="Ferrari",
+            team_tier="top",
+            mu=16.0,
+            sigma=2.0,
+        ),
+        "NOR": DriverPrior(
+            driver_number="4",
+            driver_code="NOR",
+            team="McLaren",
+            team_tier="top",
+            mu=15.0,
+            sigma=2.1,
+        ),
+    }
+    patcher.setattr("src.models.priors_factory.PriorsFactory.create_priors", lambda self: priors)
+    patcher.setattr("src.utils.lineups.load_current_lineups", lambda: None)
+
+    class _Store:
+        def __init__(self, data_root):
+            self.saved = []
+
+        def load_artifact(self, artifact_type, artifact_key):
+            if artifact_type == "driver_characteristics":
+                return {
+                    "version": 1,
+                    "drivers": {
+                        "LEC": {
+                            "racecraft": {"skill_score": 0.55, "overtaking_skill": 0.58},
+                            "pace": {"quali_pace": 0.60, "race_pace": 0.60},
+                            "dnf_risk": {"dnf_rate": 0.20},
+                        },
+                        "NOR": {
+                            "racecraft": {"skill_score": 0.60, "overtaking_skill": 0.61},
+                            "pace": {"quali_pace": 0.58, "race_pace": 0.64},
+                            "dnf_risk": {"dnf_rate": 0.10},
+                        },
+                    },
+                }
+            return None
+
+        def get_latest_version(self, artifact_type, artifact_key):
+            return 1
+
+        def save_artifact(self, artifact_type, artifact_key, data, version):
+            self.saved.append((artifact_type, artifact_key, data, version))
+
+    store = _Store("data")
+    patcher.setattr(updater, "ArtifactStore", lambda data_root: store)
+
+    def _config_get(key, default=None):
+        if key == "grid.size":
+            return 22
+        if key == "baseline_predictor.driver_form.dnf_rate_update_blend":
+            return 0.5
+        if key == "baseline_predictor.driver_form.dnf_rate_cap":
+            return 0.9
+        return default
+
+    patcher.setattr(updater.config_loader, "get", _config_get)
+
+    updater.update_bayesian_driver_ratings(race_results)
+
+    payload = store.saved[0][2]
+    assert payload["drivers"]["LEC"]["dnf_risk"]["dnf_rate"] == pytest.approx(0.10)
+    assert payload["drivers"]["NOR"]["dnf_risk"]["dnf_rate"] == pytest.approx(0.55)
+
+
 def test_load_driver_characteristics_payload_prefers_year_scoped_fallback(tmp_path, patcher):
     patcher.chdir(tmp_path)
 

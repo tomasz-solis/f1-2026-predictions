@@ -39,7 +39,7 @@ class GridConfig(StrictConfigModel):
 class ModelConfig(StrictConfigModel):
     """Model release metadata shared across generated artifacts."""
 
-    version: str = Field(default="2.0", min_length=1)
+    version: str = Field(default="2.1", min_length=1)
 
 
 class BayesianConfig(StrictConfigModel):
@@ -321,6 +321,7 @@ class BaselineQualifyingConfig(StrictConfigModel):
         return self
 
     team_strength_compression: float = Field(default=0.60, ge=0.0)
+    team_strength_seconds_score_scale: float = Field(default=1.9707717329051126, gt=0.0)
     driver_quali_pace_weight: float = Field(default=0.70, ge=0.0, le=1.0)
     driver_skill_weight: float = Field(default=0.30, ge=0.0, le=1.0)
     teammate_setup_std: float = Field(default=0.018, ge=0.0)
@@ -805,7 +806,7 @@ class GridAnchorConfig(StrictConfigModel):
     base: float = Field(default=0.28, ge=0.0)
     track_scale: float = Field(default=0.36, ge=0.0)
     min: float = Field(default=0.42, ge=0.0)
-    main_max: float = Field(default=0.70, ge=0.0)
+    main_max: float = Field(default=0.57, ge=0.0)
     sprint_min: float = Field(default=0.78, ge=0.0)
     low_confidence_scale: float = Field(default=0.30, ge=0.0)
 

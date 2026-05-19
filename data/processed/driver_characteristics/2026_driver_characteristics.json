@@ -6,15 +6,15 @@
     2025
   ],
   "method": "global_teammate_network_ranking",
-  "last_updated": "2026-04-25T08:04:41.351012+00:00",
+  "last_updated": "2026-05-19T19:32:51.252463",
   "bayesian_last_updated_year": 2026,
   "drivers": {
     "LEC": {
       "name": "Charles Leclerc",
       "wet_skill": 0.75,
       "pace": {
-        "quali_pace": 0.684,
-        "race_pace": 0.737
+        "quali_pace": 0.587,
+        "race_pace": 0.638
       },
       "racecraft": {
         "skill_score": 0.768,
@@ -27,14 +27,15 @@
         "tier": "established"
       },
       "dnf_risk": {
-        "dnf_rate": 0.1
+        "dnf_rate": 0.059
       },
       "bayesian": {
-        "rating_mu": 17.128,
-        "rating_sigma": 2.5,
-        "sessions_observed": 0,
+        "rating_mu": 14.26015311061757,
+        "rating_sigma": 2.7380535969431015,
+        "sessions_observed": 10,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -42,8 +43,8 @@
       "name": "Lewis Hamilton",
       "wet_skill": 0.9,
       "pace": {
-        "quali_pace": 0.636,
-        "race_pace": 0.601
+        "quali_pace": 0.505,
+        "race_pace": 0.587
       },
       "racecraft": {
         "skill_score": 0.634,
@@ -56,14 +57,15 @@
         "tier": "veteran"
       },
       "dnf_risk": {
-        "dnf_rate": 0.1
+        "dnf_rate": 0.059
       },
       "bayesian": {
-        "rating_mu": 14.314,
-        "rating_sigma": 2.5,
-        "sessions_observed": 0,
+        "rating_mu": 13.468281547864494,
+        "rating_sigma": 3.5204407318998396,
+        "sessions_observed": 10,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -71,8 +73,8 @@
       "name": "Fernando Alonso",
       "wet_skill": 0.85,
       "pace": {
-        "quali_pace": 0.712,
-        "race_pace": 0.746
+        "quali_pace": 0.543,
+        "race_pace": 0.608
       },
       "racecraft": {
         "skill_score": 0.714,
@@ -85,14 +87,15 @@
         "tier": "veteran"
       },
       "dnf_risk": {
-        "dnf_rate": 0.1
+        "dnf_rate": 0.202
       },
       "bayesian": {
-        "rating_mu": 15.994,
-        "rating_sigma": 2.5,
-        "sessions_observed": 0,
+        "rating_mu": 11.485486611176821,
+        "rating_sigma": 2.8725384315461286,
+        "sessions_observed": 8,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -100,8 +103,8 @@
       "name": "Gabriel Bortoleto",
       "wet_skill": 0.65,
       "pace": {
-        "quali_pace": 0.7,
-        "race_pace": 0.678
+        "quali_pace": 0.482,
+        "race_pace": 0.57
       },
       "racecraft": {
         "skill_score": 0.653,
@@ -114,14 +117,15 @@
         "tier": "rookie"
       },
       "dnf_risk": {
-        "dnf_rate": 0.208
+        "dnf_rate": 0.245
       },
       "bayesian": {
-        "rating_mu": 14.713,
-        "rating_sigma": 2.9,
-        "sessions_observed": 0,
+        "rating_mu": 11.187752145032377,
+        "rating_sigma": 5.584745422271346,
+        "sessions_observed": 8,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -129,8 +133,8 @@
       "name": "George Russell",
       "wet_skill": 0.8,
       "pace": {
-        "quali_pace": 0.738,
-        "race_pace": 0.779
+        "quali_pace": 0.53,
+        "race_pace": 0.618
       },
       "racecraft": {
         "skill_score": 0.748,
@@ -143,14 +147,15 @@
         "tier": "established"
       },
       "dnf_risk": {
-        "dnf_rate": 0.1
+        "dnf_rate": 0.059
       },
       "bayesian": {
-        "rating_mu": 16.708,
-        "rating_sigma": 2.5,
-        "sessions_observed": 0,
+        "rating_mu": 13.143384540908176,
+        "rating_sigma": 2.7132303306544685,
+        "sessions_observed": 10,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -158,8 +163,8 @@
       "name": "Sergio Perez",
       "wet_skill": 0.7,
       "pace": {
-        "quali_pace": 0.53,
-        "race_pace": 0.46
+        "quali_pace": 0.508,
+        "race_pace": 0.536
       },
       "racecraft": {
         "skill_score": 0.492,
@@ -172,14 +177,15 @@
         "tier": "veteran"
       },
       "dnf_risk": {
-        "dnf_rate": 0.152
+        "dnf_rate": 0.09
       },
       "bayesian": {
-        "rating_mu": 11.332,
-        "rating_sigma": 2.5,
-        "sessions_observed": 0,
+        "rating_mu": 12.464683181760432,
+        "rating_sigma": 2.5029424370138487,
+        "sessions_observed": 10,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -187,8 +193,8 @@
       "name": "Isack Hadjar",
       "wet_skill": 0.65,
       "pace": {
-        "quali_pace": 0.699,
-        "race_pace": 0.699
+        "quali_pace": 0.459,
+        "race_pace": 0.595
       },
       "racecraft": {
         "skill_score": 0.674,
@@ -201,14 +207,15 @@
         "tier": "rookie"
       },
       "dnf_risk": {
-        "dnf_rate": 0.125
+        "dnf_rate": 0.24
       },
       "bayesian": {
-        "rating_mu": 15.154,
-        "rating_sigma": 2.9,
-        "sessions_observed": 0,
+        "rating_mu": 10.444808209222442,
+        "rating_sigma": 7.11305612056584,
+        "sessions_observed": 8,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -216,8 +223,8 @@
       "name": "Oscar Piastri",
       "wet_skill": 0.7,
       "pace": {
-        "quali_pace": 0.61,
-        "race_pace": 0.578
+        "quali_pace": 0.528,
+        "race_pace": 0.577
       },
       "racecraft": {
         "skill_score": 0.607,
@@ -230,14 +237,15 @@
         "tier": "developing"
       },
       "dnf_risk": {
-        "dnf_rate": 0.071
+        "dnf_rate": 0.184
       },
       "bayesian": {
-        "rating_mu": 13.747,
-        "rating_sigma": 2.7,
-        "sessions_observed": 0,
+        "rating_mu": 13.394693234668143,
+        "rating_sigma": 2.048199995147813,
+        "sessions_observed": 8,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -245,8 +253,8 @@
       "name": "Valtteri Bottas",
       "wet_skill": 0.7,
       "pace": {
-        "quali_pace": 0.64,
-        "race_pace": 0.601
+        "quali_pace": 0.548,
+        "race_pace": 0.576
       },
       "racecraft": {
         "skill_score": 0.576,
@@ -259,14 +267,15 @@
         "tier": "veteran"
       },
       "dnf_risk": {
-        "dnf_rate": 0.109
+        "dnf_rate": 0.165
       },
       "bayesian": {
-        "rating_mu": 13.096,
-        "rating_sigma": 2.5,
-        "sessions_observed": 0,
+        "rating_mu": 13.027420303094308,
+        "rating_sigma": 1.8877632318026565,
+        "sessions_observed": 8,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -303,8 +312,8 @@
       "name": "Lance Stroll",
       "wet_skill": 0.6,
       "pace": {
-        "quali_pace": 0.619,
-        "race_pace": 0.577
+        "quali_pace": 0.522,
+        "race_pace": 0.513
       },
       "racecraft": {
         "skill_score": 0.607,
@@ -317,14 +326,15 @@
         "tier": "established"
       },
       "dnf_risk": {
-        "dnf_rate": 0.13
+        "dnf_rate": 0.239
       },
       "bayesian": {
-        "rating_mu": 13.747,
-        "rating_sigma": 2.5,
-        "sessions_observed": 0,
+        "rating_mu": 10.85986757843164,
+        "rating_sigma": 2.859059844955523,
+        "sessions_observed": 7,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -332,8 +342,8 @@
       "name": "Liam Lawson",
       "wet_skill": 0.7,
       "pace": {
-        "quali_pace": 0.644,
-        "race_pace": 0.612
+        "quali_pace": 0.563,
+        "race_pace": 0.617
       },
       "racecraft": {
         "skill_score": 0.626,
@@ -346,14 +356,15 @@
         "tier": "developing"
       },
       "dnf_risk": {
-        "dnf_rate": 0.171
+        "dnf_rate": 0.201
       },
       "bayesian": {
-        "rating_mu": 14.146,
-        "rating_sigma": 2.7,
-        "sessions_observed": 0,
+        "rating_mu": 13.20270387668936,
+        "rating_sigma": 3.726403236269727,
+        "sessions_observed": 9,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -361,8 +372,8 @@
       "name": "Carlos Sainz",
       "wet_skill": 0.75,
       "pace": {
-        "quali_pace": 0.691,
-        "race_pace": 0.647
+        "quali_pace": 0.588,
+        "race_pace": 0.637
       },
       "racecraft": {
         "skill_score": 0.642,
@@ -375,14 +386,15 @@
         "tier": "veteran"
       },
       "dnf_risk": {
-        "dnf_rate": 0.13
+        "dnf_rate": 0.077
       },
       "bayesian": {
-        "rating_mu": 14.482,
-        "rating_sigma": 2.5,
-        "sessions_observed": 0,
+        "rating_mu": 14.17439230020445,
+        "rating_sigma": 1.7842561905420957,
+        "sessions_observed": 9,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -419,8 +431,8 @@
       "name": "Oliver Bearman",
       "wet_skill": 0.7,
       "pace": {
-        "quali_pace": 0.634,
-        "race_pace": 0.59
+        "quali_pace": 0.537,
+        "race_pace": 0.662
       },
       "racecraft": {
         "skill_score": 0.601,
@@ -433,14 +445,15 @@
         "tier": "rookie"
       },
       "dnf_risk": {
-        "dnf_rate": 0.111
+        "dnf_rate": 0.151
       },
       "bayesian": {
-        "rating_mu": 13.621,
-        "rating_sigma": 2.9,
-        "sessions_observed": 0,
+        "rating_mu": 14.004402323213029,
+        "rating_sigma": 3.7990815255472623,
+        "sessions_observed": 9,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -448,8 +461,8 @@
       "name": "Max Verstappen",
       "wet_skill": 0.9,
       "pace": {
-        "quali_pace": 0.844,
-        "race_pace": 0.836
+        "quali_pace": 0.749,
+        "race_pace": 0.766
       },
       "racecraft": {
         "skill_score": 0.833,
@@ -462,14 +475,15 @@
         "tier": "veteran"
       },
       "dnf_risk": {
-        "dnf_rate": 0.03
+        "dnf_rate": 0.095
       },
       "bayesian": {
-        "rating_mu": 18.493,
-        "rating_sigma": 2.5,
-        "sessions_observed": 0,
+        "rating_mu": 16.453840456488308,
+        "rating_sigma": 2.848193327614638,
+        "sessions_observed": 8,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -477,8 +491,8 @@
       "name": "Pierre Gasly",
       "wet_skill": 0.75,
       "pace": {
-        "quali_pace": 0.693,
-        "race_pace": 0.712
+        "quali_pace": 0.609,
+        "race_pace": 0.715
       },
       "racecraft": {
         "skill_score": 0.681,
@@ -491,14 +505,15 @@
         "tier": "established"
       },
       "dnf_risk": {
-        "dnf_rate": 0.129
+        "dnf_rate": 0.177
       },
       "bayesian": {
-        "rating_mu": 15.301,
-        "rating_sigma": 2.5,
-        "sessions_observed": 0,
+        "rating_mu": 15.203071884967404,
+        "rating_sigma": 3.993271979060249,
+        "sessions_observed": 9,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -506,8 +521,8 @@
       "name": "Lando Norris",
       "wet_skill": 0.8,
       "pace": {
-        "quali_pace": 0.721,
-        "race_pace": 0.743
+        "quali_pace": 0.566,
+        "race_pace": 0.654
       },
       "racecraft": {
         "skill_score": 0.721,
@@ -520,14 +535,15 @@
         "tier": "established"
       },
       "dnf_risk": {
-        "dnf_rate": 0.057
+        "dnf_rate": 0.111
       },
       "bayesian": {
-        "rating_mu": 16.141,
-        "rating_sigma": 2.5,
-        "sessions_observed": 0,
+        "rating_mu": 13.66706048230261,
+        "rating_sigma": 2.764682330851864,
+        "sessions_observed": 9,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -593,8 +609,8 @@
       "name": "Franco Colapinto",
       "wet_skill": 0.65,
       "pace": {
-        "quali_pace": 0.672,
-        "race_pace": 0.631
+        "quali_pace": 0.494,
+        "race_pace": 0.571
       },
       "racecraft": {
         "skill_score": 0.606,
@@ -607,14 +623,15 @@
         "tier": "rookie"
       },
       "dnf_risk": {
-        "dnf_rate": 0.111
+        "dnf_rate": 0.066
       },
       "bayesian": {
-        "rating_mu": 13.726,
-        "rating_sigma": 2.9,
-        "sessions_observed": 0,
+        "rating_mu": 12.170897191718614,
+        "rating_sigma": 2.8155778674997185,
+        "sessions_observed": 10,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -651,8 +668,8 @@
       "name": "Alexander Albon",
       "wet_skill": 0.75,
       "pace": {
-        "quali_pace": 0.72,
-        "race_pace": 0.736
+        "quali_pace": 0.513,
+        "race_pace": 0.597
       },
       "racecraft": {
         "skill_score": 0.705,
@@ -665,14 +682,15 @@
         "tier": "established"
       },
       "dnf_risk": {
-        "dnf_rate": 0.2
+        "dnf_rate": 0.196
       },
       "bayesian": {
-        "rating_mu": 15.805,
-        "rating_sigma": 2.5,
-        "sessions_observed": 0,
+        "rating_mu": 12.0055244470798,
+        "rating_sigma": 2.778002682638803,
+        "sessions_observed": 9,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -738,8 +756,8 @@
       "name": "Nico Hulkenberg",
       "wet_skill": 0.7,
       "pace": {
-        "quali_pace": 0.662,
-        "race_pace": 0.706
+        "quali_pace": 0.62,
+        "race_pace": 0.644
       },
       "racecraft": {
         "skill_score": 0.677,
@@ -752,14 +770,15 @@
         "tier": "veteran"
       },
       "dnf_risk": {
-        "dnf_rate": 0.114
+        "dnf_rate": 0.313
       },
       "bayesian": {
-        "rating_mu": 15.217,
-        "rating_sigma": 2.5,
-        "sessions_observed": 0,
+        "rating_mu": 14.238098580323483,
+        "rating_sigma": 4.111221295051254,
+        "sessions_observed": 6,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -767,8 +786,8 @@
       "name": "Kimi Antonelli",
       "wet_skill": 0.7,
       "pace": {
-        "quali_pace": 0.577,
-        "race_pace": 0.52
+        "quali_pace": 0.561,
+        "race_pace": 0.599
       },
       "racecraft": {
         "skill_score": 0.545,
@@ -781,14 +800,15 @@
         "tier": "rookie"
       },
       "dnf_risk": {
-        "dnf_rate": 0.167
+        "dnf_rate": 0.098
       },
       "bayesian": {
-        "rating_mu": 12.445,
-        "rating_sigma": 2.9,
-        "sessions_observed": 0,
+        "rating_mu": 13.273425260612068,
+        "rating_sigma": 1.890431227226268,
+        "sessions_observed": 10,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -796,8 +816,8 @@
       "name": "Esteban Ocon",
       "wet_skill": 0.7,
       "pace": {
-        "quali_pace": 0.647,
-        "race_pace": 0.669
+        "quali_pace": 0.545,
+        "race_pace": 0.57
       },
       "racecraft": {
         "skill_score": 0.666,
@@ -810,14 +830,15 @@
         "tier": "established"
       },
       "dnf_risk": {
-        "dnf_rate": 0.145
+        "dnf_rate": 0.086
       },
       "bayesian": {
-        "rating_mu": 14.986,
-        "rating_sigma": 2.5,
-        "sessions_observed": 0,
+        "rating_mu": 13.500729972318975,
+        "rating_sigma": 1.7700644114461563,
+        "sessions_observed": 10,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     },
@@ -825,8 +846,8 @@
       "name": "Arvid Lindblad",
       "wet_skill": 0.6,
       "pace": {
-        "quali_pace": 0.594,
-        "race_pace": 0.596
+        "quali_pace": 0.508,
+        "race_pace": 0.519
       },
       "racecraft": {
         "skill_score": 0.595,
@@ -839,19 +860,21 @@
         "tier": "rookie"
       },
       "dnf_risk": {
-        "dnf_rate": 0.03
+        "dnf_rate": 0.097
       },
       "prior_source": "team_based_prior",
       "bayesian": {
-        "rating_mu": 13.495,
-        "rating_sigma": 3.2,
-        "sessions_observed": 0,
+        "rating_mu": 12.547490923002202,
+        "rating_sigma": 2.039991434780563,
+        "sessions_observed": 8,
         "seeded_from": "extraction_prior",
-        "last_updated": null,
+        "last_session": "Qualifying_Miami Grand Prix",
+        "last_updated": "2026-05-19T19:32:51.251023",
         "season_year": 2026
       }
     }
   },
   "year": 2026,
-  "note": "Preseason 2026 prior built from driver form from seasons 2023, 2024, 2025. Used for historical replay without target-season race leakage."
+  "note": "Preseason 2026 prior built from driver form from seasons 2023, 2024, 2025. Used for historical replay without target-season race leakage.",
+  "version": 7
 }

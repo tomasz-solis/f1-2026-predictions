@@ -21,6 +21,52 @@ def _driver_characteristics_fallback_paths(data_dir: Path, season_year: int) -> 
     )
 
 
+def _experience_tier_for_season(driver_stats: dict, season_year: int) -> str:
+    """Resolve a driver's experience tier for the requested season."""
+    experience = driver_stats.get("experience", {}) if isinstance(driver_stats, dict) else {}
+    stored_tier = str(experience.get("tier", "rookie") or "rookie").strip().lower()
+    if stored_tier == "sophomore":
+        stored_tier = "second_year"
+
+    debut_year = experience.get("debut_year")
+    stored_years = experience.get("years_of_experience")
+    effective_years: int | None = None
+    try:
+        effective_years = int(stored_years)
+    except (TypeError, ValueError):
+        effective_years = None
+
+    try:
+        debut_year_int = int(debut_year) if debut_year is not None else None
+    except (TypeError, ValueError):
+        debut_year_int = None
+
+    if debut_year_int is not None and int(season_year) >= debut_year_int:
+        computed_years = int(season_year) - debut_year_int
+        effective_years = (
+            computed_years
+            if effective_years is None
+            else max(
+                effective_years,
+                computed_years,
+            )
+        )
+
+    if effective_years is None:
+        return stored_tier
+    if effective_years <= 0:
+        return "rookie"
+    if effective_years == 1:
+        return "second_year"
+    if effective_years <= 3:
+        return "developing"
+    if effective_years <= 6:
+        return "established"
+    if effective_years <= 14:
+        return "veteran"
+    return "sunset"
+
+
 class PriorsFactory:
     """Build Bayesian driver priors from persisted driver and car characteristics."""
 
@@ -84,7 +130,7 @@ class PriorsFactory:
             car_perf = self._get_car_performance(team_name)
             driver_stats = self.drivers.get(driver_code, {})
             skill_score = driver_stats.get("racecraft", {}).get("skill_score", 0.5)
-            experience = driver_stats.get("experience", {}).get("tier", "rookie")
+            experience = _experience_tier_for_season(driver_stats, self.season_year)
 
             # Driver skill nudges the team baseline without overpowering it.
             modifier = (skill_score * 4) - 2

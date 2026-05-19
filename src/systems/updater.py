@@ -2,6 +2,7 @@
 
 import json
 import logging
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -170,6 +171,78 @@ def _restore_bayesian_state(
         seeded_drivers += 1
 
     return seeded_drivers
+
+
+def _read_sessions_observed(bayesian_payload: Any) -> int:
+    """Read a non-negative observed-session count from a Bayesian payload."""
+    if not isinstance(bayesian_payload, dict):
+        return 0
+    try:
+        return max(int(bayesian_payload.get("sessions_observed", 0)), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _bayesian_history_metadata(
+    bayesian: BayesianDriverRanking,
+) -> tuple[Counter[str], dict[str, str]]:
+    """Summarize update counts and last session names from a Bayesian model."""
+    raw_history = getattr(bayesian, "history", [])
+    if not isinstance(raw_history, list):
+        return Counter(), {}
+
+    update_counts: Counter[str] = Counter()
+    last_sessions: dict[str, str] = {}
+    for record in raw_history:
+        driver_code = str(getattr(record, "driver_number", "")).strip()
+        session_name = str(getattr(record, "session_name", "")).strip()
+        if not driver_code:
+            continue
+        update_counts[driver_code] += 1
+        if session_name:
+            last_sessions[driver_code] = session_name
+    return update_counts, last_sessions
+
+
+def _persist_bayesian_ratings_to_drivers(
+    *,
+    bayesian: BayesianDriverRanking,
+    drivers_payload: dict[str, Any],
+    season_year: int,
+    fallback_session_name: str,
+    updated_at: str,
+) -> int:
+    """Persist the current Bayesian ratings and observed-session counters."""
+    update_counts, last_sessions = _bayesian_history_metadata(bayesian)
+    touched = 0
+
+    for driver_code, (mu, sigma) in bayesian.ratings.items():
+        driver_entry = drivers_payload.get(driver_code)
+        if not isinstance(driver_entry, dict):
+            continue
+
+        previous_bayesian = driver_entry.get("bayesian")
+        sessions_observed = _read_sessions_observed(previous_bayesian) + int(
+            update_counts.get(driver_code, 0)
+        )
+        seeded_from = (
+            previous_bayesian.get("seeded_from") if isinstance(previous_bayesian, dict) else None
+        )
+        if not seeded_from:
+            seeded_from = "inseason_update" if sessions_observed > 0 else "extraction_prior"
+
+        driver_entry["bayesian"] = {
+            "rating_mu": float(mu),
+            "rating_sigma": float(sigma),
+            "sessions_observed": int(sessions_observed),
+            "seeded_from": str(seeded_from),
+            "last_session": last_sessions.get(driver_code, fallback_session_name),
+            "last_updated": updated_at,
+            "season_year": season_year,
+        }
+        touched += 1
+
+    return touched
 
 
 def load_competitive_session(
@@ -371,6 +444,65 @@ def _extract_dnf_drivers(race_results: pd.DataFrame) -> set[str]:
     return dnf_drivers
 
 
+def _status_observed_driver_codes(session_results: pd.DataFrame) -> set[str]:
+    """Return drivers whose result row has an explicit classified status."""
+    observed: set[str] = set()
+    if not isinstance(session_results, pd.DataFrame):
+        return observed
+    if "Abbreviation" not in session_results.columns or "Status" not in session_results.columns:
+        return observed
+
+    for _, row in session_results.iterrows():
+        status = str(row.get("Status", "")).strip()
+        driver_code = str(row.get("Abbreviation", "")).strip()
+        if status and driver_code:
+            observed.add(driver_code)
+    return observed
+
+
+def _update_dnf_rate_ema(
+    *,
+    session_results: pd.DataFrame,
+    drivers_payload: dict[str, Any],
+    blend_weight: float,
+    floor: float,
+    cap: float,
+) -> int:
+    """Update stored DNF risk from explicit classified/retired statuses."""
+    observed_codes = _status_observed_driver_codes(session_results)
+    if not observed_codes:
+        return 0
+
+    dnf_drivers = _extract_dnf_drivers(session_results)
+    safe_blend = float(np.clip(blend_weight, 0.0, 1.0))
+    safe_floor = float(np.clip(floor, 0.0, 1.0))
+    safe_cap = float(np.clip(max(cap, safe_floor), safe_floor, 1.0))
+    touched = 0
+
+    for driver_code in observed_codes:
+        driver_entry = drivers_payload.get(driver_code)
+        if not isinstance(driver_entry, dict):
+            continue
+        dnf_payload = driver_entry.get("dnf_risk")
+        if not isinstance(dnf_payload, dict):
+            dnf_payload = {}
+            driver_entry["dnf_risk"] = dnf_payload
+
+        try:
+            existing_rate = float(dnf_payload.get("dnf_rate", 0.10))
+        except (TypeError, ValueError):
+            existing_rate = 0.10
+        if not np.isfinite(existing_rate):
+            existing_rate = 0.10
+
+        observed_rate = 1.0 if driver_code in dnf_drivers else 0.0
+        updated_rate = ((1.0 - safe_blend) * existing_rate) + (safe_blend * observed_rate)
+        dnf_payload["dnf_rate"] = round(float(np.clip(updated_rate, safe_floor, safe_cap)), 3)
+        touched += 1
+
+    return touched
+
+
 def _update_teammate_relative_pace_ema(
     *,
     observations: dict[str, int],
@@ -519,24 +651,6 @@ def update_bayesian_driver_ratings(
         )
         return
 
-    touched_skill_drivers = 0
-    for driver_code, (mu, sigma) in bayesian.ratings.items():
-        driver_entry = drivers_payload.get(driver_code)
-        if not isinstance(driver_entry, dict):
-            continue
-
-        # Persist Bayesian state only. Prediction-time blending in
-        # _blend_race_skill_with_bayesian_form handles the skill_score
-        # adjustment — keeping it in one place avoids double-counting.
-        driver_entry["bayesian"] = {
-            "rating_mu": float(mu),
-            "rating_sigma": float(sigma),
-            "last_session": session_name,
-            "last_updated": datetime.now().isoformat(),
-            "season_year": season_year,
-        }
-        touched_skill_drivers += 1
-
     # --- Qualifying Bayesian update ---
     # Lower confidence than race (0.15 vs 0.35): qualifying is one lap in controlled
     # conditions, so it's a noisier signal than race finishing position.
@@ -572,6 +686,18 @@ def update_bayesian_driver_ratings(
             len(qualifying_observations),
             quali_bayesian_confidence,
         )
+
+    # Persist Bayesian state only. Prediction-time blending in
+    # _blend_race_skill_with_bayesian_form handles the skill_score adjustment —
+    # keeping it in one place avoids double-counting. This must happen after the
+    # qualifying update above so the stored posterior reflects both sessions.
+    touched_skill_drivers = _persist_bayesian_ratings_to_drivers(
+        bayesian=bayesian,
+        drivers_payload=drivers_payload,
+        season_year=season_year,
+        fallback_session_name=session_name,
+        updated_at=datetime.now().isoformat(),
+    )
 
     # --- Qualifying pace EMA update (teammate-relative) ---
     quali_pace_blend = float(
@@ -655,11 +781,23 @@ def update_bayesian_driver_ratings(
         if touched_wet_skill_drivers > 0:
             logger.info("Updated wet_skill for %d drivers", touched_wet_skill_drivers)
 
+    dnf_rate_blend = float(
+        config_loader.get("baseline_predictor.driver_form.dnf_rate_update_blend", 0.10)
+    )
+    touched_dnf_rate_drivers = _update_dnf_rate_ema(
+        session_results=race_results,
+        drivers_payload=drivers_payload,
+        blend_weight=dnf_rate_blend,
+        floor=float(config_loader.get("baseline_predictor.driver_form.dnf_rate_floor", 0.02)),
+        cap=float(config_loader.get("baseline_predictor.driver_form.dnf_rate_cap", 0.35)),
+    )
+
     if (
         touched_skill_drivers == 0
         and touched_quali_pace_drivers == 0
         and touched_race_pace_drivers == 0
         and touched_wet_skill_drivers == 0
+        and touched_dnf_rate_drivers == 0
     ):
         logger.warning("Bayesian update produced no persisted driver changes")
         return
@@ -667,12 +805,13 @@ def update_bayesian_driver_ratings(
     _persist_driver_characteristics_payload(store, driver_payload, season_year)
     logger.info(
         "Updated Bayesian ratings for %s drivers, blended skill for %s, "
-        "qualifying pace for %s, race pace for %s, wet_skill for %s",
+        "qualifying pace for %s, race pace for %s, wet_skill for %s, dnf_rate for %s",
         len(observations),
         touched_skill_drivers,
         touched_quali_pace_drivers,
         touched_race_pace_drivers,
         touched_wet_skill_drivers,
+        touched_dnf_rate_drivers,
     )
 
 
@@ -847,18 +986,13 @@ def update_from_sprint_race(
             confidence=sprint_confidence,
         )
 
-    for driver_code, (mu, sigma) in bayesian.ratings.items():
-        driver_entry = drivers_payload.get(driver_code)
-        if not isinstance(driver_entry, dict):
-            continue
-        driver_entry["bayesian"] = {
-            "rating_mu": float(mu),
-            "rating_sigma": float(sigma),
-            "last_session": session_name,
-            "last_updated": datetime.now().isoformat(),
-            "season_year": season_year,
-        }
-        strip_legacy_bayesian_fields({driver_code: driver_entry})
+    touched_bayesian = _persist_bayesian_ratings_to_drivers(
+        bayesian=bayesian,
+        drivers_payload=drivers_payload,
+        season_year=season_year,
+        fallback_session_name=session_name,
+        updated_at=datetime.now().isoformat(),
+    )
 
     # Sprint race pace EMA — lower blend than main race because sprint is ~1/3 distance.
     driver_to_team: dict[str, str] = {}
@@ -924,13 +1058,27 @@ def update_from_sprint_race(
         if touched_wet > 0:
             logger.info("Sprint wet_skill update: %d drivers", touched_wet)
 
+    sprint_dnf_blend = (
+        float(config_loader.get("baseline_predictor.driver_form.dnf_rate_update_blend", 0.10)) * 0.5
+    )
+    touched_dnf_rate = _update_dnf_rate_ema(
+        session_results=sprint_results,
+        drivers_payload=drivers_payload,
+        blend_weight=sprint_dnf_blend,
+        floor=float(config_loader.get("baseline_predictor.driver_form.dnf_rate_floor", 0.02)),
+        cap=float(config_loader.get("baseline_predictor.driver_form.dnf_rate_cap", 0.35)),
+    )
+
     _persist_driver_characteristics_payload(store, driver_payload, season_year)
     logger.info(
         "Sprint update applied for %s drivers: Bayesian (confidence=%.2f), "
-        "race_pace EMA (%d drivers, blend=%.2f), wet_skill (%d drivers)",
+        "persisted ratings (%d), race_pace EMA (%d drivers, blend=%.2f), "
+        "wet_skill (%d drivers), dnf_rate (%d drivers)",
         len(observations),
         sprint_confidence,
+        touched_bayesian,
         touched_pace,
         sprint_pace_blend,
         touched_wet,
+        touched_dnf_rate,
     )

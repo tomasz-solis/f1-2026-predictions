@@ -6,8 +6,9 @@ older scoring scheme. The script:
 
 1. Backs up the current 2026 car and driver files.
 2. Resets the 2026 car file to the seeded preseason baseline.
-3. Restores the 2026 driver file from the carried-over baseline file.
-4. Replays completed races through ``update_from_race`` using cached FastF1 data.
+3. Restores the 2026 driver file from a clean preseason driver baseline.
+4. Replays completed practice, sprint, and race sessions through the updaters using cached
+   FastF1 data.
 5. Refreshes team note strings so they describe the rebuilt state honestly.
 """
 
@@ -32,6 +33,7 @@ _DEFAULT_RACES = (
     "Australian Grand Prix",
     "Chinese Grand Prix",
     "Japanese Grand Prix",
+    "Miami Grand Prix",
 )
 _TEAM_2026_SEEDS = {
     "McLaren": {"position": 1, "performance": 0.85},
@@ -68,6 +70,32 @@ def _parse_args() -> argparse.Namespace:
         default=2026,
         help="Season year to rebuild.",
     )
+    parser.add_argument(
+        "--car-baseline-file",
+        default=None,
+        help=(
+            "Clean car baseline to restore before replay. Defaults to the "
+            "*.pre_sync_backup file when present."
+        ),
+    )
+    parser.add_argument(
+        "--driver-baseline-file",
+        default=None,
+        help=(
+            "Clean driver baseline to restore before replay. Defaults to the current "
+            "season-scoped driver file, read before it is overwritten."
+        ),
+    )
+    parser.add_argument(
+        "--skip-sprint-updates",
+        action="store_true",
+        help="Replay only grand-prix qualifying/race updates.",
+    )
+    parser.add_argument(
+        "--skip-practice-updates",
+        action="store_true",
+        help="Do not replay FP/testing-derived car directionality updates.",
+    )
     return parser.parse_args()
 
 
@@ -76,6 +104,27 @@ def _load_update_from_race() -> Any:
     from src.systems.updater import update_from_race
 
     return update_from_race
+
+
+def _load_update_from_sprint_race() -> Any:
+    """Import the sprint updater lazily after the project root is on ``sys.path``."""
+    from src.systems.updater import update_from_sprint_race
+
+    return update_from_sprint_race
+
+
+def _load_update_from_testing_sessions() -> Any:
+    """Import the practice updater lazily after the project root is on ``sys.path``."""
+    from src.systems.testing_updater import update_from_testing_sessions
+
+    return update_from_testing_sessions
+
+
+def _load_is_sprint_weekend() -> Any:
+    """Import the sprint-weekend resolver lazily after the project root is on ``sys.path``."""
+    from src.utils.weekend import is_sprint_weekend
+
+    return is_sprint_weekend
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -102,6 +151,14 @@ def _backup_file(path: Path) -> Path:
         return backup_path
     shutil.copy2(path, backup_path)
     return backup_path
+
+
+def _reset_artifact_from_payload(path: Path, payload: dict[str, Any], *, year: int) -> None:
+    """Restore an artifact from an already-loaded clean baseline payload."""
+    reset_payload = deepcopy(payload)
+    reset_payload["year"] = int(year)
+    reset_payload["version"] = 1
+    _write_json(path, reset_payload)
 
 
 def _reset_car_artifact(car_file: Path, *, year: int) -> None:
@@ -141,25 +198,18 @@ def _reset_car_artifact(car_file: Path, *, year: int) -> None:
 def _reset_driver_artifact(
     driver_file: Path,
     *,
-    baseline_driver_file: Path,
+    baseline_payload: dict[str, Any],
     year: int,
 ) -> None:
-    """Restore the 2026 driver file from the carried-over baseline profile."""
-    baseline_payload = _read_json(baseline_driver_file)
+    """Restore the 2026 driver file from a clean preseason profile."""
     baseline_drivers = baseline_payload.get("drivers")
     if not isinstance(baseline_drivers, dict):
-        raise ValueError(f"{baseline_driver_file} is missing the 'drivers' payload")
+        raise ValueError("Driver baseline payload is missing the 'drivers' payload")
 
-    target_payload: dict[str, Any] = {
-        "note": f"{year} driver baseline carried over from 2025 before in-season updates",
-        "years": baseline_payload.get("years", [2025]),
-        "method": baseline_payload.get("method", "historical_carry_over"),
-        "drivers": deepcopy(baseline_drivers),
-        "version": 1,
-        "last_updated": baseline_payload.get("extraction_date"),
-        "extraction_date": baseline_payload.get("extraction_date"),
-        "carried_over_from": 2025,
-    }
+    target_payload: dict[str, Any] = deepcopy(baseline_payload)
+    target_payload["year"] = int(year)
+    target_payload["version"] = 1
+    target_payload["bayesian_last_updated_year"] = int(year)
     _write_json(driver_file, target_payload)
 
 
@@ -184,10 +234,18 @@ def _refresh_team_notes(car_file: Path) -> None:
     _write_json(car_file, payload)
 
 
+def _practice_sessions_for_weekend(is_sprint: bool) -> list[str]:
+    """Return practice sessions that exist before competitive running."""
+    return ["FP1"] if is_sprint else ["FP1", "FP2", "FP3"]
+
+
 def main() -> None:
     """Reset the 2026 seed artifacts and replay completed race weekends."""
     args = _parse_args()
     update_from_race = _load_update_from_race()
+    update_from_sprint_race = _load_update_from_sprint_race()
+    update_from_testing_sessions = _load_update_from_testing_sessions()
+    is_sprint_weekend = _load_is_sprint_weekend()
     data_dir = Path(args.data_dir)
     year = int(args.year)
     races = [str(race).strip() for race in args.races if str(race).strip()]
@@ -196,29 +254,65 @@ def main() -> None:
 
     car_file = data_dir / "car_characteristics" / f"{year}_car_characteristics.json"
     driver_file = data_dir / "driver_characteristics" / f"{year}_driver_characteristics.json"
-    baseline_driver_file = data_dir / "driver_characteristics.json"
+    default_car_baseline = car_file.with_suffix(car_file.suffix + ".pre_sync_backup")
+    car_baseline_file = (
+        Path(args.car_baseline_file)
+        if args.car_baseline_file
+        else (default_car_baseline if default_car_baseline.exists() else None)
+    )
+    driver_baseline_file = (
+        Path(args.driver_baseline_file) if args.driver_baseline_file else driver_file
+    )
 
     if not car_file.exists():
         raise FileNotFoundError(f"Missing car artifact: {car_file}")
-    if not baseline_driver_file.exists():
-        raise FileNotFoundError(f"Missing baseline driver artifact: {baseline_driver_file}")
     if not driver_file.exists():
         raise FileNotFoundError(f"Missing 2026 driver artifact: {driver_file}")
+    if not driver_baseline_file.exists():
+        raise FileNotFoundError(f"Missing driver baseline artifact: {driver_baseline_file}")
+
+    driver_baseline_payload = _read_json(driver_baseline_file)
+    car_baseline_payload = _read_json(car_baseline_file) if car_baseline_file is not None else None
 
     car_backup = _backup_file(car_file)
     driver_backup = _backup_file(driver_file)
     logger.info("Backed up %s -> %s", car_file, car_backup)
     logger.info("Backed up %s -> %s", driver_file, driver_backup)
 
-    _reset_car_artifact(car_file, year=year)
+    if car_baseline_payload is not None:
+        logger.info("Resetting car artifact from %s", car_baseline_file)
+        _reset_artifact_from_payload(car_file, car_baseline_payload, year=year)
+    else:
+        logger.info("Resetting car artifact from embedded 2026 seed table")
+        _reset_car_artifact(car_file, year=year)
     _reset_driver_artifact(
         driver_file,
-        baseline_driver_file=baseline_driver_file,
+        baseline_payload=driver_baseline_payload,
         year=year,
     )
 
+    data_root = data_dir.parent if data_dir.name == "processed" else data_dir
     for race_name in races:
         logger.info("Replaying %s %s", year, race_name)
+        sprint_weekend = bool(is_sprint_weekend(year, race_name))
+        if not args.skip_practice_updates:
+            update_from_testing_sessions(
+                year=year,
+                characteristics_year=year,
+                events=[race_name],
+                data_dir=str(data_dir),
+                sessions=_practice_sessions_for_weekend(sprint_weekend),
+                testing_backend="auto",
+                cache_dir="data/raw/.fastf1_cache",
+                force_renew_cache=False,
+                new_weight=0.7,
+                directionality_scale=0.10,
+                session_aggregation="laps_weighted",
+                run_profile="balanced",
+                dry_run=False,
+            )
+        if not args.skip_sprint_updates and sprint_weekend:
+            update_from_sprint_race(year, race_name, str(data_root))
         update_from_race(year, race_name, str(data_dir))
 
     _refresh_team_notes(car_file)

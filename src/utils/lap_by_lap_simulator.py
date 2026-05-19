@@ -390,16 +390,19 @@ def simulate_race_lap_by_lap(
             team_strength = info["team_strength_by_compound"].get(compound, info["team_strength"])
             skill = info["skill"]
 
-            # Base lap time from team strength (inverted: 1.0 = fastest, 0.0 = slowest)
+            # Base lap time from team strength. Phase 7 mappings provide a
+            # direct seconds delta; older callers fall back to the legacy
+            # compressed unit-strength penalty.
             reference_base = _reference_base
             team_pace_penalty_range = _team_pace_penalty_range
             skill_improvement_max = _skill_improvement_max
             team_strength_compression = _team_strength_compression
 
-            compressed_team_strength = 0.5 + ((team_strength - 0.5) * team_strength_compression)
-            compressed_team_strength = np.clip(compressed_team_strength, 0.0, 1.0)
-
-            team_pace_penalty = (1.0 - compressed_team_strength) * team_pace_penalty_range
+            team_pace_delta_s = _resolve_team_pace_delta_seconds(info, compound)
+            if team_pace_delta_s is None:
+                compressed_team_strength = 0.5 + ((team_strength - 0.5) * team_strength_compression)
+                compressed_team_strength = np.clip(compressed_team_strength, 0.0, 1.0)
+                team_pace_delta_s = -((1.0 - compressed_team_strength) * team_pace_penalty_range)
             skill_improvement = skill * skill_improvement_max
             elite_skill_threshold = _elite_skill_threshold
             elite_skill_lap_bonus_max = _elite_skill_lap_bonus_max
@@ -423,7 +426,7 @@ def simulate_race_lap_by_lap(
 
             base_lap_time = (
                 reference_base
-                + team_pace_penalty
+                - team_pace_delta_s
                 - skill_improvement
                 - elite_skill_bonus
                 + race_advantage_delta
@@ -564,6 +567,30 @@ def _resolve_base_chaos_std(race_params: dict[str, Any], weather: str) -> float:
     if weather_key == "mixed":
         return float(mixed_std)
     return dry_std
+
+
+def _resolve_team_pace_delta_seconds(
+    info: dict[str, Any],
+    compound: str,
+) -> float | None:
+    """Return centered team pace seconds for a driver and compound when available."""
+    compound_deltas = info.get("team_strength_seconds_delta_by_compound")
+    if isinstance(compound_deltas, dict) and compound in compound_deltas:
+        try:
+            value = float(compound_deltas[compound])
+        except (TypeError, ValueError):
+            value = float("nan")
+        if np.isfinite(value):
+            return value
+
+    raw_value = info.get("team_strength_seconds_delta")
+    try:
+        value = float(raw_value) if raw_value is not None else float("nan")
+    except (TypeError, ValueError):
+        value = float("nan")
+    if np.isfinite(value):
+        return value
+    return None
 
 
 def _compute_race_wet_skill_modifier(

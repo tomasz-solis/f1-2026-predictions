@@ -1,70 +1,70 @@
 {
   "grid": [
     {
-      "confidence": 50.9,
+      "confidence": 49.7,
       "driver": "RUS",
-      "median_position": 2,
+      "median_position": 3,
       "p5": 1,
       "p95": 6,
       "position": 1,
       "team": "Mercedes"
     },
     {
-      "confidence": 46.7,
-      "driver": "NOR",
+      "confidence": 46.3,
+      "driver": "LEC",
       "median_position": 3,
       "p5": 1,
       "p95": 8,
       "position": 2,
-      "team": "McLaren"
+      "team": "Ferrari"
     },
     {
-      "confidence": 44.9,
-      "driver": "LEC",
+      "confidence": 45.1,
+      "driver": "VER",
       "median_position": 4,
       "p5": 1,
       "p95": 9,
       "position": 3,
-      "team": "Ferrari"
-    },
-    {
-      "confidence": 42.9,
-      "driver": "VER",
-      "median_position": 4,
-      "p5": 1,
-      "p95": 11,
-      "position": 4,
       "team": "Red Bull Racing"
     },
     {
-      "confidence": 47.2,
+      "confidence": 47.3,
       "driver": "ANT",
-      "median_position": 5,
-      "p5": 2,
-      "p95": 10,
-      "position": 5,
+      "median_position": 4,
+      "p5": 1,
+      "p95": 9,
+      "position": 4,
       "team": "Mercedes"
     },
     {
-      "confidence": 41.0,
+      "confidence": 46.2,
+      "driver": "NOR",
+      "median_position": 5,
+      "p5": 1,
+      "p95": 8,
+      "position": 5,
+      "team": "McLaren"
+    },
+    {
+      "confidence": 42.4,
       "driver": "HAM",
       "median_position": 6,
       "p5": 1,
-      "p95": 12,
+      "p95": 11,
       "position": 6,
       "team": "Ferrari"
     },
     {
-      "confidence": 43.8,
+      "confidence": 43.6,
       "driver": "PIA",
       "median_position": 6,
       "p5": 1,
-      "p95": 11,
+      "p95": 13,
       "position": 7,
       "team": "McLaren"
     },
     {
-      "confidence": 41.6,
+      "confidence": 41.5,
       "driver": "HAD",
       "median_position": 8,
       "p5": 3,
@@ -73,29 +73,29 @@
       "team": "Red Bull Racing"
     },
     {
-      "confidence": 42.8,
+      "confidence": 42.2,
       "driver": "LAW",
       "median_position": 10,
       "p5": 5,
-      "p95": 15,
+      "p95": 16,
       "position": 9,
       "team": "RB"
     },
     {
-      "confidence": 41.6,
-      "driver": "ALB",
-      "median_position": 11,
+      "confidence": 40.0,
+      "driver": "GAS",
+      "median_position": 12,
       "p5": 6,
       "p95": 17,
       "position": 10,
-      "team": "Williams"
+      "team": "Alpine"
     },
     {
-      "confidence": 42.5,
+      "confidence": 41.4,
       "driver": "LIN",
       "median_position": 12,
-      "p5": 8,
-      "p95": 17,
+      "p5": 7,
+      "p95": 19,
       "position": 11,
       "team": "RB"
     },
@@ -109,91 +109,91 @@
       "team": "Williams"
     },
     {
-      "confidence": 40.0,
-      "driver": "BOR",
+      "confidence": 41.4,
+      "driver": "ALB",
       "median_position": 13,
-      "p5": 6,
-      "p95": 19,
+      "p5": 8,
+      "p95": 18,
       "position": 13,
-      "team": "Audi"
+      "team": "Williams"
+    },
+    {
+      "confidence": 42.4,
+      "driver": "OCO",
+      "median_position": 13,
+      "p5": 8,
+      "p95": 20,
+      "position": 14,
+      "team": "Haas F1 Team"
     },
     {
       "confidence": 40.0,
-      "driver": "GAS",
-      "median_position": 14,
-      "p5": 6,
-      "p95": 19,
-      "position": 14,
-      "team": "Alpine"
-    },
-    {
-      "confidence": 40.2,
       "driver": "COL",
-      "median_position": 14,
+      "median_position": 15,
       "p5": 7,
-      "p95": 19,
+      "p95": 20,
       "position": 15,
       "team": "Alpine"
     },
     {
-      "confidence": 42.5,
-      "driver": "OCO",
+      "confidence": 40.0,
+      "driver": "BEA",
       "median_position": 15,
-      "p5": 8,
-      "p95": 20,
+      "p5": 9,
+      "p95": 21,
       "position": 16,
       "team": "Haas F1 Team"
     },
     {
-      "confidence": 42.1,
-      "driver": "BEA",
+      "confidence": 40.1,
+      "driver": "BOR",
       "median_position": 16,
-      "p5": 10,
-      "p95": 21,
+      "p5": 8,
+      "p95": 20,
       "position": 17,
-      "team": "Haas F1 Team"
+      "team": "Audi"
     },
     {
-      "confidence": 45.6,
+      "confidence": 43.7,
       "driver": "HUL",
-      "median_position": 17,
-      "p5": 11,
+      "median_position": 16,
+      "p5": 9,
       "p95": 20,
       "position": 18,
       "team": "Audi"
     },
     {
-      "confidence": 42.1,
+      "confidence": 41.3,
       "driver": "ALO",
       "median_position": 19,
-      "p5": 10,
+      "p5": 9,
       "p95": 22,
       "position": 19,
       "team": "Aston Martin"
     },
     {
-      "confidence": 48.4,
-      "driver": "BOT",
+      "confidence": 46.4,
+      "driver": "STR",
       "median_position": 20,
       "p5": 16,
       "p95": 22,
       "position": 20,
-      "team": "Cadillac F1"
-    },
-    {
-      "confidence": 48.7,
-      "driver": "STR",
-      "median_position": 21,
-      "p5": 16,
-      "p95": 22,
-      "position": 21,
       "team": "Aston Martin"
     },
     {
-      "confidence": 50.8,
+      "confidence": 48.6,
+      "driver": "BOT",
+      "median_position": 20,
+      "p5": 15,
+      "p95": 22,
+      "position": 21,
+      "team": "Cadillac F1"
+    },
+    {
+      "confidence": 48.9,
       "driver": "PER",
       "median_position": 21,
-      "p5": 18,
+      "p5": 17,
       "p95": 22,
       "position": 22,
       "team": "Cadillac F1"

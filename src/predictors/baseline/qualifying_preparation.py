@@ -7,6 +7,8 @@ from typing import Any
 
 import numpy as np
 
+from src.models.team_strength_mapping import team_strength_seconds_components
+
 
 def resolve_effective_experience_tier(
     driver_data: dict[str, Any],
@@ -547,11 +549,16 @@ def _build_driver_record(
         races_completed=races_completed,
     )
     wet_skill = float(driver_data.get("wet_skill", 0.70) if isinstance(driver_data, dict) else 0.70)
+    seconds_components = team_strength_seconds_components(
+        team_strength,
+        session_kind="qualifying",
+    )
 
-    return {
+    record = {
         "driver": driver_code,
         "team": team,
         "team_strength": team_strength,
+        "team_strength_score": team_strength,
         "team_uncertainty": float(np.clip(team_uncertainty, 0.0, 1.0)),
         "skill": skill,
         "quali_pace": quali_pace,
@@ -564,6 +571,9 @@ def _build_driver_record(
         "season_races_completed": races_completed,
         "wet_skill": wet_skill,
     }
+    if seconds_components is not None:
+        record.update(seconds_components)
+    return record
 
 
 def build_driver_list_with_strengths_core(

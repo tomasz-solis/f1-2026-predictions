@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 
+from src.models.team_strength_mapping import team_strength_seconds_components
 from src.predictors.baseline.qualifying_preparation import resolve_bayesian_skill_score
 from src.types.prediction_types import DriverRaceInfo, QualifyingGridEntry
 from src.utils import config_loader
@@ -481,11 +482,13 @@ def prepare_driver_info_core(
             resolve_effective_experience_tier_for_race_fn=resolve_effective_experience_tier_for_race_fn,
         )
 
-        driver_info_map[driver_code] = {
+        seconds_components = team_strength_seconds_components(team_strength, session_kind="race")
+        driver_record: DriverRaceInfo = {
             "driver": driver_code,
             "team": team,
             "grid_pos": grid_pos,
             "team_strength": team_strength,
+            "team_strength_score": team_strength,
             "team_uncertainty": float(np.clip(team_uncertainty, 0.0, 1.0)),
             "skill": skill,
             "race_advantage": race_advantage,
@@ -497,6 +500,12 @@ def prepare_driver_info_core(
                 driver_data.get("wet_skill", 0.70) if isinstance(driver_data, dict) else 0.70
             ),
         }
+        if seconds_components is not None:
+            driver_record["team_strength_seconds"] = seconds_components["team_strength_seconds"]
+            driver_record["team_strength_seconds_delta"] = seconds_components[
+                "team_strength_seconds_delta"
+            ]
+        driver_info_map[driver_code] = driver_record
 
     return driver_info_map, len(teams_with_long_profile)
 
@@ -558,6 +567,8 @@ def prepare_driver_info_with_compounds_core(
 
         team_compound_chars = team_payload.get("compound_characteristics", {})
         team_strength_by_compound: dict[str, float] = {}
+        team_strength_seconds_by_compound: dict[str, float] = {}
+        team_strength_seconds_delta_by_compound: dict[str, float] = {}
         tire_deg_by_compound: dict[str, float] = {}
         for compound in ("SOFT", "MEDIUM", "HARD"):
             if compound in team_compound_chars:
@@ -572,6 +583,17 @@ def prepare_driver_info_with_compounds_core(
                 tire_deg_slope = default_tire_deg_slope
 
             team_strength_by_compound[compound] = np.clip(adjusted_strength, 0.0, 1.0)
+            compound_seconds = team_strength_seconds_components(
+                team_strength_by_compound[compound],
+                session_kind="race",
+            )
+            if compound_seconds is not None:
+                team_strength_seconds_by_compound[compound] = compound_seconds[
+                    "team_strength_seconds"
+                ]
+                team_strength_seconds_delta_by_compound[compound] = compound_seconds[
+                    "team_strength_seconds_delta"
+                ]
             tire_deg_by_compound[compound] = float(tire_deg_slope)
 
         driver_data = get_driver_data_or_fallback_fn(driver_code, team)
@@ -597,11 +619,16 @@ def prepare_driver_info_with_compounds_core(
             resolve_effective_experience_tier_for_race_fn=resolve_effective_experience_tier_for_race_fn,
         )
 
-        driver_info_map[driver_code] = {
+        seconds_components = team_strength_seconds_components(
+            base_team_strength,
+            session_kind="race",
+        )
+        driver_record: DriverRaceInfo = {
             "driver": driver_code,
             "team": team,
             "grid_pos": grid_pos,
             "team_strength": base_team_strength,
+            "team_strength_score": base_team_strength,
             "team_uncertainty": float(np.clip(team_uncertainty, 0.0, 1.0)),
             "team_strength_by_compound": team_strength_by_compound,
             "tire_deg_by_compound": tire_deg_by_compound,
@@ -615,5 +642,16 @@ def prepare_driver_info_with_compounds_core(
                 driver_data.get("wet_skill", 0.70) if isinstance(driver_data, dict) else 0.70
             ),
         }
+        if seconds_components is not None:
+            driver_record["team_strength_seconds"] = seconds_components["team_strength_seconds"]
+            driver_record["team_strength_seconds_delta"] = seconds_components[
+                "team_strength_seconds_delta"
+            ]
+        if team_strength_seconds_by_compound:
+            driver_record["team_strength_seconds_by_compound"] = team_strength_seconds_by_compound
+            driver_record["team_strength_seconds_delta_by_compound"] = (
+                team_strength_seconds_delta_by_compound
+            )
+        driver_info_map[driver_code] = driver_record
 
     return driver_info_map, len(teams_with_long_profile)

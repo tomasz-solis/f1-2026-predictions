@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 import pytest
 
 from src.models.team_strength_mapping import (
     build_construct_aligned_driver_observations,
     evaluate_policy_folds,
+    load_live_team_strength_mappings,
+    team_strength_seconds_components,
 )
 
 
@@ -233,3 +237,40 @@ def test_policy_fold_evaluation_reports_combined_prediction_metrics() -> None:
     assert len(evaluation["folds"]) == 8
     assert {row["session_kind"] for row in evaluation["folds"]} == {"race", "qualifying"}
     assert evaluation["per_driver_residual_means"]
+
+
+def test_live_mapping_loader_returns_centered_seconds(tmp_path) -> None:
+    """Frozen mapping artifacts load into runtime seconds components."""
+    artifact_path = tmp_path / "mapping.json"
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "artifact_type": "team_strength_seconds_mapping",
+                "schema_version": 1,
+                "policy": "same_session_construct",
+                "training_years": [2022, 2023],
+                "mappings": {
+                    "race": {
+                        "session_kind": "race",
+                        "policy": "same_session_construct",
+                        "intercept_s": -0.1,
+                        "slope_s_per_unit": 2.0,
+                        "training_years": [2022, 2023],
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    mappings = load_live_team_strength_mappings(artifact_path)
+    components = team_strength_seconds_components(
+        0.75,
+        session_kind="race",
+        artifact_path=artifact_path,
+    )
+
+    assert mappings["race"].predict_one(0.75) == pytest.approx(0.4)
+    assert components is not None
+    assert components["team_strength_seconds"] == pytest.approx(0.4)
+    assert components["team_strength_seconds_delta"] == pytest.approx(0.5)

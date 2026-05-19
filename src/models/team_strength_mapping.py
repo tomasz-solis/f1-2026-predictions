@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -28,6 +31,13 @@ TEAM_STRENGTH_POLICY_COLUMNS: dict[str, str] = {
     "race_season_mean_shared_scalar": "team_strength_race_season_mean",
     "race_trailing_mean_shared_scalar": "team_strength_race_trailing_mean",
 }
+DEFAULT_TEAM_STRENGTH_SECONDS_MAPPING_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "data"
+    / "processed"
+    / "team_strength_seconds_mapping"
+    / "latest.json"
+)
 
 
 @dataclass(frozen=True)
@@ -44,6 +54,19 @@ class LinearTeamStrengthMapping:
         """Convert team-strength values into predicted seconds relative to the field."""
         values = np.asarray(team_strength, dtype=float)
         return self.intercept_s + (self.slope_s_per_unit * (values - 0.5))
+
+    def predict_one(self, team_strength: float) -> float:
+        """Convert one team-strength value into predicted seconds."""
+        return float(self.predict(float(team_strength)))
+
+    def predict_delta(self, team_strength: pd.Series | np.ndarray | float) -> np.ndarray:
+        """Convert team strength into centered seconds, excluding the shared intercept."""
+        values = np.asarray(team_strength, dtype=float)
+        return self.slope_s_per_unit * (values - 0.5)
+
+    def predict_delta_one(self, team_strength: float) -> float:
+        """Convert one team-strength value into centered seconds."""
+        return float(self.predict_delta(float(team_strength)))
 
 
 def build_construct_aligned_driver_observations(
@@ -299,6 +322,74 @@ def fit_linear_team_strength_mapping(
         slope_s_per_unit=float(slope_s_per_unit),
         training_years=tuple(sorted(int(year) for year in training_years)),
     )
+
+
+def load_live_team_strength_mappings(
+    artifact_path: str | Path | None = None,
+) -> dict[str, LinearTeamStrengthMapping]:
+    """Load the frozen live team-strength seconds mappings.
+
+    Missing artifacts return an empty mapping so prediction code can fall back to
+    the older unit-scale path instead of failing a live prediction.
+    """
+    path = (
+        Path(artifact_path)
+        if artifact_path is not None
+        else DEFAULT_TEAM_STRENGTH_SECONDS_MAPPING_PATH
+    )
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parents[2] / path
+    return dict(_load_live_team_strength_mappings_cached(str(path)))
+
+
+def team_strength_seconds_components(
+    team_strength: float,
+    *,
+    session_kind: str,
+    artifact_path: str | Path | None = None,
+) -> dict[str, float] | None:
+    """Return predicted and centered team-strength seconds for one runtime value."""
+    try:
+        strength = float(team_strength)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(strength):
+        return None
+
+    mapping = load_live_team_strength_mappings(artifact_path).get(str(session_kind))
+    if mapping is None:
+        return None
+    return {
+        "team_strength_seconds": mapping.predict_one(strength),
+        "team_strength_seconds_delta": mapping.predict_delta_one(strength),
+    }
+
+
+@lru_cache(maxsize=8)
+def _load_live_team_strength_mappings_cached(path_str: str) -> dict[str, LinearTeamStrengthMapping]:
+    """Read and parse a frozen mapping artifact from disk."""
+    path = Path(path_str)
+    if not path.exists():
+        return {}
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    mappings_payload = payload.get("mappings", {})
+    if not isinstance(mappings_payload, Mapping):
+        raise ValueError(f"Invalid team-strength mapping artifact: {path}")
+
+    mappings: dict[str, LinearTeamStrengthMapping] = {}
+    for session_kind, raw_mapping in mappings_payload.items():
+        if not isinstance(raw_mapping, Mapping):
+            raise ValueError(f"Invalid mapping payload for session_kind={session_kind!r} in {path}")
+        training_years = raw_mapping.get("training_years", payload.get("training_years", ()))
+        mappings[str(session_kind)] = LinearTeamStrengthMapping(
+            session_kind=str(raw_mapping.get("session_kind", session_kind)),
+            policy=str(raw_mapping.get("policy", payload.get("policy", ""))),
+            intercept_s=float(raw_mapping["intercept_s"]),
+            slope_s_per_unit=float(raw_mapping["slope_s_per_unit"]),
+            training_years=tuple(int(year) for year in training_years),
+        )
+    return mappings
 
 
 def evaluate_policy_folds(

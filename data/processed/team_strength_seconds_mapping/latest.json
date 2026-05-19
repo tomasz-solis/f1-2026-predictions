@@ -1,0 +1,141 @@
+{
+  "artifact_type": "team_strength_seconds_mapping",
+  "schema_version": 1,
+  "model_version": "2.1",
+  "built_at": "2026-05-19T16:37:02.358552+00:00",
+  "policy": "same_session_construct",
+  "training_years": [
+    2022,
+    2023,
+    2024,
+    2025
+  ],
+  "stored_state_policy": "single_team_strength_scalar",
+  "sign_convention": "positive_seconds_means_faster_than_field",
+  "decision": "Freeze separate race and qualifying seconds mappings over one stored team_strength scalar; do not split short-run and long-run state.",
+  "mappings": {
+    "race": {
+      "session_kind": "race",
+      "policy": "same_session_construct",
+      "intercept_s": -0.03357082219154591,
+      "slope_s_per_unit": 1.9707717329051126,
+      "training_years": [
+        2022,
+        2023,
+        2024,
+        2025
+      ]
+    },
+    "qualifying": {
+      "session_kind": "qualifying",
+      "policy": "same_session_construct",
+      "intercept_s": -0.17315963297281994,
+      "slope_s_per_unit": 1.7741686893278807,
+      "training_years": [
+        2022,
+        2023,
+        2024,
+        2025
+      ]
+    }
+  },
+  "validation": {
+    "selected_policy": "same_session_construct",
+    "folds": [
+      {
+        "session_kind": "race",
+        "holdout_year": 2022,
+        "n_rows": 376,
+        "intercept_s": -0.061072332917908756,
+        "slope_s_per_unit": 1.9108829682622177,
+        "r_squared": 0.4379647879164741,
+        "prediction_slope": 0.9931845904000137,
+        "rmse_s": 0.9214615852297658
+      },
+      {
+        "session_kind": "race",
+        "holdout_year": 2023,
+        "n_rows": 384,
+        "intercept_s": -0.009294886591909165,
+        "slope_s_per_unit": 2.0380847887809495,
+        "r_squared": 0.317540647829301,
+        "prediction_slope": 0.7909208463715857,
+        "rmse_s": 0.9431458433107496
+      },
+      {
+        "session_kind": "race",
+        "holdout_year": 2024,
+        "n_rows": 418,
+        "intercept_s": -0.025918665133080214,
+        "slope_s_per_unit": 1.9949560374827155,
+        "r_squared": 0.6252581271938973,
+        "prediction_slope": 0.8628359879255308,
+        "rmse_s": 0.5365415220232204
+      },
+      {
+        "session_kind": "race",
+        "holdout_year": 2025,
+        "n_rows": 426,
+        "intercept_s": -0.037747600231379096,
+        "slope_s_per_unit": 1.939086684931943,
+        "r_squared": 0.3150614555249721,
+        "prediction_slope": 0.9823173084473354,
+        "rmse_s": 1.0761629133004704
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_year": 2022,
+        "n_rows": 304,
+        "intercept_s": -0.17763012142505677,
+        "slope_s_per_unit": 1.7361989317782647,
+        "r_squared": 0.5178909611380491,
+        "prediction_slope": 0.9689855938098937,
+        "rmse_s": 0.7256877637545143
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_year": 2023,
+        "n_rows": 334,
+        "intercept_s": -0.13666342679180896,
+        "slope_s_per_unit": 1.4804192316144054,
+        "r_squared": 0.25564352596704665,
+        "prediction_slope": 1.4496120120957265,
+        "rmse_s": 1.5034935240229959
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_year": 2024,
+        "n_rows": 332,
+        "intercept_s": -0.1893021580205484,
+        "slope_s_per_unit": 1.9229131901602987,
+        "r_squared": 0.5501718980980543,
+        "prediction_slope": 0.700601663629574,
+        "rmse_s": 0.46202491563947384
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_year": 2025,
+        "n_rows": 316,
+        "intercept_s": -0.18857653990961698,
+        "slope_s_per_unit": 1.9571477637476147,
+        "r_squared": 0.3038639385498816,
+        "prediction_slope": 0.6058063059522204,
+        "rmse_s": 0.5405567993333071
+      }
+    ],
+    "coverage": [
+      {
+        "policy": "same_session_construct",
+        "session_kind": "qualifying",
+        "usable_rows": 1286,
+        "total_rows": 1286
+      },
+      {
+        "policy": "same_session_construct",
+        "session_kind": "race",
+        "usable_rows": 1604,
+        "total_rows": 1604
+      }
+    ]
+  }
+}

@@ -215,6 +215,7 @@ def _build_replay_predictor_config() -> ReplayConfigOverride:
 def _reset_replay_artifacts(processed_dir: Path, year: int) -> None:
     """Reset season artifacts to the pre-race baseline used by the replay."""
     from scripts.rebuild_2026_race_artifacts import (
+        _read_json,
         _reset_car_artifact,
         _reset_driver_artifact,
     )
@@ -228,7 +229,7 @@ def _reset_replay_artifacts(processed_dir: Path, year: int) -> None:
     _reset_car_artifact(car_file, year=int(year))
     _reset_driver_artifact(
         driver_file,
-        baseline_driver_file=baseline_driver_file,
+        baseline_payload=_read_json(baseline_driver_file),
         year=int(year),
     )
 

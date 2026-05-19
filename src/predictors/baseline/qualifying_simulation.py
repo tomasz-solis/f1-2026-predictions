@@ -37,6 +37,7 @@ class QualiSimConfig:
     team_weight: float
     skill_weight: float
     team_strength_compression: float
+    team_strength_seconds_score_scale: float
     driver_offset_cap: float
     driver_signal_softness: float
     driver_quali_pace_weight: float
@@ -295,9 +296,8 @@ def _score_single_driver_in_simulation(
     rng: np.random.Generator,
 ) -> float:
     """Combine team, driver, form, wet skill, and noise into one simulation score."""
-    compressed_team = 0.5 + (
-        (float(driver_info["team_strength"]) - 0.5) * sim_cfg.team_strength_compression
-    )
+    team_signal = _resolve_team_strength_signal(driver_info, sim_cfg)
+    compressed_team = 0.5 + ((team_signal - 0.5) * sim_cfg.team_strength_compression)
     compressed_team = float(np.clip(compressed_team, 0.0, 1.0))
 
     bounded_driver = 0.5 + (
@@ -324,6 +324,33 @@ def _score_single_driver_in_simulation(
     score += float(rng.normal(0, sim_cfg.teammate_setup_std))
     score += float(rng.normal(0, sim_cfg.noise_std))
     return float(score)
+
+
+def _resolve_team_strength_signal(
+    driver_info: dict[str, Any],
+    sim_cfg: QualiSimConfig,
+) -> float:
+    """Return the team component on the existing qualifying score scale.
+
+    Phase 7 supplies a construct-aligned seconds delta. Qualifying still uses a
+    latent ranking score, so the seconds delta is projected into that score
+    space with an explicit scale while preserving the old unit-score fallback.
+    """
+    raw_seconds_delta = driver_info.get("team_strength_seconds_delta")
+    try:
+        seconds_delta = float(raw_seconds_delta) if raw_seconds_delta is not None else float("nan")
+    except (TypeError, ValueError):
+        seconds_delta = float("nan")
+
+    if np.isfinite(seconds_delta) and sim_cfg.team_strength_seconds_score_scale > 0:
+        return float(
+            np.clip(
+                0.5 + (seconds_delta / sim_cfg.team_strength_seconds_score_scale),
+                0.0,
+                1.0,
+            )
+        )
+    return float(driver_info["team_strength"])
 
 
 def build_deterministic_qualifying_ranking(
@@ -466,6 +493,12 @@ def _load_base_quali_weights(cfg: Any, is_sprint: bool) -> dict[str, float]:
         "skill_weight": float(cfg.get("baseline_predictor.qualifying.skill_weight", 0.40)),
         "team_strength_compression": float(
             cfg.get("baseline_predictor.qualifying.team_strength_compression", 0.60)
+        ),
+        "team_strength_seconds_score_scale": float(
+            cfg.get(
+                "baseline_predictor.qualifying.team_strength_seconds_score_scale",
+                1.9707717329051126,
+            )
         ),
         "driver_offset_cap": float(
             cfg.get("baseline_predictor.qualifying.driver_offset_cap", 0.18)
@@ -887,6 +920,7 @@ def _build_quali_sim_config(
         team_weight=weights["team_weight"],
         skill_weight=weights["skill_weight"],
         team_strength_compression=weights["team_strength_compression"],
+        team_strength_seconds_score_scale=weights["team_strength_seconds_score_scale"],
         driver_offset_cap=weights["driver_offset_cap"],
         driver_signal_softness=weights["driver_signal_softness"],
         driver_quali_pace_weight=weights["driver_quali_pace_weight"],
