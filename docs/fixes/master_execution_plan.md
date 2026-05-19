@@ -301,6 +301,65 @@ For regulation-reset validity, 2026 conventional weekends are the real transfer
 test. Reopen the stored-state split only if 2026 evidence shows a consistent MSE
 gain rather than a one-off improvement.
 
+Implementation note (2026-05-19): Phase 7 is now wired into the live predictor
+through `data/processed/team_strength_seconds_mapping/latest.json`. The frozen
+policy is `same_session_construct` over one stored `team_strength` scalar, with
+separate mappings:
+
+- race: intercept `-0.033571s`, slope `1.970772s/unit`;
+- qualifying: intercept `-0.173160s`, slope `1.774169s/unit`.
+
+The live race simulator consumes the centered race seconds delta directly in
+lap-time construction. The live qualifying simulator consumes the centered
+qualifying seconds delta through the existing latent-score layer using an
+explicit seconds-to-score scale. The original 0-1 `team_strength` value remains
+available for legacy gates and residual-model features.
+
+Live-state replay note (2026-05-19): the model now distinguishes the offline
+prior from the active-season state. Historical driver and car artifacts remain
+the seed; the live 2026 artifacts are rebuilt from data by replaying completed
+2026 weekends. This is not a hand edit and not an in-season refit of the
+teammate-network prior.
+
+The replay path now:
+
+- restores driver and car artifacts from an explicit baseline before replay;
+- replays completed FP/practice sessions into car track profiles;
+- replays sprint, race, and qualifying evidence into the 2026 driver/car
+  artifacts;
+- persists the Bayesian driver state after both race and qualifying updates, so
+  the qualifying pass no longer clobbers or omits the race-learned state;
+- updates DNF rates from explicit FastF1 `Status` rows, never by assuming that
+  missing status data means a classified finish;
+- resolves the effective experience tier from `debut_year` and prediction
+  season, so a 2025 debut driver is treated as second-year in 2026 even if the
+  seed artifact still says `rookie`.
+
+The first data-only replay covered the four completed 2026 weekends available
+at the time: Australia, China, Japan, and Miami. The warmed live prediction set
+was regenerated for Canadian GP PRE with artifact hash
+`847ceb4cd127f8bd0db5ed3a06c96429ca6a49d8`.
+
+Supabase deployment note: after the local replay, the 2026 car and driver
+artifacts were written as the latest DB artifact rows and DB warmup was rerun.
+The final DB warmup verified that the DB predictor loaded live-updated car data
+from `4` races before regenerating the nine PRE predictions.
+
+Audit note: the China race car update gave McLaren a `0.0` race signal because
+the cached telemetry was incomplete and the updater fell back to finishing
+position context. That value is data-derived, not manually patched, but it is a
+known candidate for a follow-up data-quality audit if McLaren's car strength is
+pulled too far down.
+
+Race-realism follow-up from the same run: the non-live suite exposed that the
+main-race median order had become over-anchored to predicted qualifying
+(`0.41` mean median-position movement on the Australian GP diagnostic). Cached
+2026 completed races show actual qualifying-to-race movement between `2.00`
+and `4.55` mean absolute positions on the same driver-aligned comparison, so
+the full-distance grid-anchor cap was reduced from `0.62` to `0.57`. The
+`0.56` candidate over-widened top-grid tail risk, so it was rejected. Sprint
+anchoring was left unchanged.
+
 Tasks:
 
 - Fit separate race and qualifying `team_strength_to_seconds()` mappings.

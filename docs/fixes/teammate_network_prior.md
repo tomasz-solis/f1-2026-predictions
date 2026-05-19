@@ -100,6 +100,13 @@ same-session driver residuals. Team strength captures shared car movement for
 future predictions, while same-session driver residuals stay anchored to the
 observed team median so car error does not leak into driver skill.
 
+Implementation note (2026-05-19): active-season learning is allowed only through
+the replay/update path. The 2026 live artifacts are rebuilt from completed
+session data, including FP/practice, sprint, race, qualifying, and explicit
+`Status` rows for DNF-rate learning. The seed artifacts are not hand-edited to
+make a driver or team "look right"; if the replay output conflicts with domain
+expectation, the next step is to audit the input construct or updater rule.
+
 ## 1.7 Known Limits
 
 These are not blockers; they are open risks that should sit visibly so
