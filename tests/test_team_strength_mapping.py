@@ -274,3 +274,34 @@ def test_live_mapping_loader_returns_centered_seconds(tmp_path) -> None:
     assert components is not None
     assert components["team_strength_seconds"] == pytest.approx(0.4)
     assert components["team_strength_seconds_delta"] == pytest.approx(0.5)
+
+
+def test_live_mapping_loader_supports_environment_override(tmp_path, monkeypatch) -> None:
+    """Replay diagnostics can point runtime mapping reads at a sidecar artifact."""
+    artifact_path = tmp_path / "override_mapping.json"
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "artifact_type": "team_strength_seconds_mapping",
+                "schema_version": 1,
+                "policy": "same_session_construct",
+                "training_years": [2022, 2023],
+                "mappings": {
+                    "race": {
+                        "session_kind": "race",
+                        "policy": "same_session_construct",
+                        "intercept_s": 0.0,
+                        "slope_s_per_unit": 4.0,
+                        "training_years": [2022, 2023],
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("TEAM_STRENGTH_SECONDS_MAPPING_PATH", str(artifact_path))
+    components = team_strength_seconds_components(0.75, session_kind="race")
+
+    assert components is not None
+    assert components["team_strength_seconds"] == pytest.approx(1.0)

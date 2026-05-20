@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import lru_cache
@@ -38,6 +39,7 @@ DEFAULT_TEAM_STRENGTH_SECONDS_MAPPING_PATH = (
     / "team_strength_seconds_mapping"
     / "latest.json"
 )
+TEAM_STRENGTH_SECONDS_MAPPING_PATH_ENV = "TEAM_STRENGTH_SECONDS_MAPPING_PATH"
 
 
 @dataclass(frozen=True)
@@ -335,6 +337,8 @@ def load_live_team_strength_mappings(
     path = (
         Path(artifact_path)
         if artifact_path is not None
+        else Path(override_path)
+        if (override_path := os.environ.get(TEAM_STRENGTH_SECONDS_MAPPING_PATH_ENV))
         else DEFAULT_TEAM_STRENGTH_SECONDS_MAPPING_PATH
     )
     if not path.is_absolute():

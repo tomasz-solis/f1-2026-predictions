@@ -905,6 +905,7 @@ def run_historical_checkpoint_replay(
     weather: str = "dry",
     overwrite: bool = False,
     excluded_scoring_targets: set[str] | frozenset[str] | None = None,
+    stop_after_race: str | None = None,
 ) -> HistoricalReplaySummary:
     """Replay testing and race weekends into sidecar checkpoint forecast files."""
     processed_source = Path(source_processed_dir)
@@ -957,6 +958,7 @@ def run_historical_checkpoint_replay(
                 )
                 summary.testing_sessions_replayed.append(f"{event_name}::{session_name}")
 
+        stop_after_label = str(stop_after_race).strip() if stop_after_race else None
         for plan_entry in race_entries:
             race_name = str(plan_entry["event_name"])
             cache_dirs = [str(path) for path in plan_entry.get("cache_dirs", [])]
@@ -1005,6 +1007,8 @@ def run_historical_checkpoint_replay(
 
             update_from_race(year, race_name, str(processed_dir))
             summary.race_updates.append(race_name)
+            if stop_after_label and race_name == stop_after_label:
+                break
 
         reports_dir = replay_output_root / "reports"
         reports_dir.mkdir(parents=True, exist_ok=True)
