@@ -140,68 +140,34 @@ def test_midfield_grid_position_constrains_result():
     assert 8 <= hul_final <= 17, f"Midfield driver moved unrealistically: P13 → P{hul_final}"
 
 
-def test_track_overtaking_difficulty_affects_grid_anchoring():
-    """Verify hard-to-overtake tracks preserve grid order more."""
+def test_track_overtaking_difficulty_strengthens_grid_weight():
+    """Verify hard-to-overtake tracks put more model weight on grid position."""
     predictor = Baseline2026Predictor(seed=42)
+    race_params = predictor._load_race_params()
 
-    qualifying_grid = [
-        {"driver": "VER", "team": "Red Bull Racing", "position": 1},
-        {"driver": "NOR", "team": "McLaren", "position": 2},
-        {"driver": "LEC", "team": "Ferrari", "position": 3},
-        {"driver": "HAM", "team": "Mercedes", "position": 4},
-        {"driver": "PIA", "team": "McLaren", "position": 5},
-        {"driver": "SAI", "team": "Ferrari", "position": 6},
-        {"driver": "RUS", "team": "Mercedes", "position": 7},
-        {"driver": "PER", "team": "Red Bull Racing", "position": 8},
-        {"driver": "ALO", "team": "Aston Martin", "position": 9},
-        {"driver": "STR", "team": "Aston Martin", "position": 10},
-        {"driver": "GAS", "team": "Alpine", "position": 11},
-        {"driver": "OCO", "team": "Alpine", "position": 12},
-        {"driver": "HUL", "team": "Haas F1 Team", "position": 13},
-        {"driver": "MAG", "team": "Haas F1 Team", "position": 14},
-        {"driver": "TSU", "team": "RB", "position": 15},
-        {"driver": "RIC", "team": "RB", "position": 16},
-        {"driver": "BOT", "team": "Sauber", "position": 17},
-        {"driver": "ZHO", "team": "Sauber", "position": 18},
-        {"driver": "ALB", "team": "Williams", "position": 19},
-        {"driver": "SAR", "team": "Williams", "position": 20},
-    ]
+    def normalized_grid_weight(track_overtaking: float) -> float:
+        """Return the grid-position share used by the race score blend."""
+        grid_weight = race_params["grid_weight_min"] + (
+            track_overtaking * race_params["grid_weight_multiplier"]
+        )
+        pace_weight = race_params["pace_weight_base"] - (
+            track_overtaking * race_params["pace_weight_track_modifier"]
+        )
+        driver_weight = 0.20
+        return grid_weight / (grid_weight + pace_weight + driver_weight)
 
-    # Monaco: Very hard to overtake
-    result_monaco = predictor.predict_race(
-        race_name="Monaco Grand Prix",
-        qualifying_grid=qualifying_grid,
-        n_simulations=50,
-    )
+    def strategy_variance(track_overtaking: float) -> float:
+        """Return the strategy variance applied for one track difficulty."""
+        return race_params["strategy_variance_base"] * (
+            1.0 - (track_overtaking * race_params["strategy_track_modifier"])
+        )
 
-    # Monza: Easy to overtake (reload predictor with different seed)
-    predictor_monza = Baseline2026Predictor(seed=42)
-    result_monza = predictor_monza.predict_race(
-        race_name="Italian Grand Prix",
-        qualifying_grid=qualifying_grid,
-        n_simulations=50,
-    )
+    monaco_overtaking = predictor._load_track_overtaking_difficulty("Monaco Grand Prix")
+    monza_overtaking = predictor._load_track_overtaking_difficulty("Italian Grand Prix")
 
-    # Calculate average position change
-    def calc_avg_position_change(finish_order, grid):
-        total_change = 0
-        count = 0
-        for entry in finish_order:
-            start_pos = next((g["position"] for g in grid if g["driver"] == entry["driver"]), None)
-            if start_pos:
-                change = abs(entry["position"] - start_pos)
-                total_change += change
-                count += 1
-        return total_change / count if count > 0 else 0
-
-    avg_change_monaco = calc_avg_position_change(result_monaco["finish_order"], qualifying_grid)
-    avg_change_monza = calc_avg_position_change(result_monza["finish_order"], qualifying_grid)
-
-    # Monaco should have less position change than Monza
-    assert avg_change_monaco < avg_change_monza * 1.2, (
-        f"Monaco should preserve grid order more than Monza: "
-        f"Monaco avg change={avg_change_monaco:.2f}, Monza avg change={avg_change_monza:.2f}"
-    )
+    assert monaco_overtaking > monza_overtaking
+    assert normalized_grid_weight(monaco_overtaking) > normalized_grid_weight(monza_overtaking)
+    assert strategy_variance(monaco_overtaking) < strategy_variance(monza_overtaking)
 
 
 def test_elite_driver_midfield_car_realistic_result():

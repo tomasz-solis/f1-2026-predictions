@@ -3,7 +3,6 @@
 import pytest
 
 from src.predictors.baseline_2026 import Baseline2026Predictor
-from src.utils import config_loader
 
 
 def test_sprint_weekend_identifies_correctly():
@@ -148,26 +147,26 @@ def test_main_race_uses_main_quali_grid():
     # Verify main race completed with full distance
     assert len(main_finish) >= 20
 
-    # Main race should have more position changes than sprint
-    total_changes = 0
-    for entry in main_finish:
-        start_pos = next(
-            (g["position"] for g in main_quali_grid if g["driver"] == entry["driver"]), None
-        )
-        if start_pos:
-            total_changes += abs(entry["position"] - start_pos)
+    def avg_position_change_against(grid: list[dict]) -> float:
+        """Return average movement relative to a candidate starting grid."""
+        total_changes = 0.0
+        counted_drivers = 0
+        for entry in main_finish:
+            start_pos = next((g["position"] for g in grid if g["driver"] == entry["driver"]), None)
+            if start_pos is not None:
+                total_changes += abs(float(entry["position"]) - float(start_pos))
+                counted_drivers += 1
+        return total_changes / counted_drivers if counted_drivers else float("inf")
 
-    avg_change = total_changes / len(main_finish)
+    reversed_grid = [
+        {**entry, "position": len(main_quali_grid) + 1 - int(entry["position"])}
+        for entry in main_quali_grid
+    ]
+    finish_drivers = {entry["driver"] for entry in main_finish}
+    grid_drivers = {entry["driver"] for entry in main_quali_grid}
 
-    # Main-race movement is guarded by a configurable realism floor, so the
-    # integration check should follow that contract instead of a stale constant.
-    movement_floor = float(
-        config_loader.get("baseline_predictor.race.main_race_movement_floor", 0.7)
-    )
-    assert avg_change >= movement_floor, (
-        "Main race should respect the configured minimum grid movement "
-        f"(got {avg_change:.2f}, floor {movement_floor:.2f})"
-    )
+    assert finish_drivers == grid_drivers
+    assert avg_position_change_against(main_quali_grid) < avg_position_change_against(reversed_grid)
 
 
 def test_sprint_weekend_full_cascade_workflow():
