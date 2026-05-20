@@ -1,0 +1,89 @@
+year,race_name,session_name,session_kind,team,reference_driver_code,comparison_driver_code,raw_laps,reference_raw_laps,comparison_raw_laps,missing_lap_time_laps,pit_laps,deleted_laps,inaccurate_laps,lap1_laps,final_driver_laps,non_green_laps,sc_vsc_laps,large_position_change_laps,stint_outlier_laps,lap_level_weather_unreliable_laps,weather_mode_excluded_laps,non_quick_qualifying_laps,valid_laps,candidate_matched_pairs,matched_pair_rows,skip_reason
+2026,Australian Grand Prix,Race,race,Alpine,COL,GAS,113,56,57,0,6,0,19,2,2,14,13,1,16,0,0,0,75,20,20,
+2026,Australian Grand Prix,Race,race,Aston Martin,ALO,STR,65,22,43,3,13,0,20,2,2,11,11,1,7,0,0,0,37,7,0,insufficient_matched_pairs
+2026,Australian Grand Prix,Race,race,Audi,BOR,HUL,58,57,1,1,4,0,9,2,2,7,7,1,6,0,0,0,42,0,0,missing_lap_time_data
+2026,Australian Grand Prix,Race,race,Cadillac,BOT,PER,71,16,55,2,6,0,15,2,2,11,11,4,6,0,0,0,50,9,9,
+2026,Australian Grand Prix,Race,race,Ferrari,HAM,LEC,116,58,58,0,4,0,20,2,2,14,14,2,12,0,0,0,82,32,32,
+2026,Australian Grand Prix,Race,race,Haas F1 Team,BEA,OCO,114,57,57,0,4,0,16,2,2,14,14,2,13,0,0,0,84,31,31,
+2026,Australian Grand Prix,Race,race,McLaren,NOR,PIA,58,58,0,0,4,0,9,1,1,7,7,1,5,0,0,0,43,0,0,missing_lap_time_data
+2026,Australian Grand Prix,Race,race,Mercedes,ANT,RUS,116,58,58,0,4,0,17,2,2,15,15,0,11,0,0,0,86,37,37,
+2026,Australian Grand Prix,Race,race,Racing Bulls,LAW,LIN,114,57,57,0,6,0,17,2,2,14,14,0,10,0,0,0,86,22,22,
+2026,Australian Grand Prix,Race,race,Red Bull Racing,HAD,VER,69,11,58,1,4,0,12,2,2,8,8,1,9,0,0,0,48,7,0,insufficient_matched_pairs
+2026,Australian Grand Prix,Race,race,Williams,ALB,SAI,113,57,56,0,10,0,18,2,2,12,12,1,12,0,0,0,82,25,25,
+2026,Australian Grand Prix,Qualifying,qualifying,Alpine,COL,GAS,36,18,18,8,16,0,16,2,2,5,0,0,0,0,0,10,10,5,5,
+2026,Australian Grand Prix,Qualifying,qualifying,Aston Martin,ALO,STR,10,10,0,2,4,0,4,1,1,1,0,0,2,0,0,2,4,0,0,missing_lap_time_data
+2026,Australian Grand Prix,Qualifying,qualifying,Audi,BOR,HUL,32,14,18,7,14,0,14,2,2,4,0,0,3,0,0,8,10,4,4,
+2026,Australian Grand Prix,Qualifying,qualifying,Cadillac,BOT,PER,15,8,7,6,11,0,11,2,2,2,0,0,0,0,0,0,4,2,0,insufficient_matched_pairs
+2026,Australian Grand Prix,Qualifying,qualifying,Ferrari,HAM,LEC,47,24,23,13,26,0,26,2,2,8,0,0,3,0,0,8,13,3,3,
+2026,Australian Grand Prix,Qualifying,qualifying,Haas F1 Team,BEA,OCO,36,18,18,11,16,0,16,2,2,4,0,0,4,0,0,8,12,6,6,
+2026,Australian Grand Prix,Qualifying,qualifying,McLaren,NOR,PIA,50,25,25,16,26,0,26,2,2,8,0,0,1,0,0,10,14,4,4,
+2026,Australian Grand Prix,Qualifying,qualifying,Mercedes,ANT,RUS,40,18,22,15,27,0,27,2,2,7,0,0,1,0,0,2,11,3,3,
+2026,Australian Grand Prix,Qualifying,qualifying,Racing Bulls,LAW,LIN,47,23,24,14,22,0,22,2,2,8,0,0,2,0,0,12,13,3,3,
+2026,Australian Grand Prix,Qualifying,qualifying,Red Bull Racing,HAD,VER,21,19,2,9,15,0,15,2,2,5,0,0,0,0,0,0,6,0,0,insufficient_matched_pairs
+2026,Australian Grand Prix,Qualifying,qualifying,Williams,ALB,SAI,19,19,0,6,11,0,11,1,1,2,0,0,2,0,0,2,6,0,0,missing_lap_time_data
+2026,Chinese Grand Prix,Race,race,Alpine,COL,GAS,111,55,56,3,4,0,12,2,2,20,8,3,10,0,0,0,78,22,22,
+2026,Chinese Grand Prix,Race,race,Aston Martin,ALO,STR,42,32,10,1,2,0,9,2,2,11,5,3,6,0,0,0,24,4,0,insufficient_matched_pairs
+2026,Chinese Grand Prix,Race,race,Audi,BOR,HUL,56,1,55,2,2,0,8,2,2,12,4,1,4,0,0,0,37,0,0,missing_lap_time_data
+2026,Chinese Grand Prix,Race,race,Cadillac,BOT,PER,110,55,55,1,4,0,10,2,2,20,8,3,6,0,0,0,84,35,35,
+2026,Chinese Grand Prix,Race,race,Ferrari,HAM,LEC,112,56,56,4,4,0,10,2,2,18,8,1,11,0,0,0,81,37,37,
+2026,Chinese Grand Prix,Race,race,Haas F1 Team,BEA,OCO,111,56,55,1,6,0,14,2,2,19,8,3,10,0,0,0,78,17,17,
+2026,Chinese Grand Prix,Race,race,McLaren,NOR,PIA,2,1,1,2,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,missing_lap_time_data
+2026,Chinese Grand Prix,Race,race,Mercedes,ANT,RUS,112,56,56,3,4,0,10,2,2,18,8,0,11,0,0,0,82,40,40,
+2026,Chinese Grand Prix,Race,race,Racing Bulls,LAW,LIN,111,56,55,0,4,0,13,2,2,21,8,2,7,0,0,0,80,30,30,
+2026,Chinese Grand Prix,Race,race,Red Bull Racing,HAD,VER,101,56,45,2,7,0,13,2,2,19,8,4,16,0,0,0,64,18,18,
+2026,Chinese Grand Prix,Race,race,Williams,ALB,SAI,56,1,55,1,2,0,7,2,2,11,4,1,4,0,0,0,40,0,0,missing_lap_time_data
+2026,Chinese Grand Prix,Qualifying,qualifying,Alpine,COL,GAS,36,15,21,10,22,0,22,2,2,3,0,0,0,0,0,2,10,4,4,
+2026,Chinese Grand Prix,Qualifying,qualifying,Aston Martin,ALO,STR,18,9,9,4,12,0,12,2,2,0,0,0,0,0,0,0,6,3,3,
+2026,Chinese Grand Prix,Qualifying,qualifying,Audi,BOR,HUL,26,14,12,7,16,0,16,2,2,2,0,0,2,0,0,2,8,3,3,
+2026,Chinese Grand Prix,Qualifying,qualifying,Cadillac,BOT,PER,15,9,6,5,10,0,10,2,2,0,0,0,0,0,0,0,5,2,0,insufficient_matched_pairs
+2026,Chinese Grand Prix,Qualifying,qualifying,Ferrari,HAM,LEC,39,19,20,12,24,0,24,2,2,4,0,0,0,0,0,3,12,4,4,
+2026,Chinese Grand Prix,Qualifying,qualifying,Haas F1 Team,BEA,OCO,33,19,14,10,20,0,20,2,2,3,0,0,2,0,0,2,10,4,4,
+2026,Chinese Grand Prix,Qualifying,qualifying,McLaren,NOR,PIA,40,20,20,12,24,0,24,2,2,4,0,0,2,0,0,2,12,4,4,
+2026,Chinese Grand Prix,Qualifying,qualifying,Mercedes,ANT,RUS,28,15,13,10,19,0,19,2,2,5,0,0,0,0,0,0,8,3,3,
+2026,Chinese Grand Prix,Qualifying,qualifying,Racing Bulls,LAW,LIN,30,15,15,8,16,0,16,2,2,4,0,0,0,0,0,4,8,4,4,
+2026,Chinese Grand Prix,Qualifying,qualifying,Red Bull Racing,HAD,VER,40,20,20,12,24,0,24,2,2,4,0,0,2,0,0,2,14,4,4,
+2026,Chinese Grand Prix,Qualifying,qualifying,Williams,ALB,SAI,20,10,10,3,12,0,12,2,2,0,0,0,0,0,0,2,6,3,3,
+2026,Japanese Grand Prix,Race,race,Alpine,COL,GAS,106,53,53,2,4,0,17,2,2,13,13,2,10,0,0,0,77,28,28,
+2026,Japanese Grand Prix,Race,race,Aston Martin,ALO,STR,82,52,30,0,9,0,17,2,2,14,14,0,4,0,0,0,61,19,19,
+2026,Japanese Grand Prix,Race,race,Audi,BOR,HUL,106,53,53,2,4,0,14,2,2,14,12,1,8,0,0,0,80,38,38,
+2026,Japanese Grand Prix,Race,race,Cadillac,BOT,PER,105,52,53,1,4,0,18,2,2,14,14,0,6,0,0,0,79,19,19,
+2026,Japanese Grand Prix,Race,race,Ferrari,HAM,LEC,106,53,53,3,4,0,16,2,2,12,12,0,10,0,0,0,78,27,27,
+2026,Japanese Grand Prix,Race,race,Haas F1 Team,BEA,OCO,74,21,53,2,4,0,14,2,2,8,8,2,4,0,0,0,55,12,12,
+2026,Japanese Grand Prix,Race,race,McLaren,NOR,PIA,106,53,53,2,4,0,18,2,2,12,12,1,9,0,0,0,77,33,33,
+2026,Japanese Grand Prix,Race,race,Mercedes,ANT,RUS,106,53,53,4,4,0,15,2,2,12,12,1,7,0,0,0,83,38,38,
+2026,Japanese Grand Prix,Race,race,Racing Bulls,LAW,LIN,106,53,53,2,4,0,18,2,2,14,13,1,9,0,0,0,76,29,29,
+2026,Japanese Grand Prix,Race,race,Red Bull Racing,HAD,VER,106,53,53,2,4,0,17,2,2,13,13,1,12,0,0,0,75,31,31,
+2026,Japanese Grand Prix,Race,race,Williams,ALB,SAI,104,51,53,1,10,0,20,2,2,14,12,2,11,0,0,0,69,27,27,
+2026,Japanese Grand Prix,Qualifying,qualifying,Alpine,COL,GAS,30,12,18,10,20,0,20,2,2,0,0,0,0,0,0,0,10,4,4,
+2026,Japanese Grand Prix,Qualifying,qualifying,Aston Martin,ALO,STR,18,9,9,6,12,0,12,2,2,0,0,0,0,0,0,0,6,3,3,
+2026,Japanese Grand Prix,Qualifying,qualifying,Audi,BOR,HUL,34,20,14,10,20,0,20,2,2,0,0,0,2,0,0,2,12,5,5,
+2026,Japanese Grand Prix,Qualifying,qualifying,Cadillac,BOT,PER,15,9,6,5,10,0,10,2,2,0,0,0,0,0,0,0,5,2,0,insufficient_matched_pairs
+2026,Japanese Grand Prix,Qualifying,qualifying,Ferrari,HAM,LEC,38,20,18,11,20,0,20,2,2,0,0,0,3,0,0,5,13,4,4,
+2026,Japanese Grand Prix,Qualifying,qualifying,Haas F1 Team,BEA,OCO,24,9,15,6,12,0,12,2,2,0,0,0,0,0,0,4,8,3,3,
+2026,Japanese Grand Prix,Qualifying,qualifying,McLaren,NOR,PIA,40,20,20,12,24,0,24,2,2,0,0,0,2,0,0,2,14,4,4,
+2026,Japanese Grand Prix,Qualifying,qualifying,Mercedes,ANT,RUS,36,15,21,11,22,0,22,2,2,0,0,0,0,0,0,2,12,4,4,
+2026,Japanese Grand Prix,Qualifying,qualifying,Racing Bulls,LAW,LIN,36,15,21,10,20,0,21,2,2,0,0,0,0,0,0,4,11,4,4,
+2026,Japanese Grand Prix,Qualifying,qualifying,Red Bull Racing,HAD,VER,29,17,12,10,20,0,20,2,2,0,0,0,0,0,0,0,9,4,4,
+2026,Japanese Grand Prix,Qualifying,qualifying,Williams,ALB,SAI,24,9,15,6,16,0,16,2,2,0,0,0,0,0,0,0,8,3,3,
+2026,Miami Grand Prix,Race,race,Alpine,COL,GAS,62,57,5,1,2,0,11,2,2,11,7,1,5,0,0,0,42,2,0,insufficient_matched_pairs
+2026,Miami Grand Prix,Race,race,Aston Martin,ALO,STR,112,56,56,0,6,0,22,2,2,20,14,1,9,0,0,0,76,20,20,
+2026,Miami Grand Prix,Race,race,Audi,BOR,HUL,63,56,7,1,5,0,15,2,2,13,10,2,5,0,0,0,40,1,0,insufficient_matched_pairs
+2026,Miami Grand Prix,Race,race,Cadillac,BOT,PER,111,55,56,0,8,0,22,2,2,20,14,2,14,0,0,0,67,10,10,
+2026,Miami Grand Prix,Race,race,Ferrari,HAM,LEC,114,57,57,1,4,0,18,2,2,20,12,1,12,0,0,0,78,29,29,
+2026,Miami Grand Prix,Race,race,Haas F1 Team,BEA,OCO,112,56,56,0,4,0,18,2,2,20,12,1,8,0,0,0,79,32,32,
+2026,Miami Grand Prix,Race,race,McLaren,NOR,PIA,114,57,57,1,4,0,18,2,2,20,12,1,10,0,0,0,81,35,35,
+2026,Miami Grand Prix,Race,race,Mercedes,ANT,RUS,114,57,57,1,4,0,18,2,2,20,12,1,9,0,0,0,82,32,32,
+2026,Miami Grand Prix,Race,race,Racing Bulls,LAW,LIN,62,6,56,1,3,0,13,2,2,13,9,1,6,0,0,0,40,2,0,insufficient_matched_pairs
+2026,Miami Grand Prix,Race,race,Red Bull Racing,HAD,VER,62,5,57,1,3,0,9,2,2,11,7,1,7,0,0,0,44,0,0,insufficient_matched_pairs
+2026,Miami Grand Prix,Race,race,Williams,ALB,SAI,114,57,57,0,4,0,18,2,2,20,12,0,8,0,0,0,82,37,37,
+2026,Miami Grand Prix,Qualifying,qualifying,Alpine,COL,GAS,39,19,20,14,24,0,24,2,2,4,0,0,0,0,0,4,11,3,3,
+2026,Miami Grand Prix,Qualifying,qualifying,Aston Martin,ALO,STR,17,8,9,7,12,0,12,2,2,0,0,0,0,0,0,0,5,2,0,insufficient_matched_pairs
+2026,Miami Grand Prix,Qualifying,qualifying,Audi,BOR,HUL,17,3,14,7,12,0,12,2,2,2,0,0,0,0,0,0,5,1,0,insufficient_matched_pairs
+2026,Miami Grand Prix,Qualifying,qualifying,Cadillac,BOT,PER,18,9,9,7,12,0,12,2,2,2,0,0,0,0,0,1,5,2,0,insufficient_matched_pairs
+2026,Miami Grand Prix,Qualifying,qualifying,Ferrari,HAM,LEC,42,21,21,14,24,0,24,2,2,4,0,0,1,0,0,5,13,4,4,
+2026,Miami Grand Prix,Qualifying,qualifying,Haas F1 Team,BEA,OCO,27,12,15,10,18,0,18,2,2,4,0,0,0,0,0,0,9,4,4,
+2026,Miami Grand Prix,Qualifying,qualifying,McLaren,NOR,PIA,40,20,20,17,24,0,24,2,2,4,0,0,1,0,0,3,13,4,4,
+2026,Miami Grand Prix,Qualifying,qualifying,Mercedes,ANT,RUS,35,17,18,14,24,0,24,2,2,4,0,0,0,0,0,0,11,3,3,
+2026,Miami Grand Prix,Qualifying,qualifying,Racing Bulls,LAW,LIN,23,14,9,8,16,0,16,2,2,1,0,0,0,0,0,0,7,2,0,insufficient_matched_pairs
+2026,Miami Grand Prix,Qualifying,qualifying,Red Bull Racing,HAD,VER,36,21,15,14,22,0,22,2,2,5,0,0,0,0,0,2,12,4,4,
+2026,Miami Grand Prix,Qualifying,qualifying,Williams,ALB,SAI,30,15,15,9,20,0,20,2,2,3,0,0,0,0,0,1,9,4,4,

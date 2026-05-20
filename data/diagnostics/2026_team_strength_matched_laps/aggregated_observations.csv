@@ -1,0 +1,89 @@
+reference_driver_code,comparison_driver_code,team,year,race_name,session_name,session_kind,matched_gap_median_s,matched_gap_se_s,n_matched_pairs,weather_bucket,skip_reason
+ALB,SAI,Williams,2026,Australian Grand Prix,Race,race,0.26599999999999113,0.13529543617672996,25,dry,
+ANT,RUS,Mercedes,2026,Australian Grand Prix,Race,race,0.07499999999998863,0.07207887290737977,37,dry,
+BEA,OCO,Haas F1 Team,2026,Australian Grand Prix,Race,race,0.465999999999994,0.13165311881405276,31,dry,
+BOT,PER,Cadillac,2026,Australian Grand Prix,Race,race,0.6730000000000018,0.9210393241104234,9,dry,
+COL,GAS,Alpine,2026,Australian Grand Prix,Race,race,-0.7115000000000009,0.20524837484590275,20,dry,
+HAM,LEC,Ferrari,2026,Australian Grand Prix,Race,race,0.09299999999999642,0.0625016469632244,32,dry,
+LAW,LIN,Racing Bulls,2026,Australian Grand Prix,Race,race,-0.8164999999999978,0.13521286677107514,22,dry,
+ALO,STR,Aston Martin,2026,Australian Grand Prix,Race,race,,,0,,insufficient_matched_pairs
+BOR,HUL,Audi,2026,Australian Grand Prix,Race,race,,,0,,missing_lap_time_data
+NOR,PIA,McLaren,2026,Australian Grand Prix,Race,race,,,0,,missing_lap_time_data
+HAD,VER,Red Bull Racing,2026,Australian Grand Prix,Race,race,,,0,,insufficient_matched_pairs
+ANT,RUS,Mercedes,2026,Australian Grand Prix,Qualifying,qualifying,-0.4480000000000075,0.3666793046550508,3,dry,
+BEA,OCO,Haas F1 Team,2026,Australian Grand Prix,Qualifying,qualifying,-0.07350000000000279,0.28750691745009843,6,dry,
+BOR,HUL,Audi,2026,Australian Grand Prix,Qualifying,qualifying,0.5389999999999944,0.22764456360010973,4,dry,
+COL,GAS,Alpine,2026,Australian Grand Prix,Qualifying,qualifying,-0.7189999999999941,0.24665187234370026,5,dry,
+HAM,LEC,Ferrari,2026,Australian Grand Prix,Qualifying,qualifying,-0.15099999999999625,0.13529610890718766,3,dry,
+LAW,LIN,Racing Bulls,2026,Australian Grand Prix,Qualifying,qualifying,1.0889999999999986,0.601830105995382,3,dry,
+NOR,PIA,McLaren,2026,Australian Grand Prix,Qualifying,qualifying,-0.19750000000000512,0.2820673706901265,4,dry,
+ALO,STR,Aston Martin,2026,Australian Grand Prix,Qualifying,qualifying,,,0,,missing_lap_time_data
+BOT,PER,Cadillac,2026,Australian Grand Prix,Qualifying,qualifying,,,0,,insufficient_matched_pairs
+HAD,VER,Red Bull Racing,2026,Australian Grand Prix,Qualifying,qualifying,,,0,,insufficient_matched_pairs
+ALB,SAI,Williams,2026,Australian Grand Prix,Qualifying,qualifying,,,0,,missing_lap_time_data
+ANT,RUS,Mercedes,2026,Chinese Grand Prix,Race,race,0.0030000000000001137,0.07041127404445083,40,dry,
+BEA,OCO,Haas F1 Team,2026,Chinese Grand Prix,Race,race,0.742999999999995,0.5277056488794647,17,dry,
+BOT,PER,Cadillac,2026,Chinese Grand Prix,Race,race,-0.030000000000001137,0.10194779418257806,35,dry,
+COL,GAS,Alpine,2026,Chinese Grand Prix,Race,race,-0.5775000000000077,0.6198266755978362,22,dry,
+HAD,VER,Red Bull Racing,2026,Chinese Grand Prix,Race,race,-0.5144999999999982,0.08938380500957921,18,dry,
+HAM,LEC,Ferrari,2026,Chinese Grand Prix,Race,race,0.04200000000000159,0.0658673005474417,37,dry,
+LAW,LIN,Racing Bulls,2026,Chinese Grand Prix,Race,race,0.7134999999999962,0.09241671515450771,30,dry,
+ALO,STR,Aston Martin,2026,Chinese Grand Prix,Race,race,,,0,,insufficient_matched_pairs
+BOR,HUL,Audi,2026,Chinese Grand Prix,Race,race,,,0,,missing_lap_time_data
+NOR,PIA,McLaren,2026,Chinese Grand Prix,Race,race,,,0,,missing_lap_time_data
+ALB,SAI,Williams,2026,Chinese Grand Prix,Race,race,,,0,,missing_lap_time_data
+ALB,SAI,Williams,2026,Chinese Grand Prix,Qualifying,qualifying,-0.1490000000000009,0.8205434904369754,3,dry,
+ALO,STR,Aston Martin,2026,Chinese Grand Prix,Qualifying,qualifying,0.7920000000000016,0.09220038860163027,3,dry,
+ANT,RUS,Mercedes,2026,Chinese Grand Prix,Qualifying,qualifying,-0.043000000000006366,0.17495336234258324,3,dry,
+BEA,OCO,Haas F1 Team,2026,Chinese Grand Prix,Qualifying,qualifying,0.2995000000000019,0.06948979169272003,4,dry,
+BOR,HUL,Audi,2026,Chinese Grand Prix,Qualifying,qualifying,-0.3259999999999934,0.14045004110083797,3,dry,
+COL,GAS,Alpine,2026,Chinese Grand Prix,Qualifying,qualifying,-0.4100000000000037,0.404887641713179,4,dry,
+HAD,VER,Red Bull Racing,2026,Chinese Grand Prix,Qualifying,qualifying,-0.1460000000000008,0.08565738838345202,4,dry,
+HAM,LEC,Ferrari,2026,Chinese Grand Prix,Qualifying,qualifying,-0.03399999999999892,0.11671788551457712,4,dry,
+LAW,LIN,Racing Bulls,2026,Chinese Grand Prix,Qualifying,qualifying,0.16150000000000375,0.46860578887866944,4,dry,
+NOR,PIA,McLaren,2026,Chinese Grand Prix,Qualifying,qualifying,0.017499999999998295,0.06348023294597031,4,dry,
+BOT,PER,Cadillac,2026,Chinese Grand Prix,Qualifying,qualifying,,,0,,insufficient_matched_pairs
+ALB,SAI,Williams,2026,Japanese Grand Prix,Race,race,-0.22400000000000375,0.07839525611224632,27,dry,
+ALO,STR,Aston Martin,2026,Japanese Grand Prix,Race,race,-0.10200000000000387,0.04782011282875087,19,dry,
+ANT,RUS,Mercedes,2026,Japanese Grand Prix,Race,race,0.3504999999999967,0.07222261574378534,38,dry,
+BEA,OCO,Haas F1 Team,2026,Japanese Grand Prix,Race,race,-0.21749999999999403,0.16716405219268218,12,dry,
+BOR,HUL,Audi,2026,Japanese Grand Prix,Race,race,-0.4065000000000083,0.07648879626960814,38,dry,
+BOT,PER,Cadillac,2026,Japanese Grand Prix,Race,race,0.49500000000000455,1.419160783897572,19,dry,
+COL,GAS,Alpine,2026,Japanese Grand Prix,Race,race,-0.9570000000000007,0.08593548532585965,28,dry,
+HAD,VER,Red Bull Racing,2026,Japanese Grand Prix,Race,race,-0.8990000000000009,0.13645165092515663,31,dry,
+HAM,LEC,Ferrari,2026,Japanese Grand Prix,Race,race,-0.06799999999999784,0.09443175515635405,27,dry,
+LAW,LIN,Racing Bulls,2026,Japanese Grand Prix,Race,race,0.04200000000000159,0.07650700431033958,29,dry,
+NOR,PIA,McLaren,2026,Japanese Grand Prix,Race,race,-0.22299999999999898,0.08227990223351932,33,dry,
+ALB,SAI,Williams,2026,Japanese Grand Prix,Qualifying,qualifying,0.07900000000000773,0.11786482750512506,3,dry,
+ALO,STR,Aston Martin,2026,Japanese Grand Prix,Qualifying,qualifying,0.5619999999999976,0.4873721564362732,3,dry,
+ANT,RUS,Mercedes,2026,Japanese Grand Prix,Qualifying,qualifying,0.34949999999999903,0.10193816109380166,4,dry,
+BEA,OCO,Haas F1 Team,2026,Japanese Grand Prix,Qualifying,qualifying,-0.22500000000000853,0.15057990916861091,3,dry,
+BOR,HUL,Audi,2026,Japanese Grand Prix,Qualifying,qualifying,0.09100000000000819,0.18674121399686897,5,dry,
+COL,GAS,Alpine,2026,Japanese Grand Prix,Qualifying,qualifying,-0.722999999999999,0.105132003050103,4,dry,
+HAD,VER,Red Bull Racing,2026,Japanese Grand Prix,Qualifying,qualifying,0.04399999999999693,0.10674738072410511,4,dry,
+HAM,LEC,Ferrari,2026,Japanese Grand Prix,Qualifying,qualifying,-0.29399999999999693,0.11617479293100925,4,dry,
+LAW,LIN,Racing Bulls,2026,Japanese Grand Prix,Qualifying,qualifying,0.016500000000000625,0.3159149828385974,4,dry,
+NOR,PIA,McLaren,2026,Japanese Grand Prix,Qualifying,qualifying,-0.31050000000000466,0.08638816771617083,4,dry,
+BOT,PER,Cadillac,2026,Japanese Grand Prix,Qualifying,qualifying,,,0,,insufficient_matched_pairs
+ALB,SAI,Williams,2026,Miami Grand Prix,Race,race,-0.23499999999999943,0.03980444629339392,37,dry,
+ALO,STR,Aston Martin,2026,Miami Grand Prix,Race,race,0.18700000000000472,0.1670865097861369,20,dry,
+ANT,RUS,Mercedes,2026,Miami Grand Prix,Race,race,0.8889999999999958,0.10735812409429034,32,dry,
+BEA,OCO,Haas F1 Team,2026,Miami Grand Prix,Race,race,0.125,0.049842603960849025,32,dry,
+BOT,PER,Cadillac,2026,Miami Grand Prix,Race,race,-1.153499999999994,0.2647852608541047,10,dry,
+HAM,LEC,Ferrari,2026,Miami Grand Prix,Race,race,-0.3579999999999899,0.10829165857342317,29,dry,
+NOR,PIA,McLaren,2026,Miami Grand Prix,Race,race,0.3289999999999935,0.13891764660290146,35,dry,
+COL,GAS,Alpine,2026,Miami Grand Prix,Race,race,,,0,,insufficient_matched_pairs
+BOR,HUL,Audi,2026,Miami Grand Prix,Race,race,,,0,,insufficient_matched_pairs
+LAW,LIN,Racing Bulls,2026,Miami Grand Prix,Race,race,,,0,,insufficient_matched_pairs
+HAD,VER,Red Bull Racing,2026,Miami Grand Prix,Race,race,,,0,,insufficient_matched_pairs
+ALB,SAI,Williams,2026,Miami Grand Prix,Qualifying,qualifying,0.2924999999999969,0.6485843378594516,4,dry,
+ANT,RUS,Mercedes,2026,Miami Grand Prix,Qualifying,qualifying,0.3990000000000009,0.15147078461856917,3,dry,
+BEA,OCO,Haas F1 Team,2026,Miami Grand Prix,Qualifying,qualifying,0.3925000000000054,0.2664899224526954,4,dry,
+COL,GAS,Alpine,2026,Miami Grand Prix,Qualifying,qualifying,0.18600000000000705,0.10522645966709894,3,dry,
+HAD,VER,Red Bull Racing,2026,Miami Grand Prix,Qualifying,qualifying,-0.8755000000000024,0.35864272335442055,4,dry,
+HAM,LEC,Ferrari,2026,Miami Grand Prix,Qualifying,qualifying,-0.17450000000000188,0.1283867733123542,4,dry,
+NOR,PIA,McLaren,2026,Miami Grand Prix,Qualifying,qualifying,-0.08250000000000313,0.23881476041633926,4,dry,
+ALO,STR,Aston Martin,2026,Miami Grand Prix,Qualifying,qualifying,,,0,,insufficient_matched_pairs
+BOR,HUL,Audi,2026,Miami Grand Prix,Qualifying,qualifying,,,0,,insufficient_matched_pairs
+BOT,PER,Cadillac,2026,Miami Grand Prix,Qualifying,qualifying,,,0,,insufficient_matched_pairs
+LAW,LIN,Racing Bulls,2026,Miami Grand Prix,Qualifying,qualifying,,,0,,insufficient_matched_pairs

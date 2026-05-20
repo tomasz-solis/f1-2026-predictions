@@ -1,0 +1,1168 @@
+{
+  "artifact_type": "replay_leakage_diagnostics",
+  "schema_version": 1,
+  "model_version": "2.1",
+  "built_at": "2026-05-20T08:58:35.450017+00:00",
+  "year": 2026,
+  "status": "provisional_with_warnings",
+  "source_state": {
+    "year": 2026,
+    "replay_root": "data/historical_replay",
+    "replay_summary_found": true,
+    "replay_race_updates": [
+      "Australian Grand Prix",
+      "Chinese Grand Prix",
+      "Japanese Grand Prix",
+      "Miami Grand Prix"
+    ],
+    "replay_race_count": 4,
+    "replay_checkpoint_count": 14,
+    "live_artifact_races_completed": 4.0,
+    "replay_stale_vs_live_artifact": false
+  },
+  "historical_scale_reference": {
+    "policy": "same_session_construct",
+    "folds": [
+      {
+        "session_kind": "race",
+        "holdout_year": 2022,
+        "n_rows": 376,
+        "intercept_s": -0.061072332917908756,
+        "slope_s_per_unit": 1.9108829682622177,
+        "r_squared": 0.4379647879164741,
+        "prediction_slope": 0.9931845904000137,
+        "rmse_s": 0.9214615852297658
+      },
+      {
+        "session_kind": "race",
+        "holdout_year": 2023,
+        "n_rows": 384,
+        "intercept_s": -0.009294886591909165,
+        "slope_s_per_unit": 2.0380847887809495,
+        "r_squared": 0.317540647829301,
+        "prediction_slope": 0.7909208463715857,
+        "rmse_s": 0.9431458433107496
+      },
+      {
+        "session_kind": "race",
+        "holdout_year": 2024,
+        "n_rows": 418,
+        "intercept_s": -0.025918665133080214,
+        "slope_s_per_unit": 1.9949560374827155,
+        "r_squared": 0.6252581271938973,
+        "prediction_slope": 0.8628359879255308,
+        "rmse_s": 0.5365415220232204
+      },
+      {
+        "session_kind": "race",
+        "holdout_year": 2025,
+        "n_rows": 426,
+        "intercept_s": -0.037747600231379096,
+        "slope_s_per_unit": 1.939086684931943,
+        "r_squared": 0.3150614555249721,
+        "prediction_slope": 0.9823173084473354,
+        "rmse_s": 1.0761629133004704
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_year": 2022,
+        "n_rows": 304,
+        "intercept_s": -0.17763012142505677,
+        "slope_s_per_unit": 1.7361989317782647,
+        "r_squared": 0.5178909611380491,
+        "prediction_slope": 0.9689855938098937,
+        "rmse_s": 0.7256877637545143
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_year": 2023,
+        "n_rows": 334,
+        "intercept_s": -0.13666342679180896,
+        "slope_s_per_unit": 1.4804192316144054,
+        "r_squared": 0.25564352596704665,
+        "prediction_slope": 1.4496120120957265,
+        "rmse_s": 1.5034935240229959
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_year": 2024,
+        "n_rows": 332,
+        "intercept_s": -0.1893021580205484,
+        "slope_s_per_unit": 1.9229131901602987,
+        "r_squared": 0.5501718980980543,
+        "prediction_slope": 0.700601663629574,
+        "rmse_s": 0.46202491563947384
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_year": 2025,
+        "n_rows": 316,
+        "intercept_s": -0.18857653990961698,
+        "slope_s_per_unit": 1.9571477637476147,
+        "r_squared": 0.3038639385498816,
+        "prediction_slope": 0.6058063059522204,
+        "rmse_s": 0.5405567993333071
+      }
+    ],
+    "reference_band_2024_2025": {
+      "race": {
+        "fold_years": [
+          2024,
+          2025
+        ],
+        "prediction_slope_mean": 0.9225766481864331,
+        "prediction_slope_se": 0.059740660260902294,
+        "r_squared_mean": 0.4701597913594347,
+        "rmse_s_mean": 0.8063522176618454
+      },
+      "qualifying": {
+        "fold_years": [
+          2024,
+          2025
+        ],
+        "prediction_slope_mean": 0.6532039847908973,
+        "prediction_slope_se": 0.047397678838676786,
+        "r_squared_mean": 0.42701791832396796,
+        "rmse_s_mean": 0.5012908574863905
+      }
+    },
+    "per_driver_residual_means": [
+      {
+        "session_kind": "qualifying",
+        "driver_code": "BOR",
+        "residual_mean_s": 0.9209490191228327,
+        "n_rows": 10
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "LAT",
+        "residual_mean_s": -0.7963005554002766,
+        "n_rows": 7
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "HUL",
+        "residual_mean_s": 0.6437630830946097,
+        "n_rows": 37
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "MSC",
+        "residual_mean_s": 0.6206892632368454,
+        "n_rows": 15
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "MAG",
+        "residual_mean_s": 0.5420081104608873,
+        "n_rows": 40
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "SAR",
+        "residual_mean_s": -0.5354902612543885,
+        "n_rows": 19
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "HAD",
+        "residual_mean_s": 0.49166909303017226,
+        "n_rows": 17
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "BOT",
+        "residual_mean_s": -0.40376235764032864,
+        "n_rows": 43
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "ZHO",
+        "residual_mean_s": -0.39776656969945484,
+        "n_rows": 43
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "ALB",
+        "residual_mean_s": -0.38499548938077277,
+        "n_rows": 45
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "ANT",
+        "residual_mean_s": -0.3495186479696807,
+        "n_rows": 19
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "DOO",
+        "residual_mean_s": 0.33954519287325163,
+        "n_rows": 3
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "LAW",
+        "residual_mean_s": 0.2641849903035609,
+        "n_rows": 23
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "BEA",
+        "residual_mean_s": 0.24423008397943757,
+        "n_rows": 16
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "LEC",
+        "residual_mean_s": -0.21179206468752934,
+        "n_rows": 83
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "RUS",
+        "residual_mean_s": -0.20367792055337186,
+        "n_rows": 79
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "HAM",
+        "residual_mean_s": -0.1697125158966132,
+        "n_rows": 80
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "ALO",
+        "residual_mean_s": 0.16169733880372064,
+        "n_rows": 62
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "PIA",
+        "residual_mean_s": 0.15556685880589366,
+        "n_rows": 58
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "SAI",
+        "residual_mean_s": -0.1395566915166353,
+        "n_rows": 78
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "COL",
+        "residual_mean_s": 0.13891725060185064,
+        "n_rows": 11
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "NOR",
+        "residual_mean_s": 0.11451918689302393,
+        "n_rows": 73
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "STR",
+        "residual_mean_s": 0.1121551073081239,
+        "n_rows": 58
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "GAS",
+        "residual_mean_s": 0.10471018394603174,
+        "n_rows": 56
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "VER",
+        "residual_mean_s": 0.05185279385851525,
+        "n_rows": 76
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "OCO",
+        "residual_mean_s": 0.04802064187672555,
+        "n_rows": 60
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "VET",
+        "residual_mean_s": 0.04292891462487915,
+        "n_rows": 10
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "DEV",
+        "residual_mean_s": -0.021922138569383368,
+        "n_rows": 8
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "RIC",
+        "residual_mean_s": -0.0044523252652878854,
+        "n_rows": 32
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "TSU",
+        "residual_mean_s": 0.0014894483915387417,
+        "n_rows": 66
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "PER",
+        "residual_mean_s": -8.652249361677306e-05,
+        "n_rows": 59
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "LAW",
+        "residual_mean_s": -0.8120642340348143,
+        "n_rows": 30
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "HAD",
+        "residual_mean_s": -0.6249067440476358,
+        "n_rows": 21
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "PER",
+        "residual_mean_s": -0.5512020364090905,
+        "n_rows": 61
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "MSC",
+        "residual_mean_s": 0.542920189555362,
+        "n_rows": 17
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "VER",
+        "residual_mean_s": -0.5264245436802362,
+        "n_rows": 83
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "VET",
+        "residual_mean_s": 0.4455683927563729,
+        "n_rows": 17
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "RIC",
+        "residual_mean_s": -0.40610749788601413,
+        "n_rows": 43
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "HUL",
+        "residual_mean_s": 0.35259962506964077,
+        "n_rows": 63
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "MAG",
+        "residual_mean_s": 0.3505429114277601,
+        "n_rows": 58
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "DEV",
+        "residual_mean_s": 0.3070097946097578,
+        "n_rows": 9
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "DOO",
+        "residual_mean_s": 0.3017989699203014,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "BOR",
+        "residual_mean_s": 0.27446577308884035,
+        "n_rows": 19
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "STR",
+        "residual_mean_s": 0.23172552921238568,
+        "n_rows": 79
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "RUS",
+        "residual_mean_s": 0.22866447564431056,
+        "n_rows": 82
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "PIA",
+        "residual_mean_s": -0.18367304040119264,
+        "n_rows": 63
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "COL",
+        "residual_mean_s": 0.16761071216462978,
+        "n_rows": 22
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "ANT",
+        "residual_mean_s": 0.16697221102573698,
+        "n_rows": 22
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "ALO",
+        "residual_mean_s": 0.15716615139053655,
+        "n_rows": 80
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "LEC",
+        "residual_mean_s": 0.13765326391635643,
+        "n_rows": 82
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "HAM",
+        "residual_mean_s": 0.13730595218458305,
+        "n_rows": 83
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "TSU",
+        "residual_mean_s": -0.12636952931055082,
+        "n_rows": 79
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "OCO",
+        "residual_mean_s": 0.12550977660880439,
+        "n_rows": 81
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "ALB",
+        "residual_mean_s": -0.1244013819782509,
+        "n_rows": 75
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "SAR",
+        "residual_mean_s": -0.12326204340967832,
+        "n_rows": 30
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "ZHO",
+        "residual_mean_s": 0.1198364447780847,
+        "n_rows": 58
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "NOR",
+        "residual_mean_s": -0.1180541415200757,
+        "n_rows": 84
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "BEA",
+        "residual_mean_s": 0.11252607406882832,
+        "n_rows": 26
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "SAI",
+        "residual_mean_s": 0.08221922120316737,
+        "n_rows": 79
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "GAS",
+        "residual_mean_s": 0.03423206275401008,
+        "n_rows": 77
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "LAT",
+        "residual_mean_s": -0.01731334582086595,
+        "n_rows": 19
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "BOT",
+        "residual_mean_s": -0.01192637883635825,
+        "n_rows": 58
+      }
+    ],
+    "residual_outliers": [
+      {
+        "session_kind": "qualifying",
+        "driver_code": "BOR",
+        "residual_mean_s": 0.9209490191228327,
+        "n_rows": 10
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "LAT",
+        "residual_mean_s": -0.7963005554002766,
+        "n_rows": 7
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "HUL",
+        "residual_mean_s": 0.6437630830946097,
+        "n_rows": 37
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "MSC",
+        "residual_mean_s": 0.6206892632368454,
+        "n_rows": 15
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "MAG",
+        "residual_mean_s": 0.5420081104608873,
+        "n_rows": 40
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "SAR",
+        "residual_mean_s": -0.5354902612543885,
+        "n_rows": 19
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "HAD",
+        "residual_mean_s": 0.49166909303017226,
+        "n_rows": 17
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "BOT",
+        "residual_mean_s": -0.40376235764032864,
+        "n_rows": 43
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "ZHO",
+        "residual_mean_s": -0.39776656969945484,
+        "n_rows": 43
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "ALB",
+        "residual_mean_s": -0.38499548938077277,
+        "n_rows": 45
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "LAW",
+        "residual_mean_s": -0.8120642340348143,
+        "n_rows": 30
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "HAD",
+        "residual_mean_s": -0.6249067440476358,
+        "n_rows": 21
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "PER",
+        "residual_mean_s": -0.5512020364090905,
+        "n_rows": 61
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "MSC",
+        "residual_mean_s": 0.542920189555362,
+        "n_rows": 17
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "VER",
+        "residual_mean_s": -0.5264245436802362,
+        "n_rows": 83
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "VET",
+        "residual_mean_s": 0.4455683927563729,
+        "n_rows": 17
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "RIC",
+        "residual_mean_s": -0.40610749788601413,
+        "n_rows": 43
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "HUL",
+        "residual_mean_s": 0.35259962506964077,
+        "n_rows": 63
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "MAG",
+        "residual_mean_s": 0.3505429114277601,
+        "n_rows": 58
+      }
+    ]
+  },
+  "regulation_reset_monitoring": {
+    "state": "measured",
+    "policy": "same_session_construct",
+    "metrics_by_session_kind": {
+      "race": {
+        "state": "measured",
+        "n_rows": 61,
+        "n_races": 4,
+        "prediction_slope": 1.95212172312117,
+        "r_squared": 0.545676495233214,
+        "rmse_s": 1.0285105119115125,
+        "residual_mean_s": -0.1375902490882122,
+        "historical_2024_2025_prediction_slope_mean": 0.9225766481864331,
+        "historical_2024_2025_prediction_slope_se": 0.059740660260902294,
+        "outside_historical_one_se_band": true
+      },
+      "qualifying": {
+        "state": "measured",
+        "n_rows": 65,
+        "n_races": 4,
+        "prediction_slope": 1.1159552871056975,
+        "r_squared": 0.6708074543460534,
+        "rmse_s": 0.5754357561662359,
+        "residual_mean_s": -0.024701978203102125,
+        "historical_2024_2025_prediction_slope_mean": 0.6532039847908973,
+        "historical_2024_2025_prediction_slope_se": 0.047397678838676786,
+        "outside_historical_one_se_band": true
+      }
+    },
+    "per_driver_residual_means": [
+      {
+        "session_kind": "qualifying",
+        "driver_code": "STR",
+        "residual_mean_s": -1.5013206181008751,
+        "n_rows": 2
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "ALO",
+        "residual_mean_s": -1.3025845729832386,
+        "n_rows": 2
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "SAI",
+        "residual_mean_s": -0.8242402727188738,
+        "n_rows": 3
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "BOR",
+        "residual_mean_s": 0.6738981351844068,
+        "n_rows": 3
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "ALB",
+        "residual_mean_s": -0.6245206239953673,
+        "n_rows": 3
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "LAW",
+        "residual_mean_s": 0.5308564304111886,
+        "n_rows": 3
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "PIA",
+        "residual_mean_s": 0.49949288309422557,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "HUL",
+        "residual_mean_s": 0.4060787861247188,
+        "n_rows": 3
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "GAS",
+        "residual_mean_s": 0.3820430023178807,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "BEA",
+        "residual_mean_s": -0.3028886300870343,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "NOR",
+        "residual_mean_s": 0.22192104477975239,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "COL",
+        "residual_mean_s": 0.21224922125203682,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "HAM",
+        "residual_mean_s": -0.1906954675383677,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "HAD",
+        "residual_mean_s": 0.1867123629093015,
+        "n_rows": 3
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "LEC",
+        "residual_mean_s": -0.16136093636954968,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "ANT",
+        "residual_mean_s": 0.15696399912439848,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "OCO",
+        "residual_mean_s": -0.055373086672780916,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "RUS",
+        "residual_mean_s": -0.025997905535380783,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "qualifying",
+        "driver_code": "VER",
+        "residual_mean_s": 0.0034702825865812006,
+        "n_rows": 3
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "PER",
+        "residual_mean_s": -2.159323397127966,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "ALO",
+        "residual_mean_s": -1.694675602444069,
+        "n_rows": 2
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "BOT",
+        "residual_mean_s": -1.6202112578650592,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "STR",
+        "residual_mean_s": -1.3667062784911796,
+        "n_rows": 2
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "ANT",
+        "residual_mean_s": 1.3522882246309744,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "HAM",
+        "residual_mean_s": 0.82106588668099,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "RUS",
+        "residual_mean_s": 0.7261200448768298,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "LEC",
+        "residual_mean_s": 0.7159876594687705,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "PIA",
+        "residual_mean_s": 0.6197512542068669,
+        "n_rows": 2
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "VER",
+        "residual_mean_s": -0.4809777550573284,
+        "n_rows": 2
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "GAS",
+        "residual_mean_s": 0.4767299300843391,
+        "n_rows": 3
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "ALB",
+        "residual_mean_s": -0.4764965603362336,
+        "n_rows": 3
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "HAD",
+        "residual_mean_s": -0.47207793506111956,
+        "n_rows": 2
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "NOR",
+        "residual_mean_s": 0.42474624969058894,
+        "n_rows": 2
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "HUL",
+        "residual_mean_s": 0.36356274709012504,
+        "n_rows": 1
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "SAI",
+        "residual_mean_s": -0.30627093444033404,
+        "n_rows": 3
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "OCO",
+        "residual_mean_s": -0.29981321798682525,
+        "n_rows": 4
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "BOR",
+        "residual_mean_s": 0.2337811246800412,
+        "n_rows": 1
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "COL",
+        "residual_mean_s": -0.18303292692397488,
+        "n_rows": 3
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "LAW",
+        "residual_mean_s": 0.15846334474889087,
+        "n_rows": 3
+      },
+      {
+        "session_kind": "race",
+        "driver_code": "BEA",
+        "residual_mean_s": -0.050775815486887685,
+        "n_rows": 4
+      }
+    ]
+  },
+  "dry_leakage": {
+    "state": "measured_legacy_proxy",
+    "year": 2026,
+    "exact_metric_state": "schema_blocked_until_race_quali_seconds_fields_exist",
+    "driver_field": "bayesian.rating_mu",
+    "driver_unit": "legacy_grid_rank_mu",
+    "team_field": "overall_performance - preseason_overall_performance",
+    "team_unit": "race_team_strength_seconds_delta",
+    "n_drivers": 22,
+    "correlation": 0.15933902440010883,
+    "slope_rating_mu_per_team_second": 1.344908824745,
+    "rows": [
+      {
+        "driver_code": "ALB",
+        "team": "Williams",
+        "baseline_rating_mu": 16.75,
+        "current_rating_mu": 12.0055244470798,
+        "delta_rating_mu": -4.7444755529202,
+        "baseline_team_strength": 0.55,
+        "current_team_strength": 0.3284,
+        "delta_team_strength": -0.22160000000000002,
+        "delta_team_seconds": -0.436723016011773
+      },
+      {
+        "driver_code": "ALO",
+        "team": "Aston Martin",
+        "baseline_rating_mu": 16.918,
+        "current_rating_mu": 11.485486611176821,
+        "delta_rating_mu": -5.432513388823178,
+        "baseline_team_strength": 0.47,
+        "current_team_strength": 0.1743,
+        "delta_team_strength": -0.29569999999999996,
+        "delta_team_seconds": -0.5827572014200417
+      },
+      {
+        "driver_code": "ANT",
+        "team": "Mercedes",
+        "baseline_rating_mu": 10.639,
+        "current_rating_mu": 13.273425260612068,
+        "delta_rating_mu": 2.634425260612069,
+        "baseline_team_strength": 0.75,
+        "current_team_strength": 0.9325,
+        "delta_team_strength": 0.1825,
+        "delta_team_seconds": 0.3596658412551831
+      },
+      {
+        "driver_code": "BEA",
+        "team": "Haas F1 Team",
+        "baseline_rating_mu": 12.991,
+        "current_rating_mu": 14.004402323213029,
+        "delta_rating_mu": 1.013402323213029,
+        "baseline_team_strength": 0.43,
+        "current_team_strength": 0.4364,
+        "delta_team_strength": 0.006400000000000017,
+        "delta_team_seconds": 0.012612939090592773
+      },
+      {
+        "driver_code": "BOR",
+        "team": "Audi",
+        "baseline_rating_mu": 15.175,
+        "current_rating_mu": 11.187752145032377,
+        "delta_rating_mu": -3.987247854967624,
+        "baseline_team_strength": 0.38,
+        "current_team_strength": 0.4083,
+        "delta_team_strength": 0.028299999999999992,
+        "delta_team_seconds": 0.05577284004121469
+      },
+      {
+        "driver_code": "BOT",
+        "team": "Cadillac F1",
+        "baseline_rating_mu": 12.466,
+        "current_rating_mu": 13.027420303094308,
+        "delta_rating_mu": 0.5614203030943088,
+        "baseline_team_strength": 0.35,
+        "current_team_strength": 0.186,
+        "delta_team_strength": -0.16399999999999998,
+        "delta_team_seconds": -0.32320656419643845
+      },
+      {
+        "driver_code": "COL",
+        "team": "Alpine",
+        "baseline_rating_mu": 13.201,
+        "current_rating_mu": 12.170897191718614,
+        "delta_rating_mu": -1.0301028082813861,
+        "baseline_team_strength": 0.4,
+        "current_team_strength": 0.5138,
+        "delta_team_strength": 0.11380000000000001,
+        "delta_team_seconds": 0.22427382320460185
+      },
+      {
+        "driver_code": "GAS",
+        "team": "Alpine",
+        "baseline_rating_mu": 15.952,
+        "current_rating_mu": 15.203071884967404,
+        "delta_rating_mu": -0.7489281150325962,
+        "baseline_team_strength": 0.4,
+        "current_team_strength": 0.5138,
+        "delta_team_strength": 0.11380000000000001,
+        "delta_team_seconds": 0.22427382320460185
+      },
+      {
+        "driver_code": "HAD",
+        "team": "Red Bull Racing",
+        "baseline_rating_mu": 16.057,
+        "current_rating_mu": 10.444808209222442,
+        "delta_rating_mu": -5.6121917907775565,
+        "baseline_team_strength": 0.74,
+        "current_team_strength": 0.6514,
+        "delta_team_strength": -0.08860000000000001,
+        "delta_team_seconds": -0.174610375535393
+      },
+      {
+        "driver_code": "HAM",
+        "team": "Ferrari",
+        "baseline_rating_mu": 14.335,
+        "current_rating_mu": 13.468281547864494,
+        "delta_rating_mu": -0.8667184521355065,
+        "baseline_team_strength": 0.7,
+        "current_team_strength": 0.83,
+        "delta_team_strength": 0.13,
+        "delta_team_seconds": 0.2562003252776647
+      },
+      {
+        "driver_code": "HUL",
+        "team": "Audi",
+        "baseline_rating_mu": 15.742,
+        "current_rating_mu": 14.238098580323483,
+        "delta_rating_mu": -1.5039014196765184,
+        "baseline_team_strength": 0.38,
+        "current_team_strength": 0.4083,
+        "delta_team_strength": 0.028299999999999992,
+        "delta_team_seconds": 0.05577284004121469
+      },
+      {
+        "driver_code": "LAW",
+        "team": "RB",
+        "baseline_rating_mu": 14.062,
+        "current_rating_mu": 13.20270387668936,
+        "delta_rating_mu": -0.8592961233106386,
+        "baseline_team_strength": 0.48,
+        "current_team_strength": 0.5164,
+        "delta_team_strength": 0.03639999999999999,
+        "delta_team_seconds": 0.07173609107774608
+      },
+      {
+        "driver_code": "LEC",
+        "team": "Ferrari",
+        "baseline_rating_mu": 18.892,
+        "current_rating_mu": 14.26015311061757,
+        "delta_rating_mu": -4.63184688938243,
+        "baseline_team_strength": 0.7,
+        "current_team_strength": 0.83,
+        "delta_team_strength": 0.13,
+        "delta_team_seconds": 0.2562003252776647
+      },
+      {
+        "driver_code": "LIN",
+        "team": "RB",
+        "baseline_rating_mu": 12.382,
+        "current_rating_mu": 12.547490923002202,
+        "delta_rating_mu": 0.1654909230022028,
+        "baseline_team_strength": 0.48,
+        "current_team_strength": 0.5164,
+        "delta_team_strength": 0.03639999999999999,
+        "delta_team_seconds": 0.07173609107774608
+      },
+      {
+        "driver_code": "NOR",
+        "team": "McLaren",
+        "baseline_rating_mu": 17.317,
+        "current_rating_mu": 13.66706048230261,
+        "delta_rating_mu": -3.6499395176973906,
+        "baseline_team_strength": 0.85,
+        "current_team_strength": 0.6667,
+        "delta_team_strength": -0.18330000000000002,
+        "delta_team_seconds": -0.36124245864150717
+      },
+      {
+        "driver_code": "OCO",
+        "team": "Haas F1 Team",
+        "baseline_rating_mu": 15.427,
+        "current_rating_mu": 13.500729972318975,
+        "delta_rating_mu": -1.9262700276810243,
+        "baseline_team_strength": 0.43,
+        "current_team_strength": 0.4364,
+        "delta_team_strength": 0.006400000000000017,
+        "delta_team_seconds": 0.012612939090592773
+      },
+      {
+        "driver_code": "PER",
+        "team": "Cadillac F1",
+        "baseline_rating_mu": 9.757,
+        "current_rating_mu": 12.464683181760432,
+        "delta_rating_mu": 2.707683181760432,
+        "baseline_team_strength": 0.35,
+        "current_team_strength": 0.186,
+        "delta_team_strength": -0.16399999999999998,
+        "delta_team_seconds": -0.32320656419643845
+      },
+      {
+        "driver_code": "PIA",
+        "team": "McLaren",
+        "baseline_rating_mu": 13.369,
+        "current_rating_mu": 13.394693234668143,
+        "delta_rating_mu": 0.025693234668143106,
+        "baseline_team_strength": 0.85,
+        "current_team_strength": 0.6667,
+        "delta_team_strength": -0.18330000000000002,
+        "delta_team_seconds": -0.36124245864150717
+      },
+      {
+        "driver_code": "RUS",
+        "team": "Mercedes",
+        "baseline_rating_mu": 18.22,
+        "current_rating_mu": 13.143384540908176,
+        "delta_rating_mu": -5.076615459091823,
+        "baseline_team_strength": 0.75,
+        "current_team_strength": 0.9325,
+        "delta_team_strength": 0.1825,
+        "delta_team_seconds": 0.3596658412551831
+      },
+      {
+        "driver_code": "SAI",
+        "team": "Williams",
+        "baseline_rating_mu": 14.608,
+        "current_rating_mu": 14.17439230020445,
+        "delta_rating_mu": -0.4336076997955498,
+        "baseline_team_strength": 0.55,
+        "current_team_strength": 0.3284,
+        "delta_team_strength": -0.22160000000000002,
+        "delta_team_seconds": -0.436723016011773
+      },
+      {
+        "driver_code": "STR",
+        "team": "Aston Martin",
+        "baseline_rating_mu": 13.453,
+        "current_rating_mu": 10.85986757843164,
+        "delta_rating_mu": -2.5931324215683595,
+        "baseline_team_strength": 0.47,
+        "current_team_strength": 0.1743,
+        "delta_team_strength": -0.29569999999999996,
+        "delta_team_seconds": -0.5827572014200417
+      },
+      {
+        "driver_code": "VER",
+        "team": "Red Bull Racing",
+        "baseline_rating_mu": 21.265,
+        "current_rating_mu": 16.453840456488308,
+        "delta_rating_mu": -4.8111595435116925,
+        "baseline_team_strength": 0.74,
+        "current_team_strength": 0.6514,
+        "delta_team_strength": -0.08860000000000001,
+        "delta_team_seconds": -0.174610375535393
+      }
+    ]
+  },
+  "wet_leakage": {
+    "state": "not_evaluable_without_weather_routed_wet_replay_rows",
+    "fully_wet_dry_update_invariant": {
+      "state": "not_evaluable_from_current_inputs",
+      "wet_matched_rows": 0,
+      "mixed_or_unreliable_matched_rows": 0,
+      "violations": []
+    },
+    "legacy_wet_skill_delta_vs_rating_mu_delta_correlation": null,
+    "note": "The hard wet invariant requires session-level update trace. Aggregate driver artifacts alone cannot prove that a wet session did not update dry ratings."
+  },
+  "warnings": [
+    "Dry leakage is reported as a legacy rating-mu proxy until schema migration adds seconds fields.",
+    "Regulation-reset scale monitoring is outside the 2024-2025 one-SE band for: qualifying, race.",
+    "Wet-leakage hard invariant is not evaluable without wet routed replay rows."
+  ],
+  "decision_notes": [
+    "This artifact is diagnostic-only; it does not retune extractor semantics.",
+    "The exact dry-leakage metric is schema-blocked until race/quali seconds fields exist in persisted driver state."
+  ]
+}

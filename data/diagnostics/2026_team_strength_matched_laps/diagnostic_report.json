@@ -1,0 +1,1355 @@
+{
+  "built_at": "2026-05-20T07:21:11.669948+00:00",
+  "config": {
+    "min_matched_pairs_race": 8,
+    "min_matched_pairs_quali": 3,
+    "max_position_change_for_clean_lap": 2,
+    "traffic_stint_sigma_threshold": 1.5,
+    "tire_age_fallback_window_laps": 3,
+    "early_teammate_dnf_lap_threshold": 10,
+    "bootstrap_samples": 200,
+    "bootstrap_random_seed": 2026,
+    "matched_gap_se_floor_s": 0.02,
+    "qualifying_quicklap_threshold": 1.07
+  },
+  "n_target_sessions": 8,
+  "n_loaded_sessions": 8,
+  "n_error_sessions": 0,
+  "n_raw_rows": 1021,
+  "n_matched_pair_rows": 999,
+  "n_skipped_pair_rows": 22,
+  "n_aggregate_rows": 88,
+  "n_valid_aggregate_rows": 66,
+  "errors": [],
+  "n_matched_pairs_distribution": {
+    "overall": {
+      "count": 66,
+      "min": 3.0,
+      "p25": 4.0,
+      "median": 5.5,
+      "p75": 28.75,
+      "max": 40.0
+    },
+    "by_session_kind_weather": [
+      {
+        "session_kind": "qualifying",
+        "weather_bucket": "dry",
+        "count": 34,
+        "min": 3.0,
+        "p25": 3.0,
+        "median": 4.0,
+        "p75": 4.0,
+        "max": 6.0
+      },
+      {
+        "session_kind": "race",
+        "weather_bucket": "dry",
+        "count": 32,
+        "min": 9.0,
+        "p25": 20.0,
+        "median": 29.0,
+        "p75": 33.5,
+        "max": 40.0
+      }
+    ]
+  },
+  "matched_gap_se_distribution": {
+    "count": 66,
+    "min": 0.03980444629339392,
+    "p25": 0.08713707703952292,
+    "median": 0.13343299279256393,
+    "p75": 0.2602519137265036,
+    "max": 1.419160783897572
+  },
+  "matched_gap_median_distribution": {
+    "count": 66,
+    "min": -1.153499999999994,
+    "p25": -0.27924999999999756,
+    "median": -0.03200000000000003,
+    "p75": 0.28587499999999544,
+    "max": 1.0889999999999986
+  },
+  "skip_reason_counts": [
+    {
+      "session_kind": "qualifying",
+      "skip_reason": "insufficient_matched_pairs",
+      "count": 8
+    },
+    {
+      "session_kind": "qualifying",
+      "skip_reason": "missing_lap_time_data",
+      "count": 2
+    },
+    {
+      "session_kind": "race",
+      "skip_reason": "insufficient_matched_pairs",
+      "count": 7
+    },
+    {
+      "session_kind": "race",
+      "skip_reason": "missing_lap_time_data",
+      "count": 5
+    }
+  ],
+  "zero_observation_sessions": [],
+  "teammate_pair_coverage": [
+    {
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "reference_driver_code": "ALB",
+      "comparison_driver_code": "SAI",
+      "n_observations": 3,
+      "total_matched_pairs": 10
+    },
+    {
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "reference_driver_code": "ALO",
+      "comparison_driver_code": "STR",
+      "n_observations": 2,
+      "total_matched_pairs": 6
+    },
+    {
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "reference_driver_code": "ANT",
+      "comparison_driver_code": "RUS",
+      "n_observations": 4,
+      "total_matched_pairs": 13
+    },
+    {
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "reference_driver_code": "BEA",
+      "comparison_driver_code": "OCO",
+      "n_observations": 4,
+      "total_matched_pairs": 17
+    },
+    {
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "reference_driver_code": "BOR",
+      "comparison_driver_code": "HUL",
+      "n_observations": 3,
+      "total_matched_pairs": 12
+    },
+    {
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "reference_driver_code": "COL",
+      "comparison_driver_code": "GAS",
+      "n_observations": 4,
+      "total_matched_pairs": 16
+    },
+    {
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "reference_driver_code": "HAD",
+      "comparison_driver_code": "VER",
+      "n_observations": 3,
+      "total_matched_pairs": 12
+    },
+    {
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "reference_driver_code": "HAM",
+      "comparison_driver_code": "LEC",
+      "n_observations": 4,
+      "total_matched_pairs": 15
+    },
+    {
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "reference_driver_code": "LAW",
+      "comparison_driver_code": "LIN",
+      "n_observations": 3,
+      "total_matched_pairs": 11
+    },
+    {
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "reference_driver_code": "NOR",
+      "comparison_driver_code": "PIA",
+      "n_observations": 4,
+      "total_matched_pairs": 16
+    },
+    {
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "reference_driver_code": "ALB",
+      "comparison_driver_code": "SAI",
+      "n_observations": 3,
+      "total_matched_pairs": 89
+    },
+    {
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "reference_driver_code": "ALO",
+      "comparison_driver_code": "STR",
+      "n_observations": 2,
+      "total_matched_pairs": 39
+    },
+    {
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "reference_driver_code": "ANT",
+      "comparison_driver_code": "RUS",
+      "n_observations": 4,
+      "total_matched_pairs": 147
+    },
+    {
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "reference_driver_code": "BEA",
+      "comparison_driver_code": "OCO",
+      "n_observations": 4,
+      "total_matched_pairs": 92
+    },
+    {
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "reference_driver_code": "BOR",
+      "comparison_driver_code": "HUL",
+      "n_observations": 1,
+      "total_matched_pairs": 38
+    },
+    {
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "reference_driver_code": "BOT",
+      "comparison_driver_code": "PER",
+      "n_observations": 4,
+      "total_matched_pairs": 73
+    },
+    {
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "reference_driver_code": "COL",
+      "comparison_driver_code": "GAS",
+      "n_observations": 3,
+      "total_matched_pairs": 70
+    },
+    {
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "reference_driver_code": "HAD",
+      "comparison_driver_code": "VER",
+      "n_observations": 2,
+      "total_matched_pairs": 49
+    },
+    {
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "reference_driver_code": "HAM",
+      "comparison_driver_code": "LEC",
+      "n_observations": 4,
+      "total_matched_pairs": 125
+    },
+    {
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "reference_driver_code": "LAW",
+      "comparison_driver_code": "LIN",
+      "n_observations": 3,
+      "total_matched_pairs": 81
+    },
+    {
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "reference_driver_code": "NOR",
+      "comparison_driver_code": "PIA",
+      "n_observations": 2,
+      "total_matched_pairs": 68
+    }
+  ],
+  "weather_bucket_counts": [
+    {
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "count": 128
+    },
+    {
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "count": 871
+    }
+  ],
+  "compound_counts": [
+    {
+      "session_kind": "qualifying",
+      "compound": "SOFT",
+      "count": 128
+    },
+    {
+      "session_kind": "race",
+      "compound": "HARD",
+      "count": 550
+    },
+    {
+      "session_kind": "race",
+      "compound": "MEDIUM",
+      "count": 305
+    },
+    {
+      "session_kind": "race",
+      "compound": "SOFT",
+      "count": 16
+    }
+  ],
+  "compound_overlap_counts": {
+    "no_compound_overlap": 0
+  },
+  "connected_components": [
+    {
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "n_components": 10,
+      "component_sizes": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "component_observation_counts": [
+        3,
+        2,
+        4,
+        4,
+        3,
+        4,
+        3,
+        4,
+        3,
+        4
+      ],
+      "component_observation_shares": [
+        0.08823529411764706,
+        0.058823529411764705,
+        0.11764705882352941,
+        0.11764705882352941,
+        0.08823529411764706,
+        0.11764705882352941,
+        0.08823529411764706,
+        0.11764705882352941,
+        0.08823529411764706,
+        0.11764705882352941
+      ],
+      "components": [
+        [
+          "ALB",
+          "SAI"
+        ],
+        [
+          "ALO",
+          "STR"
+        ],
+        [
+          "ANT",
+          "RUS"
+        ],
+        [
+          "BEA",
+          "OCO"
+        ],
+        [
+          "BOR",
+          "HUL"
+        ],
+        [
+          "COL",
+          "GAS"
+        ],
+        [
+          "HAD",
+          "VER"
+        ],
+        [
+          "HAM",
+          "LEC"
+        ],
+        [
+          "LAW",
+          "LIN"
+        ],
+        [
+          "NOR",
+          "PIA"
+        ]
+      ]
+    },
+    {
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "n_components": 11,
+      "component_sizes": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "component_observation_counts": [
+        3,
+        2,
+        4,
+        4,
+        1,
+        4,
+        3,
+        2,
+        4,
+        3,
+        2
+      ],
+      "component_observation_shares": [
+        0.09375,
+        0.0625,
+        0.125,
+        0.125,
+        0.03125,
+        0.125,
+        0.09375,
+        0.0625,
+        0.125,
+        0.09375,
+        0.0625
+      ],
+      "components": [
+        [
+          "ALB",
+          "SAI"
+        ],
+        [
+          "ALO",
+          "STR"
+        ],
+        [
+          "ANT",
+          "RUS"
+        ],
+        [
+          "BEA",
+          "OCO"
+        ],
+        [
+          "BOR",
+          "HUL"
+        ],
+        [
+          "BOT",
+          "PER"
+        ],
+        [
+          "COL",
+          "GAS"
+        ],
+        [
+          "HAD",
+          "VER"
+        ],
+        [
+          "HAM",
+          "LEC"
+        ],
+        [
+          "LAW",
+          "LIN"
+        ],
+        [
+          "NOR",
+          "PIA"
+        ]
+      ]
+    }
+  ],
+  "filter_totals": {
+    "missing_lap_time_laps": 473,
+    "pit_laps": 997,
+    "deleted_laps": 0,
+    "inaccurate_laps": 1438,
+    "lap1_laps": 173,
+    "final_driver_laps": 173,
+    "non_green_laps": 742,
+    "sc_vsc_laps": 451,
+    "large_position_change_laps": 58,
+    "stint_outlier_laps": 410,
+    "lap_level_weather_unreliable_laps": 0,
+    "weather_mode_excluded_laps": 0,
+    "non_quick_qualifying_laps": 116,
+    "valid_laps": 3294,
+    "candidate_matched_pairs": 1035,
+    "matched_pair_rows": 999
+  },
+  "session_team_pair_counts": [
+    {
+      "year": 2026,
+      "race_name": "Australian Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Alpine",
+      "reference_driver_code": "COL",
+      "comparison_driver_code": "GAS",
+      "n_matched_pairs": 5,
+      "matched_gap_median_s": -0.7189999999999941,
+      "matched_gap_se_s": 0.24665187234370026
+    },
+    {
+      "year": 2026,
+      "race_name": "Australian Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Audi",
+      "reference_driver_code": "BOR",
+      "comparison_driver_code": "HUL",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": 0.5389999999999944,
+      "matched_gap_se_s": 0.22764456360010973
+    },
+    {
+      "year": 2026,
+      "race_name": "Australian Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Ferrari",
+      "reference_driver_code": "HAM",
+      "comparison_driver_code": "LEC",
+      "n_matched_pairs": 3,
+      "matched_gap_median_s": -0.15099999999999625,
+      "matched_gap_se_s": 0.13529610890718766
+    },
+    {
+      "year": 2026,
+      "race_name": "Australian Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Haas F1 Team",
+      "reference_driver_code": "BEA",
+      "comparison_driver_code": "OCO",
+      "n_matched_pairs": 6,
+      "matched_gap_median_s": -0.07350000000000279,
+      "matched_gap_se_s": 0.28750691745009843
+    },
+    {
+      "year": 2026,
+      "race_name": "Australian Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "McLaren",
+      "reference_driver_code": "NOR",
+      "comparison_driver_code": "PIA",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": -0.19750000000000512,
+      "matched_gap_se_s": 0.2820673706901265
+    },
+    {
+      "year": 2026,
+      "race_name": "Australian Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Mercedes",
+      "reference_driver_code": "ANT",
+      "comparison_driver_code": "RUS",
+      "n_matched_pairs": 3,
+      "matched_gap_median_s": -0.4480000000000075,
+      "matched_gap_se_s": 0.3666793046550508
+    },
+    {
+      "year": 2026,
+      "race_name": "Australian Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Racing Bulls",
+      "reference_driver_code": "LAW",
+      "comparison_driver_code": "LIN",
+      "n_matched_pairs": 3,
+      "matched_gap_median_s": 1.0889999999999986,
+      "matched_gap_se_s": 0.601830105995382
+    },
+    {
+      "year": 2026,
+      "race_name": "Australian Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Alpine",
+      "reference_driver_code": "COL",
+      "comparison_driver_code": "GAS",
+      "n_matched_pairs": 20,
+      "matched_gap_median_s": -0.7115000000000009,
+      "matched_gap_se_s": 0.20524837484590275
+    },
+    {
+      "year": 2026,
+      "race_name": "Australian Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Cadillac",
+      "reference_driver_code": "BOT",
+      "comparison_driver_code": "PER",
+      "n_matched_pairs": 9,
+      "matched_gap_median_s": 0.6730000000000018,
+      "matched_gap_se_s": 0.9210393241104234
+    },
+    {
+      "year": 2026,
+      "race_name": "Australian Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Ferrari",
+      "reference_driver_code": "HAM",
+      "comparison_driver_code": "LEC",
+      "n_matched_pairs": 32,
+      "matched_gap_median_s": 0.09299999999999642,
+      "matched_gap_se_s": 0.0625016469632244
+    },
+    {
+      "year": 2026,
+      "race_name": "Australian Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Haas F1 Team",
+      "reference_driver_code": "BEA",
+      "comparison_driver_code": "OCO",
+      "n_matched_pairs": 31,
+      "matched_gap_median_s": 0.465999999999994,
+      "matched_gap_se_s": 0.13165311881405276
+    },
+    {
+      "year": 2026,
+      "race_name": "Australian Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Mercedes",
+      "reference_driver_code": "ANT",
+      "comparison_driver_code": "RUS",
+      "n_matched_pairs": 37,
+      "matched_gap_median_s": 0.07499999999998863,
+      "matched_gap_se_s": 0.07207887290737977
+    },
+    {
+      "year": 2026,
+      "race_name": "Australian Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Racing Bulls",
+      "reference_driver_code": "LAW",
+      "comparison_driver_code": "LIN",
+      "n_matched_pairs": 22,
+      "matched_gap_median_s": -0.8164999999999978,
+      "matched_gap_se_s": 0.13521286677107514
+    },
+    {
+      "year": 2026,
+      "race_name": "Australian Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Williams",
+      "reference_driver_code": "ALB",
+      "comparison_driver_code": "SAI",
+      "n_matched_pairs": 25,
+      "matched_gap_median_s": 0.26599999999999113,
+      "matched_gap_se_s": 0.13529543617672996
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Alpine",
+      "reference_driver_code": "COL",
+      "comparison_driver_code": "GAS",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": -0.4100000000000037,
+      "matched_gap_se_s": 0.404887641713179
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Aston Martin",
+      "reference_driver_code": "ALO",
+      "comparison_driver_code": "STR",
+      "n_matched_pairs": 3,
+      "matched_gap_median_s": 0.7920000000000016,
+      "matched_gap_se_s": 0.09220038860163027
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Audi",
+      "reference_driver_code": "BOR",
+      "comparison_driver_code": "HUL",
+      "n_matched_pairs": 3,
+      "matched_gap_median_s": -0.3259999999999934,
+      "matched_gap_se_s": 0.14045004110083797
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Ferrari",
+      "reference_driver_code": "HAM",
+      "comparison_driver_code": "LEC",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": -0.03399999999999892,
+      "matched_gap_se_s": 0.11671788551457712
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Haas F1 Team",
+      "reference_driver_code": "BEA",
+      "comparison_driver_code": "OCO",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": 0.2995000000000019,
+      "matched_gap_se_s": 0.06948979169272003
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "McLaren",
+      "reference_driver_code": "NOR",
+      "comparison_driver_code": "PIA",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": 0.017499999999998295,
+      "matched_gap_se_s": 0.06348023294597031
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Mercedes",
+      "reference_driver_code": "ANT",
+      "comparison_driver_code": "RUS",
+      "n_matched_pairs": 3,
+      "matched_gap_median_s": -0.043000000000006366,
+      "matched_gap_se_s": 0.17495336234258324
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Racing Bulls",
+      "reference_driver_code": "LAW",
+      "comparison_driver_code": "LIN",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": 0.16150000000000375,
+      "matched_gap_se_s": 0.46860578887866944
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Red Bull Racing",
+      "reference_driver_code": "HAD",
+      "comparison_driver_code": "VER",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": -0.1460000000000008,
+      "matched_gap_se_s": 0.08565738838345202
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Williams",
+      "reference_driver_code": "ALB",
+      "comparison_driver_code": "SAI",
+      "n_matched_pairs": 3,
+      "matched_gap_median_s": -0.1490000000000009,
+      "matched_gap_se_s": 0.8205434904369754
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Alpine",
+      "reference_driver_code": "COL",
+      "comparison_driver_code": "GAS",
+      "n_matched_pairs": 22,
+      "matched_gap_median_s": -0.5775000000000077,
+      "matched_gap_se_s": 0.6198266755978362
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Cadillac",
+      "reference_driver_code": "BOT",
+      "comparison_driver_code": "PER",
+      "n_matched_pairs": 35,
+      "matched_gap_median_s": -0.030000000000001137,
+      "matched_gap_se_s": 0.10194779418257806
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Ferrari",
+      "reference_driver_code": "HAM",
+      "comparison_driver_code": "LEC",
+      "n_matched_pairs": 37,
+      "matched_gap_median_s": 0.04200000000000159,
+      "matched_gap_se_s": 0.0658673005474417
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Haas F1 Team",
+      "reference_driver_code": "BEA",
+      "comparison_driver_code": "OCO",
+      "n_matched_pairs": 17,
+      "matched_gap_median_s": 0.742999999999995,
+      "matched_gap_se_s": 0.5277056488794647
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Mercedes",
+      "reference_driver_code": "ANT",
+      "comparison_driver_code": "RUS",
+      "n_matched_pairs": 40,
+      "matched_gap_median_s": 0.0030000000000001137,
+      "matched_gap_se_s": 0.07041127404445083
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Racing Bulls",
+      "reference_driver_code": "LAW",
+      "comparison_driver_code": "LIN",
+      "n_matched_pairs": 30,
+      "matched_gap_median_s": 0.7134999999999962,
+      "matched_gap_se_s": 0.09241671515450771
+    },
+    {
+      "year": 2026,
+      "race_name": "Chinese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Red Bull Racing",
+      "reference_driver_code": "HAD",
+      "comparison_driver_code": "VER",
+      "n_matched_pairs": 18,
+      "matched_gap_median_s": -0.5144999999999982,
+      "matched_gap_se_s": 0.08938380500957921
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Alpine",
+      "reference_driver_code": "COL",
+      "comparison_driver_code": "GAS",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": -0.722999999999999,
+      "matched_gap_se_s": 0.105132003050103
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Aston Martin",
+      "reference_driver_code": "ALO",
+      "comparison_driver_code": "STR",
+      "n_matched_pairs": 3,
+      "matched_gap_median_s": 0.5619999999999976,
+      "matched_gap_se_s": 0.4873721564362732
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Audi",
+      "reference_driver_code": "BOR",
+      "comparison_driver_code": "HUL",
+      "n_matched_pairs": 5,
+      "matched_gap_median_s": 0.09100000000000819,
+      "matched_gap_se_s": 0.18674121399686897
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Ferrari",
+      "reference_driver_code": "HAM",
+      "comparison_driver_code": "LEC",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": -0.29399999999999693,
+      "matched_gap_se_s": 0.11617479293100925
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Haas F1 Team",
+      "reference_driver_code": "BEA",
+      "comparison_driver_code": "OCO",
+      "n_matched_pairs": 3,
+      "matched_gap_median_s": -0.22500000000000853,
+      "matched_gap_se_s": 0.15057990916861091
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "McLaren",
+      "reference_driver_code": "NOR",
+      "comparison_driver_code": "PIA",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": -0.31050000000000466,
+      "matched_gap_se_s": 0.08638816771617083
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Mercedes",
+      "reference_driver_code": "ANT",
+      "comparison_driver_code": "RUS",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": 0.34949999999999903,
+      "matched_gap_se_s": 0.10193816109380166
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Racing Bulls",
+      "reference_driver_code": "LAW",
+      "comparison_driver_code": "LIN",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": 0.016500000000000625,
+      "matched_gap_se_s": 0.3159149828385974
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Red Bull Racing",
+      "reference_driver_code": "HAD",
+      "comparison_driver_code": "VER",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": 0.04399999999999693,
+      "matched_gap_se_s": 0.10674738072410511
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Williams",
+      "reference_driver_code": "ALB",
+      "comparison_driver_code": "SAI",
+      "n_matched_pairs": 3,
+      "matched_gap_median_s": 0.07900000000000773,
+      "matched_gap_se_s": 0.11786482750512506
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Alpine",
+      "reference_driver_code": "COL",
+      "comparison_driver_code": "GAS",
+      "n_matched_pairs": 28,
+      "matched_gap_median_s": -0.9570000000000007,
+      "matched_gap_se_s": 0.08593548532585965
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Aston Martin",
+      "reference_driver_code": "ALO",
+      "comparison_driver_code": "STR",
+      "n_matched_pairs": 19,
+      "matched_gap_median_s": -0.10200000000000387,
+      "matched_gap_se_s": 0.04782011282875087
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Audi",
+      "reference_driver_code": "BOR",
+      "comparison_driver_code": "HUL",
+      "n_matched_pairs": 38,
+      "matched_gap_median_s": -0.4065000000000083,
+      "matched_gap_se_s": 0.07648879626960814
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Cadillac",
+      "reference_driver_code": "BOT",
+      "comparison_driver_code": "PER",
+      "n_matched_pairs": 19,
+      "matched_gap_median_s": 0.49500000000000455,
+      "matched_gap_se_s": 1.419160783897572
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Ferrari",
+      "reference_driver_code": "HAM",
+      "comparison_driver_code": "LEC",
+      "n_matched_pairs": 27,
+      "matched_gap_median_s": -0.06799999999999784,
+      "matched_gap_se_s": 0.09443175515635405
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Haas F1 Team",
+      "reference_driver_code": "BEA",
+      "comparison_driver_code": "OCO",
+      "n_matched_pairs": 12,
+      "matched_gap_median_s": -0.21749999999999403,
+      "matched_gap_se_s": 0.16716405219268218
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "McLaren",
+      "reference_driver_code": "NOR",
+      "comparison_driver_code": "PIA",
+      "n_matched_pairs": 33,
+      "matched_gap_median_s": -0.22299999999999898,
+      "matched_gap_se_s": 0.08227990223351932
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Mercedes",
+      "reference_driver_code": "ANT",
+      "comparison_driver_code": "RUS",
+      "n_matched_pairs": 38,
+      "matched_gap_median_s": 0.3504999999999967,
+      "matched_gap_se_s": 0.07222261574378534
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Racing Bulls",
+      "reference_driver_code": "LAW",
+      "comparison_driver_code": "LIN",
+      "n_matched_pairs": 29,
+      "matched_gap_median_s": 0.04200000000000159,
+      "matched_gap_se_s": 0.07650700431033958
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Red Bull Racing",
+      "reference_driver_code": "HAD",
+      "comparison_driver_code": "VER",
+      "n_matched_pairs": 31,
+      "matched_gap_median_s": -0.8990000000000009,
+      "matched_gap_se_s": 0.13645165092515663
+    },
+    {
+      "year": 2026,
+      "race_name": "Japanese Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Williams",
+      "reference_driver_code": "ALB",
+      "comparison_driver_code": "SAI",
+      "n_matched_pairs": 27,
+      "matched_gap_median_s": -0.22400000000000375,
+      "matched_gap_se_s": 0.07839525611224632
+    },
+    {
+      "year": 2026,
+      "race_name": "Miami Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Alpine",
+      "reference_driver_code": "COL",
+      "comparison_driver_code": "GAS",
+      "n_matched_pairs": 3,
+      "matched_gap_median_s": 0.18600000000000705,
+      "matched_gap_se_s": 0.10522645966709894
+    },
+    {
+      "year": 2026,
+      "race_name": "Miami Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Ferrari",
+      "reference_driver_code": "HAM",
+      "comparison_driver_code": "LEC",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": -0.17450000000000188,
+      "matched_gap_se_s": 0.1283867733123542
+    },
+    {
+      "year": 2026,
+      "race_name": "Miami Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Haas F1 Team",
+      "reference_driver_code": "BEA",
+      "comparison_driver_code": "OCO",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": 0.3925000000000054,
+      "matched_gap_se_s": 0.2664899224526954
+    },
+    {
+      "year": 2026,
+      "race_name": "Miami Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "McLaren",
+      "reference_driver_code": "NOR",
+      "comparison_driver_code": "PIA",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": -0.08250000000000313,
+      "matched_gap_se_s": 0.23881476041633926
+    },
+    {
+      "year": 2026,
+      "race_name": "Miami Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Mercedes",
+      "reference_driver_code": "ANT",
+      "comparison_driver_code": "RUS",
+      "n_matched_pairs": 3,
+      "matched_gap_median_s": 0.3990000000000009,
+      "matched_gap_se_s": 0.15147078461856917
+    },
+    {
+      "year": 2026,
+      "race_name": "Miami Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Red Bull Racing",
+      "reference_driver_code": "HAD",
+      "comparison_driver_code": "VER",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": -0.8755000000000024,
+      "matched_gap_se_s": 0.35864272335442055
+    },
+    {
+      "year": 2026,
+      "race_name": "Miami Grand Prix",
+      "session_name": "Qualifying",
+      "session_kind": "qualifying",
+      "weather_bucket": "dry",
+      "team": "Williams",
+      "reference_driver_code": "ALB",
+      "comparison_driver_code": "SAI",
+      "n_matched_pairs": 4,
+      "matched_gap_median_s": 0.2924999999999969,
+      "matched_gap_se_s": 0.6485843378594516
+    },
+    {
+      "year": 2026,
+      "race_name": "Miami Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Aston Martin",
+      "reference_driver_code": "ALO",
+      "comparison_driver_code": "STR",
+      "n_matched_pairs": 20,
+      "matched_gap_median_s": 0.18700000000000472,
+      "matched_gap_se_s": 0.1670865097861369
+    },
+    {
+      "year": 2026,
+      "race_name": "Miami Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Cadillac",
+      "reference_driver_code": "BOT",
+      "comparison_driver_code": "PER",
+      "n_matched_pairs": 10,
+      "matched_gap_median_s": -1.153499999999994,
+      "matched_gap_se_s": 0.2647852608541047
+    },
+    {
+      "year": 2026,
+      "race_name": "Miami Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Ferrari",
+      "reference_driver_code": "HAM",
+      "comparison_driver_code": "LEC",
+      "n_matched_pairs": 29,
+      "matched_gap_median_s": -0.3579999999999899,
+      "matched_gap_se_s": 0.10829165857342317
+    },
+    {
+      "year": 2026,
+      "race_name": "Miami Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Haas F1 Team",
+      "reference_driver_code": "BEA",
+      "comparison_driver_code": "OCO",
+      "n_matched_pairs": 32,
+      "matched_gap_median_s": 0.125,
+      "matched_gap_se_s": 0.049842603960849025
+    },
+    {
+      "year": 2026,
+      "race_name": "Miami Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "McLaren",
+      "reference_driver_code": "NOR",
+      "comparison_driver_code": "PIA",
+      "n_matched_pairs": 35,
+      "matched_gap_median_s": 0.3289999999999935,
+      "matched_gap_se_s": 0.13891764660290146
+    },
+    {
+      "year": 2026,
+      "race_name": "Miami Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Mercedes",
+      "reference_driver_code": "ANT",
+      "comparison_driver_code": "RUS",
+      "n_matched_pairs": 32,
+      "matched_gap_median_s": 0.8889999999999958,
+      "matched_gap_se_s": 0.10735812409429034
+    },
+    {
+      "year": 2026,
+      "race_name": "Miami Grand Prix",
+      "session_name": "Race",
+      "session_kind": "race",
+      "weather_bucket": "dry",
+      "team": "Williams",
+      "reference_driver_code": "ALB",
+      "comparison_driver_code": "SAI",
+      "n_matched_pairs": 37,
+      "matched_gap_median_s": -0.23499999999999943,
+      "matched_gap_se_s": 0.03980444629339392
+    }
+  ]
+}
