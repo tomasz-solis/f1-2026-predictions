@@ -17,15 +17,16 @@ Two non-negotiable rules:
   This includes Phase 0. A doc that still has TODO entries in lock-required
   fields is not closed.
 
-Current local gate state as of 2026-05-18:
+Current local gate state as of 2026-05-20:
 
 - Phase 1 source-backed evidence rows were filled, then reclassified on
   2026-05-17 after the construct audit: the current PACETEQ race and
   qualifying rows remain `EXTERNAL_CONTEXT`, not HARD gates, until a
   same-construct match is proven.
 - Phase 2 smoke sessions are locked.
-- Phases 3-6 have produced the extractor, historical observation artifacts,
-  construct probes, and the first prior fit. The next planned phase is Phase 7.
+- Phases 3-7 have produced the extractor, historical observation artifacts,
+  construct probes, the first prior fit, and the frozen live team-strength
+  seconds mapping. The next planned phase is Phase 8.
 
 ---
 
@@ -400,6 +401,85 @@ Dependencies: Phase 6.
 ## Phase 8 — Replay And Leakage Diagnostics
 
 Goal: verify orthogonality before changing live state.
+
+Implementation note (2026-05-20): the first replay/leakage diagnostics artifact is
+persisted at `data/model_diagnostics/2026/replay_leakage_diagnostics.json` with a
+Markdown companion at `data/model_diagnostics/2026/replay_leakage_diagnostics.md`.
+The dashboard now reads this artifact from the `Model Diagnostics` page rather
+than recomputing a separate definition.
+
+A construct-row audit was added on 2026-05-20 at
+`data/model_diagnostics/2026/team_strength_construct_row_audit.json` with a Markdown
+companion at `data/model_diagnostics/2026/team_strength_construct_row_audit.md`.
+This audit reads the same frozen mapping and construct-aligned rows, then
+reports row-level residuals, team-target slopes, grouped residuals, and
+leave-one-race / leave-one-team influence checks. The dashboard surfaces this
+persisted artifact when present.
+
+A held-out refit-candidate test was added at
+`data/model_diagnostics/2026/team_strength_refit_candidate_test.json` with a
+Markdown companion at
+`data/model_diagnostics/2026/team_strength_refit_candidate_test.md`. It uses
+leave-one-race-out splits over the first four completed 2026 weekends, so each
+candidate is trained on three weekends and scored on the omitted weekend.
+
+A full prediction replay test was added at
+`data/model_diagnostics/2026/team_strength_prediction_replay_test.json` with a
+Markdown companion at
+`data/model_diagnostics/2026/team_strength_prediction_replay_test.md`. It uses
+the race-only scale candidate and compares held-out replay prediction position
+MSE against the current frozen mapping.
+
+Current measured state:
+
+- historical replay was rebuilt through Australia, China, Japan, and Miami, so
+  replay race count now matches the live 2026 artifact count (`4`);
+- the 2026 construct-aligned transfer rows cover `61` race rows and `65`
+  qualifying rows over the four completed weekends;
+- regulation-reset monitoring is outside the 2024-2025 one-standard-error band
+  for both constructs:
+  - race prediction slope `1.952` versus historical reference mean `0.923`
+    (`SE 0.060`);
+  - qualifying prediction slope `1.116` versus historical reference mean
+    `0.653` (`SE 0.047`);
+- dry leakage is measured only as a legacy `bayesian.rating_mu` proxy for now,
+  with correlation `0.159` against race team-strength seconds deltas. The exact
+  seconds-field leakage metric remains schema-blocked until Phase 9 adds
+  race/quali seconds fields;
+- no wet routed replay rows exist in the current four-race sample, so the
+  wet-leakage hard invariant is not yet evaluable from real 2026 replay rows.
+- the construct-row audit covers `126` rows total. The team-target slope is
+  also high (`2.243` race, `1.398` qualifying), so the transfer warning is not
+  explained only by adding driver priors to an otherwise aligned team mapping.
+- leave-one checks do not reduce either construct back into the 2024-2025
+  one-standard-error band. The largest race influences are Chinese Grand Prix
+  by race (`+0.174` slope delta) and Japanese Grand Prix by qualifying
+  (`-0.123` slope delta). The largest team influences are Cadillac by race
+  (`-0.260`) and Aston Martin by qualifying (`-0.168`). All leave-one variants
+  remain outside the band.
+- the held-out refit-candidate test found strong race evidence but weak
+  qualifying evidence:
+  - combined row-weighted MSE improves from `0.683` to `0.364` under the
+    leave-one-race linear refit (`-46.7%`);
+  - race MSE improves from `1.058` to `0.397` (`-62.4%`) and both scale-only
+    and linear refits win all four race holdouts;
+  - qualifying MSE improves only from `0.331` to `0.318` under scale-only
+    (`-3.9%`) and the candidates win only two of four qualifying holdouts;
+  - uncertainty-only widening keeps the same medians, so construct MSE is
+    unchanged.
+- the full prediction replay test does not confirm the large construct-level
+  gain at output level:
+  - race-target position MSE improves from `33.277` to `32.427` (`-2.6%`);
+  - race-target MSE improves in `12/20` paired checkpoint/target rows;
+  - all-target position MSE improves from `28.767` to `28.176` (`-2.1%`);
+  - this is below the current release bar for a median-changing refit.
+
+Interpretation: this is a transfer-risk flag, not permission to refit the
+extractor or to hand-edit priors. The row audit makes a single outlier
+explanation weak. The refit-candidate test supports a full prediction replay
+for a race-only scale/refit candidate, but the full replay result is too small
+to ship. It does not support a qualifying median refit. No continuous in-season
+refitting is approved by this test.
 
 Tasks:
 
