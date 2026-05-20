@@ -915,6 +915,49 @@ def render_model_insights_page() -> None:
         st.markdown(RACE_HYPERPARAMETERS_MARKDOWN)
 
 
+def render_model_diagnostics_page() -> None:
+    """Render persisted model diagnostics."""
+    from .model_diagnostics import render_model_diagnostics
+
+    selected_season = _get_selected_season()
+    render_page_hero_deck(
+        title="Model Diagnostics",
+        summary=(
+            "Read the persisted replay, leakage, and regulation-reset checks used before "
+            "schema migration."
+        ),
+        eyebrow="Model audit",
+        cards=[
+            {
+                "label": "Season",
+                "value": str(selected_season),
+                "meta": "Uses the shared dashboard season.",
+                "tone": "neutral",
+            },
+            {
+                "label": "Source",
+                "value": "Persisted",
+                "meta": "No ad hoc dashboard recompute.",
+                "tone": "accent",
+            },
+            {
+                "label": "Dry leakage",
+                "value": "Measured",
+                "meta": "Legacy proxy until schema migration.",
+                "tone": "warning",
+            },
+            {
+                "label": "Wet invariant",
+                "value": "Guarded",
+                "meta": "Depends on weather-routed replay rows.",
+                "tone": "neutral",
+            },
+        ],
+        st_module=st,
+    )
+    render_model_diagnostics(year=selected_season, st_module=st)
+
+
 def _render_accuracy_page_controls() -> tuple[int, bool]:
     """Render season and refresh controls for the accuracy page."""
     selected_season = _get_selected_season()
@@ -1164,6 +1207,8 @@ def render_page(page: str, enable_logging: bool) -> None:
         render_live_prediction_page(enable_logging)
     elif page in {"Model & Learning", "Model Insights"}:
         render_model_insights_page()
+    elif page == "Model Diagnostics":
+        render_model_diagnostics_page()
     elif page == "Team Comparison":
         render_team_comparison_page()
     elif page == "Prediction Accuracy" and ENABLE_PREDICTION_ACCURACY_TAB:

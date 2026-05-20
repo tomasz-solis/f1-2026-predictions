@@ -29,7 +29,7 @@ NAVIGATION_PAGES = ["Prediction", "Team Comparison"]
 if ENABLE_PREDICTION_ACCURACY_TAB:
     NAVIGATION_PAGES.append("Prediction Accuracy")
     NAVIGATION_PAGES.append("Checkpoint Viewer")
-NAVIGATION_PAGES.extend(["Model & Learning", "Contact"])
+NAVIGATION_PAGES.extend(["Model Diagnostics", "Model & Learning", "Contact"])
 _NAVIGATION_STATE_KEY = "nav_tabs"
 _NAVIGATION_WIDGET_KEY = "nav_tabs_selector"
 _NAVIGATION_FALLBACK_KEY = "nav_tabs_selectbox"
