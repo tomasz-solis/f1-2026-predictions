@@ -5,18 +5,33 @@ import logging
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import fastf1
 import numpy as np
 import pandas as pd
 
+from src.extractors.matched_laps import (
+    MatchedLapConfig,
+    aggregate_matched_teammate_laps,
+    extract_matched_teammate_laps,
+)
 from src.models.bayesian import BayesianDriverRanking
+from src.models.driver_seconds_state import (
+    DriverSecondsUpdateSummary,
+    preserve_driver_seconds_fields,
+    update_driver_seconds_from_teammate_aggregates,
+)
 from src.persistence.artifact_store import ArtifactStore
 from src.systems.compound_analyzer import (
     aggregate_compound_samples,
     extract_compound_metrics,
     normalize_compound_metrics_across_teams,
+)
+from src.systems.driver_update_trace import (
+    build_driver_update_trace_rows,
+    legacy_ratings_from_trace_state,
+    snapshot_driver_update_state,
 )
 from src.systems.updater_flow import (
     update_team_characteristics_core as _update_team_characteristics_core,
@@ -27,6 +42,7 @@ from src.utils.team_mapping import map_team_to_characteristics
 from src.utils.validation_helpers import normalize_weather_key
 
 logger = logging.getLogger(__name__)
+_SPRINT_SECONDS_EVIDENCE_SCALE = 0.5
 
 
 def _driver_characteristics_fallback_paths(year: int) -> tuple[Path, ...]:
@@ -231,15 +247,18 @@ def _persist_bayesian_ratings_to_drivers(
         if not seeded_from:
             seeded_from = "inseason_update" if sessions_observed > 0 else "extraction_prior"
 
-        driver_entry["bayesian"] = {
-            "rating_mu": float(mu),
-            "rating_sigma": float(sigma),
-            "sessions_observed": int(sessions_observed),
-            "seeded_from": str(seeded_from),
-            "last_session": last_sessions.get(driver_code, fallback_session_name),
-            "last_updated": updated_at,
-            "season_year": season_year,
-        }
+        driver_entry["bayesian"] = preserve_driver_seconds_fields(
+            previous_bayesian=previous_bayesian,
+            updated_bayesian={
+                "rating_mu": float(mu),
+                "rating_sigma": float(sigma),
+                "sessions_observed": int(sessions_observed),
+                "seeded_from": str(seeded_from),
+                "last_session": last_sessions.get(driver_code, fallback_session_name),
+                "last_updated": updated_at,
+                "season_year": season_year,
+            },
+        )
         touched += 1
 
     return touched
@@ -260,7 +279,7 @@ def load_competitive_session(
     fastf1.Cache.enable_cache(str(cache_dir))
 
     session = fastf1.get_session(year, race_name, session_name)
-    session.load(laps=load_laps, telemetry=False, weather=False)
+    session.load(laps=load_laps, telemetry=False, weather=True)
 
     results = session.results.copy()
     results["race_name"] = race_name
@@ -277,7 +296,7 @@ def load_race_session(year: int, race_name: str) -> tuple[pd.DataFrame, fastf1.c
 
 def load_qualifying_session(year: int, race_name: str) -> tuple[pd.DataFrame, fastf1.core.Session]:
     """Load qualifying results and session from FastF1."""
-    return load_competitive_session(year, race_name, "Q", load_laps=False)
+    return load_competitive_session(year, race_name, "Q", load_laps=True)
 
 
 def _build_position_observations(session_results: pd.DataFrame) -> dict[str, int]:
@@ -585,8 +604,12 @@ def update_bayesian_driver_ratings(
     *,
     data_root: str | Path = "data",
     weather: str = "dry",
+    qualifying_weather: str | None = None,
+    race_matched_lap_aggregates: pd.DataFrame | None = None,
+    qualifying_matched_lap_aggregates: pd.DataFrame | None = None,
+    trace_rows: list[dict[str, Any]] | None = None,
 ) -> None:
-    """Update Bayesian driver ratings plus qualifying pace from completed sessions."""
+    """Update driver state from completed sessions with fully wet dry-state routing."""
     logger.info("Updating Bayesian driver ratings...")
 
     from src.models.priors_factory import PriorsFactory
@@ -604,6 +627,11 @@ def update_bayesian_driver_ratings(
     if isinstance(drivers_payload, dict):
         strip_legacy_bayesian_fields(drivers_payload)
         _restore_bayesian_state(bayesian, drivers_payload)
+    trace_initial_state = (
+        snapshot_driver_update_state(drivers_payload, legacy_ratings=bayesian.ratings)
+        if trace_rows is not None and isinstance(drivers_payload, dict)
+        else {}
+    )
 
     all_observations = _build_position_observations(race_results)
     dnf_drivers = _extract_dnf_drivers(race_results)
@@ -621,6 +649,12 @@ def update_bayesian_driver_ratings(
     session_name = str(race_results.get("race_name", pd.Series(["Race"])).iloc[0])
     teammate_confidence = float(config_loader.get("bayesian.teammate_relative_confidence", 0.35))
     teammate_confidence = float(np.clip(teammate_confidence, 0.05, 1.0))
+    race_weather_key = normalize_weather_key(weather)
+    qualifying_weather_key = normalize_weather_key(
+        qualifying_weather if qualifying_weather is not None else weather
+    )
+    race_updates_dry_state = race_weather_key != "rain"
+    qualifying_updates_dry_state = qualifying_weather_key != "rain"
     from src.utils.lineups import load_current_lineups
 
     lineups = load_current_lineups()
@@ -631,15 +665,20 @@ def update_bayesian_driver_ratings(
         for d in team_drivers:
             driver_to_team[str(d)] = str(team_name)
 
-    if lineups:
-        bayesian.update_teammate_relative(
-            observations=observations,
-            session_name=session_name,
-            lineups=lineups,
-            confidence=teammate_confidence,
-        )
+    dry_bayesian_update_applied = False
+    if race_updates_dry_state:
+        if lineups:
+            bayesian.update_teammate_relative(
+                observations=observations,
+                session_name=session_name,
+                lineups=lineups,
+                confidence=teammate_confidence,
+            )
+        else:
+            bayesian.update(observations=observations, session_name=session_name, confidence=1.0)
+        dry_bayesian_update_applied = True
     else:
-        bayesian.update(observations=observations, session_name=session_name, confidence=1.0)
+        logger.info("Skipped dry race driver-state updates for fully wet %s", session_name)
 
     if not isinstance(driver_payload, dict):
         logger.warning("Could not load driver characteristics payload to persist Bayesian updates")
@@ -650,6 +689,18 @@ def update_bayesian_driver_ratings(
             "Driver characteristics payload missing 'drivers'; skipping Bayesian persistence"
         )
         return
+
+    race_seconds_summary = _update_dry_driver_seconds_path(
+        drivers_payload=drivers_payload,
+        aggregate_rows=race_matched_lap_aggregates,
+        session_kind="race",
+        dry_state_route=race_updates_dry_state,
+    )
+    trace_after_race_state = (
+        snapshot_driver_update_state(drivers_payload, legacy_ratings=bayesian.ratings)
+        if trace_rows is not None
+        else {}
+    )
 
     # --- Qualifying Bayesian update ---
     # Lower confidence than race (0.15 vs 0.35): qualifying is one lap in controlled
@@ -663,7 +714,7 @@ def update_bayesian_driver_ratings(
         if isinstance(qualifying_results, pd.DataFrame)
         else {}
     )
-    if qualifying_observations:
+    if qualifying_observations and qualifying_updates_dry_state:
         quali_bayesian_confidence = float(
             config_loader.get("bayesian.qualifying_update_confidence", 0.15)
         )
@@ -686,17 +737,50 @@ def update_bayesian_driver_ratings(
             len(qualifying_observations),
             quali_bayesian_confidence,
         )
+        dry_bayesian_update_applied = True
+    elif qualifying_observations:
+        logger.info("Skipped dry qualifying driver-state updates for fully wet %s", session_name)
+    qualifying_seconds_summary = _update_dry_driver_seconds_path(
+        drivers_payload=drivers_payload,
+        aggregate_rows=qualifying_matched_lap_aggregates,
+        session_kind="qualifying",
+        dry_state_route=qualifying_updates_dry_state,
+    )
+    trace_after_qualifying_state = (
+        snapshot_driver_update_state(drivers_payload, legacy_ratings=bayesian.ratings)
+        if trace_rows is not None
+        else {}
+    )
+    if trace_rows is not None and qualifying_observations:
+        trace_rows.extend(
+            build_driver_update_trace_rows(
+                year=season_year,
+                event_name=session_name,
+                session_name="Qualifying",
+                session_kind="qualifying",
+                weather_route=qualifying_weather_key,
+                driver_codes=qualifying_observations,
+                before=trace_after_race_state,
+                after=trace_after_qualifying_state,
+                dry_race_update_applied=False,
+                dry_quali_update_applied=qualifying_updates_dry_state,
+            )
+        )
 
     # Persist Bayesian state only. Prediction-time blending in
     # _blend_race_skill_with_bayesian_form handles the skill_score adjustment —
     # keeping it in one place avoids double-counting. This must happen after the
     # qualifying update above so the stored posterior reflects both sessions.
-    touched_skill_drivers = _persist_bayesian_ratings_to_drivers(
-        bayesian=bayesian,
-        drivers_payload=drivers_payload,
-        season_year=season_year,
-        fallback_session_name=session_name,
-        updated_at=datetime.now().isoformat(),
+    touched_skill_drivers = (
+        _persist_bayesian_ratings_to_drivers(
+            bayesian=bayesian,
+            drivers_payload=drivers_payload,
+            season_year=season_year,
+            fallback_session_name=session_name,
+            updated_at=datetime.now().isoformat(),
+        )
+        if dry_bayesian_update_applied
+        else 0
     )
 
     # --- Qualifying pace EMA update (teammate-relative) ---
@@ -704,13 +788,17 @@ def update_bayesian_driver_ratings(
         config_loader.get("baseline_predictor.driver_form.quali_pace_update_blend", 0.30)
     )
     quali_pace_blend = float(np.clip(quali_pace_blend, 0.0, 1.0))
-    touched_quali_pace_drivers = _update_teammate_relative_pace_ema(
-        observations=qualifying_observations,
-        drivers_payload=drivers_payload,
-        driver_to_team=driver_to_team,
-        grid_size=grid_size,
-        blend_weight=quali_pace_blend,
-        pace_key="quali_pace",
+    touched_quali_pace_drivers = (
+        _update_teammate_relative_pace_ema(
+            observations=qualifying_observations,
+            drivers_payload=drivers_payload,
+            driver_to_team=driver_to_team,
+            grid_size=grid_size,
+            blend_weight=quali_pace_blend,
+            pace_key="quali_pace",
+        )
+        if qualifying_updates_dry_state
+        else 0
     )
 
     # --- Race pace EMA update (teammate-relative, DNF drivers excluded) ---
@@ -721,24 +809,28 @@ def update_bayesian_driver_ratings(
     race_finish_obs: dict[str, int] = {
         dc: pos for dc, pos in all_observations.items() if dc not in dnf_drivers
     }
-    touched_race_pace_drivers = _update_teammate_relative_pace_ema(
-        observations=race_finish_obs,
-        drivers_payload=drivers_payload,
-        driver_to_team=driver_to_team,
-        grid_size=grid_size,
-        blend_weight=race_pace_blend,
-        pace_key="race_pace",
+    touched_race_pace_drivers = (
+        _update_teammate_relative_pace_ema(
+            observations=race_finish_obs,
+            drivers_payload=drivers_payload,
+            driver_to_team=driver_to_team,
+            grid_size=grid_size,
+            blend_weight=race_pace_blend,
+            pace_key="race_pace",
+        )
+        if race_updates_dry_state
+        else 0
     )
 
     # --- Wet-skill EMA update (only in wet/mixed conditions) ---
-    weather_key = normalize_weather_key(weather)
     touched_wet_skill_drivers = 0
-    if weather_key in {"rain", "mixed"}:
+    wet_skill_updated_drivers: set[str] = set()
+    if race_weather_key in {"rain", "mixed"}:
         wet_skill_blend = float(
             config_loader.get("baseline_predictor.driver_form.wet_skill_update_blend", 0.15)
         )
         wet_skill_blend = float(np.clip(wet_skill_blend, 0.0, 0.5))
-        if weather_key == "mixed":
+        if race_weather_key == "mixed":
             wet_skill_blend *= 0.5
 
         wet_skill_neutral = float(
@@ -777,6 +869,7 @@ def update_bayesian_driver_ratings(
             ) * existing_wet_skill + wet_skill_blend * observed_wet_signal
             driver_entry["wet_skill"] = round(updated, 3)
             touched_wet_skill_drivers += 1
+            wet_skill_updated_drivers.add(driver_code)
 
         if touched_wet_skill_drivers > 0:
             logger.info("Updated wet_skill for %d drivers", touched_wet_skill_drivers)
@@ -791,11 +884,38 @@ def update_bayesian_driver_ratings(
         floor=float(config_loader.get("baseline_predictor.driver_form.dnf_rate_floor", 0.02)),
         cap=float(config_loader.get("baseline_predictor.driver_form.dnf_rate_cap", 0.35)),
     )
+    if trace_rows is not None:
+        trace_after_wet_state = snapshot_driver_update_state(
+            drivers_payload,
+            legacy_ratings=legacy_ratings_from_trace_state(trace_after_race_state),
+        )
+        _restore_trace_fields(
+            target=trace_after_wet_state,
+            source=trace_after_race_state,
+            fields=("quali_rating_mu_s", "quali_rating_sigma_s"),
+        )
+        trace_rows.extend(
+            build_driver_update_trace_rows(
+                year=season_year,
+                event_name=session_name,
+                session_name="Race",
+                session_kind="race",
+                weather_route=race_weather_key,
+                driver_codes=observations,
+                before=trace_initial_state,
+                after=trace_after_wet_state,
+                dry_race_update_applied=race_updates_dry_state,
+                dry_quali_update_applied=False,
+                wet_update_drivers=wet_skill_updated_drivers,
+            )
+        )
 
     if (
         touched_skill_drivers == 0
         and touched_quali_pace_drivers == 0
         and touched_race_pace_drivers == 0
+        and race_seconds_summary.drivers_touched == 0
+        and qualifying_seconds_summary.drivers_touched == 0
         and touched_wet_skill_drivers == 0
         and touched_dnf_rate_drivers == 0
     ):
@@ -805,9 +925,12 @@ def update_bayesian_driver_ratings(
     _persist_driver_characteristics_payload(store, driver_payload, season_year)
     logger.info(
         "Updated Bayesian ratings for %s drivers, blended skill for %s, "
-        "qualifying pace for %s, race pace for %s, wet_skill for %s, dnf_rate for %s",
+        "driver seconds race/quali for %s/%s, qualifying pace for %s, "
+        "race pace for %s, wet_skill for %s, dnf_rate for %s",
         len(observations),
         touched_skill_drivers,
+        race_seconds_summary.drivers_touched,
+        qualifying_seconds_summary.drivers_touched,
         touched_quali_pace_drivers,
         touched_race_pace_drivers,
         touched_wet_skill_drivers,
@@ -815,7 +938,127 @@ def update_bayesian_driver_ratings(
     )
 
 
-def update_from_race(year: int, race_name: str, data_dir: str = "data/processed") -> None:
+def _weather_from_session(session: Any) -> str:
+    """Return dry, mixed, or rain from one FastF1 session rainfall trace."""
+    try:
+        weather_data = session.weather_data
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        return "dry"
+    if not isinstance(weather_data, pd.DataFrame) or weather_data.empty:
+        return "dry"
+    if "Rainfall" not in weather_data.columns:
+        return "dry"
+
+    try:
+        rainfall = weather_data["Rainfall"].dropna().astype(bool)
+        wet_fraction = float(rainfall.mean()) if not rainfall.empty else 0.0
+    except (AttributeError, TypeError, ValueError):
+        return "dry"
+    if wet_fraction > 0.30:
+        return "rain"
+    if wet_fraction > 0.05:
+        return "mixed"
+    return "dry"
+
+
+def _restore_trace_fields(
+    *,
+    target: dict[str, dict[str, float | None]],
+    source: dict[str, dict[str, float | None]],
+    fields: tuple[str, ...],
+) -> None:
+    """Restore session-external fields before emitting one trace route."""
+    for driver_code, target_state in target.items():
+        source_state = source.get(driver_code)
+        if source_state is None:
+            continue
+        for field in fields:
+            target_state[field] = source_state.get(field)
+
+
+def _update_dry_driver_seconds_path(
+    *,
+    drivers_payload: dict[str, Any],
+    aggregate_rows: pd.DataFrame | None,
+    session_kind: Literal["race", "qualifying"],
+    dry_state_route: bool,
+    evidence_scale: float = 1.0,
+) -> DriverSecondsUpdateSummary:
+    """Apply one live dry seconds path only when the weather route permits it."""
+    if not dry_state_route:
+        return DriverSecondsUpdateSummary(
+            session_kind=session_kind,
+            observations_applied=0,
+            drivers_touched=0,
+            rows_skipped_missing_state=0,
+        )
+
+    summary = update_driver_seconds_from_teammate_aggregates(
+        drivers_payload=drivers_payload,
+        aggregate_rows=aggregate_rows,
+        session_kind=session_kind,
+        evidence_scale=evidence_scale,
+    )
+    if summary.observations_applied:
+        logger.info(
+            "Applied %s dry driver-seconds aggregates: %s observations, %s drivers",
+            session_kind,
+            summary.observations_applied,
+            summary.drivers_touched,
+        )
+    if summary.rows_skipped_missing_state:
+        logger.warning(
+            "Skipped %s %s driver-seconds aggregates with missing seconds state",
+            summary.rows_skipped_missing_state,
+            session_kind,
+        )
+    return summary
+
+
+def _matched_lap_weather_mode(weather: str) -> Literal["dry", "wet", "mixed", "unknown"]:
+    """Map updater weather labels onto the matched-lap extractor labels."""
+    weather_key = normalize_weather_key(weather)
+    if weather_key == "rain":
+        return "wet"
+    if weather_key == "dry":
+        return "dry"
+    if weather_key == "mixed":
+        return "mixed"
+    return "unknown"
+
+
+def _extract_driver_seconds_aggregates(
+    session: Any,
+    *,
+    session_kind: Literal["race", "qualifying"],
+    weather: str,
+) -> pd.DataFrame | None:
+    """Extract canonical teammate aggregates for one live seconds-state path."""
+    try:
+        config = MatchedLapConfig()
+        raw_rows = extract_matched_teammate_laps(
+            session,
+            session_kind=session_kind,
+            weather_mode=_matched_lap_weather_mode(weather),
+            config=config,
+        )
+        return aggregate_matched_teammate_laps(raw_rows, config=config)
+    except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
+        logger.warning(
+            "Skipped %s driver-seconds aggregates; matched-lap extraction failed: %s",
+            session_kind,
+            exc,
+        )
+        return None
+
+
+def update_from_race(
+    year: int,
+    race_name: str,
+    data_dir: str = "data/processed",
+    *,
+    trace_rows: list[dict[str, Any]] | None = None,
+) -> None:
     """
     Main entry point: Update all characteristics after a race.
 
@@ -837,8 +1080,9 @@ def update_from_race(year: int, race_name: str, data_dir: str = "data/processed"
         logger.error("Make sure race has completed and data is available via FastF1")
         raise
 
+    qualifying_session = None
     try:
-        qualifying_results, _qualifying_session = load_qualifying_session(year, race_name)
+        qualifying_results, qualifying_session = load_qualifying_session(year, race_name)
         logger.info("Loaded qualifying results for %s drivers", len(qualifying_results))
     except (AttributeError, FileNotFoundError, OSError, RuntimeError, TypeError, ValueError) as exc:
         logger.warning(
@@ -849,22 +1093,24 @@ def update_from_race(year: int, race_name: str, data_dir: str = "data/processed"
         )
         qualifying_results = None
 
-    # Detect race weather from session for wet_skill updating
-    race_weather = "dry"
-    try:
-        weather_data = session.weather_data
-        if (
-            weather_data is not None
-            and not weather_data.empty
-            and "Rainfall" in weather_data.columns
-        ):
-            wet_fraction = float(weather_data["Rainfall"].dropna().astype(bool).mean())
-            if wet_fraction > 0.30:
-                race_weather = "rain"
-            elif wet_fraction > 0.05:
-                race_weather = "mixed"
-    except Exception:
-        race_weather = "dry"
+    race_weather = _weather_from_session(session)
+    qualifying_weather = (
+        _weather_from_session(qualifying_session) if qualifying_session is not None else None
+    )
+    race_matched_lap_aggregates = _extract_driver_seconds_aggregates(
+        session,
+        session_kind="race",
+        weather=race_weather,
+    )
+    qualifying_matched_lap_aggregates = (
+        _extract_driver_seconds_aggregates(
+            qualifying_session,
+            session_kind="qualifying",
+            weather=qualifying_weather or "unknown",
+        )
+        if qualifying_session is not None
+        else None
+    )
 
     char_file = Path(data_dir) / "car_characteristics" / f"{year}_car_characteristics.json"
     if char_file.exists():
@@ -874,12 +1120,17 @@ def update_from_race(year: int, race_name: str, data_dir: str = "data/processed"
 
     data_dir_path = Path(data_dir)
     data_root = data_dir_path.parent if data_dir_path.name == "processed" else data_dir_path
-    update_bayesian_driver_ratings(
-        race_results,
-        qualifying_results=qualifying_results,
-        data_root=data_root,
-        weather=race_weather,
-    )
+    update_kwargs: dict[str, Any] = {
+        "qualifying_results": qualifying_results,
+        "data_root": data_root,
+        "weather": race_weather,
+        "qualifying_weather": qualifying_weather,
+        "race_matched_lap_aggregates": race_matched_lap_aggregates,
+        "qualifying_matched_lap_aggregates": qualifying_matched_lap_aggregates,
+    }
+    if trace_rows is not None:
+        update_kwargs["trace_rows"] = trace_rows
+    update_bayesian_driver_ratings(race_results, **update_kwargs)
 
     logger.info("Race update complete for %s %s", year, race_name)
 
@@ -888,6 +1139,8 @@ def update_from_sprint_race(
     year: int,
     race_name: str,
     data_root: str = "data",
+    *,
+    trace_rows: list[dict[str, Any]] | None = None,
 ) -> None:
     """Update driver ratings from a sprint race result.
 
@@ -905,8 +1158,8 @@ def update_from_sprint_race(
         return
 
     try:
-        sprint_results, _sprint_session = load_competitive_session(
-            year, race_name, "Sprint", load_laps=False
+        sprint_results, sprint_session = load_competitive_session(
+            year, race_name, "Sprint", load_laps=True
         )
         logger.info("Loaded sprint results for %s drivers", len(sprint_results))
     except (AttributeError, FileNotFoundError, OSError, RuntimeError, TypeError, ValueError) as exc:
@@ -918,22 +1171,49 @@ def update_from_sprint_race(
         )
         return
 
-    # Detect sprint weather for wet_skill updating
-    sprint_weather = "dry"
+    sprint_qualifying_results: pd.DataFrame | None = None
+    sprint_qualifying_session: Any | None = None
     try:
-        weather_data = _sprint_session.weather_data
-        if (
-            weather_data is not None
-            and not weather_data.empty
-            and "Rainfall" in weather_data.columns
-        ):
-            wet_fraction = float(weather_data["Rainfall"].dropna().astype(bool).mean())
-            if wet_fraction > 0.30:
-                sprint_weather = "rain"
-            elif wet_fraction > 0.05:
-                sprint_weather = "mixed"
-    except Exception:
-        sprint_weather = "dry"
+        sprint_qualifying_results, sprint_qualifying_session = load_competitive_session(
+            year,
+            race_name,
+            "SQ",
+            load_laps=True,
+        )
+        logger.info(
+            "Loaded sprint qualifying results for %s drivers",
+            len(sprint_qualifying_results),
+        )
+    except (AttributeError, FileNotFoundError, OSError, RuntimeError, TypeError, ValueError) as exc:
+        logger.warning(
+            "Could not load sprint qualifying results for %s %s; skipping SQ seconds update (%s)",
+            year,
+            race_name,
+            exc,
+        )
+
+    sprint_weather = _weather_from_session(sprint_session)
+    sprint_weather_key = normalize_weather_key(sprint_weather)
+    sprint_qualifying_weather = (
+        _weather_from_session(sprint_qualifying_session)
+        if sprint_qualifying_session is not None
+        else "unknown"
+    )
+    sprint_qualifying_weather_key = normalize_weather_key(sprint_qualifying_weather)
+    sprint_matched_lap_aggregates = _extract_driver_seconds_aggregates(
+        sprint_session,
+        session_kind="race",
+        weather=sprint_weather,
+    )
+    sprint_qualifying_matched_lap_aggregates = (
+        _extract_driver_seconds_aggregates(
+            sprint_qualifying_session,
+            session_kind="qualifying",
+            weather=sprint_qualifying_weather,
+        )
+        if sprint_qualifying_session is not None
+        else None
+    )
 
     sprint_confidence = float(config_loader.get("bayesian.sprint_race_confidence", 0.20))
     sprint_confidence = float(np.clip(sprint_confidence, 0.05, 0.5))
@@ -959,6 +1239,43 @@ def update_from_sprint_race(
     bayesian = BayesianDriverRanking(priors, grid_size=grid_size)
     strip_legacy_bayesian_fields(drivers_payload)
     _restore_bayesian_state(bayesian, drivers_payload)
+    trace_initial_state = (
+        snapshot_driver_update_state(drivers_payload, legacy_ratings=bayesian.ratings)
+        if trace_rows is not None
+        else {}
+    )
+    sprint_qualifying_observations = (
+        _build_position_observations(sprint_qualifying_results)
+        if isinstance(sprint_qualifying_results, pd.DataFrame)
+        else {}
+    )
+    sprint_qualifying_seconds_summary = _update_dry_driver_seconds_path(
+        drivers_payload=drivers_payload,
+        aggregate_rows=sprint_qualifying_matched_lap_aggregates,
+        session_kind="qualifying",
+        dry_state_route=sprint_qualifying_weather_key != "rain",
+        evidence_scale=_SPRINT_SECONDS_EVIDENCE_SCALE,
+    )
+    trace_after_qualifying_state = (
+        snapshot_driver_update_state(drivers_payload, legacy_ratings=bayesian.ratings)
+        if trace_rows is not None
+        else {}
+    )
+    if trace_rows is not None and sprint_qualifying_observations:
+        trace_rows.extend(
+            build_driver_update_trace_rows(
+                year=season_year,
+                event_name=race_name,
+                session_name="Sprint Qualifying",
+                session_kind="qualifying",
+                weather_route=sprint_qualifying_weather_key,
+                driver_codes=sprint_qualifying_observations,
+                before=trace_initial_state,
+                after=trace_after_qualifying_state,
+                dry_race_update_applied=False,
+                dry_quali_update_applied=sprint_qualifying_weather_key != "rain",
+            )
+        )
 
     all_observations = _build_position_observations(sprint_results)
     dnf_drivers = _extract_dnf_drivers(sprint_results)
@@ -972,26 +1289,42 @@ def update_from_sprint_race(
     from src.utils.lineups import load_current_lineups
 
     lineups = load_current_lineups()
-    if lineups:
-        bayesian.update_teammate_relative(
-            observations=observations,
-            session_name=session_name,
-            lineups=lineups,
-            confidence=sprint_confidence,
+    if sprint_weather_key != "rain":
+        if lineups:
+            bayesian.update_teammate_relative(
+                observations=observations,
+                session_name=session_name,
+                lineups=lineups,
+                confidence=sprint_confidence,
+            )
+        else:
+            bayesian.update(
+                observations=observations,
+                session_name=session_name,
+                confidence=sprint_confidence,
+            )
+
+        touched_bayesian = _persist_bayesian_ratings_to_drivers(
+            bayesian=bayesian,
+            drivers_payload=drivers_payload,
+            season_year=season_year,
+            fallback_session_name=session_name,
+            updated_at=datetime.now().isoformat(),
         )
     else:
-        bayesian.update(
-            observations=observations,
-            session_name=session_name,
-            confidence=sprint_confidence,
-        )
-
-    touched_bayesian = _persist_bayesian_ratings_to_drivers(
-        bayesian=bayesian,
+        logger.info("Skipped dry sprint driver-state updates for fully wet %s", session_name)
+        touched_bayesian = 0
+    sprint_race_seconds_summary = _update_dry_driver_seconds_path(
         drivers_payload=drivers_payload,
-        season_year=season_year,
-        fallback_session_name=session_name,
-        updated_at=datetime.now().isoformat(),
+        aggregate_rows=sprint_matched_lap_aggregates,
+        session_kind="race",
+        dry_state_route=sprint_weather_key != "rain",
+        evidence_scale=_SPRINT_SECONDS_EVIDENCE_SCALE,
+    )
+    trace_after_dry_state = (
+        snapshot_driver_update_state(drivers_payload, legacy_ratings=bayesian.ratings)
+        if trace_rows is not None
+        else {}
     )
 
     # Sprint race pace EMA — lower blend than main race because sprint is ~1/3 distance.
@@ -1005,18 +1338,22 @@ def update_from_sprint_race(
         * 0.5
     )  # Half weight for sprint distance
     sprint_pace_blend = float(np.clip(sprint_pace_blend, 0.0, 0.5))
-    touched_pace = _update_teammate_relative_pace_ema(
-        observations=observations,
-        drivers_payload=drivers_payload,
-        driver_to_team=driver_to_team,
-        grid_size=grid_size,
-        blend_weight=sprint_pace_blend,
-        pace_key="race_pace",
+    touched_pace = (
+        _update_teammate_relative_pace_ema(
+            observations=observations,
+            drivers_payload=drivers_payload,
+            driver_to_team=driver_to_team,
+            grid_size=grid_size,
+            blend_weight=sprint_pace_blend,
+            pace_key="race_pace",
+        )
+        if sprint_weather_key != "rain"
+        else 0
     )
 
     # Sprint wet_skill EMA — quarter weight of main race
     touched_wet = 0
-    sprint_weather_key = normalize_weather_key(sprint_weather)
+    wet_skill_updated_drivers: set[str] = set()
     if sprint_weather_key in {"rain", "mixed"}:
         wet_blend = (
             float(config_loader.get("baseline_predictor.driver_form.wet_skill_update_blend", 0.15))
@@ -1054,6 +1391,7 @@ def update_from_sprint_race(
             updated = (1.0 - wet_blend) * existing_val + wet_blend * observed_signal
             driver_entry["wet_skill"] = round(updated, 3)
             touched_wet += 1
+            wet_skill_updated_drivers.add(driver_code)
 
         if touched_wet > 0:
             logger.info("Sprint wet_skill update: %d drivers", touched_wet)
@@ -1068,15 +1406,38 @@ def update_from_sprint_race(
         floor=float(config_loader.get("baseline_predictor.driver_form.dnf_rate_floor", 0.02)),
         cap=float(config_loader.get("baseline_predictor.driver_form.dnf_rate_cap", 0.35)),
     )
+    if trace_rows is not None:
+        trace_after_wet_state = snapshot_driver_update_state(
+            drivers_payload,
+            legacy_ratings=legacy_ratings_from_trace_state(trace_after_dry_state),
+        )
+        trace_rows.extend(
+            build_driver_update_trace_rows(
+                year=season_year,
+                event_name=race_name,
+                session_name="Sprint",
+                session_kind="sprint_race",
+                weather_route=sprint_weather_key,
+                driver_codes=observations,
+                before=trace_after_qualifying_state,
+                after=trace_after_wet_state,
+                dry_race_update_applied=sprint_weather_key != "rain",
+                dry_quali_update_applied=False,
+                wet_update_drivers=wet_skill_updated_drivers,
+            )
+        )
 
     _persist_driver_characteristics_payload(store, driver_payload, season_year)
     logger.info(
         "Sprint update applied for %s drivers: Bayesian (confidence=%.2f), "
-        "persisted ratings (%d), race_pace EMA (%d drivers, blend=%.2f), "
-        "wet_skill (%d drivers), dnf_rate (%d drivers)",
+        "persisted ratings (%d), driver seconds race/quali (%d/%d), "
+        "race_pace EMA (%d drivers, blend=%.2f), wet_skill (%d drivers), "
+        "dnf_rate (%d drivers)",
         len(observations),
         sprint_confidence,
         touched_bayesian,
+        sprint_race_seconds_summary.drivers_touched,
+        sprint_qualifying_seconds_summary.drivers_touched,
         touched_pace,
         sprint_pace_blend,
         touched_wet,

@@ -56,6 +56,9 @@ def _run_update(
     quali_positions: dict[str, int] | None = None,
     lineups: dict[str, list[str]] | None = None,
     statuses: dict[str, str] | None = None,
+    weather: str = "dry",
+    qualifying_weather: str | None = None,
+    trace_rows: list[dict] | None = None,
 ) -> dict[str, dict]:
     """Run one update cycle and return the mutated drivers dict.
 
@@ -84,7 +87,13 @@ def _run_update(
         ),
         patch("src.systems.updater._persist_driver_characteristics_payload"),
     ):
-        update_bayesian_driver_ratings(race_results, qualifying_results=quali_results)
+        update_bayesian_driver_ratings(
+            race_results,
+            qualifying_results=quali_results,
+            weather=weather,
+            qualifying_weather=qualifying_weather,
+            trace_rows=trace_rows,
+        )
 
     return driver_payload["drivers"]
 
@@ -184,6 +193,46 @@ class TestRacePaceTeammateRelative:
         assert "race_pace" in result["SAI"]["pace"]
         assert 0.05 <= result["SAI"]["pace"]["race_pace"] <= 0.99
 
+    def test_fully_wet_race_does_not_update_dry_race_pace(self):
+        """Fully wet race results should not move dry race pace state."""
+        lineups = {"Ferrari": ["LEC", "HAM"]}
+        drivers = {
+            "LEC": _make_driver_entry(race_pace=0.61),
+            "HAM": _make_driver_entry(race_pace=0.47),
+        }
+
+        result = _run_update(
+            drivers,
+            race_positions={"LEC": 1, "HAM": 20},
+            lineups=lineups,
+            weather="rain",
+        )
+
+        assert result["LEC"]["pace"]["race_pace"] == 0.61
+        assert result["HAM"]["pace"]["race_pace"] == 0.47
+        assert result["LEC"]["bayesian"] == {"rating_mu": 11.0, "rating_sigma": 2.5}
+        assert result["HAM"]["bayesian"] == {"rating_mu": 11.0, "rating_sigma": 2.5}
+
+    def test_fully_wet_race_trace_reports_zero_dry_rating_delta(self):
+        """The updater trace should expose wet routing evidence per driver."""
+        trace_rows: list[dict] = []
+        _run_update(
+            {
+                "LEC": {**_make_driver_entry(), "wet_skill": 0.70},
+                "HAM": {**_make_driver_entry(), "wet_skill": 0.70},
+            },
+            race_positions={"LEC": 1, "HAM": 20},
+            lineups={"Ferrari": ["LEC", "HAM"]},
+            weather="rain",
+            trace_rows=trace_rows,
+        )
+
+        race_rows = [row for row in trace_rows if row["session_kind"] == "race"]
+        assert {row["driver_code"] for row in race_rows} == {"LEC", "HAM"}
+        assert all(row["weather_route"] == "rain" for row in race_rows)
+        assert all(row["dry_race_update_applied"] is False for row in race_rows)
+        assert all(row["legacy_rating_mu_delta"] == 0.0 for row in race_rows)
+
 
 # ---------------------------------------------------------------------------
 # FIX 1: teammate-relative quali_pace
@@ -218,6 +267,26 @@ class TestQualiPaceTeammateRelative:
         assert pia_pace >= 0.46, (
             f"PIA's quali_pace ({pia_pace:.3f}) too low despite beating teammate"
         )
+
+    def test_fully_wet_qualifying_does_not_update_dry_quali_pace(self):
+        """Fully wet qualifying results should not move dry qualifying pace state."""
+        lineups = {"Ferrari": ["LEC", "HAM"]}
+        drivers = {
+            "LEC": _make_driver_entry(quali_pace=0.63),
+            "HAM": _make_driver_entry(quali_pace=0.45),
+        }
+
+        result = _run_update(
+            drivers,
+            race_positions={"LEC": 2, "HAM": 5},
+            quali_positions={"LEC": 1, "HAM": 20},
+            lineups=lineups,
+            weather="dry",
+            qualifying_weather="rain",
+        )
+
+        assert result["LEC"]["pace"]["quali_pace"] == 0.63
+        assert result["HAM"]["pace"]["quali_pace"] == 0.45
 
 
 # ---------------------------------------------------------------------------

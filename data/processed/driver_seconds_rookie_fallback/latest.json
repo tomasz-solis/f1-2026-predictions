@@ -1,0 +1,251 @@
+{
+  "artifact_type": "driver_seconds_rookie_fallback",
+  "schema_version": 1,
+  "built_at": "2026-05-21T09:57:55.937553+00:00",
+  "sign_convention": "positive_mu_s_means_faster_than_field",
+  "cohort_years": [
+    2022,
+    2023,
+    2024,
+    2025
+  ],
+  "method": {
+    "mean_policy": "median_of_debut_season_rookie_medians",
+    "sigma_policy": "max_of_rookie_median_robust_spread_and_prior_sigma_median",
+    "construct": "dry aggregate matched-lap teammate residuals anchored by the teammate-network seconds prior"
+  },
+  "promotion_policy": {
+    "evidence_gate": "construct_aligned_driver_observations_by_session_kind",
+    "min_observations": 24,
+    "note": "Keep the fallback for one session kind until live seconds-state updates have at least this many construct-aligned driver observations."
+  },
+  "race": {
+    "mu_s": -0.19076115170883245,
+    "sigma_s": 0.5292706957024398,
+    "n_rookies": 10,
+    "n_implied_observations": 126,
+    "robust_rookie_spread_s": 0.29220130395498195,
+    "teammate_network_sigma_median_s": 0.5292706957024398,
+    "cohort": [
+      {
+        "driver_code": "ANT",
+        "debut_year": 2025,
+        "n_implied_observations": 22,
+        "teammate_codes": [
+          "RUS"
+        ],
+        "median_mu_s": -0.3643196002667862,
+        "teammate_network_sigma_s": 0.5292706957024398
+      },
+      {
+        "driver_code": "BEA",
+        "debut_year": 2024,
+        "n_implied_observations": 2,
+        "teammate_codes": [
+          "HUL",
+          "LEC"
+        ],
+        "median_mu_s": -0.30804595660419637,
+        "teammate_network_sigma_s": 0.18526479040161073
+      },
+      {
+        "driver_code": "BOR",
+        "debut_year": 2025,
+        "n_implied_observations": 19,
+        "teammate_codes": [
+          "HUL"
+        ],
+        "median_mu_s": -0.31441475160805343,
+        "teammate_network_sigma_s": 0.5292706957024398
+      },
+      {
+        "driver_code": "COL",
+        "debut_year": 2024,
+        "n_implied_observations": 6,
+        "teammate_codes": [
+          "ALB"
+        ],
+        "median_mu_s": 0.1880934683775858,
+        "teammate_network_sigma_s": 0.5292706957024398
+      },
+      {
+        "driver_code": "DOO",
+        "debut_year": 2025,
+        "n_implied_observations": 3,
+        "teammate_codes": [
+          "GAS"
+        ],
+        "median_mu_s": -0.4113768620001731,
+        "teammate_network_sigma_s": 0.5292706957024398
+      },
+      {
+        "driver_code": "HAD",
+        "debut_year": 2025,
+        "n_implied_observations": 21,
+        "teammate_codes": [
+          "LAW",
+          "TSU"
+        ],
+        "median_mu_s": 0.15491544776544203,
+        "teammate_network_sigma_s": 0.5292706957024398
+      },
+      {
+        "driver_code": "LAW",
+        "debut_year": 2023,
+        "n_implied_observations": 2,
+        "teammate_codes": [
+          "TSU"
+        ],
+        "median_mu_s": -0.9196217569261099,
+        "teammate_network_sigma_s": 0.20117389324421628
+      },
+      {
+        "driver_code": "PIA",
+        "debut_year": 2023,
+        "n_implied_observations": 18,
+        "teammate_codes": [
+          "NOR"
+        ],
+        "median_mu_s": -0.050272707306336234,
+        "teammate_network_sigma_s": 0.17602293505956196
+      },
+      {
+        "driver_code": "SAR",
+        "debut_year": 2023,
+        "n_implied_observations": 17,
+        "teammate_codes": [
+          "ALB"
+        ],
+        "median_mu_s": 0.14659346837757956,
+        "teammate_network_sigma_s": 0.19706746381713583
+      },
+      {
+        "driver_code": "ZHO",
+        "debut_year": 2022,
+        "n_implied_observations": 16,
+        "teammate_codes": [
+          "BOT"
+        ],
+        "median_mu_s": -0.07347634681346853,
+        "teammate_network_sigma_s": 0.5292706957024398
+      }
+    ]
+  },
+  "qualifying": {
+    "mu_s": -0.031331610632049894,
+    "sigma_s": 0.5304206197376727,
+    "n_rookies": 10,
+    "n_implied_observations": 100,
+    "robust_rookie_spread_s": 0.15292225496549147,
+    "teammate_network_sigma_median_s": 0.5304206197376727,
+    "cohort": [
+      {
+        "driver_code": "ANT",
+        "debut_year": 2025,
+        "n_implied_observations": 19,
+        "teammate_codes": [
+          "RUS"
+        ],
+        "median_mu_s": 0.18821685282537187,
+        "teammate_network_sigma_s": 0.5304206197376727
+      },
+      {
+        "driver_code": "BEA",
+        "debut_year": 2024,
+        "n_implied_observations": 2,
+        "teammate_codes": [
+          "HUL",
+          "LEC"
+        ],
+        "median_mu_s": -0.1998257583298587,
+        "teammate_network_sigma_s": 0.5304206197376727
+      },
+      {
+        "driver_code": "BOR",
+        "debut_year": 2025,
+        "n_implied_observations": 10,
+        "teammate_codes": [
+          "HUL"
+        ],
+        "median_mu_s": -0.5511875593003472,
+        "teammate_network_sigma_s": 0.5304206197376727
+      },
+      {
+        "driver_code": "COL",
+        "debut_year": 2024,
+        "n_implied_observations": 3,
+        "teammate_codes": [
+          "ALB"
+        ],
+        "median_mu_s": 0.12084469871896092,
+        "teammate_network_sigma_s": 0.5304206197376727
+      },
+      {
+        "driver_code": "DOO",
+        "debut_year": 2025,
+        "n_implied_observations": 3,
+        "teammate_codes": [
+          "GAS"
+        ],
+        "median_mu_s": 0.022781375802035028,
+        "teammate_network_sigma_s": 0.5304206197376727
+      },
+      {
+        "driver_code": "HAD",
+        "debut_year": 2025,
+        "n_implied_observations": 17,
+        "teammate_codes": [
+          "LAW",
+          "TSU"
+        ],
+        "median_mu_s": -0.08519032494535056,
+        "teammate_network_sigma_s": 0.5304206197376727
+      },
+      {
+        "driver_code": "LAW",
+        "debut_year": 2023,
+        "n_implied_observations": 4,
+        "teammate_codes": [
+          "TSU"
+        ],
+        "median_mu_s": -0.5957671733817727,
+        "teammate_network_sigma_s": 0.5304206197376727
+      },
+      {
+        "driver_code": "PIA",
+        "debut_year": 2023,
+        "n_implied_observations": 14,
+        "teammate_codes": [
+          "NOR"
+        ],
+        "median_mu_s": 0.018258915861099838,
+        "teammate_network_sigma_s": 0.15154874849647793
+      },
+      {
+        "driver_code": "SAR",
+        "debut_year": 2023,
+        "n_implied_observations": 13,
+        "teammate_codes": [
+          "ALB"
+        ],
+        "median_mu_s": -0.008655301281046357,
+        "teammate_network_sigma_s": 0.5304206197376727
+      },
+      {
+        "driver_code": "ZHO",
+        "debut_year": 2022,
+        "n_implied_observations": 15,
+        "teammate_codes": [
+          "BOT"
+        ],
+        "median_mu_s": -0.05400791998305343,
+        "teammate_network_sigma_s": 0.5304206197376727
+      }
+    ]
+  },
+  "sources": {
+    "observations": "data/processed/teammate_network_observations/latest/aggregated_observations.csv",
+    "teammate_network_prior": "data/processed/teammate_network_prior/latest.json",
+    "driver_debuts": "data/driver_debuts.json"
+  }
+}

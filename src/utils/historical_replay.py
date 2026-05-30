@@ -28,7 +28,7 @@ from src.dashboard.race_context import attach_starting_grid_context
 from src.persistence.artifact_store import ArtifactStore
 from src.predictors.baseline_2026 import Baseline2026Predictor
 from src.systems.testing_updater import _season_snapshot_plan, update_from_testing_sessions
-from src.systems.updater import update_from_race
+from src.systems.updater import update_from_race, update_from_sprint_race
 from src.types.prediction_types import QualifyingGridEntry
 from src.utils.accuracy_snapshots import build_accuracy_snapshot_records
 from src.utils.accuracy_targets import (
@@ -91,6 +91,7 @@ class HistoricalReplaySummary:
     weekend_sessions_replayed: list[str] = field(default_factory=list)
     race_updates: list[str] = field(default_factory=list)
     checkpoints: list[ReplayCheckpointRecord] = field(default_factory=list)
+    driver_update_trace_path: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-ready representation."""
@@ -927,6 +928,7 @@ def run_historical_checkpoint_replay(
             overwrite=overwrite,
         )
         actual_cache: dict[tuple[int, str, str], list[QualifyingGridEntry]] = {}
+        driver_update_traces: list[dict[str, Any]] = []
         summary = HistoricalReplaySummary(
             year=year,
             output_root=str(replay_output_root),
@@ -1005,13 +1007,34 @@ def run_historical_checkpoint_replay(
                         )
                     )
 
-            update_from_race(year, race_name, str(processed_dir))
+            if is_sprint:
+                update_from_sprint_race(
+                    year,
+                    race_name,
+                    str(processed_dir.parent),
+                    trace_rows=driver_update_traces,
+                )
+            update_from_race(
+                year,
+                race_name,
+                str(processed_dir),
+                trace_rows=driver_update_traces,
+            )
             summary.race_updates.append(race_name)
             if stop_after_label and race_name == stop_after_label:
                 break
 
         reports_dir = replay_output_root / "reports"
         reports_dir.mkdir(parents=True, exist_ok=True)
+        trace_path = reports_dir / "driver_update_trace.json"
+        _write_json(
+            trace_path,
+            {
+                "year": int(year),
+                "rows": driver_update_traces,
+            },
+        )
+        summary.driver_update_trace_path = str(trace_path)
         _write_json(reports_dir / "summary.json", summary.to_dict())
         _write_summary_markdown(summary, replay_output_root)
         return summary

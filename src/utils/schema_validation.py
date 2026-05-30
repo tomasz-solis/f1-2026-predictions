@@ -92,6 +92,12 @@ _DRIVER_BAYESIAN_SCHEMA = {
     "properties": {
         "rating_mu": {"type": "number"},
         "rating_sigma": {"type": "number", "minimum": 0.0},
+        "race_rating_mu_s": {"type": "number"},
+        "race_rating_sigma_s": {"type": "number", "minimum": 0.0},
+        "race_rating_observations": {"type": "integer", "minimum": 0},
+        "quali_rating_mu_s": {"type": "number"},
+        "quali_rating_sigma_s": {"type": "number", "minimum": 0.0},
+        "quali_rating_observations": {"type": "integer", "minimum": 0},
         "sessions_observed": {"type": "integer", "minimum": 0},
         "seeded_from": {"type": "string"},
         "last_session": {"type": "string"},

@@ -164,6 +164,36 @@ class TestDriverCharacteristicsSchema:
 
         validate_driver_characteristics(data, expected_year=2026)
 
+    def test_valid_driver_bayesian_payload_with_mixed_seconds_state(self):
+        """Accept legacy ratings beside seconds-native race and qualifying fields."""
+        data = _driver_payload()
+        data["drivers"]["VER"]["bayesian"] = {
+            "rating_mu": 18.5,
+            "rating_sigma": 1.6,
+            "race_rating_mu_s": 0.28,
+            "race_rating_sigma_s": 0.14,
+            "race_rating_observations": 4,
+            "quali_rating_mu_s": 0.31,
+            "quali_rating_sigma_s": 0.18,
+            "quali_rating_observations": 3,
+            "season_year": 2026,
+        }
+
+        validate_driver_characteristics(data, expected_year=2026)
+
+    def test_valid_driver_bayesian_payload_with_seconds_state_only(self):
+        """Accept the seconds-native fields without the legacy rating pair."""
+        data = _driver_payload()
+        data["drivers"]["VER"]["bayesian"] = {
+            "race_rating_mu_s": 0.28,
+            "race_rating_sigma_s": 0.14,
+            "quali_rating_mu_s": 0.31,
+            "quali_rating_sigma_s": 0.18,
+            "season_year": 2026,
+        }
+
+        validate_driver_characteristics(data, expected_year=2026)
+
 
 class TestTeamCharacteristicsSchema:
     """Test team characteristics schema validation."""

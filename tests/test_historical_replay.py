@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from src.utils.accuracy_targets import TARGET_GRAND_PRIX_RACE, TARGET_SPRINT_QUALIFYING
 from src.utils.historical_replay import (
+    HistoricalReplaySummary,
     ReplayConfigOverride,
     apply_target_scoring_policy,
     checkpoint_sequence_for_weekend,
@@ -64,3 +65,16 @@ def test_replay_config_override_blocks_saved_actual_inference():
 
     assert config.get("baseline_predictor.current_season_form.infer_from_saved_actuals") is False
     assert config.get("other.key") == "base-value"
+
+
+def test_historical_replay_summary_tracks_driver_update_trace_report() -> None:
+    """Replay summaries should point at the separate driver update trace report."""
+    summary = HistoricalReplaySummary(
+        year=2026,
+        output_root="data/historical_replay",
+        processed_data_dir="data/historical_replay/processed",
+        excluded_scoring_targets=[],
+        driver_update_trace_path="data/historical_replay/reports/driver_update_trace.json",
+    )
+
+    assert summary.to_dict()["driver_update_trace_path"].endswith("driver_update_trace.json")

@@ -526,7 +526,7 @@ class TestSprintWetSkillUpdate:
     """Sprint race should update wet_skill in wet and mixed conditions."""
 
     def test_sprint_wet_updates_wet_skill(self, patcher, tmp_path):
-        """Wet sprint race should modify wet_skill values when teammates are observed."""
+        """Wet sprint race should update wet_skill without moving dry state."""
         initial_wet_skills = {"LEC": 0.724, "HAM": 0.726}
 
         drivers = _run_sprint_wet_skill_update(
@@ -548,6 +548,10 @@ class TestSprintWetSkillUpdate:
         assert drivers["HAM"]["wet_skill"] < initial_wet_skills["HAM"], (
             "HAM lost sprint, should decrease"
         )
+        assert drivers["LEC"]["pace"]["race_pace"] == 0.50
+        assert drivers["HAM"]["pace"]["race_pace"] == 0.50
+        assert "bayesian" not in drivers["LEC"]
+        assert "bayesian" not in drivers["HAM"]
 
     def test_sprint_dry_leaves_wet_skill_unchanged(self, patcher, tmp_path):
         """Dry sprint race should leave wet_skill untouched."""
