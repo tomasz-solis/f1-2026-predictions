@@ -127,6 +127,104 @@ def test_build_saved_prediction_browser_rows_orders_races_by_round_number(patche
     assert rows[2]["race_option_label"] == "Round 4 | Miami Grand Prix"
 
 
+def test_accuracy_pipeline_orders_target_trends_by_calendar_round(patcher):
+    """Season-trend data should follow GP order instead of alphabetic race names."""
+
+    def _prediction(race_name: str) -> dict:
+        return {
+            "metadata": {
+                "year": 2026,
+                "race_name": race_name,
+                "session_name": "PRE",
+                "weekend_format": "sprint",
+            },
+            "targets": {
+                "main_qualifying": {
+                    "target_session": "Q",
+                    "predicted_order": [{"position": 1, "driver": "NOR", "team": "McLaren"}],
+                    "eligible_at_save": True,
+                }
+            },
+            "actuals": {
+                "targets": {
+                    "main_qualifying": [{"position": 1, "driver": "NOR", "team": "McLaren"}]
+                }
+            },
+        }
+
+    class _Logger:
+        def reconcile_completed_prediction_actuals(self, year: int) -> int:
+            del year
+            return 0
+
+        def get_all_predictions(self, year: int):
+            del year
+            return [
+                _prediction("Canadian Grand Prix"),
+                _prediction("Chinese Grand Prix"),
+                _prediction("Miami Grand Prix"),
+            ]
+
+    class _Metrics:
+        def calculate_prediction_target_metrics(self, prediction_data, *, is_sprint):
+            del is_sprint
+            metric_by_race = {
+                "Chinese Grand Prix": 2.0,
+                "Miami Grand Prix": 3.0,
+                "Canadian Grand Prix": 4.0,
+            }
+            race_name = prediction_data["metadata"]["race_name"]
+            return {
+                "main_qualifying": {
+                    "overall_mae": metric_by_race[race_name],
+                    "top_3_pct": 100.0,
+                }
+            }
+
+    class _Store:
+        def __init__(self, data_root: str = "data"):
+            del data_root
+
+        def list_artifacts(self, artifact_type: str, key_prefix=None, limit: int = 100):
+            del artifact_type, key_prefix, limit
+            return []
+
+    patcher.setattr("src.utils.prediction_logger.PredictionLogger", _Logger)
+    patcher.setattr("src.utils.prediction_metrics.PredictionMetrics", _Metrics)
+    patcher.setattr("src.persistence.artifact_store.ArtifactStore", _Store)
+    patcher.setattr(
+        "src.dashboard.accuracy.get_schedule_rows",
+        lambda year: (
+            (
+                ("Australian Grand Prix", "conventional"),
+                ("Chinese Grand Prix", "sprint"),
+                ("Japanese Grand Prix", "conventional"),
+                ("Miami Grand Prix", "sprint"),
+                ("Canadian Grand Prix", "sprint"),
+            )
+            if year == 2026
+            else tuple()
+        ),
+    )
+
+    pipeline = AccuracyPipeline(year=2026)
+    summary = pipeline.build_summary()
+
+    trend = summary.targets["main_qualifying"].season_trend
+    assert [point.race_name for point in trend] == [
+        "Chinese Grand Prix",
+        "Miami Grand Prix",
+        "Canadian Grand Prix",
+    ]
+    assert [point.race_order for point in trend] == [2, 4, 5]
+    assert [row["race_name"] for row in pipeline.prediction_status_rows] == [
+        "Chinese Grand Prix",
+        "Miami Grand Prix",
+        "Canadian Grand Prix",
+    ]
+    assert [row["round_number"] for row in pipeline.prediction_status_rows] == [2, 4, 5]
+
+
 def test_build_saved_prediction_browser_rows_disambiguates_duplicate_checkpoints():
     """Duplicate checkpoint saves should stay selectable without exposing timestamps."""
     predictions = [

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from datetime import UTC, datetime
 from typing import Any
 
@@ -525,7 +526,11 @@ def _build_saved_prediction_round_map(season_year: int | None) -> dict[str, int]
 
 def _normalize_saved_race_name(race_name: str) -> str:
     """Normalize one race name for case-insensitive schedule lookups."""
-    return str(race_name).strip().lower()
+    without_accents = unicodedata.normalize("NFKD", str(race_name)).encode(
+        "ascii",
+        "ignore",
+    )
+    return " ".join(without_accents.decode("ascii").split()).lower()
 
 
 def _parse_saved_timestamp(value: Any) -> datetime:
@@ -816,6 +821,11 @@ def _render_trend_charts(target_summary: TargetAccuracySummary, metric_name: str
                 xaxis_title="Race",
                 yaxis_title=METRIC_OPTIONS.get(metric_name, metric_name),
                 legend_title="Checkpoint",
+            )
+            figure.update_xaxes(
+                type="category",
+                categoryorder="array",
+                categoryarray=race_names,
             )
             st.plotly_chart(figure, width="stretch")
             if len(race_names) < 2:

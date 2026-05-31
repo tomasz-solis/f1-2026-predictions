@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -10,6 +11,7 @@ import numpy as np
 
 from src.utils.accuracy_snapshots import accuracy_snapshot_artifact_key, calculate_target_metric_map
 from src.utils.accuracy_targets import (
+    CHECKPOINT_ORDER,
     PRIMARY_TARGET_KEYS,
     explicit_target_actuals,
     explicit_target_predictions,
@@ -19,6 +21,7 @@ from src.utils.accuracy_targets import (
     target_label,
     weekend_format_name,
 )
+from src.utils.weekend import get_schedule_rows
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +142,7 @@ class AccuracyPipeline:
         self._prediction_status_rows: list[dict[str, Any]] = []
         self._excluded_predictions: list[dict[str, Any]] = []
         self._excluded_target_keys: set[str] = set()
+        self._schedule_rounds: dict[str, int] | None = None
 
     def _ensure_deps(self) -> None:
         """Lazily initialize storage, logger, and metrics dependencies."""
@@ -278,6 +282,28 @@ class AccuracyPipeline:
         self._excluded_predictions = []
         self._excluded_target_keys = set()
 
+    def _schedule_round_map(self) -> dict[str, int]:
+        """Return normalized race names keyed to their calendar round number."""
+        if self._schedule_rounds is not None:
+            return self._schedule_rounds
+
+        try:
+            schedule_rows = get_schedule_rows(self.year)
+        except Exception as exc:
+            logger.warning("Could not load %s schedule round order: %s", self.year, exc)
+            self._schedule_rounds = {}
+            return self._schedule_rounds
+
+        round_map: dict[str, int] = {}
+        for round_number, schedule_row in enumerate(schedule_rows, start=1):
+            if not isinstance(schedule_row, tuple) or not schedule_row:
+                continue
+            race_name = str(schedule_row[0]).strip()
+            if race_name:
+                round_map[_normalize_race_name(race_name)] = round_number
+        self._schedule_rounds = round_map
+        return self._schedule_rounds
+
     def _run_actuals_reconciliation(self, logger_inst: Any) -> int:
         """Reconcile stored predictions with completed-session actuals when requested."""
         try:
@@ -355,6 +381,8 @@ class AccuracyPipeline:
         target_status_records: list[_TargetStatusRecord] = []
         status_rows: list[dict[str, Any]] = []
         excluded_targets = 0
+        schedule_rounds = self._schedule_round_map()
+        fallback_race_order: dict[str, int] = {}
 
         for prediction in self._predictions:
             metadata = prediction.get("metadata", {})
@@ -364,6 +392,9 @@ class AccuracyPipeline:
             if not race_name or not checkpoint_session:
                 continue
 
+            normalized_race_name = _normalize_race_name(race_name)
+            fallback_race_order.setdefault(normalized_race_name, len(fallback_race_order))
+            round_number = schedule_rounds.get(normalized_race_name)
             is_sprint = self._prediction_is_sprint(prediction)
             weekend_format = str(metadata.get("weekend_format", "")).strip().lower()
             if weekend_format not in {"normal", "sprint"}:
@@ -476,6 +507,8 @@ class AccuracyPipeline:
                     "race_name": race_name,
                     "checkpoint_session": checkpoint_session,
                     "weekend_format": weekend_format,
+                    "round_number": round_number,
+                    "_race_order": fallback_race_order[normalized_race_name],
                     "target_labels": sorted(set(target_labels)),
                     "scored_target_count": scored_target_count,
                     "pending_target_count": pending_target_count,
@@ -490,10 +523,14 @@ class AccuracyPipeline:
 
         status_rows.sort(
             key=lambda row: (
-                str(row.get("race_name", "")),
+                row.get("round_number") is None,
+                int(row.get("round_number") or row.get("_race_order", 0)),
+                CHECKPOINT_ORDER.get(str(row.get("checkpoint_session", "")).upper(), 99),
                 str(row.get("checkpoint_session", "")),
             )
         )
+        for row in status_rows:
+            row.pop("_race_order", None)
         return records, target_status_records, status_rows, excluded_targets
 
     def _build_target_summaries(
@@ -502,9 +539,19 @@ class AccuracyPipeline:
         target_status_records: list[_TargetStatusRecord],
     ) -> dict[str, TargetAccuracySummary]:
         """Build target summaries from normalized score records."""
-        race_order: dict[str, int] = {}
+        schedule_rounds = self._schedule_round_map()
+        fallback_race_order: dict[str, int] = {}
         for record in records:
-            race_order.setdefault(record.race_name, len(race_order))
+            normalized_race_name = _normalize_race_name(record.race_name)
+            fallback_race_order.setdefault(normalized_race_name, len(fallback_race_order))
+
+        schedule_offset = len(schedule_rounds) + 1
+        race_order: dict[str, int] = {}
+        for race_name_normalized, fallback_index in fallback_race_order.items():
+            race_order[race_name_normalized] = schedule_rounds.get(
+                race_name_normalized,
+                schedule_offset + fallback_index if schedule_rounds else fallback_index,
+            )
 
         grouped: dict[str, list[_TargetAccuracyRecord]] = {}
         for record in records:
@@ -527,7 +574,7 @@ class AccuracyPipeline:
                     target_key=target_key,
                     weekend_format=record.weekend_format,
                     race_name=record.race_name,
-                    race_order=race_order[record.race_name],
+                    race_order=race_order[_normalize_race_name(record.race_name)],
                     checkpoint_session=record.checkpoint_session,
                     checkpoint_index=target_checkpoint_index(
                         target_key,
@@ -539,7 +586,7 @@ class AccuracyPipeline:
                 for record in sorted(
                     target_records,
                     key=lambda item: (
-                        race_order[item.race_name],
+                        race_order[_normalize_race_name(item.race_name)],
                         target_checkpoint_index(
                             target_key,
                             item.weekend_format,
@@ -652,7 +699,25 @@ class AccuracyPipeline:
                 snapshot.qualifying = record.metrics
             if record.target_key == "grand_prix_race":
                 snapshot.race = record.metrics
-        return list(grouped.values())
+        schedule_rounds = self._schedule_round_map()
+        fallback_race_order: dict[str, int] = {}
+        for snapshot in grouped.values():
+            normalized_race_name = _normalize_race_name(snapshot.race_name)
+            fallback_race_order.setdefault(normalized_race_name, len(fallback_race_order))
+        schedule_offset = len(schedule_rounds) + 1
+        return sorted(
+            grouped.values(),
+            key=lambda snapshot: (
+                schedule_rounds.get(
+                    _normalize_race_name(snapshot.race_name),
+                    schedule_offset + fallback_race_order[_normalize_race_name(snapshot.race_name)]
+                    if schedule_rounds
+                    else fallback_race_order[_normalize_race_name(snapshot.race_name)],
+                ),
+                CHECKPOINT_ORDER.get(snapshot.session_name, 99),
+                snapshot.session_name,
+            ),
+        )
 
     @staticmethod
     def _aggregate_metric_rows(metric_rows: list[dict[str, float]]) -> dict[str, dict[str, float]]:
@@ -717,3 +782,12 @@ class AccuracyPipeline:
                 or race_target not in PRIMARY_TARGET_KEYS
             )
         return False
+
+
+def _normalize_race_name(race_name: str) -> str:
+    """Normalize one race name for case-insensitive schedule lookups."""
+    without_accents = unicodedata.normalize("NFKD", str(race_name)).encode(
+        "ascii",
+        "ignore",
+    )
+    return " ".join(without_accents.decode("ascii").split()).lower()

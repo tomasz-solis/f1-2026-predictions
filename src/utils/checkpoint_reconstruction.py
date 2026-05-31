@@ -22,6 +22,7 @@ from src.utils.accuracy_targets import (
 )
 from src.utils.car_snapshot_history import (
     SNAPSHOT_ARTIFACT_TYPE,
+    session_order_index,
     snapshot_artifact_key,
     snapshot_sort_timestamp,
     sort_snapshot_payloads,
@@ -172,7 +173,7 @@ def _load_latest_snapshot_before_pre_checkpoint(
     race_name: str,
     is_sprint: bool,
 ) -> dict[str, Any] | None:
-    """Return the newest stored snapshot that predates the weekend PRE deadline."""
+    """Return the newest PRE-safe snapshot that predates the weekend deadline."""
     from src.utils.accuracy_targets import _scheduled_session_start
 
     deadline_starts: list[datetime] = []
@@ -190,7 +191,11 @@ def _load_latest_snapshot_before_pre_checkpoint(
             deadline_starts.append(deadline_start)
 
     if not deadline_starts:
-        return None
+        return _load_latest_prior_round_snapshot_for_pre_checkpoint(
+            store=store,
+            year=year,
+            race_name=race_name,
+        )
 
     pre_deadline = min(deadline_starts)
     snapshot_rows = store.list_artifacts(
@@ -207,10 +212,101 @@ def _load_latest_snapshot_before_pre_checkpoint(
             continue
         candidate_payloads.append(payload)
 
+    candidate_payloads = [
+        payload for payload in candidate_payloads if _is_pre_profile_snapshot_payload(payload)
+    ]
     if not candidate_payloads:
         return None
 
     return sort_snapshot_payloads(candidate_payloads)[-1]
+
+
+def _load_latest_prior_round_snapshot_for_pre_checkpoint(
+    *,
+    store: ArtifactStore,
+    year: int,
+    race_name: str,
+) -> dict[str, Any] | None:
+    """Return the latest PRE-safe snapshot by season round when session times are absent."""
+    round_map = _schedule_round_map(year)
+    target_round = round_map.get(str(race_name).strip().casefold())
+    if target_round is None:
+        return None
+
+    snapshot_rows = store.list_artifacts(
+        SNAPSHOT_ARTIFACT_TYPE,
+        key_prefix=f"{int(year)}::",
+        limit=8192,
+    )
+    candidate_payloads: list[dict[str, Any]] = []
+    for row in snapshot_rows:
+        payload = row.get("data")
+        if not isinstance(payload, dict):
+            continue
+        snapshot_round = _snapshot_round_number(payload, round_map)
+        if snapshot_round is None or snapshot_round >= target_round:
+            continue
+        if not _is_pre_profile_snapshot_payload(payload):
+            continue
+        candidate_payloads.append(payload)
+
+    if not candidate_payloads:
+        return None
+
+    candidate_payloads.sort(
+        key=lambda payload: (
+            _snapshot_round_number(payload, round_map) or -1,
+            snapshot_sort_timestamp(payload),
+        )
+    )
+    return candidate_payloads[-1]
+
+
+def _schedule_round_map(year: int) -> dict[str, int]:
+    """Map schedule race names to one-based season round numbers."""
+    from src.utils.weekend import get_schedule_rows
+
+    rows = get_schedule_rows(int(year))
+    round_map: dict[str, int] = {}
+    for round_number, row in enumerate(rows, start=1):
+        if not isinstance(row, tuple) or not row:
+            continue
+        race_name = str(row[0]).strip()
+        if race_name:
+            round_map[race_name.casefold()] = int(round_number)
+    return round_map
+
+
+def _snapshot_round_number(
+    payload: dict[str, Any],
+    round_map: dict[str, int],
+) -> int | None:
+    """Resolve a snapshot's season round from payload metadata or event name."""
+    raw_round = payload.get("round_number")
+    if raw_round is not None:
+        try:
+            round_number = int(raw_round)
+        except (TypeError, ValueError):
+            round_number = 0
+        if round_number > 0:
+            return round_number
+
+    event_name = str(payload.get("event_name", "")).strip().casefold()
+    if not event_name:
+        return None
+    return round_map.get(event_name)
+
+
+def _is_pre_profile_snapshot_payload(payload: dict[str, Any]) -> bool:
+    """Return True for prior snapshots that can seed a full PRE weekend profile."""
+    teams_payload = payload.get("teams")
+    if not isinstance(teams_payload, dict) or not teams_payload:
+        return False
+
+    session_name = str(payload.get("session_name", "")).strip()
+    # PRE predicts both main qualifying and race pace. Sprint-only checkpoints
+    # carry a narrower program, so leave them to their own weekend targets.
+    return session_order_index(session_name) in {1, 2, 3, 6, 7}
 
 
 def build_snapshot_overlay_car_characteristics(

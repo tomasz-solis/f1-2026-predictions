@@ -389,6 +389,135 @@ def test_load_checkpoint_snapshot_payload_falls_back_to_latest_prior_snapshot_fo
     assert payload["session_name"] == "Testing 2 Day 3"
 
 
+def test_load_checkpoint_snapshot_payload_skips_prior_sprint_only_snapshot_for_pre(patcher):
+    """PRE reconstruction should keep sprint-only snapshots out of full-weekend profiles."""
+    patcher.setattr(
+        "src.utils.checkpoint_reconstruction.is_sprint_weekend",
+        lambda year, race_name: True,
+    )
+    patcher.setattr(
+        "src.utils.accuracy_targets._scheduled_session_start",
+        lambda *, year, race_name, session_name: (
+            datetime.fromisoformat("2026-05-22T16:30:00+00:00")
+            if (year, race_name, session_name) == (2026, "Canadian Grand Prix", "FP1")
+            else None
+        ),
+    )
+
+    store = MagicMock()
+    store.load_artifact.return_value = None
+    store.list_artifacts.return_value = [
+        {
+            "data": {
+                "event_name": "Miami Grand Prix",
+                "session_name": "R",
+                "captured_at": "2026-05-03T22:00:00+00:00",
+                "session_started_at": "2026-05-03T20:00:00+00:00",
+                "teams": {"Ferrari": {"profiles": {"balanced": {"overall_pace": 0.4}}}},
+            },
+        },
+        {
+            "data": {
+                "event_name": "Miami Grand Prix",
+                "session_name": "Sprint",
+                "captured_at": "2026-05-03T23:00:00+00:00",
+                "session_started_at": "2026-05-03T21:00:00+00:00",
+                "teams": {"Ferrari": {"profiles": {"balanced": {"overall_pace": 0.9}}}},
+            },
+        },
+    ]
+
+    payload = load_checkpoint_snapshot_payload(
+        store=store,
+        year=2026,
+        race_name="Canadian Grand Prix",
+        checkpoint_session="PRE",
+        is_sprint=True,
+    )
+
+    assert payload["event_name"] == "Miami Grand Prix"
+    assert payload["session_name"] == "R"
+
+
+def test_load_checkpoint_snapshot_payload_uses_prior_round_when_pre_deadline_missing(patcher):
+    """PRE reconstruction should fall back to the latest earlier round when times are absent."""
+    patcher.setattr(
+        "src.utils.checkpoint_reconstruction.is_sprint_weekend",
+        lambda year, race_name: False,
+    )
+    patcher.setattr(
+        "src.utils.accuracy_targets._scheduled_session_start",
+        lambda *, year, race_name, session_name: None,
+    )
+    patcher.setattr(
+        "src.utils.weekend.get_schedule_rows",
+        lambda year: (
+            ("Australian Grand Prix", "conventional"),
+            ("Chinese Grand Prix", "sprint_qualifying"),
+            ("Japanese Grand Prix", "conventional"),
+            ("Miami Grand Prix", "sprint_qualifying"),
+            ("Canadian Grand Prix", "sprint_qualifying"),
+            ("Monaco Grand Prix", "conventional"),
+            ("Barcelona Grand Prix", "conventional"),
+        ),
+    )
+
+    store = MagicMock()
+    store.load_artifact.return_value = None
+    store.list_artifacts.return_value = [
+        {
+            "data": {
+                "event_name": "Miami Grand Prix",
+                "session_name": "R",
+                "round_number": 4,
+                "captured_at": "2026-05-03T22:00:00+00:00",
+                "session_started_at": "2026-05-03T20:00:00+00:00",
+                "teams": {"Ferrari": {"profiles": {"balanced": {"overall_pace": 0.4}}}},
+            },
+        },
+        {
+            "data": {
+                "event_name": "Canadian Grand Prix",
+                "session_name": "R",
+                "round_number": 5,
+                "captured_at": "2026-05-24T22:00:00+00:00",
+                "session_started_at": "2026-05-24T20:00:00+00:00",
+                "teams": {"Mercedes": {"profiles": {"balanced": {"overall_pace": 0.8}}}},
+            },
+        },
+        {
+            "data": {
+                "event_name": "Canadian Grand Prix",
+                "session_name": "Sprint",
+                "round_number": 5,
+                "captured_at": "2026-05-24T23:00:00+00:00",
+                "session_started_at": "2026-05-24T21:00:00+00:00",
+                "teams": {"Mercedes": {"profiles": {"balanced": {"overall_pace": 0.99}}}},
+            },
+        },
+        {
+            "data": {
+                "event_name": "Barcelona Grand Prix",
+                "session_name": "FP1",
+                "round_number": 7,
+                "captured_at": "2026-06-05T13:30:00+00:00",
+                "session_started_at": "2026-06-05T12:30:00+00:00",
+                "teams": {"McLaren": {"profiles": {"balanced": {"overall_pace": 0.9}}}},
+            },
+        },
+    ]
+
+    payload = load_checkpoint_snapshot_payload(
+        store=store,
+        year=2026,
+        race_name="Monaco Grand Prix",
+        checkpoint_session="PRE",
+    )
+
+    assert payload["event_name"] == "Canadian Grand Prix"
+    assert payload["session_name"] == "R"
+
+
 def test_reconstruct_checkpoint_prediction_allows_missing_actuals_for_upcoming_pre(
     patcher,
     tmp_path,
