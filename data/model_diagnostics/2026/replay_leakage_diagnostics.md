@@ -1,8 +1,8 @@
 # Replay And Leakage Diagnostics
 
-- Built at: `2026-05-20T08:58:35.450017+00:00`
-- Model version: `2.1`
-- Status: `provisional_with_warnings`
+- Built at: `2026-05-22T07:56:03.985821+00:00`
+- Model version: `2.2`
+- Status: `provisional_with_limitations`
 
 ## Source State
 
@@ -10,11 +10,13 @@
 - Live artifact races completed: `4.0`
 - Replay stale vs live artifact: `False`
 
-## Warnings
+## Coverage Limitations
 
-- Dry leakage is reported as a legacy rating-mu proxy until schema migration adds seconds fields.
-- Regulation-reset scale monitoring is outside the 2024-2025 one-SE band for: qualifying, race.
-- Wet-leakage hard invariant is not evaluable without wet routed replay rows.
+- Current replay coverage has no wet weather-routed rows, so the wet-leakage replay invariant has no real 2026 wet sample yet.
+
+## Monitoring Notes
+
+- Reset-year scale differs from the 2024-2025 reference band for qualifying, race. The comparison stays visible for transfer review; it is not a warning by itself.
 
 ## Historical Reference
 
@@ -30,12 +32,12 @@
 
 ## Dry Leakage
 
-- State: `measured_legacy_proxy`
-- Exact metric state: `schema_blocked_until_race_quali_seconds_fields_exist`
-- Correlation: `0.159`
+- State: `measured_seconds`
+- Exact metric state: `measured`
+- Correlation: `-0.089`
 - Drivers: `22`
 
 ## Wet Leakage
 
 - State: `not_evaluable_without_weather_routed_wet_replay_rows`
-- Hard invariant state: `not_evaluable_from_current_inputs`
+- Hard invariant state: `not_evaluable_without_fully_wet_trace_rows`

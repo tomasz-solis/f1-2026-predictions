@@ -212,3 +212,26 @@ def test_render_model_diagnostics_includes_construct_audit_table() -> None:
     assert "Refit candidate test" in fake_st.subheaders
     assert "Prediction replay test" in fake_st.subheaders
     assert len(fake_st.dataframes) >= 5
+    assert list(fake_st.dataframes[0].columns) == [
+        "Session",
+        "State",
+        "Rows",
+        "Races",
+        "Slope",
+        "R squared",
+        "RMSE (s)",
+        "Outside 1-SE band",
+    ]
+    assert list(fake_st.dataframes[3].columns) == [
+        "Candidate",
+        "Folds",
+        "Rows",
+        "Weighted MSE (s²)",
+        "Weighted RMSE (s)",
+    ]
+    assert list(fake_st.dataframes[4].columns) == [
+        "Rows",
+        "Current MSE",
+        "Candidate MSE",
+        "MSE delta (%)",
+    ]

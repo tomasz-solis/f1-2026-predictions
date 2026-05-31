@@ -21,7 +21,7 @@ from src.utils.model_version import get_model_version
 
 REPLAY_LEAKAGE_ARTIFACT_TYPE = "model_diagnostics"
 REPLAY_LEAKAGE_ARTIFACT_KEY_TEMPLATE = "{year}::replay_leakage_diagnostics"
-REPLAY_LEAKAGE_SCHEMA_VERSION = 1
+REPLAY_LEAKAGE_SCHEMA_VERSION = 2
 
 
 def build_replay_leakage_diagnostics(
@@ -42,9 +42,9 @@ def build_replay_leakage_diagnostics(
 ) -> dict[str, Any]:
     """Build the replay/leakage diagnostics artifact from persisted replay inputs.
 
-    The dry-leakage metric is exact only after the schema migration introduces
-    race/quali seconds fields. Until then this function reports a clearly
-    labeled legacy proxy using ``bayesian.rating_mu``.
+    Dry leakage prefers seconds-native race state. It falls back to a clearly
+    labeled legacy ``bayesian.rating_mu`` proxy only while replay inputs still
+    lack the migrated baseline/current race seconds fields.
     """
     season_year = int(year)
     replay_root_path = Path(replay_root)
@@ -80,7 +80,7 @@ def build_replay_leakage_diagnostics(
             else None
         ),
     )
-    dry_leakage = build_dry_leakage_proxy(
+    dry_leakage = build_dry_leakage_status(
         year=season_year,
         race_mapping=mappings.get("race"),
         baseline_driver_path=Path(baseline_driver_path),
@@ -96,6 +96,7 @@ def build_replay_leakage_diagnostics(
             if regulation_reset_raw_matched_laps_path is not None
             else None
         ),
+        driver_update_trace_path=replay_root_path / "reports" / "driver_update_trace.json",
     )
 
     source_state = build_source_state(
@@ -107,10 +108,13 @@ def build_replay_leakage_diagnostics(
 
     warnings = _diagnostic_warnings(
         source_state=source_state,
-        dry_leakage=dry_leakage,
         regulation_reset=regulation_reset,
+    )
+    limitations = _diagnostic_limitations(
+        dry_leakage=dry_leakage,
         wet_leakage=wet_leakage,
     )
+    monitoring_notes = _diagnostic_monitoring_notes(regulation_reset=regulation_reset)
 
     return _json_safe(
         {
@@ -119,18 +123,21 @@ def build_replay_leakage_diagnostics(
             "model_version": get_model_version(),
             "built_at": datetime.now(UTC).isoformat(),
             "year": season_year,
-            "status": _overall_status(warnings),
+            "status": _overall_status(warnings=warnings, limitations=limitations),
             "source_state": source_state,
             "historical_scale_reference": historical_reference,
             "regulation_reset_monitoring": regulation_reset,
             "dry_leakage": dry_leakage,
             "wet_leakage": wet_leakage,
             "warnings": warnings,
+            "limitations": limitations,
+            "monitoring_notes": monitoring_notes,
             "decision_notes": [
                 "This artifact is diagnostic-only; it does not retune extractor semantics.",
                 (
-                    "The exact dry-leakage metric is schema-blocked until "
-                    "race/quali seconds fields exist in persisted driver state."
+                    "Dry leakage uses race driver seconds when baseline and current "
+                    "driver artifacts both expose that state; otherwise it reports "
+                    "the legacy rating-mu proxy."
                 ),
             ],
         }
@@ -297,7 +304,7 @@ def build_regulation_reset_monitoring(
     }
 
 
-def build_dry_leakage_proxy(
+def build_dry_leakage_status(
     *,
     year: int,
     race_mapping: LinearTeamStrengthMapping | None,
@@ -306,7 +313,7 @@ def build_dry_leakage_proxy(
     current_car_path: Path,
     lineup_path: Path,
 ) -> dict[str, Any]:
-    """Measure the currently possible dry-leakage proxy from live artifacts."""
+    """Measure exact dry leakage when available, else report the legacy proxy."""
     if race_mapping is None:
         return {
             "state": "not_available",
@@ -323,7 +330,9 @@ def build_dry_leakage_proxy(
     current_cars = _read_json(current_car_path).get("teams", {})
     driver_to_team = _driver_to_team(_read_json(lineup_path))
 
-    rows: list[dict[str, Any]] = []
+    exact_rows: list[dict[str, Any]] = []
+    legacy_rows: list[dict[str, Any]] = []
+    exact_missing_driver_codes: list[str] = []
     for driver_code, current_payload in sorted(current_drivers.items()):
         team = driver_to_team.get(driver_code)
         if not team or team not in current_cars or driver_code not in baseline_drivers:
@@ -331,51 +340,85 @@ def build_dry_leakage_proxy(
         car_payload = current_cars.get(team, {})
         if not isinstance(car_payload, Mapping):
             continue
-        baseline_mu = _rating_mu(baseline_drivers[driver_code])
-        current_mu = _rating_mu(current_payload)
         baseline_strength = _coerce_float(car_payload.get("preseason_overall_performance"))
         current_strength = _coerce_float(car_payload.get("overall_performance"))
-        if (
-            baseline_mu is None
-            or current_mu is None
-            or baseline_strength is None
-            or current_strength is None
-        ):
+        if baseline_strength is None or current_strength is None:
             continue
 
         baseline_team_seconds = race_mapping.predict_delta_one(baseline_strength)
         current_team_seconds = race_mapping.predict_delta_one(current_strength)
-        rows.append(
-            {
-                "driver_code": driver_code,
-                "team": team,
-                "baseline_rating_mu": baseline_mu,
-                "current_rating_mu": current_mu,
-                "delta_rating_mu": float(current_mu - baseline_mu),
-                "baseline_team_strength": baseline_strength,
-                "current_team_strength": current_strength,
-                "delta_team_strength": float(current_strength - baseline_strength),
-                "delta_team_seconds": float(current_team_seconds - baseline_team_seconds),
-            }
-        )
+        shared_row = {
+            "driver_code": driver_code,
+            "team": team,
+            "baseline_team_strength": baseline_strength,
+            "current_team_strength": current_strength,
+            "delta_team_strength": float(current_strength - baseline_strength),
+            "delta_team_seconds": float(current_team_seconds - baseline_team_seconds),
+        }
+        baseline_seconds = _driver_seconds_mu(baseline_drivers[driver_code], session_kind="race")
+        current_seconds = _driver_seconds_mu(current_payload, session_kind="race")
+        if baseline_seconds is None or current_seconds is None:
+            exact_missing_driver_codes.append(driver_code)
+        else:
+            exact_rows.append(
+                {
+                    **shared_row,
+                    "baseline_race_rating_mu_s": baseline_seconds,
+                    "current_race_rating_mu_s": current_seconds,
+                    "delta_race_rating_mu_s": float(current_seconds - baseline_seconds),
+                }
+            )
 
-    delta_rating = [row["delta_rating_mu"] for row in rows]
-    delta_team_seconds = [row["delta_team_seconds"] for row in rows]
+        baseline_mu = _rating_mu(baseline_drivers[driver_code])
+        current_mu = _rating_mu(current_payload)
+        if baseline_mu is not None and current_mu is not None:
+            legacy_rows.append(
+                {
+                    **shared_row,
+                    "baseline_rating_mu": baseline_mu,
+                    "current_rating_mu": current_mu,
+                    "delta_rating_mu": float(current_mu - baseline_mu),
+                }
+            )
+
+    if exact_rows and not exact_missing_driver_codes:
+        delta_driver_seconds = [row["delta_race_rating_mu_s"] for row in exact_rows]
+        delta_team_seconds = [row["delta_team_seconds"] for row in exact_rows]
+        return {
+            "state": "measured_seconds",
+            "year": int(year),
+            "exact_metric_state": "measured",
+            "driver_field": "bayesian.race_rating_mu_s",
+            "driver_unit": "seconds",
+            "team_field": "overall_performance - preseason_overall_performance",
+            "team_unit": "race_team_strength_seconds_delta",
+            "n_drivers": len(exact_rows),
+            "correlation": _correlation(delta_driver_seconds, delta_team_seconds),
+            "slope_driver_second_per_team_second": _prediction_slope(
+                observed=np.asarray(delta_driver_seconds, dtype=float),
+                predicted=np.asarray(delta_team_seconds, dtype=float),
+            ),
+            "rows": exact_rows,
+        }
+
+    delta_rating = [row["delta_rating_mu"] for row in legacy_rows]
+    delta_team_seconds = [row["delta_team_seconds"] for row in legacy_rows]
     return {
         "state": "measured_legacy_proxy",
         "year": int(year),
-        "exact_metric_state": "schema_blocked_until_race_quali_seconds_fields_exist",
+        "exact_metric_state": "blocked_missing_race_seconds_state",
         "driver_field": "bayesian.rating_mu",
         "driver_unit": "legacy_grid_rank_mu",
         "team_field": "overall_performance - preseason_overall_performance",
         "team_unit": "race_team_strength_seconds_delta",
-        "n_drivers": len(rows),
+        "n_drivers": len(legacy_rows),
+        "missing_race_seconds_driver_codes": sorted(set(exact_missing_driver_codes)),
         "correlation": _correlation(delta_rating, delta_team_seconds),
         "slope_rating_mu_per_team_second": _prediction_slope(
             observed=np.asarray(delta_rating, dtype=float),
             predicted=np.asarray(delta_team_seconds, dtype=float),
         ),
-        "rows": rows,
+        "rows": legacy_rows,
     }
 
 
@@ -384,6 +427,7 @@ def build_wet_leakage_status(
     baseline_driver_path: Path,
     current_driver_path: Path,
     raw_matched_laps_path: Path | None,
+    driver_update_trace_path: Path | None = None,
 ) -> dict[str, Any]:
     """Report wet-leakage evaluability without fabricating missing wet evidence."""
     wet_rows = 0
@@ -419,16 +463,19 @@ def build_wet_leakage_status(
             wet_deltas.append(float(current_wet - baseline_wet))
         proxy_corr = _correlation(wet_deltas, rating_deltas)
 
+    traced_invariant = evaluate_fully_wet_dry_update_invariant(
+        _load_driver_update_trace_rows(driver_update_trace_path)
+    )
+    traced_invariant["wet_matched_rows"] = wet_rows
+    traced_invariant["mixed_or_unreliable_matched_rows"] = mixed_rows
+    status = _wet_leakage_state(
+        wet_rows=wet_rows,
+        mixed_rows=mixed_rows,
+        traced_invariant=traced_invariant,
+    )
     return {
-        "state": "not_evaluable_without_weather_routed_wet_replay_rows"
-        if wet_rows == 0 and mixed_rows == 0
-        else "weather_rows_present_needs_session_update_trace",
-        "fully_wet_dry_update_invariant": {
-            "state": "not_evaluable_from_current_inputs",
-            "wet_matched_rows": wet_rows,
-            "mixed_or_unreliable_matched_rows": mixed_rows,
-            "violations": [],
-        },
+        "state": status,
+        "fully_wet_dry_update_invariant": traced_invariant,
         "legacy_wet_skill_delta_vs_rating_mu_delta_correlation": proxy_corr,
         "note": (
             "The hard wet invariant requires session-level update trace. "
@@ -436,6 +483,95 @@ def build_wet_leakage_status(
             "did not update dry ratings."
         ),
     }
+
+
+def evaluate_fully_wet_dry_update_invariant(trace_rows: list[Any]) -> dict[str, Any]:
+    """Evaluate whether fully wet traced sessions kept dry driver state still."""
+    wet_rows = [
+        row
+        for row in trace_rows
+        if isinstance(row, Mapping) and str(row.get("weather_route", "")).lower() == "rain"
+    ]
+    if not trace_rows:
+        return {
+            "state": "not_evaluable_without_session_update_trace",
+            "fully_wet_trace_rows": 0,
+            "violations": [],
+        }
+    if not wet_rows:
+        return {
+            "state": "not_evaluable_without_fully_wet_trace_rows",
+            "fully_wet_trace_rows": 0,
+            "violations": [],
+        }
+
+    violations = [
+        violation for row in wet_rows if (violation := _wet_trace_violation(row)) is not None
+    ]
+    return {
+        "state": "failed" if violations else "passed_from_update_trace",
+        "fully_wet_trace_rows": len(wet_rows),
+        "violations": violations,
+    }
+
+
+def _wet_leakage_state(
+    *,
+    wet_rows: int,
+    mixed_rows: int,
+    traced_invariant: Mapping[str, Any],
+) -> str:
+    """Return a compact wet-leakage state from coverage and trace evidence."""
+    invariant_state = str(traced_invariant.get("state", ""))
+    if invariant_state == "failed":
+        return "failed_fully_wet_dry_update_invariant"
+    if wet_rows == 0 and mixed_rows == 0:
+        return "not_evaluable_without_weather_routed_wet_replay_rows"
+    if invariant_state == "passed_from_update_trace":
+        return "evaluated_from_session_update_trace"
+    return "weather_rows_present_needs_session_update_trace"
+
+
+def _wet_trace_violation(row: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Return one violation when a fully wet trace row moved dry state."""
+    session_kind = str(row.get("session_kind", "")).lower()
+    relevant_flag = (
+        "dry_quali_update_applied" if session_kind == "qualifying" else "dry_race_update_applied"
+    )
+    relevant_seconds_delta = (
+        "quali_rating_mu_s_delta" if session_kind == "qualifying" else "race_rating_mu_s_delta"
+    )
+    moved_fields = [
+        field
+        for field in ("legacy_rating_mu_delta", relevant_seconds_delta)
+        if _non_zero_delta(row.get(field))
+    ]
+    dry_update_flagged = bool(row.get(relevant_flag))
+    if not dry_update_flagged and not moved_fields:
+        return None
+    return {
+        "event_name": row.get("event_name"),
+        "session_name": row.get("session_name"),
+        "session_kind": row.get("session_kind"),
+        "driver_code": row.get("driver_code"),
+        "dry_update_flag": relevant_flag if dry_update_flagged else None,
+        "moved_fields": moved_fields,
+    }
+
+
+def _non_zero_delta(value: Any) -> bool:
+    """Return whether one optional numeric trace delta is measurably non-zero."""
+    numeric = _coerce_float(value)
+    return numeric is not None and not np.isclose(numeric, 0.0)
+
+
+def _load_driver_update_trace_rows(path: Path | None) -> list[Any]:
+    """Load trace rows from a replay report when it exists."""
+    if path is None or not path.exists():
+        return []
+    payload = _read_json(path)
+    rows = payload.get("rows", [])
+    return rows if isinstance(rows, list) else []
 
 
 def build_source_state(
@@ -497,6 +633,20 @@ def format_replay_leakage_diagnostics_markdown(artifact: Mapping[str, Any]) -> s
         lines.extend(["## Warnings", ""])
         for warning in warnings:
             lines.append(f"- {warning}")
+        lines.append("")
+
+    limitations = artifact.get("limitations", [])
+    if limitations:
+        lines.extend(["## Coverage Limitations", ""])
+        for limitation in limitations:
+            lines.append(f"- {limitation}")
+        lines.append("")
+
+    monitoring_notes = artifact.get("monitoring_notes", [])
+    if monitoring_notes:
+        lines.extend(["## Monitoring Notes", ""])
+        for note in monitoring_notes:
+            lines.append(f"- {note}")
         lines.append("")
 
     lines.extend(["## Historical Reference", ""])
@@ -657,9 +807,7 @@ def _sorted_residual_rows(rows: list[Any]) -> list[dict[str, Any]]:
 def _diagnostic_warnings(
     *,
     source_state: Mapping[str, Any],
-    dry_leakage: Mapping[str, Any],
     regulation_reset: Mapping[str, Any],
-    wet_leakage: Mapping[str, Any],
 ) -> list[str]:
     """Collect plain-language warnings for reviewers."""
     warnings: list[str] = []
@@ -667,43 +815,72 @@ def _diagnostic_warnings(
         warnings.append(
             "Historical replay output is stale relative to the live 2026 artifact race count."
         )
-    if (
-        dry_leakage.get("exact_metric_state")
-        == "schema_blocked_until_race_quali_seconds_fields_exist"
-    ):
-        warnings.append(
-            "Dry leakage is reported as a legacy rating-mu proxy until schema migration adds seconds fields."
-        )
     if regulation_reset.get("state") != "measured":
         warnings.append(
             "Regulation-reset seconds monitoring has no measured 2026 construct rows yet."
         )
-    else:
-        metrics = regulation_reset.get("metrics_by_session_kind", {})
-        if isinstance(metrics, Mapping):
-            outside = [
-                str(session_kind)
-                for session_kind, payload in metrics.items()
-                if isinstance(payload, Mapping)
-                and payload.get("outside_historical_one_se_band") is True
-            ]
-            if outside:
-                warnings.append(
-                    "Regulation-reset scale monitoring is outside the 2024-2025 one-SE band "
-                    f"for: {', '.join(sorted(outside))}."
-                )
-    if wet_leakage.get("state") == "not_evaluable_without_weather_routed_wet_replay_rows":
-        warnings.append(
-            "Wet-leakage hard invariant is not evaluable without wet routed replay rows."
-        )
     return warnings
 
 
-def _overall_status(warnings: list[str]) -> str:
-    """Return a compact artifact status from warning content."""
-    if not warnings:
-        return "measured"
-    return "provisional_with_warnings"
+def _diagnostic_limitations(
+    *,
+    dry_leakage: Mapping[str, Any],
+    wet_leakage: Mapping[str, Any],
+) -> list[str]:
+    """Collect expected coverage gaps that are not diagnostic failures."""
+    limitations: list[str] = []
+    if dry_leakage.get("exact_metric_state") == "blocked_missing_race_seconds_state":
+        limitations.append(
+            "Exact dry-leakage seconds measurement needs baseline and current race "
+            "driver-seconds state; the current rating-mu value is a legacy proxy."
+        )
+
+    wet_state = wet_leakage.get("state")
+    if wet_state == "not_evaluable_without_weather_routed_wet_replay_rows":
+        limitations.append(
+            "Current replay coverage has no wet weather-routed rows, so the wet-leakage "
+            "replay invariant has no real 2026 wet sample yet."
+        )
+    elif wet_state == "weather_rows_present_needs_session_update_trace":
+        limitations.append(
+            "Wet weather-routed rows are present, but the wet-leakage replay invariant "
+            "still needs a session-level driver-update trace."
+        )
+    return limitations
+
+
+def _diagnostic_monitoring_notes(*, regulation_reset: Mapping[str, Any]) -> list[str]:
+    """Collect non-failing context notes for transfer monitoring."""
+    if regulation_reset.get("state") != "measured":
+        return []
+
+    metrics = regulation_reset.get("metrics_by_session_kind", {})
+    if not isinstance(metrics, Mapping):
+        return []
+
+    outside = [
+        str(session_kind)
+        for session_kind, payload in metrics.items()
+        if isinstance(payload, Mapping) and payload.get("outside_historical_one_se_band") is True
+    ]
+    if not outside:
+        return []
+    return [
+        (
+            "Reset-year scale differs from the 2024-2025 reference band for "
+            f"{', '.join(sorted(outside))}. The comparison stays visible for transfer review; "
+            "it is not a warning by itself."
+        )
+    ]
+
+
+def _overall_status(*, warnings: list[str], limitations: list[str]) -> str:
+    """Return a compact artifact status from warnings and coverage gaps."""
+    if warnings:
+        return "provisional_with_warnings"
+    if limitations:
+        return "provisional_with_limitations"
+    return "measured"
 
 
 def _drivers_payload(payload: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
@@ -735,6 +912,19 @@ def _rating_mu(driver_payload: Mapping[str, Any]) -> float | None:
     if not isinstance(bayesian, Mapping):
         return None
     return _coerce_float(bayesian.get("rating_mu"))
+
+
+def _driver_seconds_mu(
+    driver_payload: Mapping[str, Any],
+    *,
+    session_kind: str,
+) -> float | None:
+    """Read one persisted race or qualifying driver mean in seconds."""
+    bayesian = driver_payload.get("bayesian", {})
+    if not isinstance(bayesian, Mapping):
+        return None
+    field = "race_rating_mu_s" if session_kind == "race" else "quali_rating_mu_s"
+    return _coerce_float(bayesian.get(field))
 
 
 def _season_driver_path(year: int) -> Path:

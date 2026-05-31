@@ -25,6 +25,50 @@ from src.analysis.team_strength_refit_candidate_test import (
 )
 from src.persistence.artifact_store import ArtifactStore
 
+_DISPLAY_COLUMN_LABELS = {
+    "candidate": "Candidate",
+    "candidate_mae": "Candidate MAE",
+    "candidate_mae_wins": "Candidate MAE wins",
+    "candidate_mse": "Candidate MSE",
+    "candidate_mse_wins": "Candidate MSE wins",
+    "combined_slope": "Combined slope",
+    "current_mae": "Current MAE",
+    "current_mse": "Current MSE",
+    "delta_race_rating_mu_s": "Race driver seconds delta",
+    "delta_rating_mu": "Rating μ delta",
+    "delta_team_seconds": "Team seconds delta",
+    "delta_team_strength": "Team strength delta",
+    "driver_code": "Driver",
+    "mae_delta": "MAE delta",
+    "mean_fold_mse_s2": "Mean fold MSE (s²)",
+    "mean_fold_rmse_s": "Mean fold RMSE (s)",
+    "mse_delta": "MSE delta",
+    "mse_delta_vs_current_s2": "MSE delta vs current (s²)",
+    "mse_pct_delta": "MSE delta (%)",
+    "mse_pct_delta_vs_current": "MSE delta vs current (%)",
+    "n_construct_laps": "Construct laps",
+    "n_folds": "Folds",
+    "n_rows": "Rows",
+    "observed_driver_to_field_s": "Observed driver to field (s)",
+    "outside_1se": "Outside 1-SE band",
+    "predicted_driver_to_field_s": "Predicted driver to field (s)",
+    "race_name": "Race",
+    "r_squared": "R squared",
+    "races": "Races",
+    "residual_mean_s": "Residual mean (s)",
+    "residual_s": "Residual (s)",
+    "rmse_s": "RMSE (s)",
+    "rows": "Rows",
+    "session": "Session",
+    "session_kind": "Session",
+    "slope": "Slope",
+    "state": "State",
+    "team": "Team",
+    "team_target_slope": "Team target slope",
+    "weighted_mse_s2": "Weighted MSE (s²)",
+    "weighted_rmse_s": "Weighted RMSE (s)",
+}
+
 
 def load_replay_leakage_diagnostics(
     *,
@@ -106,6 +150,16 @@ def render_model_diagnostics(
         f"status `{artifact.get('status', 'unknown')}`"
     )
     _render_warning_block(artifact.get("warnings", []), st_module=st_module)
+    _render_note_block(
+        artifact.get("limitations", []),
+        label="Coverage limitations",
+        st_module=st_module,
+    )
+    _render_note_block(
+        artifact.get("monitoring_notes", []),
+        label="Monitoring notes",
+        st_module=st_module,
+    )
 
     cols = st_module.columns(4)
     with cols[0]:
@@ -139,21 +193,33 @@ def render_model_diagnostics(
     _render_prediction_replay_test(prediction_replay, st_module=st_module)
 
     st_module.subheader("Dry leakage")
-    st_module.caption(
-        "The current artifact reports a legacy proxy until race/quali seconds fields exist."
-    )
+    if dry_leakage.get("exact_metric_state") == "measured":
+        st_module.caption("Measured from race driver-seconds deltas and team-seconds deltas.")
+    else:
+        st_module.caption(
+            "The current artifact reports a legacy rating-mu proxy until baseline "
+            "and current race driver-seconds state is available."
+        )
     dry_rows = dry_leakage.get("rows", [])
     if isinstance(dry_rows, list) and dry_rows:
+        dry_frame = pd.DataFrame(dry_rows)
+        driver_delta_column = (
+            "delta_race_rating_mu_s"
+            if "delta_race_rating_mu_s" in dry_frame.columns
+            else "delta_rating_mu"
+        )
         st_module.dataframe(
-            pd.DataFrame(dry_rows)[
-                [
-                    "driver_code",
-                    "team",
-                    "delta_rating_mu",
-                    "delta_team_strength",
-                    "delta_team_seconds",
+            _display_frame(
+                dry_frame[
+                    [
+                        "driver_code",
+                        "team",
+                        driver_delta_column,
+                        "delta_team_strength",
+                        "delta_team_seconds",
+                    ]
                 ]
-            ],
+            ),
             width="stretch",
             hide_index=True,
         )
@@ -167,9 +233,27 @@ def render_model_diagnostics(
         else []
     )
     if isinstance(residual_outliers, list) and residual_outliers:
-        st_module.dataframe(pd.DataFrame(residual_outliers), width="stretch", hide_index=True)
+        st_module.dataframe(
+            _display_frame(pd.DataFrame(residual_outliers)),
+            width="stretch",
+            hide_index=True,
+        )
     else:
         st_module.caption("No historical residual outliers above the review threshold.")
+
+
+def _display_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    """Return one diagnostics table with dashboard-facing column labels."""
+    return frame.rename(columns={column: _display_column_label(column) for column in frame.columns})
+
+
+def _display_column_label(column: Any) -> str:
+    """Return a readable dashboard label for one persisted artifact field."""
+    if not isinstance(column, str):
+        return str(column)
+    if column in _DISPLAY_COLUMN_LABELS:
+        return _DISPLAY_COLUMN_LABELS[column]
+    return column.replace("_", " ").capitalize()
 
 
 def _render_regulation_reset_table(
@@ -199,7 +283,7 @@ def _render_regulation_reset_table(
     if not rows:
         st_module.info(str(regulation_reset.get("reason", "No transfer metrics available.")))
         return
-    st_module.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+    st_module.dataframe(_display_frame(pd.DataFrame(rows)), width="stretch", hide_index=True)
 
 
 def _render_construct_audit(
@@ -234,7 +318,7 @@ def _render_construct_audit(
                 }
             )
     if rows:
-        st_module.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+        st_module.dataframe(_display_frame(pd.DataFrame(rows)), width="stretch", hide_index=True)
     else:
         st_module.info(str(construct_audit.get("reason", "No construct audit rows available.")))
 
@@ -242,18 +326,20 @@ def _render_construct_audit(
     if isinstance(residual_rows, list) and residual_rows:
         st_module.caption("Largest absolute residual rows")
         st_module.dataframe(
-            pd.DataFrame(residual_rows)[
-                [
-                    "session_kind",
-                    "race_name",
-                    "team",
-                    "driver_code",
-                    "observed_driver_to_field_s",
-                    "predicted_driver_to_field_s",
-                    "residual_s",
-                    "n_construct_laps",
+            _display_frame(
+                pd.DataFrame(residual_rows)[
+                    [
+                        "session_kind",
+                        "race_name",
+                        "team",
+                        "driver_code",
+                        "observed_driver_to_field_s",
+                        "predicted_driver_to_field_s",
+                        "residual_s",
+                        "n_construct_laps",
+                    ]
                 ]
-            ],
+            ),
             width="stretch",
             hide_index=True,
         )
@@ -275,7 +361,11 @@ def _render_refit_candidate_test(
     )
     aggregate = refit_test.get("aggregate", [])
     if isinstance(aggregate, list) and aggregate:
-        st_module.dataframe(pd.DataFrame(aggregate), width="stretch", hide_index=True)
+        st_module.dataframe(
+            _display_frame(pd.DataFrame(aggregate)),
+            width="stretch",
+            hide_index=True,
+        )
     else:
         st_module.info(str(refit_test.get("reason", "No refit-candidate metrics available.")))
 
@@ -304,7 +394,7 @@ def _render_prediction_replay_test(
     race_target_aggregate = replay_test.get("race_target_aggregate", [])
     if isinstance(race_target_aggregate, list) and race_target_aggregate:
         st_module.dataframe(
-            pd.DataFrame(race_target_aggregate),
+            _display_frame(pd.DataFrame(race_target_aggregate)),
             width="stretch",
             hide_index=True,
         )
@@ -325,6 +415,15 @@ def _render_warning_block(warnings: Any, *, st_module: Any) -> None:
         return
     for warning in warnings:
         st_module.warning(str(warning))
+
+
+def _render_note_block(notes: Any, *, label: str, st_module: Any) -> None:
+    """Render non-failing diagnostics notes without warning styling."""
+    if not isinstance(notes, list) or not notes:
+        return
+    st_module.caption(f"{label}:")
+    for note in notes:
+        st_module.caption(f"- {note}")
 
 
 def _fmt(value: Any) -> str:

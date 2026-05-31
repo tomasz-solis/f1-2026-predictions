@@ -1,10 +1,10 @@
 {
   "artifact_type": "replay_leakage_diagnostics",
-  "schema_version": 1,
-  "model_version": "2.1",
-  "built_at": "2026-05-20T08:58:35.450017+00:00",
+  "schema_version": 2,
+  "model_version": "2.2",
+  "built_at": "2026-05-22T07:56:03.985821+00:00",
   "year": 2026,
-  "status": "provisional_with_warnings",
+  "status": "provisional_with_limitations",
   "source_state": {
     "year": 2026,
     "replay_root": "data/historical_replay",
@@ -890,279 +890,282 @@
     ]
   },
   "dry_leakage": {
-    "state": "measured_legacy_proxy",
+    "state": "measured_seconds",
     "year": 2026,
-    "exact_metric_state": "schema_blocked_until_race_quali_seconds_fields_exist",
-    "driver_field": "bayesian.rating_mu",
-    "driver_unit": "legacy_grid_rank_mu",
+    "exact_metric_state": "measured",
+    "driver_field": "bayesian.race_rating_mu_s",
+    "driver_unit": "seconds",
     "team_field": "overall_performance - preseason_overall_performance",
     "team_unit": "race_team_strength_seconds_delta",
     "n_drivers": 22,
-    "correlation": 0.15933902440010883,
-    "slope_rating_mu_per_team_second": 1.344908824745,
+    "correlation": -0.08922980077390477,
+    "slope_driver_second_per_team_second": -0.06670606509637243,
     "rows": [
       {
         "driver_code": "ALB",
         "team": "Williams",
-        "baseline_rating_mu": 16.75,
-        "current_rating_mu": 12.0055244470798,
-        "delta_rating_mu": -4.7444755529202,
         "baseline_team_strength": 0.55,
         "current_team_strength": 0.3284,
         "delta_team_strength": -0.22160000000000002,
-        "delta_team_seconds": -0.436723016011773
+        "delta_team_seconds": -0.436723016011773,
+        "baseline_race_rating_mu_s": 0.26859346837757936,
+        "current_race_rating_mu_s": 0.08988959427197951,
+        "delta_race_rating_mu_s": -0.17870387410559985
       },
       {
         "driver_code": "ALO",
         "team": "Aston Martin",
-        "baseline_rating_mu": 16.918,
-        "current_rating_mu": 11.485486611176821,
-        "delta_rating_mu": -5.432513388823178,
         "baseline_team_strength": 0.47,
         "current_team_strength": 0.1743,
         "delta_team_strength": -0.29569999999999996,
-        "delta_team_seconds": -0.5827572014200417
+        "delta_team_seconds": -0.5827572014200417,
+        "baseline_race_rating_mu_s": 0.016901313346079846,
+        "current_race_rating_mu_s": -0.08764984289639677,
+        "delta_race_rating_mu_s": -0.10455115624247661
       },
       {
         "driver_code": "ANT",
         "team": "Mercedes",
-        "baseline_rating_mu": 10.639,
-        "current_rating_mu": 13.273425260612068,
-        "delta_rating_mu": 2.634425260612069,
         "baseline_team_strength": 0.75,
         "current_team_strength": 0.9325,
         "delta_team_strength": 0.1825,
-        "delta_team_seconds": 0.3596658412551831
+        "delta_team_seconds": 0.3596658412551831,
+        "baseline_race_rating_mu_s": -0.24773778002094068,
+        "current_race_rating_mu_s": 0.23128593983675522,
+        "delta_race_rating_mu_s": 0.4790237198576959
       },
       {
         "driver_code": "BEA",
         "team": "Haas F1 Team",
-        "baseline_rating_mu": 12.991,
-        "current_rating_mu": 14.004402323213029,
-        "delta_rating_mu": 1.013402323213029,
         "baseline_team_strength": 0.43,
         "current_team_strength": 0.4364,
         "delta_team_strength": 0.006400000000000017,
-        "delta_team_seconds": 0.012612939090592773
+        "delta_team_seconds": 0.012612939090592773,
+        "baseline_race_rating_mu_s": 0.0345295176463184,
+        "current_race_rating_mu_s": 0.01498596740964308,
+        "delta_race_rating_mu_s": -0.019543550236675318
       },
       {
         "driver_code": "BOR",
         "team": "Audi",
-        "baseline_rating_mu": 15.175,
-        "current_rating_mu": 11.187752145032377,
-        "delta_rating_mu": -3.987247854967624,
         "baseline_team_strength": 0.38,
         "current_team_strength": 0.4083,
         "delta_team_strength": 0.028299999999999992,
-        "delta_team_seconds": 0.05577284004121469
+        "delta_team_seconds": 0.05577284004121469,
+        "baseline_race_rating_mu_s": -0.23563312919797155,
+        "current_race_rating_mu_s": -0.47957284526859933,
+        "delta_race_rating_mu_s": -0.24393971607062778
       },
       {
         "driver_code": "BOT",
         "team": "Cadillac F1",
-        "baseline_rating_mu": 12.466,
-        "current_rating_mu": 13.027420303094308,
-        "delta_rating_mu": 0.5614203030943088,
         "baseline_team_strength": 0.35,
         "current_team_strength": 0.186,
         "delta_team_strength": -0.16399999999999998,
-        "delta_team_seconds": -0.32320656419643845
+        "delta_team_seconds": -0.32320656419643845,
+        "baseline_race_rating_mu_s": 0.10127365318653098,
+        "current_race_rating_mu_s": 0.18297701030722777,
+        "delta_race_rating_mu_s": 0.08170335712069679
       },
       {
         "driver_code": "COL",
         "team": "Alpine",
-        "baseline_rating_mu": 13.201,
-        "current_rating_mu": 12.170897191718614,
-        "delta_rating_mu": -1.0301028082813861,
         "baseline_team_strength": 0.4,
         "current_team_strength": 0.5138,
         "delta_team_strength": 0.11380000000000001,
-        "delta_team_seconds": 0.22427382320460185
+        "delta_team_seconds": 0.22427382320460185,
+        "baseline_race_rating_mu_s": 0.06255266167480363,
+        "current_race_rating_mu_s": -0.5307999988743046,
+        "delta_race_rating_mu_s": -0.5933526605491083
       },
       {
         "driver_code": "GAS",
         "team": "Alpine",
-        "baseline_rating_mu": 15.952,
-        "current_rating_mu": 15.203071884967404,
-        "delta_rating_mu": -0.7489281150325962,
         "baseline_team_strength": 0.4,
         "current_team_strength": 0.5138,
         "delta_team_strength": 0.11380000000000001,
-        "delta_team_seconds": 0.22427382320460185
+        "delta_team_seconds": 0.22427382320460185,
+        "baseline_race_rating_mu_s": 0.03412313799982952,
+        "current_race_rating_mu_s": 0.05800968149522023,
+        "delta_race_rating_mu_s": 0.02388654349539071
       },
       {
         "driver_code": "HAD",
         "team": "Red Bull Racing",
-        "baseline_rating_mu": 16.057,
-        "current_rating_mu": 10.444808209222442,
-        "delta_rating_mu": -5.6121917907775565,
         "baseline_team_strength": 0.74,
         "current_team_strength": 0.6514,
         "delta_team_strength": -0.08860000000000001,
-        "delta_team_seconds": -0.174610375535393
+        "delta_team_seconds": -0.174610375535393,
+        "baseline_race_rating_mu_s": 0.19209060622006915,
+        "current_race_rating_mu_s": 0.23752918341159934,
+        "delta_race_rating_mu_s": 0.04543857719153019
       },
       {
         "driver_code": "HAM",
         "team": "Ferrari",
-        "baseline_rating_mu": 14.335,
-        "current_rating_mu": 13.468281547864494,
-        "delta_rating_mu": -0.8667184521355065,
         "baseline_team_strength": 0.7,
         "current_team_strength": 0.83,
         "delta_team_strength": 0.13,
-        "delta_team_seconds": 0.2562003252776647
+        "delta_team_seconds": 0.2562003252776647,
+        "baseline_race_rating_mu_s": -0.03013038881255811,
+        "current_race_rating_mu_s": -0.06190959886160698,
+        "delta_race_rating_mu_s": -0.03177921004904888
       },
       {
         "driver_code": "HUL",
         "team": "Audi",
-        "baseline_rating_mu": 15.742,
-        "current_rating_mu": 14.238098580323483,
-        "delta_rating_mu": -1.5039014196765184,
         "baseline_team_strength": 0.38,
         "current_team_strength": 0.4083,
         "delta_team_strength": 0.028299999999999992,
-        "delta_team_seconds": 0.05577284004121469
+        "delta_team_seconds": 0.05577284004121469,
+        "baseline_race_rating_mu_s": -0.18641475160805335,
+        "current_race_rating_mu_s": -0.07959971529415627,
+        "delta_race_rating_mu_s": 0.10681503631389708
       },
       {
         "driver_code": "LAW",
         "team": "RB",
-        "baseline_rating_mu": 14.062,
-        "current_rating_mu": 13.20270387668936,
-        "delta_rating_mu": -0.8592961233106386,
         "baseline_team_strength": 0.48,
         "current_team_strength": 0.5164,
         "delta_team_strength": 0.03639999999999999,
-        "delta_team_seconds": 0.07173609107774608
+        "delta_team_seconds": 0.07173609107774608,
+        "baseline_race_rating_mu_s": -0.0020845522345543707,
+        "current_race_rating_mu_s": 0.21674670668337132,
+        "delta_race_rating_mu_s": 0.21883125891792568
       },
       {
         "driver_code": "LEC",
         "team": "Ferrari",
-        "baseline_rating_mu": 18.892,
-        "current_rating_mu": 14.26015311061757,
-        "delta_rating_mu": -4.63184688938243,
         "baseline_team_strength": 0.7,
         "current_team_strength": 0.83,
         "delta_team_strength": 0.13,
-        "delta_team_seconds": 0.2562003252776647
+        "delta_team_seconds": 0.2562003252776647,
+        "baseline_race_rating_mu_s": 0.1958228383996559,
+        "current_race_rating_mu_s": 0.23704807033576297,
+        "delta_race_rating_mu_s": 0.04122523193610708
       },
       {
         "driver_code": "LIN",
         "team": "RB",
-        "baseline_rating_mu": 12.382,
-        "current_rating_mu": 12.547490923002202,
-        "delta_rating_mu": 0.1654909230022028,
         "baseline_team_strength": 0.48,
         "current_team_strength": 0.5164,
         "delta_team_strength": 0.03639999999999999,
-        "delta_team_seconds": 0.07173609107774608
+        "delta_team_seconds": 0.07173609107774608,
+        "baseline_race_rating_mu_s": -0.19076115170883245,
+        "current_race_rating_mu_s": 0.14762113029995577,
+        "delta_race_rating_mu_s": 0.3383822820087882
       },
       {
         "driver_code": "NOR",
         "team": "McLaren",
-        "baseline_rating_mu": 17.317,
-        "current_rating_mu": 13.66706048230261,
-        "delta_rating_mu": -3.6499395176973906,
         "baseline_team_strength": 0.85,
         "current_team_strength": 0.6667,
         "delta_team_strength": -0.18330000000000002,
-        "delta_team_seconds": -0.36124245864150717
+        "delta_team_seconds": -0.36124245864150717,
+        "baseline_race_rating_mu_s": 0.2594772926936577,
+        "current_race_rating_mu_s": 0.2820412520918498,
+        "delta_race_rating_mu_s": 0.022563959398192113
       },
       {
         "driver_code": "OCO",
         "team": "Haas F1 Team",
-        "baseline_rating_mu": 15.427,
-        "current_rating_mu": 13.500729972318975,
-        "delta_rating_mu": -1.9262700276810243,
         "baseline_team_strength": 0.43,
         "current_team_strength": 0.4364,
         "delta_team_strength": 0.006400000000000017,
-        "delta_team_seconds": 0.012612939090592773
+        "delta_team_seconds": 0.012612939090592773,
+        "baseline_race_rating_mu_s": -0.12843307985374308,
+        "current_race_rating_mu_s": -0.0890247224976004,
+        "delta_race_rating_mu_s": 0.039408357356142676
       },
       {
         "driver_code": "PER",
         "team": "Cadillac F1",
-        "baseline_rating_mu": 9.757,
-        "current_rating_mu": 12.464683181760432,
-        "delta_rating_mu": 2.707683181760432,
         "baseline_team_strength": 0.35,
         "current_team_strength": 0.186,
         "delta_team_strength": -0.16399999999999998,
-        "delta_team_seconds": -0.32320656419643845
+        "delta_team_seconds": -0.32320656419643845,
+        "baseline_race_rating_mu_s": 0.6328857924494375,
+        "current_race_rating_mu_s": 0.8682532141668697,
+        "delta_race_rating_mu_s": 0.2353674217174322
       },
       {
         "driver_code": "PIA",
         "team": "McLaren",
-        "baseline_rating_mu": 13.369,
-        "current_rating_mu": 13.394693234668143,
-        "delta_rating_mu": 0.025693234668143106,
         "baseline_team_strength": 0.85,
         "current_team_strength": 0.6667,
         "delta_team_strength": -0.18330000000000002,
-        "delta_team_seconds": -0.36124245864150717
+        "delta_team_seconds": -0.36124245864150717,
+        "baseline_race_rating_mu_s": 0.12747228817738215,
+        "current_race_rating_mu_s": 0.10703402868959368,
+        "delta_race_rating_mu_s": -0.020438259487788477
       },
       {
         "driver_code": "RUS",
         "team": "Mercedes",
-        "baseline_rating_mu": 18.22,
-        "current_rating_mu": 13.143384540908176,
-        "delta_rating_mu": -5.076615459091823,
         "baseline_team_strength": 0.75,
         "current_team_strength": 0.9325,
         "delta_team_strength": 0.1825,
-        "delta_team_seconds": 0.3596658412551831
+        "delta_team_seconds": 0.3596658412551831,
+        "baseline_race_rating_mu_s": -0.09081960026679484,
+        "current_race_rating_mu_s": -0.4066055797235413,
+        "delta_race_rating_mu_s": -0.31578597945674647
       },
       {
         "driver_code": "SAI",
         "team": "Williams",
-        "baseline_rating_mu": 14.608,
-        "current_rating_mu": 14.17439230020445,
-        "delta_rating_mu": -0.4336076997955498,
         "baseline_team_strength": 0.55,
         "current_team_strength": 0.3284,
         "delta_team_strength": -0.22160000000000002,
-        "delta_team_seconds": -0.436723016011773
+        "delta_team_seconds": -0.436723016011773,
+        "baseline_race_rating_mu_s": 0.13770117581501623,
+        "current_race_rating_mu_s": 0.3182531405941699,
+        "delta_race_rating_mu_s": 0.1805519647791537
       },
       {
         "driver_code": "STR",
         "team": "Aston Martin",
-        "baseline_rating_mu": 13.453,
-        "current_rating_mu": 10.85986757843164,
-        "delta_rating_mu": -2.5931324215683595,
         "baseline_team_strength": 0.47,
         "current_team_strength": 0.1743,
         "delta_team_strength": -0.29569999999999996,
-        "delta_team_seconds": -0.5827572014200417
+        "delta_team_seconds": -0.5827572014200417,
+        "baseline_race_rating_mu_s": -0.2745680106068059,
+        "current_race_rating_mu_s": -0.1700168543643293,
+        "delta_race_rating_mu_s": 0.1045511562424766
       },
       {
         "driver_code": "VER",
         "team": "Red Bull Racing",
-        "baseline_rating_mu": 21.265,
-        "current_rating_mu": 16.453840456488308,
-        "delta_rating_mu": -4.8111595435116925,
         "baseline_team_strength": 0.74,
         "current_team_strength": 0.6514,
         "delta_team_strength": -0.08860000000000001,
-        "delta_team_seconds": -0.174610375535393
+        "delta_team_seconds": -0.174610375535393,
+        "baseline_race_rating_mu_s": 1.05349042621627,
+        "current_race_rating_mu_s": 1.2437363798729613,
+        "delta_race_rating_mu_s": 0.19024595365669117
       }
     ]
   },
   "wet_leakage": {
     "state": "not_evaluable_without_weather_routed_wet_replay_rows",
     "fully_wet_dry_update_invariant": {
-      "state": "not_evaluable_from_current_inputs",
+      "state": "not_evaluable_without_fully_wet_trace_rows",
+      "fully_wet_trace_rows": 0,
+      "violations": [],
       "wet_matched_rows": 0,
-      "mixed_or_unreliable_matched_rows": 0,
-      "violations": []
+      "mixed_or_unreliable_matched_rows": 0
     },
     "legacy_wet_skill_delta_vs_rating_mu_delta_correlation": null,
     "note": "The hard wet invariant requires session-level update trace. Aggregate driver artifacts alone cannot prove that a wet session did not update dry ratings."
   },
-  "warnings": [
-    "Dry leakage is reported as a legacy rating-mu proxy until schema migration adds seconds fields.",
-    "Regulation-reset scale monitoring is outside the 2024-2025 one-SE band for: qualifying, race.",
-    "Wet-leakage hard invariant is not evaluable without wet routed replay rows."
+  "warnings": [],
+  "limitations": [
+    "Current replay coverage has no wet weather-routed rows, so the wet-leakage replay invariant has no real 2026 wet sample yet."
+  ],
+  "monitoring_notes": [
+    "Reset-year scale differs from the 2024-2025 reference band for qualifying, race. The comparison stays visible for transfer review; it is not a warning by itself."
   ],
   "decision_notes": [
     "This artifact is diagnostic-only; it does not retune extractor semantics.",
-    "The exact dry-leakage metric is schema-blocked until race/quali seconds fields exist in persisted driver state."
+    "Dry leakage uses race driver seconds when baseline and current driver artifacts both expose that state; otherwise it reports the legacy rating-mu proxy."
   ]
 }
