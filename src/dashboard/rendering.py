@@ -123,8 +123,9 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
             )
             if mean_qualifying_confidence < 56.0:
                 qualifying_warning_messages.append(
-                    f"Low confidence run: mean confidence is {mean_qualifying_confidence:.1f}%. "
-                    "Use this as a rough order."
+                    "Wide predicted-order spread: mean order confidence is "
+                    f"{mean_qualifying_confidence:.1f}%. This reflects simulation spread, "
+                    "not just how many weekends the model has learned."
                 )
         else:
             mean_qualifying_confidence = None

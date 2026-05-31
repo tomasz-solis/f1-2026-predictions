@@ -36,9 +36,9 @@ def build_checkpoint_overlay_predictor(
     """Return a predictor overlaid with the best stored snapshot for one checkpoint.
 
     The overlay rules intentionally mirror checkpoint reconstruction:
-    exact session snapshot when present, and for ``PRE`` the latest snapshot
-    captured before the target weekend begins. If the stored snapshot path is
-    unavailable, the original predictor is returned unchanged.
+    exact session snapshot when present, and for ``PRE`` the latest main-profile
+    snapshot captured before the target weekend begins. If the stored snapshot
+    path is unavailable, the original predictor is returned unchanged.
     """
     checkpoint_session_upper = str(checkpoint_session or "").strip().upper()
     if not checkpoint_session_upper:

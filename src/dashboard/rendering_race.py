@@ -637,7 +637,7 @@ def _style_race_table(df_display: pd.DataFrame):
         column: template
         for column, template in {
             "Expected Pos": "{:.2f}",
-            "Confidence %": "{:.1f}",
+            "Order Confidence %": "{:.1f}",
             "Podium %": "{:.1f}",
             "DNF Risk %": "{:.1f}",
         }.items()
@@ -692,8 +692,9 @@ def _render_race_result(df: pd.DataFrame) -> None:
     )
     if isinstance(mean_confidence, float) and mean_confidence < 56.0:
         warnings.append(
-            f"Low confidence run: mean confidence is {mean_confidence:.1f}%. "
-            "Use this as a rough order; it should move as more weekend data comes in."
+            "Wide projected-finish spread: mean order confidence is "
+            f"{mean_confidence:.1f}%. This reflects simulation spread; input-data "
+            "confidence is tracked separately."
         )
 
     if isinstance(input_confidence, int | float) and float(input_confidence) < 0.60:
@@ -730,10 +731,10 @@ def _render_race_result(df: pd.DataFrame) -> None:
     if has_expected_position:
         primary_caption = (
             "Rows are ranked by expected finishing position across the full simulation "
-            "distribution, not by Confidence% or Podium%."
+            "distribution, not by Order Confidence% or Podium%."
             if has_podium_probability
             else "Rows are ranked by expected finishing position across the full simulation "
-            "distribution, not by Confidence%."
+            "distribution, not by Order Confidence%."
         )
     else:
         primary_caption = (
@@ -766,7 +767,7 @@ def _render_race_result(df: pd.DataFrame) -> None:
         display_names.append("DNF Risk %")
     if has_confidence:
         display_cols.append("confidence")
-        display_names.append("Confidence %")
+        display_names.append("Order Confidence %")
 
     df_display = race_df[display_cols].copy()
     df_display.columns = display_names
@@ -785,7 +786,7 @@ def _render_race_result(df: pd.DataFrame) -> None:
                 "label": f"P{position}",
                 "value": str(podium_row["driver"]),
                 "meta": (
-                    f"{podium_row['team']} • {float(podium_row['confidence']):.1f}% confidence"
+                    f"{podium_row['team']} • {float(podium_row['confidence']):.1f}% order confidence"
                     if has_confidence and pd.notna(podium_row.get("confidence"))
                     else str(podium_row["team"])
                 ),

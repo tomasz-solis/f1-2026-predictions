@@ -407,9 +407,9 @@ def _build_prediction_highlight_cards(
             if pd.notna(confidence):
                 race_cards.append(
                     {
-                        "label": "Mean confidence",
+                        "label": "Mean order confidence",
                         "value": f"{float(confidence):.1f}%",
-                        "meta": "Average confidence across the full field.",
+                        "meta": "Average simulated finish-order concentration.",
                         "tone": "neutral",
                     }
                 )
@@ -459,9 +459,9 @@ def _build_prediction_highlight_cards(
         if pd.notna(confidence):
             qualifying_cards.append(
                 {
-                    "label": "Mean confidence",
+                    "label": "Mean order confidence",
                     "value": f"{float(confidence):.1f}%",
-                    "meta": "Average confidence across the full grid.",
+                    "meta": "Average simulated grid-order concentration.",
                     "tone": "neutral",
                 }
             )
