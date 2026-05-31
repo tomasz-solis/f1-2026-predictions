@@ -403,6 +403,7 @@ def simulate_race_lap_by_lap(
                 compressed_team_strength = 0.5 + ((team_strength - 0.5) * team_strength_compression)
                 compressed_team_strength = np.clip(compressed_team_strength, 0.0, 1.0)
                 team_pace_delta_s = -((1.0 - compressed_team_strength) * team_pace_penalty_range)
+            driver_pace_delta_s = _resolve_driver_pace_delta_seconds(info)
             skill_improvement = skill * skill_improvement_max
             elite_skill_threshold = _elite_skill_threshold
             elite_skill_lap_bonus_max = _elite_skill_lap_bonus_max
@@ -427,6 +428,7 @@ def simulate_race_lap_by_lap(
             base_lap_time = (
                 reference_base
                 - team_pace_delta_s
+                - driver_pace_delta_s
                 - skill_improvement
                 - elite_skill_bonus
                 + race_advantage_delta
@@ -591,6 +593,16 @@ def _resolve_team_pace_delta_seconds(
     if np.isfinite(value):
         return value
     return None
+
+
+def _resolve_driver_pace_delta_seconds(info: dict[str, Any]) -> float:
+    """Return a seconds-native race driver residual or a neutral fallback."""
+    raw_value = info.get("race_rating_mu_s")
+    try:
+        value = float(raw_value) if raw_value is not None else float("nan")
+    except (TypeError, ValueError):
+        value = float("nan")
+    return value if np.isfinite(value) else 0.0
 
 
 def _compute_race_wet_skill_modifier(

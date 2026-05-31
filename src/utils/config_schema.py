@@ -39,7 +39,7 @@ class GridConfig(StrictConfigModel):
 class ModelConfig(StrictConfigModel):
     """Model release metadata shared across generated artifacts."""
 
-    version: str = Field(default="2.1", min_length=1)
+    version: str = Field(default="2.2", min_length=1)
 
 
 class BayesianConfig(StrictConfigModel):
@@ -218,6 +218,8 @@ class DriverFormConfig(StrictConfigModel):
 
     bayesian_pace_blend_per_race: float = Field(default=0.20, ge=0.0, le=1.0)
     bayesian_pace_blend_cap: float = Field(default=0.60, ge=0.0, le=1.0)
+    bayesian_quali_skill_blend_per_race: float = Field(default=0.45, ge=0.0, le=1.0)
+    bayesian_quali_skill_blend_cap: float = Field(default=0.90, ge=0.0, le=1.0)
     bayesian_race_skill_blend_per_race: float = Field(default=0.20, ge=0.0, le=1.0)
     bayesian_race_skill_blend_cap: float = Field(default=0.60, ge=0.0, le=1.0)
     quali_pace_update_blend: float = Field(default=0.30, ge=0.0, le=1.0)

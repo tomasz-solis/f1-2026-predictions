@@ -123,12 +123,13 @@ class TestAutoUpdaterExecution:
             mock_needs.return_value = (True, ["Australian Grand Prix"])
 
             with patch("src.systems.updater.update_from_race") as mock_update:
-                with patch("src.utils.auto_updater.mark_race_as_learned"):
+                with patch("src.utils.auto_updater.is_sprint_weekend", return_value=False):
+                    with patch("src.utils.auto_updater.mark_race_as_learned"):
 
-                    def progress_callback(current, total, message):
-                        pass  # Mock progress callback
+                        def progress_callback(current, total, message):
+                            pass  # Mock progress callback
 
-                    updated_count = auto_update_from_races(progress_callback=progress_callback)
+                        updated_count = auto_update_from_races(progress_callback=progress_callback)
 
         assert updated_count == 1
         mock_update.assert_called_once_with(2026, "Australian Grand Prix")
@@ -148,12 +149,13 @@ class TestAutoUpdaterExecution:
             )
 
             with patch("src.systems.updater.update_from_race") as mock_update:
-                with patch("src.utils.auto_updater.mark_race_as_learned"):
+                with patch("src.utils.auto_updater.is_sprint_weekend", return_value=False):
+                    with patch("src.utils.auto_updater.mark_race_as_learned"):
 
-                    def progress_callback(current, total, message):
-                        assert total == 3
+                        def progress_callback(current, total, message):
+                            assert total == 3
 
-                    updated_count = auto_update_from_races(progress_callback=progress_callback)
+                        updated_count = auto_update_from_races(progress_callback=progress_callback)
 
         assert updated_count == 3
         assert mock_update.call_count == 3
@@ -169,14 +171,15 @@ class TestAutoUpdaterExecution:
             )
 
             with patch("src.systems.updater.update_from_race") as mock_update:
-                with patch("src.utils.auto_updater.mark_race_as_learned"):
-                    # First update succeeds, second fails
-                    mock_update.side_effect = [None, Exception("Update failed")]
+                with patch("src.utils.auto_updater.is_sprint_weekend", return_value=False):
+                    with patch("src.utils.auto_updater.mark_race_as_learned"):
+                        # First update succeeds, second fails
+                        mock_update.side_effect = [None, Exception("Update failed")]
 
-                    def progress_callback(current, total, message):
-                        pass
+                        def progress_callback(current, total, message):
+                            pass
 
-                    updated_count = auto_update_from_races(progress_callback=progress_callback)
+                        updated_count = auto_update_from_races(progress_callback=progress_callback)
 
         # Should have updated 1 race (first one) before failure
         assert updated_count == 1
@@ -187,8 +190,9 @@ class TestAutoUpdaterExecution:
         with patch("src.utils.auto_updater.needs_update") as mock_needs:
             mock_needs.return_value = (True, ["Australian Grand Prix"])
             with patch("src.systems.updater.update_from_race") as mock_update:
-                with patch("src.utils.auto_updater.mark_race_as_learned"):
-                    updated_count = auto_update_from_races(year=2027)
+                with patch("src.utils.auto_updater.is_sprint_weekend", return_value=False):
+                    with patch("src.utils.auto_updater.mark_race_as_learned"):
+                        updated_count = auto_update_from_races(year=2027)
 
         assert updated_count == 1
         mock_update.assert_called_once_with(2027, "Australian Grand Prix")
@@ -202,19 +206,52 @@ class TestAutoUpdaterExecution:
             side_effect=AssertionError("needs_update should not be called"),
         ):
             with patch("src.systems.updater.update_from_race") as mock_update:
-                with patch("src.utils.auto_updater.mark_race_as_learned"):
-                    updated_count = auto_update_from_races(
-                        races_to_update=[
-                            "Australian Grand Prix",
-                            "Chinese Grand Prix",
-                            "Australian Grand Prix",
-                        ]
-                    )
+                with patch("src.utils.auto_updater.is_sprint_weekend", return_value=False):
+                    with patch("src.utils.auto_updater.mark_race_as_learned"):
+                        updated_count = auto_update_from_races(
+                            races_to_update=[
+                                "Australian Grand Prix",
+                                "Chinese Grand Prix",
+                                "Australian Grand Prix",
+                            ]
+                        )
 
         assert updated_count == 2
         assert mock_update.call_count == 2
         assert mock_update.call_args_list[0].args == (2026, "Australian Grand Prix")
         assert mock_update.call_args_list[1].args == (2026, "Chinese Grand Prix")
+
+    def test_auto_update_from_races_runs_sprint_before_main_race(self, temp_data_dir):
+        """Sprint weekends should learn sprint sessions before the main race update."""
+        from src.utils.auto_updater import auto_update_from_races
+
+        update_order: list[str] = []
+        with patch(
+            "src.utils.auto_updater.needs_update", return_value=(True, ["China Grand Prix"])
+        ):
+            with patch("src.utils.auto_updater.is_sprint_weekend", return_value=True):
+                with patch(
+                    "src.systems.updater.update_from_sprint_race",
+                    side_effect=lambda year, race_name: update_order.append(
+                        f"sprint::{year}::{race_name}"
+                    ),
+                ) as sprint_update:
+                    with patch(
+                        "src.systems.updater.update_from_race",
+                        side_effect=lambda year, race_name: update_order.append(
+                            f"race::{year}::{race_name}"
+                        ),
+                    ) as race_update:
+                        with patch("src.utils.auto_updater.mark_race_as_learned"):
+                            updated_count = auto_update_from_races()
+
+        assert updated_count == 1
+        sprint_update.assert_called_once_with(2026, "China Grand Prix")
+        race_update.assert_called_once_with(2026, "China Grand Prix")
+        assert update_order == [
+            "sprint::2026::China Grand Prix",
+            "race::2026::China Grand Prix",
+        ]
 
 
 class TestCompletedRacesDetection:

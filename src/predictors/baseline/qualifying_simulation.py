@@ -330,11 +330,13 @@ def _resolve_team_strength_signal(
     driver_info: dict[str, Any],
     sim_cfg: QualiSimConfig,
 ) -> float:
-    """Return the team component on the existing qualifying score scale.
+    """Return the dry seconds pace component on the qualifying score scale.
 
     Phase 7 supplies a construct-aligned seconds delta. Qualifying still uses a
     latent ranking score, so the seconds delta is projected into that score
     space with an explicit scale while preserving the old unit-score fallback.
+    Driver seconds are already teammate-relative residuals and compose with the
+    mapped team delta before that projection when the new state exists.
     """
     raw_seconds_delta = driver_info.get("team_strength_seconds_delta")
     try:
@@ -343,6 +345,15 @@ def _resolve_team_strength_signal(
         seconds_delta = float("nan")
 
     if np.isfinite(seconds_delta) and sim_cfg.team_strength_seconds_score_scale > 0:
+        raw_driver_seconds = driver_info.get("quali_rating_mu_s")
+        try:
+            driver_seconds = (
+                float(raw_driver_seconds) if raw_driver_seconds is not None else float("nan")
+            )
+        except (TypeError, ValueError):
+            driver_seconds = float("nan")
+        if np.isfinite(driver_seconds):
+            seconds_delta += driver_seconds
         return float(
             np.clip(
                 0.5 + (seconds_delta / sim_cfg.team_strength_seconds_score_scale),

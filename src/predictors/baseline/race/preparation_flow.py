@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 
+from src.models.driver_seconds_state import read_driver_rating_mu_seconds
 from src.models.team_strength_mapping import team_strength_seconds_components
 from src.predictors.baseline.qualifying_preparation import resolve_bayesian_skill_score
 from src.types.prediction_types import DriverRaceInfo, QualifyingGridEntry
@@ -483,6 +484,7 @@ def prepare_driver_info_core(
         )
 
         seconds_components = team_strength_seconds_components(team_strength, session_kind="race")
+        race_rating_mu_s = read_driver_rating_mu_seconds(driver_data, session_kind="race")
         driver_record: DriverRaceInfo = {
             "driver": driver_code,
             "team": team,
@@ -505,6 +507,8 @@ def prepare_driver_info_core(
             driver_record["team_strength_seconds_delta"] = seconds_components[
                 "team_strength_seconds_delta"
             ]
+        if race_rating_mu_s is not None:
+            driver_record["race_rating_mu_s"] = race_rating_mu_s
         driver_info_map[driver_code] = driver_record
 
     return driver_info_map, len(teams_with_long_profile)
@@ -623,6 +627,7 @@ def prepare_driver_info_with_compounds_core(
             base_team_strength,
             session_kind="race",
         )
+        race_rating_mu_s = read_driver_rating_mu_seconds(driver_data, session_kind="race")
         driver_record: DriverRaceInfo = {
             "driver": driver_code,
             "team": team,
@@ -652,6 +657,8 @@ def prepare_driver_info_with_compounds_core(
             driver_record["team_strength_seconds_delta_by_compound"] = (
                 team_strength_seconds_delta_by_compound
             )
+        if race_rating_mu_s is not None:
+            driver_record["race_rating_mu_s"] = race_rating_mu_s
         driver_info_map[driver_code] = driver_record
 
     return driver_info_map, len(teams_with_long_profile)

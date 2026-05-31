@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 
+from src.models.driver_seconds_state import read_driver_rating_mu_seconds
 from src.models.team_strength_mapping import team_strength_seconds_components
 
 
@@ -124,6 +125,36 @@ def blend_quali_pace_with_bayesian_form(
         blend_weight * float(np.clip(bayesian_skill_score, 0.0, 1.0))
     )
     return float(np.clip(blended_quali_pace, 0.01, 0.99)), blend_weight
+
+
+def blend_qualifying_skill_with_bayesian_form(
+    raw_skill: float,
+    bayesian_skill_score: float | None,
+    *,
+    races_completed: int,
+    cfg: Any,
+) -> tuple[float, float]:
+    """Blend qualifying skill toward the weekend-updated Bayesian form signal."""
+    clipped_raw_skill = float(np.clip(raw_skill, 0.01, 0.99))
+    if bayesian_skill_score is None:
+        return clipped_raw_skill, 0.0
+
+    blend_per_race = float(
+        cfg.get("baseline_predictor.driver_form.bayesian_quali_skill_blend_per_race", 0.45)
+    )
+    blend_cap = float(
+        cfg.get("baseline_predictor.driver_form.bayesian_quali_skill_blend_cap", 0.90)
+    )
+    blend_weight = float(
+        np.clip(max(0, int(races_completed)) * blend_per_race, 0.0, max(0.0, blend_cap))
+    )
+    if blend_weight <= 0.0:
+        return clipped_raw_skill, 0.0
+
+    blended_skill = ((1.0 - blend_weight) * clipped_raw_skill) + (
+        blend_weight * float(np.clip(bayesian_skill_score, 0.0, 1.0))
+    )
+    return float(np.clip(blended_skill, 0.01, 0.99)), blend_weight
 
 
 def _score_profile(
@@ -480,10 +511,10 @@ def _build_driver_record(
             driver_data = {}
 
     try:
-        skill = float(driver_data.get("racecraft", {}).get("skill_score", default_skill))
+        raw_skill = float(driver_data.get("racecraft", {}).get("skill_score", default_skill))
     except (TypeError, ValueError):
-        skill = float(default_skill)
-    skill = float(np.clip(skill, 0.01, 0.99))
+        raw_skill = float(default_skill)
+    raw_skill = float(np.clip(raw_skill, 0.01, 0.99))
 
     try:
         raw_quali_pace = float(driver_data.get("pace", {}).get("quali_pace", 0.5))
@@ -492,6 +523,12 @@ def _build_driver_record(
     raw_quali_pace = float(np.clip(raw_quali_pace, 0.01, 0.99))
 
     bayesian_skill_score = resolve_bayesian_skill_score(driver_data, grid_size=grid_size)
+    skill, bayesian_skill_blend_weight = blend_qualifying_skill_with_bayesian_form(
+        raw_skill,
+        bayesian_skill_score,
+        races_completed=races_completed,
+        cfg=cfg,
+    )
     quali_pace, bayesian_pace_blend_weight = blend_quali_pace_with_bayesian_form(
         raw_quali_pace,
         bayesian_skill_score,
@@ -549,6 +586,10 @@ def _build_driver_record(
         races_completed=races_completed,
     )
     wet_skill = float(driver_data.get("wet_skill", 0.70) if isinstance(driver_data, dict) else 0.70)
+    quali_rating_mu_s = read_driver_rating_mu_seconds(
+        driver_data,
+        session_kind="qualifying",
+    )
     seconds_components = team_strength_seconds_components(
         team_strength,
         session_kind="qualifying",
@@ -561,9 +602,11 @@ def _build_driver_record(
         "team_strength_score": team_strength,
         "team_uncertainty": float(np.clip(team_uncertainty, 0.0, 1.0)),
         "skill": skill,
+        "raw_skill": raw_skill,
         "quali_pace": quali_pace,
         "raw_quali_pace": raw_quali_pace,
         "bayesian_skill_score": bayesian_skill_score,
+        "bayesian_skill_blend_weight": bayesian_skill_blend_weight,
         "bayesian_pace_blend_weight": bayesian_pace_blend_weight,
         "experience_tier": experience_tier,
         "experience_total_races": experience_total_races,
@@ -573,6 +616,8 @@ def _build_driver_record(
     }
     if seconds_components is not None:
         record.update(seconds_components)
+    if quali_rating_mu_s is not None:
+        record["quali_rating_mu_s"] = quali_rating_mu_s
     return record
 
 

@@ -25,6 +25,7 @@ class DriverRaceInfo(TypedDict):
     team_strength_score: NotRequired[float]
     team_strength_seconds: NotRequired[float]
     team_strength_seconds_delta: NotRequired[float]
+    race_rating_mu_s: NotRequired[float]
     team_uncertainty: NotRequired[float]
     team_strength_by_compound: NotRequired[dict[str, float]]
     team_strength_seconds_by_compound: NotRequired[dict[str, float]]

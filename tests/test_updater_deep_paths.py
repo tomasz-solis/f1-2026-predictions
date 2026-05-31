@@ -23,6 +23,7 @@ def _write_characteristics_file(path: Path) -> None:
         "teams": {
             "Ferrari": {
                 "overall_performance": 0.8,
+                "note": "2025 P4 seed, updated with 0 race(s) of 2026 data",
                 "directionality": {
                     "max_speed": 0.0,
                     "slow_corner_speed": 0.0,
@@ -58,7 +59,7 @@ def test_load_race_session_enriches_results_and_uses_cache(patcher, tmp_path):
     assert list(loaded_results["race_name"].unique()) == ["Bahrain Grand Prix"]
     assert list(loaded_results["year"].unique()) == [2026]
     enable_cache.assert_called_once_with("data/raw/.fastf1_cache")
-    session.load.assert_called_once_with(laps=True, telemetry=False, weather=False)
+    session.load.assert_called_once_with(laps=True, telemetry=False, weather=True)
 
 
 def test_extract_team_performance_missing_laps_or_team_column():
@@ -169,6 +170,7 @@ def test_update_team_characteristics_position_fallback_and_file_save(patcher, tm
     ferrari = saved["teams"]["Ferrari"]
     assert ferrari["current_season_performance"]
     assert ferrari["races_completed"] == 1
+    assert ferrari["note"] == "2025 P4 seed, updated with 1 race(s) of 2026 data"
     assert saved["version"] == 2
     assert saved["data_freshness"] == "LIVE_UPDATED"
     assert Path(str(characteristics_file) + ".backup").exists()
@@ -1021,12 +1023,15 @@ def test_update_from_race_skips_team_update_when_characteristics_missing(patcher
     updater.update_from_race(2026, "Bahrain Grand Prix", str(data_dir))
 
     team_update.assert_not_called()
-    bayesian_update.assert_called_once_with(
-        race_results,
-        qualifying_results=qualifying_results,
-        data_root=tmp_path,
-        weather="dry",
-    )
+    bayesian_update.assert_called_once()
+    call_args, call_kwargs = bayesian_update.call_args
+    assert call_args[0] is race_results
+    assert call_kwargs["qualifying_results"] is qualifying_results
+    assert call_kwargs["data_root"] == tmp_path
+    assert call_kwargs["weather"] == "dry"
+    assert call_kwargs["qualifying_weather"] == "dry"
+    assert call_kwargs["race_matched_lap_aggregates"].empty
+    assert call_kwargs["qualifying_matched_lap_aggregates"].empty
 
 
 def test_update_from_race_reraises_load_errors(patcher):
@@ -1159,3 +1164,131 @@ def test_sprint_race_updates_race_pace_ema(patcher, tmp_path):
         f"actual_shift={actual_shift:.4f}, expected_half={half_blend_shift:.4f}, "
         f"full_would_be={full_blend_shift:.4f}"
     )
+
+
+def test_sprint_update_moves_race_and_qualifying_seconds_with_half_evidence(patcher, tmp_path):
+    """Sprint and SQ aggregates should update isolated seconds paths at half precision."""
+    from src.models.bayesian import DriverPrior
+    from src.models.driver_seconds_state import read_driver_seconds_state
+
+    patcher.chdir(tmp_path)
+    sprint_results = pd.DataFrame(
+        {
+            "Abbreviation": ["AAA", "BBB"],
+            "Position": [1, 2],
+            "Status": ["Finished", "Finished"],
+            "race_name": ["China Grand Prix", "China Grand Prix"],
+            "year": [2026, 2026],
+        }
+    )
+    sprint_session = SimpleNamespace(
+        weather_data=pd.DataFrame({"Rainfall": [False, False]}),
+    )
+    sprint_qualifying_session = SimpleNamespace(
+        weather_data=pd.DataFrame({"Rainfall": [False, False]}),
+    )
+
+    patcher.setattr("src.utils.weekend.is_sprint_weekend", lambda year, race_name: True)
+    patcher.setattr(
+        updater,
+        "load_competitive_session",
+        lambda year, race_name, session_name, load_laps=False: (
+            sprint_results,
+            sprint_session if session_name == "Sprint" else sprint_qualifying_session,
+        ),
+    )
+    patcher.setattr(
+        "src.utils.lineups.load_current_lineups",
+        lambda config_path="data/current_lineups.json": {"Example": ["AAA", "BBB"]},
+    )
+    patcher.setattr(
+        "src.models.priors_factory.PriorsFactory.create_priors",
+        lambda self: {
+            "AAA": DriverPrior("1", "AAA", "Example", "top", mu=18.0, sigma=2.0),
+            "BBB": DriverPrior("2", "BBB", "Example", "top", mu=17.0, sigma=2.0),
+        },
+    )
+
+    def _aggregate(session_kind: str, gap_s: float) -> pd.DataFrame:
+        """Build one usable sprint aggregate row for the requested state path."""
+        return pd.DataFrame(
+            [
+                {
+                    "reference_driver_code": "AAA",
+                    "comparison_driver_code": "BBB",
+                    "session_kind": session_kind,
+                    "matched_gap_median_s": gap_s,
+                    "matched_gap_se_s": 0.10,
+                    "n_matched_pairs": 4,
+                    "weather_bucket": "dry",
+                    "skip_reason": pd.NA,
+                }
+            ]
+        )
+
+    patcher.setattr(
+        updater,
+        "_extract_driver_seconds_aggregates",
+        lambda session, session_kind, weather: _aggregate(
+            session_kind,
+            0.40 if session_kind == "race" else -0.30,
+        ),
+    )
+
+    driver_payload = {
+        "version": 1,
+        "drivers": {
+            code: {
+                "racecraft": {"skill_score": 0.60},
+                "pace": {"race_pace": 0.50},
+                "bayesian": {
+                    "race_rating_mu_s": 0.0,
+                    "race_rating_sigma_s": 0.30,
+                    "quali_rating_mu_s": 0.0,
+                    "quali_rating_sigma_s": 0.30,
+                },
+            }
+            for code in ("AAA", "BBB")
+        },
+    }
+
+    class _Store:
+        """Artifact store stub for a sprint driver-seconds update."""
+
+        def __init__(self, data_root):
+            self.data_root = data_root
+
+        def load_artifact(self, artifact_type, artifact_key):
+            return driver_payload if artifact_type == "driver_characteristics" else None
+
+        def get_latest_version(self, artifact_type, artifact_key):
+            return 1
+
+        def save_artifact(self, artifact_type, artifact_key, data, version):
+            """Accept the saved sprint driver artifact."""
+
+    patcher.setattr(updater, "ArtifactStore", _Store)
+
+    evidence_scales: list[float] = []
+    original_seconds_update = updater._update_dry_driver_seconds_path
+
+    def _record_seconds_update(**kwargs):
+        """Record evidence scale before applying the real seconds update."""
+        evidence_scales.append(float(kwargs["evidence_scale"]))
+        return original_seconds_update(**kwargs)
+
+    patcher.setattr(updater, "_update_dry_driver_seconds_path", _record_seconds_update)
+
+    updater.update_from_sprint_race(2026, "China Grand Prix", data_root=str(tmp_path))
+
+    aaa = read_driver_seconds_state(driver_payload["drivers"]["AAA"])
+    bbb = read_driver_seconds_state(driver_payload["drivers"]["BBB"])
+    assert aaa is not None
+    assert bbb is not None
+    assert aaa.race_rating_mu_s > 0.0
+    assert bbb.race_rating_mu_s < 0.0
+    assert aaa.quali_rating_mu_s < 0.0
+    assert bbb.quali_rating_mu_s > 0.0
+    assert driver_payload["drivers"]["AAA"]["bayesian"]["race_rating_observations"] == 1
+    assert driver_payload["drivers"]["AAA"]["bayesian"]["quali_rating_observations"] == 1
+    assert evidence_scales == [0.5, 0.5]

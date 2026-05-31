@@ -15,7 +15,7 @@ import pandas as pd
 
 from src.persistence.config import should_read_db_first, should_write_to_db, should_write_to_file
 from src.persistence.runtime_state_store import RuntimeStateStore
-from src.utils.weekend import should_skip_schedule_event
+from src.utils.weekend import is_sprint_weekend, should_skip_schedule_event
 
 logger = logging.getLogger(__name__)
 _LEARNING_STATE_FILE = Path("data/learning_state.json")
@@ -266,7 +266,7 @@ def auto_update_from_races(
     logger.info("Found %s new race(s) to learn from: %s", len(new_races), new_races)
 
     # Import here to avoid circular dependency
-    from src.systems.updater import update_from_race
+    from src.systems.updater import update_from_race, update_from_sprint_race
 
     updated_count = 0
 
@@ -276,6 +276,9 @@ def auto_update_from_races(
                 progress_callback(i + 1, len(new_races), f"Learning from {race_name}...")
 
             logger.info("Updating from %s (%s/%s)...", race_name, i + 1, len(new_races))
+
+            if is_sprint_weekend(year, race_name):
+                update_from_sprint_race(year, race_name)
 
             # Update from race (loads results, updates teams & drivers)
             update_from_race(year, race_name)

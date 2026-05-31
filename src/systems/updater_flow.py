@@ -142,6 +142,26 @@ def _apply_team_performance_updates(
             )
 
 
+def _refresh_team_race_count_notes(*, char_data: CharacteristicPayload, year: int) -> None:
+    """Keep generated team notes aligned with the stored race-count evidence."""
+    teams = char_data.get("teams", {})
+    if not isinstance(teams, dict):
+        return
+
+    for team_data in teams.values():
+        if not isinstance(team_data, dict):
+            continue
+        note = str(team_data.get("note", "")).strip()
+        marker = " updated with "
+        if marker not in note or " race(s)" not in note:
+            continue
+        race_count = len(team_data.get("current_season_performance", []))
+        prefix = note.split(marker, 1)[0].strip()
+        if not prefix:
+            continue
+        team_data["note"] = f"{prefix}{marker}{race_count} race(s) of {int(year)} data"
+
+
 def _resolve_race_name(session: Any) -> str:
     """Resolve race name from session metadata with safe fallback."""
     try:
@@ -348,6 +368,7 @@ def update_team_characteristics_core(
         ),
         default=int(char_data.get("races_completed", 0)),
     )
+    _refresh_team_race_count_notes(char_data=char_data, year=int(year))
 
     _save_characteristics_payload(
         store=store,

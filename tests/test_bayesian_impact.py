@@ -8,7 +8,10 @@ from typing import Any
 
 import pytest
 
-from src.predictors.baseline.qualifying_preparation import resolve_bayesian_skill_score
+from src.predictors.baseline.qualifying_preparation import (
+    blend_qualifying_skill_with_bayesian_form,
+    resolve_bayesian_skill_score,
+)
 from src.predictors.baseline_2026 import Baseline2026Predictor
 
 _DRIVER_CHARACTERISTICS_PATH = Path("data/processed/driver_characteristics.json")
@@ -82,6 +85,32 @@ def test_bayesian_skill_score_resolves_from_seeded_state() -> None:
         f"Only {resolved_count}/{len(drivers)} drivers resolved Bayesian score from "
         "committed seeded state."
     )
+
+
+def test_qualifying_skill_blend_can_follow_weekend_bayesian_form() -> None:
+    """Qualifying skill should move every weekend when the blend is configured."""
+    config = {
+        "baseline_predictor.driver_form.bayesian_quali_skill_blend_per_race": 0.25,
+        "baseline_predictor.driver_form.bayesian_quali_skill_blend_cap": 0.80,
+    }
+
+    zero_race_skill, zero_race_weight = blend_qualifying_skill_with_bayesian_form(
+        0.30,
+        0.90,
+        races_completed=0,
+        cfg=config,
+    )
+    four_race_skill, four_race_weight = blend_qualifying_skill_with_bayesian_form(
+        0.30,
+        0.90,
+        races_completed=4,
+        cfg=config,
+    )
+
+    assert zero_race_skill == pytest.approx(0.30)
+    assert zero_race_weight == 0.0
+    assert four_race_weight == pytest.approx(0.80)
+    assert four_race_skill == pytest.approx(0.78)
 
 
 def test_bayesian_ratings_reflect_driver_form_not_just_car() -> None:

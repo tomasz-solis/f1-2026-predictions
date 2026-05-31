@@ -16,7 +16,7 @@
       "pit_stop_loss": 22.5,
       "safety_car_prob": 0.45,
       "vsc_prob": 0.25,
-      "multi_sc_prob": 0.10,
+      "multi_sc_prob": 0.1,
       "lap1_risk_modifier": 0.1,
       "overtaking_difficulty": 0.5
     },
@@ -25,7 +25,7 @@
       "has_sprint": true,
       "pit_stop_loss": 28.6,
       "safety_car_prob": 0.25,
-      "vsc_prob": 0.20,
+      "vsc_prob": 0.2,
       "multi_sc_prob": 0.05,
       "lap1_risk_modifier": 0.1,
       "overtaking_difficulty": 0.4
@@ -43,7 +43,7 @@
       "type": "permanent",
       "pit_stop_loss": 24.8,
       "safety_car_prob": 0.25,
-      "vsc_prob": 0.20,
+      "vsc_prob": 0.2,
       "multi_sc_prob": 0.05,
       "lap1_risk_modifier": 0.05,
       "overtaking_difficulty": 0.4
@@ -53,7 +53,7 @@
       "has_sprint": true,
       "pit_stop_loss": 23.3,
       "safety_car_prob": 0.3,
-      "vsc_prob": 0.20,
+      "vsc_prob": 0.2,
       "multi_sc_prob": 0.08,
       "lap1_risk_modifier": 0.05,
       "overtaking_difficulty": 0.3
@@ -62,7 +62,7 @@
       "type": "permanent",
       "pit_stop_loss": 29.0,
       "safety_car_prob": 0.25,
-      "vsc_prob": 0.20,
+      "vsc_prob": 0.2,
       "multi_sc_prob": 0.05,
       "lap1_risk_modifier": 0.05,
       "overtaking_difficulty": 0.4
@@ -99,7 +99,7 @@
       "type": "permanent",
       "pit_stop_loss": 22.4,
       "safety_car_prob": 0.2,
-      "vsc_prob": 0.20,
+      "vsc_prob": 0.2,
       "multi_sc_prob": 0.05,
       "lap1_risk_modifier": 0.0,
       "overtaking_difficulty": 0.4
@@ -109,7 +109,7 @@
       "has_sprint": true,
       "pit_stop_loss": 21.8,
       "safety_car_prob": 0.25,
-      "vsc_prob": 0.20,
+      "vsc_prob": 0.2,
       "multi_sc_prob": 0.05,
       "lap1_risk_modifier": 0.05,
       "overtaking_difficulty": 0.4
@@ -118,7 +118,7 @@
       "type": "permanent",
       "pit_stop_loss": 22.5,
       "safety_car_prob": 0.5,
-      "vsc_prob": 0.30,
+      "vsc_prob": 0.3,
       "multi_sc_prob": 0.12,
       "lap1_risk_modifier": 0.15,
       "overtaking_difficulty": 0.5
@@ -127,7 +127,7 @@
       "type": "permanent",
       "pit_stop_loss": 23.5,
       "safety_car_prob": 0.3,
-      "vsc_prob": 0.20,
+      "vsc_prob": 0.2,
       "multi_sc_prob": 0.06,
       "lap1_risk_modifier": 0.1,
       "overtaking_difficulty": 0.5
@@ -145,7 +145,7 @@
       "type": "permanent",
       "pit_stop_loss": 21.7,
       "safety_car_prob": 0.2,
-      "vsc_prob": 0.20,
+      "vsc_prob": 0.2,
       "multi_sc_prob": 0.04,
       "lap1_risk_modifier": 0.1,
       "overtaking_difficulty": 0.8
@@ -154,7 +154,7 @@
       "type": "street",
       "pit_stop_loss": 21.7,
       "safety_car_prob": 0.55,
-      "vsc_prob": 0.30,
+      "vsc_prob": 0.3,
       "multi_sc_prob": 0.18,
       "lap1_risk_modifier": 0.15,
       "overtaking_difficulty": 0.3
@@ -163,7 +163,7 @@
       "type": "street",
       "pit_stop_loss": 27.4,
       "safety_car_prob": 0.5,
-      "vsc_prob": 0.40,
+      "vsc_prob": 0.4,
       "multi_sc_prob": 0.12,
       "lap1_risk_modifier": 0.35,
       "overtaking_difficulty": 0.8
@@ -172,7 +172,7 @@
       "type": "street",
       "pit_stop_loss": 18.2,
       "safety_car_prob": 0.55,
-      "vsc_prob": 0.30,
+      "vsc_prob": 0.3,
       "multi_sc_prob": 0.14,
       "lap1_risk_modifier": 0.15,
       "overtaking_difficulty": 0.5
@@ -187,12 +187,12 @@
       "lap1_risk_modifier": 0.25,
       "overtaking_difficulty": 0.35
     },
-    "São Paulo Grand Prix": {
+    "S\u00e3o Paulo Grand Prix": {
       "type": "permanent",
       "has_sprint": true,
       "pit_stop_loss": 23.9,
       "safety_car_prob": 0.5,
-      "vsc_prob": 0.30,
+      "vsc_prob": 0.3,
       "multi_sc_prob": 0.15,
       "lap1_risk_modifier": 0.15,
       "overtaking_difficulty": 0.4
@@ -210,7 +210,7 @@
       "type": "street",
       "pit_stop_loss": 21.4,
       "safety_car_prob": 0.55,
-      "vsc_prob": 0.30,
+      "vsc_prob": 0.3,
       "multi_sc_prob": 0.15,
       "lap1_risk_modifier": 0.3,
       "overtaking_difficulty": 0.6

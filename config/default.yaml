@@ -14,7 +14,7 @@ grid:
   size: 22  # 11 teams x 2 drivers in the 2026 field
 
 model:
-  version: "2.1"
+  version: "2.2"
 
 # Bayesian Model Parameters
 bayesian:
@@ -168,9 +168,13 @@ baseline_predictor:
   driver_form:
     bayesian_pace_blend_per_race: 0.20
     bayesian_pace_blend_cap: 0.60
-    # Race-specific Bayesian blend rates. Falls back to the qualifying rates
-    # above when not set. Separate keys allow independent tuning because race
-    # results carry more signal per observation than qualifying.
+    # Qualifying skill follows current-season Bayesian form quickly after each
+    # completed weekend. 2026 sequential replay supports this for the one-lap
+    # skill channel; race skill keeps the slower schedule below.
+    bayesian_quali_skill_blend_per_race: 0.45
+    bayesian_quali_skill_blend_cap: 0.90
+    # Race skill stays independent from the qualifying skill schedule. When
+    # these keys are absent, the race path falls back to the pace blend above.
     bayesian_race_skill_blend_per_race: 0.20
     bayesian_race_skill_blend_cap: 0.60
     quali_pace_update_blend: 0.30
