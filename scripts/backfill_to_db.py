@@ -3,7 +3,10 @@
 Backfill script: Migrate local persistence data to Supabase.
 
 This script discovers file-backed artifacts plus runtime-state files under the
-`data/` directory and writes them to the matching Supabase storage layer:
+`data/` directory and writes them to the matching Supabase storage layer.
+Prediction artifacts are skipped by default because local prediction files can
+be less complete than DB rows that have been reconciled with actual results.
+Use ``--include-predictions`` only for an intentional prediction sync.
 
 - artifact payloads -> `artifacts`
 - runtime-state payloads -> `runtime_state`
@@ -68,7 +71,11 @@ def _season_year_from_payload(payload: dict[str, Any], default_year: int = 2026)
     return int(default_year)
 
 
-def discover_artifacts(data_root: Path) -> list[dict[str, Any]]:
+def discover_artifacts(
+    data_root: Path,
+    *,
+    include_predictions: bool = False,
+) -> list[dict[str, Any]]:
     """
     Discover all JSON artifacts in data/ directory.
 
@@ -239,9 +246,11 @@ def discover_artifacts(data_root: Path) -> list[dict[str, Any]]:
         except Exception as e:
             print(f"  [WARN]  Failed to load {learning_file}: {e}")
 
-    # 7. Predictions (scan all years/races)
+    # 7. Predictions (scan all years/races only when explicitly requested)
     predictions_dir = data_root / "predictions"
-    if predictions_dir.exists():
+    if predictions_dir.exists() and not include_predictions:
+        print("  Skipped: predictions/ (use --include-predictions for an explicit sync)")
+    elif predictions_dir.exists():
         for pred_file in sorted(predictions_dir.rglob("*.json")):
             # Parse path: predictions/2026/bahrain_grand_prix/bahrain_grand_prix_qualifying.json
             parts = pred_file.relative_to(predictions_dir).parts
@@ -388,6 +397,7 @@ def backfill_artifacts(
     artifacts: list[dict[str, Any]],
     dry_run: bool = False,
     batch_size: int = 100,
+    bump_artifact_versions: bool = False,
 ) -> tuple[int, int]:
     """
     Backfill artifacts to Supabase.
@@ -396,6 +406,7 @@ def backfill_artifacts(
         artifacts: List of artifact metadata
         dry_run: If True, skip actual writes
         batch_size: Reserved for parity with runtime-state backfill
+        bump_artifact_versions: If True, append each artifact as the next DB version
 
     Returns:
         Tuple of (success_count, failure_count)
@@ -406,7 +417,8 @@ def backfill_artifacts(
 
     for i, artifact in enumerate(artifacts, 1):
         artifact_id = f"{artifact['artifact_type']}::{artifact['artifact_key']}"
-        print(f"\n[{i}/{len(artifacts)}] Processing: {artifact_id} (v{artifact['version']})")
+        version_label = "latest+1" if bump_artifact_versions else f"v{artifact['version']}"
+        print(f"\n[{i}/{len(artifacts)}] Processing: {artifact_id} ({version_label})")
 
         if dry_run:
             print(f"  [DRY RUN] Would save: {artifact['file_path'].name}")
@@ -419,7 +431,7 @@ def backfill_artifacts(
                 artifact_type=artifact["artifact_type"],
                 artifact_key=artifact["artifact_key"],
                 data=artifact["data"],
-                version=artifact["version"],
+                version=None if bump_artifact_versions else artifact["version"],
                 run_id=artifact.get("run_id"),
             )
 
@@ -512,6 +524,23 @@ def main():
         action="store_true",
         help="Skip the interactive confirmation prompt and run the backfill.",
     )
+    parser.add_argument(
+        "--include-predictions",
+        action="store_true",
+        help=(
+            "Also backfill local prediction artifacts. Disabled by default to avoid "
+            "overwriting DB rows that include reconciled actuals."
+        ),
+    )
+    parser.add_argument(
+        "--bump-artifact-versions",
+        action="store_true",
+        help=(
+            "Write discovered artifacts as the next DB version instead of preserving "
+            "the local payload version. Use this when promoting local files into an "
+            "existing Supabase database that already has higher artifact versions."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -535,10 +564,15 @@ def main():
 
     print(f" Data root: {args.data_root.absolute()}")
     print(f" Batch size: {args.batch_size}")
+    if args.bump_artifact_versions:
+        print(" Artifact version mode: latest+1")
 
     # Discover artifacts
     print(f"\n1. Discovering artifacts in {args.data_root}/...")
-    artifacts = discover_artifacts(args.data_root)
+    artifacts = discover_artifacts(
+        args.data_root,
+        include_predictions=bool(args.include_predictions),
+    )
     runtime_state_payloads = discover_runtime_state_records(args.data_root)
 
     if not artifacts and not runtime_state_payloads:
@@ -575,7 +609,10 @@ def main():
     # Backfill
     print("\n2. Backfilling artifacts...")
     artifact_success, artifact_failure = backfill_artifacts(
-        artifacts, args.dry_run, args.batch_size
+        artifacts,
+        args.dry_run,
+        args.batch_size,
+        bump_artifact_versions=bool(args.bump_artifact_versions),
     )
 
     print("\n3. Backfilling runtime state...")

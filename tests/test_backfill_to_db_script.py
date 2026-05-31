@@ -47,6 +47,26 @@ def test_discover_artifacts_includes_snapshots_and_skips_runtime_state_artifacts
     practice_state.parent.mkdir(parents=True, exist_ok=True)
     practice_state.write_text(json.dumps({"races": {"2026::Australian Grand Prix": {}}}))
 
+    prediction_file = (
+        tmp_path
+        / "predictions"
+        / "2026"
+        / "australian_grand_prix"
+        / "australian_grand_prix_pre.json"
+    )
+    prediction_file.parent.mkdir(parents=True, exist_ok=True)
+    prediction_file.write_text(
+        json.dumps(
+            {
+                "metadata": {
+                    "year": 2026,
+                    "race_name": "Australian Grand Prix",
+                    "session_name": "PRE",
+                }
+            }
+        )
+    )
+
     artifacts = module.discover_artifacts(tmp_path)
     artifact_lookup = {(item["artifact_type"], item["artifact_key"]) for item in artifacts}
 
@@ -57,6 +77,20 @@ def test_discover_artifacts_includes_snapshots_and_skips_runtime_state_artifacts
     ) in artifact_lookup
     assert ("driver_characteristics", "2026::driver_characteristics") in artifact_lookup
     assert all(artifact_type != "practice_state" for artifact_type, _key in artifact_lookup)
+    assert all(artifact_type != "prediction" for artifact_type, _key in artifact_lookup)
+
+    artifacts_with_predictions = module.discover_artifacts(
+        tmp_path,
+        include_predictions=True,
+    )
+    artifact_lookup_with_predictions = {
+        (item["artifact_type"], item["artifact_key"]) for item in artifacts_with_predictions
+    }
+
+    assert (
+        "prediction",
+        "2026::Australian Grand Prix::pre",
+    ) in artifact_lookup_with_predictions
 
 
 def test_discover_runtime_state_records_maps_files_to_namespaces(tmp_path):
@@ -143,3 +177,38 @@ def test_backfill_runtime_state_batches_upserts(monkeypatch):
             {"2026::Chinese Grand Prix": {"sessions": ["FP1", "SQ"]}},
         ),
     ]
+
+
+def test_backfill_artifacts_can_append_db_versions(monkeypatch):
+    module = _load_script_module()
+    calls: list[dict[str, object]] = []
+
+    class _FakeStore:
+        """Capture artifact saves for versioning assertions."""
+
+        def save_artifact(self, **kwargs):
+            calls.append(kwargs)
+            return {"data": kwargs["data"]}
+
+    monkeypatch.setattr(module, "ArtifactStore", lambda: _FakeStore())
+
+    success, failure = module.backfill_artifacts(
+        [
+            {
+                "file_path": Path(
+                    "data/processed/car_characteristics/2026_car_characteristics.json"
+                ),
+                "artifact_type": "car_characteristics",
+                "artifact_key": "2026::car_characteristics",
+                "data": {"version": 13, "races_completed": 5},
+                "version": 13,
+                "checksum": module.compute_checksum({"version": 13, "races_completed": 5}),
+            }
+        ],
+        dry_run=False,
+        bump_artifact_versions=True,
+    )
+
+    assert success == 1
+    assert failure == 0
+    assert calls[0]["version"] is None
