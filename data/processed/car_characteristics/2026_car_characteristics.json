@@ -8,9 +8,9 @@
       "last_updated": "2026-05-30T16:56:34.792102",
       "directionality": {
         "max_speed": 0.0216,
+        "high_corner_speed": 0.0148,
         "slow_corner_speed": 0.001,
-        "medium_corner_speed": 0.0062,
-        "high_corner_speed": 0.0148
+        "medium_corner_speed": 0.0062
       },
       "races_completed": 5,
       "overall_performance": 0.4965,
@@ -22,131 +22,57 @@
         "overall_pace": 0.5412,
         "sessions_used": 12,
         "tire_deg_slope": -0.0585,
-        "braking_performance": 0.413,
-        "session_aggregation": "laps_weighted",
-        "tire_deg_performance": 0.7397,
-        "fast_corner_performance": 0.604,
-        "slow_corner_performance": 0.5084,
-        "medium_corner_performance": 0.5292,
         "sessions_blended": 12,
-        "effective_blend_weight": 0.0722,
         "circuits_observed": [
           "Australian Grand Prix",
           "Chinese Grand Prix",
           "Japanese Grand Prix",
           "Miami Grand Prix",
           "Canadian Grand Prix"
-        ]
+        ],
+        "braking_performance": 0.413,
+        "session_aggregation": "laps_weighted",
+        "tire_deg_performance": 0.7397,
+        "effective_blend_weight": 0.0722,
+        "fast_corner_performance": 0.604,
+        "slow_corner_performance": 0.5084,
+        "medium_corner_performance": 0.5292
       },
       "compound_characteristics": {
         "HARD": {
           "track_name": "Canadian Grand Prix",
-          "median_lap_time": 75.998,
-          "tire_deg_slope": 0.049214003387918204,
           "consistency": 0.3896731703026004,
+          "laps_sampled": 22.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 1,
+          "tire_deg_slope": 0.049214003387918204,
+          "median_lap_time": 75.998,
           "pace_performance": 0.5,
           "tire_deg_performance": 0.5,
-          "consistency_performance": 0.5,
-          "laps_sampled": 22.0,
-          "sessions_used": 1,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        },
-        "MEDIUM": {
-          "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.2100456021686925,
-          "tire_deg_slope": -0.026317492324080653,
-          "tire_deg_performance": 0.8231104384353265,
-          "consistency": 3.0624330868167955,
-          "median_lap_time": 78.41767325208824,
-          "laps_sampled": 81.0,
-          "sessions_used": 4.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "consistency_performance": 0.5
         },
         "SOFT": {
           "track_name": "Canadian Grand Prix",
-          "median_lap_time": 76.718,
-          "tire_deg_slope": -0.002683870967740372,
           "consistency": 0.8608984491709504,
+          "laps_sampled": 31.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 1,
+          "tire_deg_slope": -0.002683870967740372,
+          "median_lap_time": 76.718,
           "pace_performance": 0.5555555555555556,
           "tire_deg_performance": 0.4285714285714286,
-          "consistency_performance": 1.0,
-          "laps_sampled": 31.0,
-          "sessions_used": 1,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        }
-      },
-      "testing_characteristics_profiles": {
-        "balanced": {
-          "top_speed": 0.7202,
-          "consistency": 0.529,
-          "run_profile": "balanced",
-          "last_updated": "2026-05-30T16:56:34.792102",
-          "overall_pace": 0.5412,
-          "sessions_used": 12,
-          "tire_deg_slope": -0.0585,
-          "braking_performance": 0.413,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.7397,
-          "fast_corner_performance": 0.604,
-          "slow_corner_performance": 0.5084,
-          "medium_corner_performance": 0.5292,
-          "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
-          "circuits_observed": [
-            "Australian Grand Prix",
-            "Chinese Grand Prix",
-            "Japanese Grand Prix",
-            "Miami Grand Prix",
-            "Canadian Grand Prix"
-          ]
+          "consistency_performance": 1.0
         },
-        "long_run": {
-          "top_speed": 0.8176,
-          "consistency": 0.4676,
-          "run_profile": "long_run",
+        "MEDIUM": {
+          "track_name": "Canadian Grand Prix",
+          "consistency": 3.0624330868167955,
+          "laps_sampled": 81.0,
           "last_updated": "2026-05-30T16:56:34.792102",
-          "overall_pace": 0.5112,
-          "sessions_used": 12,
-          "tire_deg_slope": -0.0517,
-          "braking_performance": 0.6001,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.7186,
-          "fast_corner_performance": 0.608,
-          "slow_corner_performance": 0.4655,
-          "medium_corner_performance": 0.5278,
-          "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
-          "circuits_observed": [
-            "Australian Grand Prix",
-            "Chinese Grand Prix",
-            "Japanese Grand Prix",
-            "Miami Grand Prix",
-            "Canadian Grand Prix"
-          ]
-        },
-        "short_run": {
-          "top_speed": 0.6328,
-          "consistency": 0.636,
-          "run_profile": "short_run",
-          "last_updated": "2026-05-30T16:56:34.792102",
-          "overall_pace": 0.4741,
-          "sessions_used": 12,
-          "tire_deg_slope": -0.0618,
-          "braking_performance": 0.2813,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.7502,
-          "fast_corner_performance": 0.5228,
-          "slow_corner_performance": 0.5511,
-          "medium_corner_performance": 0.4975,
-          "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
-          "circuits_observed": [
-            "Australian Grand Prix",
-            "Chinese Grand Prix",
-            "Japanese Grand Prix",
-            "Miami Grand Prix",
-            "Canadian Grand Prix"
-          ]
+          "sessions_used": 4.0,
+          "tire_deg_slope": -0.026317492324080653,
+          "median_lap_time": 78.41767325208824,
+          "pace_performance": 0.2100456021686925,
+          "tire_deg_performance": 0.8231104384353265
         }
       },
       "current_season_performance": [
@@ -156,7 +82,81 @@
         0.19999999999999996,
         0.35
       ],
-      "preseason_overall_performance": 0.48
+      "preseason_overall_performance": 0.48,
+      "testing_characteristics_profiles": {
+        "balanced": {
+          "top_speed": 0.7202,
+          "consistency": 0.529,
+          "run_profile": "balanced",
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "overall_pace": 0.5412,
+          "sessions_used": 12,
+          "tire_deg_slope": -0.0585,
+          "sessions_blended": 12,
+          "circuits_observed": [
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Miami Grand Prix",
+            "Canadian Grand Prix"
+          ],
+          "braking_performance": 0.413,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.7397,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.604,
+          "slow_corner_performance": 0.5084,
+          "medium_corner_performance": 0.5292
+        },
+        "long_run": {
+          "top_speed": 0.8176,
+          "consistency": 0.4676,
+          "run_profile": "long_run",
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "overall_pace": 0.5112,
+          "sessions_used": 12,
+          "tire_deg_slope": -0.0517,
+          "sessions_blended": 12,
+          "circuits_observed": [
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Miami Grand Prix",
+            "Canadian Grand Prix"
+          ],
+          "braking_performance": 0.6001,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.7186,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.608,
+          "slow_corner_performance": 0.4655,
+          "medium_corner_performance": 0.5278
+        },
+        "short_run": {
+          "top_speed": 0.6328,
+          "consistency": 0.636,
+          "run_profile": "short_run",
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "overall_pace": 0.4741,
+          "sessions_used": 12,
+          "tire_deg_slope": -0.0618,
+          "sessions_blended": 12,
+          "circuits_observed": [
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Miami Grand Prix",
+            "Canadian Grand Prix"
+          ],
+          "braking_performance": 0.2813,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.7502,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.5228,
+          "slow_corner_performance": 0.5511,
+          "medium_corner_performance": 0.4975
+        }
+      }
     },
     "Audi": {
       "note": "2025 P10 seed, updated with 5 race(s) of 2026 data",
@@ -164,9 +164,9 @@
       "last_updated": "2026-05-30T16:56:34.792102",
       "directionality": {
         "max_speed": 0.0085,
+        "high_corner_speed": 0.0084,
         "slow_corner_speed": -0.005,
-        "medium_corner_speed": -0.003,
-        "high_corner_speed": 0.0084
+        "medium_corner_speed": -0.003
       },
       "races_completed": 5,
       "overall_performance": 0.3968,
@@ -178,131 +178,57 @@
         "overall_pace": 0.4305,
         "sessions_used": 12,
         "tire_deg_slope": 0.1553,
-        "braking_performance": 0.3596,
-        "session_aggregation": "laps_weighted",
-        "tire_deg_performance": 0.4899,
-        "fast_corner_performance": 0.5601,
-        "slow_corner_performance": 0.3983,
-        "medium_corner_performance": 0.4228,
         "sessions_blended": 12,
-        "effective_blend_weight": 0.0722,
         "circuits_observed": [
           "Australian Grand Prix",
           "Chinese Grand Prix",
           "Japanese Grand Prix",
           "Miami Grand Prix",
           "Canadian Grand Prix"
-        ]
+        ],
+        "braking_performance": 0.3596,
+        "session_aggregation": "laps_weighted",
+        "tire_deg_performance": 0.4899,
+        "effective_blend_weight": 0.0722,
+        "fast_corner_performance": 0.5601,
+        "slow_corner_performance": 0.3983,
+        "medium_corner_performance": 0.4228
       },
       "compound_characteristics": {
         "HARD": {
           "track_name": "Canadian Grand Prix",
-          "median_lap_time": 83.357,
-          "tire_deg_slope": null,
           "consistency": 9.981962769044005,
+          "laps_sampled": 31.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 1,
+          "tire_deg_slope": null,
+          "median_lap_time": 83.357,
           "pace_performance": 0.0,
           "tire_deg_performance": null,
-          "consistency_performance": 0.5714285714285714,
-          "laps_sampled": 31.0,
-          "sessions_used": 1,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        },
-        "MEDIUM": {
-          "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.4929157347331408,
-          "tire_deg_slope": 0.03522902432033439,
-          "tire_deg_performance": 0.13287689032885366,
-          "consistency": 1.93069838894836,
-          "median_lap_time": 77.27563286907258,
-          "laps_sampled": 140.0,
-          "sessions_used": 3.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "consistency_performance": 0.5714285714285714
         },
         "SOFT": {
           "track_name": "Canadian Grand Prix",
-          "median_lap_time": 78.31,
-          "tire_deg_slope": null,
           "consistency": 1.1619031202813526,
+          "laps_sampled": 30.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 1,
+          "tire_deg_slope": null,
+          "median_lap_time": 78.31,
           "pace_performance": 0.33333333333333337,
           "tire_deg_performance": null,
-          "consistency_performance": 0.6666666666666667,
-          "laps_sampled": 30.0,
-          "sessions_used": 1,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        }
-      },
-      "testing_characteristics_profiles": {
-        "balanced": {
-          "top_speed": 0.6009,
-          "consistency": 0.5159,
-          "run_profile": "balanced",
-          "last_updated": "2026-05-30T16:56:34.792102",
-          "overall_pace": 0.4305,
-          "sessions_used": 12,
-          "tire_deg_slope": 0.1553,
-          "braking_performance": 0.3596,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.4899,
-          "fast_corner_performance": 0.5601,
-          "slow_corner_performance": 0.3983,
-          "medium_corner_performance": 0.4228,
-          "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
-          "circuits_observed": [
-            "Australian Grand Prix",
-            "Chinese Grand Prix",
-            "Japanese Grand Prix",
-            "Miami Grand Prix",
-            "Canadian Grand Prix"
-          ]
+          "consistency_performance": 0.6666666666666667
         },
-        "long_run": {
-          "top_speed": 0.5561,
-          "consistency": 0.5273,
-          "run_profile": "long_run",
+        "MEDIUM": {
+          "track_name": "Canadian Grand Prix",
+          "consistency": 1.93069838894836,
+          "laps_sampled": 140.0,
           "last_updated": "2026-05-30T16:56:34.792102",
-          "overall_pace": 0.5431,
-          "sessions_used": 12,
-          "tire_deg_slope": 0.1553,
-          "braking_performance": 0.5405,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.4899,
-          "fast_corner_performance": 0.5813,
-          "slow_corner_performance": 0.5665,
-          "medium_corner_performance": 0.6241,
-          "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
-          "circuits_observed": [
-            "Australian Grand Prix",
-            "Chinese Grand Prix",
-            "Japanese Grand Prix",
-            "Miami Grand Prix",
-            "Canadian Grand Prix"
-          ]
-        },
-        "short_run": {
-          "top_speed": 0.5907,
-          "consistency": 0.4228,
-          "run_profile": "short_run",
-          "last_updated": "2026-05-30T16:56:34.792102",
-          "overall_pace": 0.3613,
-          "sessions_used": 12,
-          "tire_deg_slope": 0.1553,
-          "braking_performance": 0.1003,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.4188,
-          "fast_corner_performance": 0.4274,
-          "slow_corner_performance": 0.3431,
-          "medium_corner_performance": 0.398,
-          "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
-          "circuits_observed": [
-            "Australian Grand Prix",
-            "Chinese Grand Prix",
-            "Japanese Grand Prix",
-            "Miami Grand Prix",
-            "Canadian Grand Prix"
-          ]
+          "sessions_used": 3.0,
+          "tire_deg_slope": 0.03522902432033439,
+          "median_lap_time": 77.27563286907258,
+          "pace_performance": 0.4929157347331408,
+          "tire_deg_performance": 0.13287689032885366
         }
       },
       "current_season_performance": [
@@ -312,7 +238,81 @@
         0.30000000000000004,
         0.35
       ],
-      "preseason_overall_performance": 0.38
+      "preseason_overall_performance": 0.38,
+      "testing_characteristics_profiles": {
+        "balanced": {
+          "top_speed": 0.6009,
+          "consistency": 0.5159,
+          "run_profile": "balanced",
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "overall_pace": 0.4305,
+          "sessions_used": 12,
+          "tire_deg_slope": 0.1553,
+          "sessions_blended": 12,
+          "circuits_observed": [
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Miami Grand Prix",
+            "Canadian Grand Prix"
+          ],
+          "braking_performance": 0.3596,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.4899,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.5601,
+          "slow_corner_performance": 0.3983,
+          "medium_corner_performance": 0.4228
+        },
+        "long_run": {
+          "top_speed": 0.5561,
+          "consistency": 0.5273,
+          "run_profile": "long_run",
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "overall_pace": 0.5431,
+          "sessions_used": 12,
+          "tire_deg_slope": 0.1553,
+          "sessions_blended": 12,
+          "circuits_observed": [
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Miami Grand Prix",
+            "Canadian Grand Prix"
+          ],
+          "braking_performance": 0.5405,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.4899,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.5813,
+          "slow_corner_performance": 0.5665,
+          "medium_corner_performance": 0.6241
+        },
+        "short_run": {
+          "top_speed": 0.5907,
+          "consistency": 0.4228,
+          "run_profile": "short_run",
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "overall_pace": 0.3613,
+          "sessions_used": 12,
+          "tire_deg_slope": 0.1553,
+          "sessions_blended": 12,
+          "circuits_observed": [
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Miami Grand Prix",
+            "Canadian Grand Prix"
+          ],
+          "braking_performance": 0.1003,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.4188,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.4274,
+          "slow_corner_performance": 0.3431,
+          "medium_corner_performance": 0.398
+        }
+      }
     },
     "Alpine": {
       "note": "2025 P9 seed, updated with 5 race(s) of 2026 data",
@@ -320,9 +320,9 @@
       "last_updated": "2026-05-30T16:56:34.792102",
       "directionality": {
         "max_speed": 0.0082,
+        "high_corner_speed": -0.0024,
         "slow_corner_speed": -0.0082,
-        "medium_corner_speed": -0.0024,
-        "high_corner_speed": -0.0024
+        "medium_corner_speed": -0.0024
       },
       "races_completed": 5,
       "overall_performance": 0.5337,
@@ -334,55 +334,55 @@
         "overall_pace": 0.3954,
         "sessions_used": 12,
         "tire_deg_slope": 0.0528,
-        "braking_performance": 0.27,
-        "session_aggregation": "laps_weighted",
-        "tire_deg_performance": 0.6199,
-        "fast_corner_performance": 0.454,
-        "slow_corner_performance": 0.3558,
-        "medium_corner_performance": 0.394,
         "sessions_blended": 12,
-        "effective_blend_weight": 0.0722,
         "circuits_observed": [
           "Australian Grand Prix",
           "Chinese Grand Prix",
           "Japanese Grand Prix",
           "Miami Grand Prix",
           "Canadian Grand Prix"
-        ]
+        ],
+        "braking_performance": 0.27,
+        "session_aggregation": "laps_weighted",
+        "tire_deg_performance": 0.6199,
+        "effective_blend_weight": 0.0722,
+        "fast_corner_performance": 0.454,
+        "slow_corner_performance": 0.3558,
+        "medium_corner_performance": 0.394
       },
       "compound_characteristics": {
         "HARD": {
           "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.48305922682052654,
-          "tire_deg_slope": -0.00036491935483671037,
-          "tire_deg_performance": 0.5,
           "consistency": 1.6129675163366646,
-          "median_lap_time": 76.8109142135906,
           "laps_sampled": 77.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
           "sessions_used": 2.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        },
-        "MEDIUM": {
-          "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.33942450641786065,
-          "tire_deg_slope": -0.07998924539761709,
-          "tire_deg_performance": 1.0,
-          "consistency": 2.1916203156523006,
-          "median_lap_time": 77.86318593592266,
-          "laps_sampled": 109.0,
-          "sessions_used": 3.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "tire_deg_slope": -0.00036491935483671037,
+          "median_lap_time": 76.8109142135906,
+          "pace_performance": 0.48305922682052654,
+          "tire_deg_performance": 0.5
         },
         "SOFT": {
           "track_name": "Japanese Grand Prix",
-          "pace_performance": 0.535669647506472,
-          "tire_deg_slope": null,
-          "tire_deg_performance": null,
           "consistency": 14.947685559781332,
-          "median_lap_time": 103.01547152828094,
           "laps_sampled": 23.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
           "sessions_used": 2.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "tire_deg_slope": null,
+          "median_lap_time": 103.01547152828094,
+          "pace_performance": 0.535669647506472,
+          "tire_deg_performance": null
+        },
+        "MEDIUM": {
+          "track_name": "Canadian Grand Prix",
+          "consistency": 2.1916203156523006,
+          "laps_sampled": 109.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 3.0,
+          "tire_deg_slope": -0.07998924539761709,
+          "median_lap_time": 77.86318593592266,
+          "pace_performance": 0.33942450641786065,
+          "tire_deg_performance": 1.0
         },
         "TEST_UNKNOWN": {
           "track_name": "Testing 2",
@@ -397,6 +397,14 @@
           "consistency_performance": 0.7089475747302947
         }
       },
+      "current_season_performance": [
+        0.30000000000000004,
+        0.8,
+        0.7,
+        0.6,
+        0.5
+      ],
+      "preseason_overall_performance": 0.4,
       "testing_characteristics_profiles": {
         "balanced": {
           "top_speed": 0.5623,
@@ -406,21 +414,21 @@
           "overall_pace": 0.3954,
           "sessions_used": 12,
           "tire_deg_slope": 0.0528,
-          "braking_performance": 0.27,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.6199,
-          "fast_corner_performance": 0.454,
-          "slow_corner_performance": 0.3558,
-          "medium_corner_performance": 0.394,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.27,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.6199,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.454,
+          "slow_corner_performance": 0.3558,
+          "medium_corner_performance": 0.394
         },
         "long_run": {
           "top_speed": 0.6116,
@@ -430,21 +438,21 @@
           "overall_pace": 0.3671,
           "sessions_used": 12,
           "tire_deg_slope": 0.041,
-          "braking_performance": 0.307,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.6282,
-          "fast_corner_performance": 0.4325,
-          "slow_corner_performance": 0.3392,
-          "medium_corner_performance": 0.3286,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.307,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.6282,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.4325,
+          "slow_corner_performance": 0.3392,
+          "medium_corner_performance": 0.3286
         },
         "short_run": {
           "top_speed": 0.5691,
@@ -454,31 +462,23 @@
           "overall_pace": 0.4277,
           "sessions_used": 12,
           "tire_deg_slope": 0.0843,
-          "braking_performance": 0.5144,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.4499,
-          "fast_corner_performance": 0.5003,
-          "slow_corner_performance": 0.364,
-          "medium_corner_performance": 0.4202,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.5144,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.4499,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.5003,
+          "slow_corner_performance": 0.364,
+          "medium_corner_performance": 0.4202
         }
-      },
-      "current_season_performance": [
-        0.30000000000000004,
-        0.8,
-        0.7,
-        0.6,
-        0.5
-      ],
-      "preseason_overall_performance": 0.4
+      }
     },
     "Ferrari": {
       "note": "2025 P4 seed, updated with 5 race(s) of 2026 data",
@@ -486,9 +486,9 @@
       "last_updated": "2026-05-30T16:56:34.792102",
       "directionality": {
         "max_speed": 0.0241,
+        "high_corner_speed": 0.0317,
         "slow_corner_speed": 0.0382,
-        "medium_corner_speed": 0.0353,
-        "high_corner_speed": 0.0317
+        "medium_corner_speed": 0.0353
       },
       "races_completed": 5,
       "overall_performance": 0.833,
@@ -500,56 +500,56 @@
         "overall_pace": 0.9075,
         "sessions_used": 12,
         "tire_deg_slope": -0.0689,
-        "braking_performance": 0.879,
-        "session_aggregation": "laps_weighted",
-        "tire_deg_performance": 0.8251,
-        "fast_corner_performance": 0.8289,
-        "slow_corner_performance": 0.8889,
-        "medium_corner_performance": 0.877,
         "sessions_blended": 12,
-        "effective_blend_weight": 0.0722,
         "circuits_observed": [
           "Australian Grand Prix",
           "Chinese Grand Prix",
           "Japanese Grand Prix",
           "Miami Grand Prix",
           "Canadian Grand Prix"
-        ]
+        ],
+        "braking_performance": 0.879,
+        "session_aggregation": "laps_weighted",
+        "tire_deg_performance": 0.8251,
+        "effective_blend_weight": 0.0722,
+        "fast_corner_performance": 0.8289,
+        "slow_corner_performance": 0.8889,
+        "medium_corner_performance": 0.877
       },
       "compound_characteristics": {
         "HARD": {
           "track_name": "Canadian Grand Prix",
-          "median_lap_time": 78.03,
-          "tire_deg_slope": null,
           "consistency": 7.998117320699645,
+          "laps_sampled": 37.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 1,
+          "tire_deg_slope": null,
+          "median_lap_time": 78.03,
           "pace_performance": 0.7142857142857143,
           "tire_deg_performance": null,
-          "consistency_performance": 0.8571428571428572,
-          "laps_sampled": 37.0,
-          "sessions_used": 1,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        },
-        "MEDIUM": {
-          "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.8492166252498855,
-          "tire_deg_slope": 0.03246632402947297,
-          "tire_deg_performance": 0.1935849970090041,
-          "consistency": 1.4302929905828654,
-          "median_lap_time": 76.25637721920506,
-          "laps_sampled": 129.0,
-          "sessions_used": 3.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "consistency_performance": 0.8571428571428572
         },
         "SOFT": {
           "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.6053718270949768,
-          "tire_deg_slope": -0.03685933223864166,
-          "tire_deg_performance": 0.8571428571428572,
           "consistency": 3.875517194332709,
-          "median_lap_time": 78.0438869282541,
           "laps_sampled": 76.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
           "sessions_used": 3.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "tire_deg_slope": -0.03685933223864166,
+          "median_lap_time": 78.0438869282541,
+          "pace_performance": 0.6053718270949768,
+          "tire_deg_performance": 0.8571428571428572
+        },
+        "MEDIUM": {
+          "track_name": "Canadian Grand Prix",
+          "consistency": 1.4302929905828654,
+          "laps_sampled": 129.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 3.0,
+          "tire_deg_slope": 0.03246632402947297,
+          "median_lap_time": 76.25637721920506,
+          "pace_performance": 0.8492166252498855,
+          "tire_deg_performance": 0.1935849970090041
         },
         "TEST_UNKNOWN": {
           "track_name": "Testing 2",
@@ -564,6 +564,14 @@
           "consistency_performance": 0.6970837877375547
         }
       },
+      "current_season_performance": [
+        0.9,
+        0.9,
+        0.8,
+        0.8,
+        0.8
+      ],
+      "preseason_overall_performance": 0.7,
       "testing_characteristics_profiles": {
         "balanced": {
           "top_speed": 0.7357,
@@ -573,21 +581,21 @@
           "overall_pace": 0.9075,
           "sessions_used": 12,
           "tire_deg_slope": -0.0689,
-          "braking_performance": 0.879,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.8251,
-          "fast_corner_performance": 0.8289,
-          "slow_corner_performance": 0.8889,
-          "medium_corner_performance": 0.877,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.879,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.8251,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.8289,
+          "slow_corner_performance": 0.8889,
+          "medium_corner_performance": 0.877
         },
         "long_run": {
           "top_speed": 0.7422,
@@ -597,21 +605,21 @@
           "overall_pace": 0.8611,
           "sessions_used": 12,
           "tire_deg_slope": -0.0689,
-          "braking_performance": 0.8461,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.8251,
-          "fast_corner_performance": 0.8255,
-          "slow_corner_performance": 0.8692,
-          "medium_corner_performance": 0.8333,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.8461,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.8251,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.8255,
+          "slow_corner_performance": 0.8692,
+          "medium_corner_performance": 0.8333
         },
         "short_run": {
           "top_speed": 0.6083,
@@ -621,31 +629,23 @@
           "overall_pace": 0.8854,
           "sessions_used": 12,
           "tire_deg_slope": -0.0689,
-          "braking_performance": 0.894,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.7625,
-          "fast_corner_performance": 0.7802,
-          "slow_corner_performance": 0.8767,
-          "medium_corner_performance": 0.8846,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.894,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.7625,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.7802,
+          "slow_corner_performance": 0.8767,
+          "medium_corner_performance": 0.8846
         }
-      },
-      "current_season_performance": [
-        0.9,
-        0.9,
-        0.8,
-        0.8,
-        0.8
-      ],
-      "preseason_overall_performance": 0.7
+      }
     },
     "McLaren": {
       "note": "2025 P1 seed, updated with 5 race(s) of 2026 data",
@@ -653,9 +653,9 @@
       "last_updated": "2026-05-30T16:56:34.792102",
       "directionality": {
         "max_speed": -0.0135,
+        "high_corner_speed": 0.0213,
         "slow_corner_speed": 0.03,
-        "medium_corner_speed": 0.0228,
-        "high_corner_speed": 0.0213
+        "medium_corner_speed": 0.0228
       },
       "races_completed": 5,
       "overall_performance": 0.6707,
@@ -667,57 +667,57 @@
         "overall_pace": 0.7543,
         "sessions_used": 12,
         "tire_deg_slope": 0.075,
-        "braking_performance": 0.6608,
-        "session_aggregation": "laps_weighted",
-        "tire_deg_performance": 0.4655,
-        "fast_corner_performance": 0.7262,
-        "slow_corner_performance": 0.7966,
-        "medium_corner_performance": 0.7603,
         "sessions_blended": 12,
-        "effective_blend_weight": 0.0722,
         "circuits_observed": [
           "Australian Grand Prix",
           "Chinese Grand Prix",
           "Japanese Grand Prix",
           "Miami Grand Prix",
           "Canadian Grand Prix"
-        ]
+        ],
+        "braking_performance": 0.6608,
+        "session_aggregation": "laps_weighted",
+        "tire_deg_performance": 0.4655,
+        "effective_blend_weight": 0.0722,
+        "fast_corner_performance": 0.7262,
+        "slow_corner_performance": 0.7966,
+        "medium_corner_performance": 0.7603
       },
       "compound_characteristics": {
         "HARD": {
           "track_name": "Canadian Grand Prix",
-          "median_lap_time": 79.6825,
-          "tire_deg_slope": -0.00702370129869994,
           "consistency": 12.756699143661322,
+          "laps_sampled": 34.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 1,
+          "tire_deg_slope": -0.00702370129869994,
+          "median_lap_time": 79.6825,
           "pace_performance": 0.1428571428571429,
           "tire_deg_performance": 0.6666666666666667,
-          "consistency_performance": 0.2857142857142857,
-          "laps_sampled": 34.0,
-          "sessions_used": 1,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        },
-        "MEDIUM": {
-          "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.627842550660319,
-          "tire_deg_slope": -0.013738035766442558,
-          "tire_deg_performance": 0.4959906231306276,
-          "consistency": 2.006452170264216,
-          "median_lap_time": 77.10625977510973,
-          "laps_sampled": 127.0,
-          "sessions_used": 3.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "consistency_performance": 0.2857142857142857
         },
         "SOFT": {
           "track_name": "Canadian Grand Prix",
-          "median_lap_time": 76.39099999999999,
-          "tire_deg_slope": 0.021865934065933363,
           "consistency": 0.9457076076255715,
+          "laps_sampled": 14.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 1,
+          "tire_deg_slope": 0.021865934065933363,
+          "median_lap_time": 76.39099999999999,
           "pace_performance": 0.8888888888888888,
           "tire_deg_performance": 0.0,
-          "consistency_performance": 0.8888888888888888,
-          "laps_sampled": 14.0,
-          "sessions_used": 1,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "consistency_performance": 0.8888888888888888
+        },
+        "MEDIUM": {
+          "track_name": "Canadian Grand Prix",
+          "consistency": 2.006452170264216,
+          "laps_sampled": 127.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 3.0,
+          "tire_deg_slope": -0.013738035766442558,
+          "median_lap_time": 77.10625977510973,
+          "pace_performance": 0.627842550660319,
+          "tire_deg_performance": 0.4959906231306276
         },
         "TEST_UNKNOWN": {
           "track_name": "Testing 2",
@@ -731,6 +731,14 @@
           "tire_deg_performance": 0.905201913382459
         }
       },
+      "current_season_performance": [
+        0.8,
+        0.0,
+        0.9,
+        1.0,
+        0.7
+      ],
+      "preseason_overall_performance": 0.85,
       "testing_characteristics_profiles": {
         "balanced": {
           "top_speed": 0.3884,
@@ -740,21 +748,21 @@
           "overall_pace": 0.7543,
           "sessions_used": 12,
           "tire_deg_slope": 0.075,
-          "braking_performance": 0.6608,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.4655,
-          "fast_corner_performance": 0.7262,
-          "slow_corner_performance": 0.7966,
-          "medium_corner_performance": 0.7603,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.6608,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.4655,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.7262,
+          "slow_corner_performance": 0.7966,
+          "medium_corner_performance": 0.7603
         },
         "long_run": {
           "top_speed": 0.4307,
@@ -764,21 +772,21 @@
           "overall_pace": 0.7998,
           "sessions_used": 12,
           "tire_deg_slope": 0.073,
-          "braking_performance": 0.658,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.4703,
-          "fast_corner_performance": 0.6965,
-          "slow_corner_performance": 0.8312,
-          "medium_corner_performance": 0.7887,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.658,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.4703,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.6965,
+          "slow_corner_performance": 0.8312,
+          "medium_corner_performance": 0.7887
         },
         "short_run": {
           "top_speed": 0.3941,
@@ -788,31 +796,23 @@
           "overall_pace": 0.7776,
           "sessions_used": 12,
           "tire_deg_slope": 0.0731,
-          "braking_performance": 0.7731,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.4349,
-          "fast_corner_performance": 0.6757,
-          "slow_corner_performance": 0.799,
-          "medium_corner_performance": 0.7209,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.7731,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.4349,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.6757,
+          "slow_corner_performance": 0.799,
+          "medium_corner_performance": 0.7209
         }
-      },
-      "current_season_performance": [
-        0.8,
-        0.0,
-        0.9,
-        1.0,
-        0.7
-      ],
-      "preseason_overall_performance": 0.85
+      }
     },
     "Mercedes": {
       "note": "2025 P2 seed, updated with 5 race(s) of 2026 data",
@@ -820,9 +820,9 @@
       "last_updated": "2026-05-30T16:56:34.792102",
       "directionality": {
         "max_speed": -0.0058,
+        "high_corner_speed": 0.013,
         "slow_corner_speed": 0.0316,
-        "medium_corner_speed": 0.027,
-        "high_corner_speed": 0.013
+        "medium_corner_speed": 0.027
       },
       "races_completed": 5,
       "overall_performance": 0.9467,
@@ -834,68 +834,56 @@
         "overall_pace": 0.7992,
         "sessions_used": 12,
         "tire_deg_slope": 0.0465,
-        "braking_performance": 0.7533,
-        "session_aggregation": "laps_weighted",
-        "tire_deg_performance": 0.5956,
-        "fast_corner_performance": 0.6535,
-        "slow_corner_performance": 0.8388,
-        "medium_corner_performance": 0.8008,
         "sessions_blended": 12,
-        "effective_blend_weight": 0.0722,
         "circuits_observed": [
           "Australian Grand Prix",
           "Chinese Grand Prix",
           "Japanese Grand Prix",
           "Miami Grand Prix",
           "Canadian Grand Prix"
-        ]
+        ],
+        "braking_performance": 0.7533,
+        "session_aggregation": "laps_weighted",
+        "tire_deg_performance": 0.5956,
+        "effective_blend_weight": 0.0722,
+        "fast_corner_performance": 0.6535,
+        "slow_corner_performance": 0.8388,
+        "medium_corner_performance": 0.8008
       },
       "compound_characteristics": {
         "HARD": {
           "track_name": "Canadian Grand Prix",
-          "median_lap_time": 77.238,
-          "tire_deg_slope": null,
           "consistency": 15.137025328421611,
+          "laps_sampled": 35.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 1,
+          "tire_deg_slope": null,
+          "median_lap_time": 77.238,
           "pace_performance": 0.8571428571428572,
           "tire_deg_performance": null,
-          "consistency_performance": 0.1428571428571429,
-          "laps_sampled": 35.0,
-          "sessions_used": 1,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        },
-        "MEDIUM": {
-          "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.9440496724833397,
-          "tire_deg_slope": -0.019463544296000803,
-          "tire_deg_performance": 0.6048112522432468,
-          "consistency": 1.6169033825860877,
-          "median_lap_time": 75.91491555065063,
-          "laps_sampled": 93.0,
-          "sessions_used": 3.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "consistency_performance": 0.1428571428571429
         },
         "SOFT": {
           "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.947295372330527,
-          "tire_deg_slope": -0.028035522714833346,
-          "tire_deg_performance": 0.7142857142857143,
           "consistency": 2.9106401986065045,
-          "median_lap_time": 77.46086391114255,
           "laps_sampled": 68.0,
-          "sessions_used": 2.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        },
-        "TEST_UNKNOWN": {
-          "track_name": "Testing 2",
-          "consistency": 1.8920292339766362,
-          "laps_sampled": 10.0,
           "last_updated": "2026-05-30T16:56:34.792102",
-          "sessions_used": 1,
-          "tire_deg_slope": 0.40784999999999666,
-          "median_lap_time": 96.035,
-          "pace_performance": 1.0,
-          "tire_deg_performance": 0.0,
-          "consistency_performance": 0.0
+          "sessions_used": 2.0,
+          "tire_deg_slope": -0.028035522714833346,
+          "median_lap_time": 77.46086391114255,
+          "pace_performance": 0.947295372330527,
+          "tire_deg_performance": 0.7142857142857143
+        },
+        "MEDIUM": {
+          "track_name": "Canadian Grand Prix",
+          "consistency": 1.6169033825860877,
+          "laps_sampled": 93.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 3.0,
+          "tire_deg_slope": -0.019463544296000803,
+          "median_lap_time": 75.91491555065063,
+          "pace_performance": 0.9440496724833397,
+          "tire_deg_performance": 0.6048112522432468
         },
         "UNKNOWN": {
           "track_name": "Testing 2",
@@ -908,80 +896,18 @@
           "pace_performance": null,
           "tire_deg_performance": null,
           "consistency_performance": null
-        }
-      },
-      "testing_characteristics_profiles": {
-        "balanced": {
-          "top_speed": 0.4207,
-          "consistency": 0.5622,
-          "run_profile": "balanced",
-          "last_updated": "2026-05-30T16:56:34.792102",
-          "overall_pace": 0.7992,
-          "sessions_used": 12,
-          "tire_deg_slope": 0.0465,
-          "braking_performance": 0.7533,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.5956,
-          "fast_corner_performance": 0.6535,
-          "slow_corner_performance": 0.8388,
-          "medium_corner_performance": 0.8008,
-          "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
-          "circuits_observed": [
-            "Australian Grand Prix",
-            "Chinese Grand Prix",
-            "Japanese Grand Prix",
-            "Miami Grand Prix",
-            "Canadian Grand Prix"
-          ]
         },
-        "long_run": {
-          "top_speed": 0.4781,
-          "consistency": 0.5132,
-          "run_profile": "long_run",
+        "TEST_UNKNOWN": {
+          "track_name": "Testing 2",
+          "consistency": 1.8920292339766362,
+          "laps_sampled": 10.0,
           "last_updated": "2026-05-30T16:56:34.792102",
-          "overall_pace": 0.8341,
-          "sessions_used": 12,
-          "tire_deg_slope": 0.0465,
-          "braking_performance": 0.5086,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.5956,
-          "fast_corner_performance": 0.7445,
-          "slow_corner_performance": 0.7941,
-          "medium_corner_performance": 0.8129,
-          "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
-          "circuits_observed": [
-            "Australian Grand Prix",
-            "Chinese Grand Prix",
-            "Japanese Grand Prix",
-            "Miami Grand Prix",
-            "Canadian Grand Prix"
-          ]
-        },
-        "short_run": {
-          "top_speed": 0.5209,
-          "consistency": 0.7,
-          "run_profile": "short_run",
-          "last_updated": "2026-05-30T16:56:34.792102",
-          "overall_pace": 0.8407,
-          "sessions_used": 12,
-          "tire_deg_slope": 0.0462,
-          "braking_performance": 0.9691,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.5811,
-          "fast_corner_performance": 0.7453,
-          "slow_corner_performance": 0.8657,
-          "medium_corner_performance": 0.8616,
-          "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
-          "circuits_observed": [
-            "Australian Grand Prix",
-            "Chinese Grand Prix",
-            "Japanese Grand Prix",
-            "Miami Grand Prix",
-            "Canadian Grand Prix"
-          ]
+          "sessions_used": 1,
+          "tire_deg_slope": 0.40784999999999666,
+          "median_lap_time": 96.035,
+          "pace_performance": 1.0,
+          "tire_deg_performance": 0.0,
+          "consistency_performance": 0.0
         }
       },
       "current_season_performance": [
@@ -991,7 +917,81 @@
         0.9,
         1.0
       ],
-      "preseason_overall_performance": 0.75
+      "preseason_overall_performance": 0.75,
+      "testing_characteristics_profiles": {
+        "balanced": {
+          "top_speed": 0.4207,
+          "consistency": 0.5622,
+          "run_profile": "balanced",
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "overall_pace": 0.7992,
+          "sessions_used": 12,
+          "tire_deg_slope": 0.0465,
+          "sessions_blended": 12,
+          "circuits_observed": [
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Miami Grand Prix",
+            "Canadian Grand Prix"
+          ],
+          "braking_performance": 0.7533,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.5956,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.6535,
+          "slow_corner_performance": 0.8388,
+          "medium_corner_performance": 0.8008
+        },
+        "long_run": {
+          "top_speed": 0.4781,
+          "consistency": 0.5132,
+          "run_profile": "long_run",
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "overall_pace": 0.8341,
+          "sessions_used": 12,
+          "tire_deg_slope": 0.0465,
+          "sessions_blended": 12,
+          "circuits_observed": [
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Miami Grand Prix",
+            "Canadian Grand Prix"
+          ],
+          "braking_performance": 0.5086,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.5956,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.7445,
+          "slow_corner_performance": 0.7941,
+          "medium_corner_performance": 0.8129
+        },
+        "short_run": {
+          "top_speed": 0.5209,
+          "consistency": 0.7,
+          "run_profile": "short_run",
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "overall_pace": 0.8407,
+          "sessions_used": 12,
+          "tire_deg_slope": 0.0462,
+          "sessions_blended": 12,
+          "circuits_observed": [
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Miami Grand Prix",
+            "Canadian Grand Prix"
+          ],
+          "braking_performance": 0.9691,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.5811,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.7453,
+          "slow_corner_performance": 0.8657,
+          "medium_corner_performance": 0.8616
+        }
+      }
     },
     "Williams": {
       "note": "2025 P5 seed, updated with 5 race(s) of 2026 data",
@@ -999,9 +999,9 @@
       "last_updated": "2026-05-30T16:56:34.792102",
       "directionality": {
         "max_speed": 0.0208,
+        "high_corner_speed": 0.0051,
         "slow_corner_speed": -0.0052,
-        "medium_corner_speed": -0.0034,
-        "high_corner_speed": 0.0051
+        "medium_corner_speed": -0.0034
       },
       "races_completed": 5,
       "overall_performance": 0.3379,
@@ -1013,57 +1013,57 @@
         "overall_pace": 0.4243,
         "sessions_used": 12,
         "tire_deg_slope": -0.0004,
-        "braking_performance": 0.2343,
-        "session_aggregation": "laps_weighted",
-        "tire_deg_performance": 0.7241,
-        "fast_corner_performance": 0.5017,
-        "slow_corner_performance": 0.4284,
-        "medium_corner_performance": 0.4321,
         "sessions_blended": 12,
-        "effective_blend_weight": 0.0722,
         "circuits_observed": [
           "Australian Grand Prix",
           "Chinese Grand Prix",
           "Japanese Grand Prix",
           "Miami Grand Prix",
           "Canadian Grand Prix"
-        ]
+        ],
+        "braking_performance": 0.2343,
+        "session_aggregation": "laps_weighted",
+        "tire_deg_performance": 0.7241,
+        "effective_blend_weight": 0.0722,
+        "fast_corner_performance": 0.5017,
+        "slow_corner_performance": 0.4284,
+        "medium_corner_performance": 0.4321
       },
       "compound_characteristics": {
         "HARD": {
           "track_name": "Canadian Grand Prix",
-          "median_lap_time": 78.436,
-          "tire_deg_slope": -0.06486363636363422,
           "consistency": 9.521013848780463,
+          "laps_sampled": 32.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 1,
+          "tire_deg_slope": -0.06486363636363422,
+          "median_lap_time": 78.436,
           "pace_performance": 0.5714285714285714,
           "tire_deg_performance": 1.0,
-          "consistency_performance": 0.7142857142857143,
-          "laps_sampled": 32.0,
-          "sessions_used": 1,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        },
-        "MEDIUM": {
-          "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.43817645619341056,
-          "tire_deg_slope": -0.015073902865566573,
-          "tire_deg_performance": 0.3424993948153475,
-          "consistency": 1.7726173749567518,
-          "median_lap_time": 77.10250321267858,
-          "laps_sampled": 105.0,
-          "sessions_used": 3.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "consistency_performance": 0.7142857142857143
         },
         "SOFT": {
           "track_name": "Canadian Grand Prix",
-          "median_lap_time": 79.138,
-          "tire_deg_slope": null,
           "consistency": 2.6012973686220486,
+          "laps_sampled": 10.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 1,
+          "tire_deg_slope": null,
+          "median_lap_time": 79.138,
           "pace_performance": 0.11111111111111116,
           "tire_deg_performance": null,
-          "consistency_performance": 0.0,
-          "laps_sampled": 10.0,
-          "sessions_used": 1,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "consistency_performance": 0.0
+        },
+        "MEDIUM": {
+          "track_name": "Canadian Grand Prix",
+          "consistency": 1.7726173749567518,
+          "laps_sampled": 105.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 3.0,
+          "tire_deg_slope": -0.015073902865566573,
+          "median_lap_time": 77.10250321267858,
+          "pace_performance": 0.43817645619341056,
+          "tire_deg_performance": 0.3424993948153475
         },
         "TEST_UNKNOWN": {
           "track_name": "Testing 2",
@@ -1078,6 +1078,14 @@
           "consistency_performance": 0.0
         }
       },
+      "current_season_performance": [
+        0.19999999999999996,
+        0.30000000000000004,
+        0.19999999999999996,
+        0.5,
+        0.6
+      ],
+      "preseason_overall_performance": 0.55,
       "testing_characteristics_profiles": {
         "balanced": {
           "top_speed": 0.7225,
@@ -1087,21 +1095,21 @@
           "overall_pace": 0.4243,
           "sessions_used": 12,
           "tire_deg_slope": -0.0004,
-          "braking_performance": 0.2343,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.7241,
-          "fast_corner_performance": 0.5017,
-          "slow_corner_performance": 0.4284,
-          "medium_corner_performance": 0.4321,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.2343,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.7241,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.5017,
+          "slow_corner_performance": 0.4284,
+          "medium_corner_performance": 0.4321
         },
         "long_run": {
           "top_speed": 0.6793,
@@ -1111,21 +1119,21 @@
           "overall_pace": 0.3617,
           "sessions_used": 12,
           "tire_deg_slope": -0.007,
-          "braking_performance": 0.489,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.7357,
-          "fast_corner_performance": 0.3659,
-          "slow_corner_performance": 0.4154,
-          "medium_corner_performance": 0.3467,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.489,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.7357,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.3659,
+          "slow_corner_performance": 0.4154,
+          "medium_corner_performance": 0.3467
         },
         "short_run": {
           "top_speed": 0.5988,
@@ -1135,31 +1143,23 @@
           "overall_pace": 0.4273,
           "sessions_used": 12,
           "tire_deg_slope": 0.0036,
-          "braking_performance": 0.5969,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.6633,
-          "fast_corner_performance": 0.5421,
-          "slow_corner_performance": 0.4466,
-          "medium_corner_performance": 0.3914,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.5969,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.6633,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.5421,
+          "slow_corner_performance": 0.4466,
+          "medium_corner_performance": 0.3914
         }
-      },
-      "current_season_performance": [
-        0.19999999999999996,
-        0.30000000000000004,
-        0.19999999999999996,
-        0.5,
-        0.6
-      ],
-      "preseason_overall_performance": 0.55
+      }
     },
     "Cadillac F1": {
       "note": "2025 P11 seed, updated with 5 race(s) of 2026 data",
@@ -1167,9 +1167,9 @@
       "last_updated": "2026-05-30T16:56:34.792102",
       "directionality": {
         "max_speed": -0.0113,
+        "high_corner_speed": -0.0401,
         "slow_corner_speed": -0.0387,
-        "medium_corner_speed": -0.0331,
-        "high_corner_speed": -0.0401
+        "medium_corner_speed": -0.0331
       },
       "races_completed": 5,
       "overall_performance": 0.1662,
@@ -1181,56 +1181,56 @@
         "overall_pace": 0.0639,
         "sessions_used": 12,
         "tire_deg_slope": 0.099,
-        "braking_performance": 0.3441,
-        "session_aggregation": "laps_weighted",
-        "tire_deg_performance": 0.3793,
-        "fast_corner_performance": 0.0667,
-        "slow_corner_performance": 0.0728,
-        "medium_corner_performance": 0.1004,
         "sessions_blended": 12,
-        "effective_blend_weight": 0.0722,
         "circuits_observed": [
           "Australian Grand Prix",
           "Chinese Grand Prix",
           "Japanese Grand Prix",
           "Miami Grand Prix",
           "Canadian Grand Prix"
-        ]
+        ],
+        "braking_performance": 0.3441,
+        "session_aggregation": "laps_weighted",
+        "tire_deg_performance": 0.3793,
+        "effective_blend_weight": 0.0722,
+        "fast_corner_performance": 0.0667,
+        "slow_corner_performance": 0.0728,
+        "medium_corner_performance": 0.1004
       },
       "compound_characteristics": {
         "HARD": {
           "track_name": "Miami Grand Prix",
-          "median_lap_time": 95.82149999999999,
-          "tire_deg_slope": 0.051907692307693536,
           "consistency": 0.8124792797357976,
+          "laps_sampled": 26.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 1,
+          "tire_deg_slope": 0.051907692307693536,
+          "median_lap_time": 95.82149999999999,
           "pace_performance": 0.0,
           "tire_deg_performance": 0.6666666666666667,
-          "consistency_performance": 0.2222222222222222,
-          "laps_sampled": 26.0,
-          "sessions_used": 1,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        },
-        "MEDIUM": {
-          "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.19593915474705842,
-          "tire_deg_slope": 0.003422403407265913,
-          "tire_deg_performance": 0.7177683909880199,
-          "consistency": 3.184806934715712,
-          "median_lap_time": 79.51812033809458,
-          "laps_sampled": 68.0,
-          "sessions_used": 3.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "consistency_performance": 0.2222222222222222
         },
         "SOFT": {
           "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.2748697724343571,
-          "tire_deg_slope": 0.020529930193094556,
-          "tire_deg_performance": 0.23091306391205424,
           "consistency": 2.7580629977339,
-          "median_lap_time": 78.99993405271901,
           "laps_sampled": 101.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
           "sessions_used": 3.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "tire_deg_slope": 0.020529930193094556,
+          "median_lap_time": 78.99993405271901,
+          "pace_performance": 0.2748697724343571,
+          "tire_deg_performance": 0.23091306391205424
+        },
+        "MEDIUM": {
+          "track_name": "Canadian Grand Prix",
+          "consistency": 3.184806934715712,
+          "laps_sampled": 68.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 3.0,
+          "tire_deg_slope": 0.003422403407265913,
+          "median_lap_time": 79.51812033809458,
+          "pace_performance": 0.19593915474705842,
+          "tire_deg_performance": 0.7177683909880199
         },
         "TEST_UNKNOWN": {
           "track_name": "Testing 2",
@@ -1244,6 +1244,14 @@
           "tire_deg_performance": 0.493130025869109
         }
       },
+      "current_season_performance": [
+        0.0,
+        0.4,
+        0.09999999999999998,
+        0.0,
+        0.09999999999999998
+      ],
+      "preseason_overall_performance": 0.35,
       "testing_characteristics_profiles": {
         "balanced": {
           "top_speed": 0.3733,
@@ -1253,21 +1261,21 @@
           "overall_pace": 0.0639,
           "sessions_used": 12,
           "tire_deg_slope": 0.099,
-          "braking_performance": 0.3441,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.3793,
-          "fast_corner_performance": 0.0667,
-          "slow_corner_performance": 0.0728,
-          "medium_corner_performance": 0.1004,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.3441,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.3793,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.0667,
+          "slow_corner_performance": 0.0728,
+          "medium_corner_performance": 0.1004
         },
         "long_run": {
           "top_speed": 0.3447,
@@ -1277,21 +1285,21 @@
           "overall_pace": 0.0577,
           "sessions_used": 12,
           "tire_deg_slope": 0.1039,
-          "braking_performance": 0.1843,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.375,
-          "fast_corner_performance": 0.1058,
-          "slow_corner_performance": 0.0662,
-          "medium_corner_performance": 0.1056,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.1843,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.375,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.1058,
+          "slow_corner_performance": 0.0662,
+          "medium_corner_performance": 0.1056
         },
         "short_run": {
           "top_speed": 0.3827,
@@ -1301,31 +1309,23 @@
           "overall_pace": 0.0798,
           "sessions_used": 12,
           "tire_deg_slope": 0.0317,
-          "braking_performance": 0.4023,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.4448,
-          "fast_corner_performance": 0.0901,
-          "slow_corner_performance": 0.1099,
-          "medium_corner_performance": 0.0687,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.4023,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.4448,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.0901,
+          "slow_corner_performance": 0.1099,
+          "medium_corner_performance": 0.0687
         }
-      },
-      "current_season_performance": [
-        0.0,
-        0.4,
-        0.09999999999999998,
-        0.0,
-        0.09999999999999998
-      ],
-      "preseason_overall_performance": 0.35
+      }
     },
     "Aston Martin": {
       "note": "2025 P7 seed, updated with 5 race(s) of 2026 data",
@@ -1333,9 +1333,9 @@
       "last_updated": "2026-05-30T16:56:34.792102",
       "directionality": {
         "max_speed": -0.0401,
+        "high_corner_speed": -0.0318,
         "slow_corner_speed": -0.0285,
-        "medium_corner_speed": -0.0319,
-        "high_corner_speed": -0.0318
+        "medium_corner_speed": -0.0319
       },
       "races_completed": 5,
       "overall_performance": 0.14,
@@ -1347,130 +1347,56 @@
         "overall_pace": 0.1261,
         "sessions_used": 11,
         "tire_deg_slope": 0.165,
-        "braking_performance": 0.1288,
-        "session_aggregation": "laps_weighted",
-        "tire_deg_performance": 0.5371,
-        "fast_corner_performance": 0.1162,
-        "slow_corner_performance": 0.1801,
-        "medium_corner_performance": 0.1521,
         "sessions_blended": 11,
-        "effective_blend_weight": 0.0754,
         "circuits_observed": [
           "Australian Grand Prix",
           "Chinese Grand Prix",
           "Japanese Grand Prix",
           "Miami Grand Prix",
           "Canadian Grand Prix"
-        ]
+        ],
+        "braking_performance": 0.1288,
+        "session_aggregation": "laps_weighted",
+        "tire_deg_performance": 0.5371,
+        "effective_blend_weight": 0.0754,
+        "fast_corner_performance": 0.1162,
+        "slow_corner_performance": 0.1801,
+        "medium_corner_performance": 0.1521
       },
       "compound_characteristics": {
         "HARD": {
           "track_name": "Miami Grand Prix",
-          "median_lap_time": 96.867,
-          "tire_deg_slope": null,
           "consistency": 14.357119238140422,
+          "laps_sampled": 11.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 1,
+          "tire_deg_slope": null,
+          "median_lap_time": 96.867,
           "pace_performance": 0.0,
           "tire_deg_performance": null,
-          "consistency_performance": 0.7777777777777778,
-          "laps_sampled": 11.0,
-          "sessions_used": 1,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        },
-        "MEDIUM": {
-          "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.0,
-          "tire_deg_slope": 0.15985212141360042,
-          "tire_deg_performance": 0.025125945381480306,
-          "consistency": 2.6762320445549745,
-          "median_lap_time": 80.52808601024887,
-          "laps_sampled": 36.0,
-          "sessions_used": 3.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "consistency_performance": 0.7777777777777778
         },
         "SOFT": {
           "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.07705184698796325,
-          "tire_deg_slope": 0.009033750052662829,
-          "tire_deg_performance": 0.30186667917380877,
           "consistency": 2.6207134357138497,
-          "median_lap_time": 80.19478331185455,
           "laps_sampled": 107.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
           "sessions_used": 3.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        }
-      },
-      "testing_characteristics_profiles": {
-        "balanced": {
-          "top_speed": 0.0735,
-          "consistency": 0.618,
-          "run_profile": "balanced",
-          "last_updated": "2026-05-30T16:56:34.792102",
-          "overall_pace": 0.1261,
-          "sessions_used": 11,
-          "tire_deg_slope": 0.165,
-          "braking_performance": 0.1288,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.5371,
-          "fast_corner_performance": 0.1162,
-          "slow_corner_performance": 0.1801,
-          "medium_corner_performance": 0.1521,
-          "sessions_blended": 11,
-          "effective_blend_weight": 0.0754,
-          "circuits_observed": [
-            "Australian Grand Prix",
-            "Chinese Grand Prix",
-            "Japanese Grand Prix",
-            "Miami Grand Prix",
-            "Canadian Grand Prix"
-          ]
+          "tire_deg_slope": 0.009033750052662829,
+          "median_lap_time": 80.19478331185455,
+          "pace_performance": 0.07705184698796325,
+          "tire_deg_performance": 0.30186667917380877
         },
-        "long_run": {
-          "top_speed": 0.0879,
-          "consistency": 0.3669,
-          "run_profile": "long_run",
+        "MEDIUM": {
+          "track_name": "Canadian Grand Prix",
+          "consistency": 2.6762320445549745,
+          "laps_sampled": 36.0,
           "last_updated": "2026-05-30T16:56:34.792102",
-          "overall_pace": 0.3626,
-          "sessions_used": 11,
-          "tire_deg_slope": 0.165,
-          "braking_performance": 0.3419,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.5371,
-          "fast_corner_performance": 0.2218,
-          "slow_corner_performance": 0.47,
-          "medium_corner_performance": 0.3925,
-          "sessions_blended": 11,
-          "effective_blend_weight": 0.0754,
-          "circuits_observed": [
-            "Australian Grand Prix",
-            "Chinese Grand Prix",
-            "Japanese Grand Prix",
-            "Miami Grand Prix",
-            "Canadian Grand Prix"
-          ]
-        },
-        "short_run": {
-          "top_speed": 0.0781,
-          "consistency": 0.4844,
-          "run_profile": "short_run",
-          "last_updated": "2026-05-30T16:56:34.792102",
-          "overall_pace": 0.0833,
-          "sessions_used": 11,
-          "tire_deg_slope": 0.1527,
-          "braking_performance": 0.0215,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.469,
-          "fast_corner_performance": 0.1386,
-          "slow_corner_performance": 0.1293,
-          "medium_corner_performance": 0.1036,
-          "sessions_blended": 11,
-          "effective_blend_weight": 0.0754,
-          "circuits_observed": [
-            "Australian Grand Prix",
-            "Chinese Grand Prix",
-            "Japanese Grand Prix",
-            "Miami Grand Prix",
-            "Canadian Grand Prix"
-          ]
+          "sessions_used": 3.0,
+          "tire_deg_slope": 0.15985212141360042,
+          "median_lap_time": 80.52808601024887,
+          "pace_performance": 0.0,
+          "tire_deg_performance": 0.025125945381480306
         }
       },
       "current_season_performance": [
@@ -1480,7 +1406,81 @@
         0.09999999999999998,
         0.0
       ],
-      "preseason_overall_performance": 0.47
+      "preseason_overall_performance": 0.47,
+      "testing_characteristics_profiles": {
+        "balanced": {
+          "top_speed": 0.0735,
+          "consistency": 0.618,
+          "run_profile": "balanced",
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "overall_pace": 0.1261,
+          "sessions_used": 11,
+          "tire_deg_slope": 0.165,
+          "sessions_blended": 11,
+          "circuits_observed": [
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Miami Grand Prix",
+            "Canadian Grand Prix"
+          ],
+          "braking_performance": 0.1288,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.5371,
+          "effective_blend_weight": 0.0754,
+          "fast_corner_performance": 0.1162,
+          "slow_corner_performance": 0.1801,
+          "medium_corner_performance": 0.1521
+        },
+        "long_run": {
+          "top_speed": 0.0879,
+          "consistency": 0.3669,
+          "run_profile": "long_run",
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "overall_pace": 0.3626,
+          "sessions_used": 11,
+          "tire_deg_slope": 0.165,
+          "sessions_blended": 11,
+          "circuits_observed": [
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Miami Grand Prix",
+            "Canadian Grand Prix"
+          ],
+          "braking_performance": 0.3419,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.5371,
+          "effective_blend_weight": 0.0754,
+          "fast_corner_performance": 0.2218,
+          "slow_corner_performance": 0.47,
+          "medium_corner_performance": 0.3925
+        },
+        "short_run": {
+          "top_speed": 0.0781,
+          "consistency": 0.4844,
+          "run_profile": "short_run",
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "overall_pace": 0.0833,
+          "sessions_used": 11,
+          "tire_deg_slope": 0.1527,
+          "sessions_blended": 11,
+          "circuits_observed": [
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Miami Grand Prix",
+            "Canadian Grand Prix"
+          ],
+          "braking_performance": 0.0215,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.469,
+          "effective_blend_weight": 0.0754,
+          "fast_corner_performance": 0.1386,
+          "slow_corner_performance": 0.1293,
+          "medium_corner_performance": 0.1036
+        }
+      }
     },
     "Haas F1 Team": {
       "note": "2025 P8 seed, updated with 5 race(s) of 2026 data",
@@ -1488,9 +1488,9 @@
       "last_updated": "2026-05-30T16:56:34.792102",
       "directionality": {
         "max_speed": -0.0064,
+        "high_corner_speed": -0.0128,
         "slow_corner_speed": -0.0196,
-        "medium_corner_speed": -0.0105,
-        "high_corner_speed": -0.0128
+        "medium_corner_speed": -0.0105
       },
       "races_completed": 5,
       "overall_performance": 0.4195,
@@ -1502,57 +1502,57 @@
         "overall_pace": 0.2723,
         "sessions_used": 12,
         "tire_deg_slope": 0.077,
-        "braking_performance": 0.3344,
-        "session_aggregation": "laps_weighted",
-        "tire_deg_performance": 0.5992,
-        "fast_corner_performance": 0.3324,
-        "slow_corner_performance": 0.2756,
-        "medium_corner_performance": 0.2944,
         "sessions_blended": 12,
-        "effective_blend_weight": 0.0722,
         "circuits_observed": [
           "Australian Grand Prix",
           "Chinese Grand Prix",
           "Japanese Grand Prix",
           "Miami Grand Prix",
           "Canadian Grand Prix"
-        ]
+        ],
+        "braking_performance": 0.3344,
+        "session_aggregation": "laps_weighted",
+        "tire_deg_performance": 0.5992,
+        "effective_blend_weight": 0.0722,
+        "fast_corner_performance": 0.3324,
+        "slow_corner_performance": 0.2756,
+        "medium_corner_performance": 0.2944
       },
       "compound_characteristics": {
         "HARD": {
           "track_name": "Canadian Grand Prix",
-          "median_lap_time": 79.003,
-          "tire_deg_slope": 0.4745000000000007,
           "consistency": 15.836395000392782,
+          "laps_sampled": 28.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 1,
+          "tire_deg_slope": 0.4745000000000007,
+          "median_lap_time": 79.003,
           "pace_performance": 0.4285714285714286,
           "tire_deg_performance": 0.0,
-          "consistency_performance": 0.0,
-          "laps_sampled": 28.0,
-          "sessions_used": 1,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        },
-        "MEDIUM": {
-          "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.6235566132859021,
-          "tire_deg_slope": -0.010281341853440436,
-          "tire_deg_performance": 0.4692265083492275,
-          "consistency": 1.7318404871272597,
-          "median_lap_time": 77.76212763698756,
-          "laps_sampled": 107.0,
-          "sessions_used": 3.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "consistency_performance": 0.0
         },
         "SOFT": {
           "track_name": "Canadian Grand Prix",
-          "median_lap_time": 78.169,
-          "tire_deg_slope": -0.023567815249264448,
           "consistency": 1.8093179867545757,
+          "laps_sampled": 74.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 1,
+          "tire_deg_slope": -0.023567815249264448,
+          "median_lap_time": 78.169,
           "pace_performance": 0.4444444444444444,
           "tire_deg_performance": 0.5714285714285714,
-          "consistency_performance": 0.11111111111111116,
-          "laps_sampled": 74.0,
-          "sessions_used": 1,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "consistency_performance": 0.11111111111111116
+        },
+        "MEDIUM": {
+          "track_name": "Canadian Grand Prix",
+          "consistency": 1.7318404871272597,
+          "laps_sampled": 107.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 3.0,
+          "tire_deg_slope": -0.010281341853440436,
+          "median_lap_time": 77.76212763698756,
+          "pace_performance": 0.6235566132859021,
+          "tire_deg_performance": 0.4692265083492275
         },
         "TEST_UNKNOWN": {
           "track_name": "Testing 2",
@@ -1567,6 +1567,14 @@
           "consistency_performance": 0.974698085043921
         }
       },
+      "current_season_performance": [
+        0.4,
+        0.6,
+        0.30000000000000004,
+        0.4,
+        0.19999999999999996
+      ],
+      "preseason_overall_performance": 0.43,
       "testing_characteristics_profiles": {
         "balanced": {
           "top_speed": 0.4202,
@@ -1576,21 +1584,21 @@
           "overall_pace": 0.2723,
           "sessions_used": 12,
           "tire_deg_slope": 0.077,
-          "braking_performance": 0.3344,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.5992,
-          "fast_corner_performance": 0.3324,
-          "slow_corner_performance": 0.2756,
-          "medium_corner_performance": 0.2944,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.3344,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.5992,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.3324,
+          "slow_corner_performance": 0.2756,
+          "medium_corner_performance": 0.2944
         },
         "long_run": {
           "top_speed": 0.4573,
@@ -1600,21 +1608,21 @@
           "overall_pace": 0.2981,
           "sessions_used": 12,
           "tire_deg_slope": 0.0622,
-          "braking_performance": 0.7698,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.6052,
-          "fast_corner_performance": 0.4095,
-          "slow_corner_performance": 0.3472,
-          "medium_corner_performance": 0.2879,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.7698,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.6052,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.4095,
+          "slow_corner_performance": 0.3472,
+          "medium_corner_performance": 0.2879
         },
         "short_run": {
           "top_speed": 0.3873,
@@ -1624,31 +1632,23 @@
           "overall_pace": 0.3525,
           "sessions_used": 12,
           "tire_deg_slope": 0.0859,
-          "braking_performance": 0.274,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.5738,
-          "fast_corner_performance": 0.3808,
-          "slow_corner_performance": 0.3378,
-          "medium_corner_performance": 0.4281,
           "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
           "circuits_observed": [
             "Australian Grand Prix",
             "Chinese Grand Prix",
             "Japanese Grand Prix",
             "Miami Grand Prix",
             "Canadian Grand Prix"
-          ]
+          ],
+          "braking_performance": 0.274,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.5738,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.3808,
+          "slow_corner_performance": 0.3378,
+          "medium_corner_performance": 0.4281
         }
-      },
-      "current_season_performance": [
-        0.4,
-        0.6,
-        0.30000000000000004,
-        0.4,
-        0.19999999999999996
-      ],
-      "preseason_overall_performance": 0.43
+      }
     },
     "Red Bull Racing": {
       "note": "2025 P3 seed, updated with 5 race(s) of 2026 data",
@@ -1656,9 +1656,9 @@
       "last_updated": "2026-05-30T16:56:34.792102",
       "directionality": {
         "max_speed": 0.0088,
+        "high_corner_speed": 0.0051,
         "slow_corner_speed": 0.0126,
-        "medium_corner_speed": 0.01,
-        "high_corner_speed": 0.0051
+        "medium_corner_speed": 0.01
       },
       "races_completed": 5,
       "overall_performance": 0.66,
@@ -1670,130 +1670,56 @@
         "overall_pace": 0.5331,
         "sessions_used": 12,
         "tire_deg_slope": 0.1108,
-        "braking_performance": 0.821,
-        "session_aggregation": "laps_weighted",
-        "tire_deg_performance": 0.4286,
-        "fast_corner_performance": 0.4989,
-        "slow_corner_performance": 0.6312,
-        "medium_corner_performance": 0.5462,
         "sessions_blended": 12,
-        "effective_blend_weight": 0.0722,
         "circuits_observed": [
           "Australian Grand Prix",
           "Chinese Grand Prix",
           "Japanese Grand Prix",
           "Miami Grand Prix",
           "Canadian Grand Prix"
-        ]
+        ],
+        "braking_performance": 0.821,
+        "session_aggregation": "laps_weighted",
+        "tire_deg_performance": 0.4286,
+        "effective_blend_weight": 0.0722,
+        "fast_corner_performance": 0.4989,
+        "slow_corner_performance": 0.6312,
+        "medium_corner_performance": 0.5462
       },
       "compound_characteristics": {
         "HARD": {
           "track_name": "Canadian Grand Prix",
-          "median_lap_time": 76.8965,
-          "tire_deg_slope": -0.005931318681316633,
           "consistency": 5.618049332770544,
+          "laps_sampled": 32.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "sessions_used": 1,
+          "tire_deg_slope": -0.005931318681316633,
+          "median_lap_time": 76.8965,
           "pace_performance": 1.0,
           "tire_deg_performance": 0.33333333333333337,
-          "consistency_performance": 1.0,
-          "laps_sampled": 32.0,
-          "sessions_used": 1,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        },
-        "MEDIUM": {
-          "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.8043650773926713,
-          "tire_deg_slope": -0.02335528823383434,
-          "tire_deg_performance": 0.6494818514459076,
-          "consistency": 1.9160763160756569,
-          "median_lap_time": 75.53700154042984,
-          "laps_sampled": 90.0,
-          "sessions_used": 3.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
+          "consistency_performance": 1.0
         },
         "SOFT": {
           "track_name": "Canadian Grand Prix",
-          "pace_performance": 0.7938152852552675,
-          "tire_deg_slope": -0.033560220240854303,
-          "tire_deg_performance": 0.9278312163512967,
           "consistency": 1.083443994926351,
-          "median_lap_time": 76.33751070827562,
           "laps_sampled": 79.0,
+          "last_updated": "2026-05-30T16:56:34.792102",
           "sessions_used": 2.0,
-          "last_updated": "2026-05-30T16:56:34.792102"
-        }
-      },
-      "testing_characteristics_profiles": {
-        "balanced": {
-          "top_speed": 0.5943,
-          "consistency": 0.3692,
-          "run_profile": "balanced",
-          "last_updated": "2026-05-30T16:56:34.792102",
-          "overall_pace": 0.5331,
-          "sessions_used": 12,
-          "tire_deg_slope": 0.1108,
-          "braking_performance": 0.821,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.4286,
-          "fast_corner_performance": 0.4989,
-          "slow_corner_performance": 0.6312,
-          "medium_corner_performance": 0.5462,
-          "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
-          "circuits_observed": [
-            "Australian Grand Prix",
-            "Chinese Grand Prix",
-            "Japanese Grand Prix",
-            "Miami Grand Prix",
-            "Canadian Grand Prix"
-          ]
+          "tire_deg_slope": -0.033560220240854303,
+          "median_lap_time": 76.33751070827562,
+          "pace_performance": 0.7938152852552675,
+          "tire_deg_performance": 0.9278312163512967
         },
-        "long_run": {
-          "top_speed": 0.6133,
-          "consistency": 0.4887,
-          "run_profile": "long_run",
+        "MEDIUM": {
+          "track_name": "Canadian Grand Prix",
+          "consistency": 1.9160763160756569,
+          "laps_sampled": 90.0,
           "last_updated": "2026-05-30T16:56:34.792102",
-          "overall_pace": 0.4503,
-          "sessions_used": 12,
-          "tire_deg_slope": 0.1184,
-          "braking_performance": 0.6222,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.4154,
-          "fast_corner_performance": 0.4946,
-          "slow_corner_performance": 0.5256,
-          "medium_corner_performance": 0.4124,
-          "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
-          "circuits_observed": [
-            "Australian Grand Prix",
-            "Chinese Grand Prix",
-            "Japanese Grand Prix",
-            "Miami Grand Prix",
-            "Canadian Grand Prix"
-          ]
-        },
-        "short_run": {
-          "top_speed": 0.5607,
-          "consistency": 0.4825,
-          "run_profile": "short_run",
-          "last_updated": "2026-05-30T16:56:34.792102",
-          "overall_pace": 0.5452,
-          "sessions_used": 12,
-          "tire_deg_slope": 0.1171,
-          "braking_performance": 0.687,
-          "session_aggregation": "laps_weighted",
-          "tire_deg_performance": 0.3484,
-          "fast_corner_performance": 0.5517,
-          "slow_corner_performance": 0.6829,
-          "medium_corner_performance": 0.5279,
-          "sessions_blended": 12,
-          "effective_blend_weight": 0.0722,
-          "circuits_observed": [
-            "Australian Grand Prix",
-            "Chinese Grand Prix",
-            "Japanese Grand Prix",
-            "Miami Grand Prix",
-            "Canadian Grand Prix"
-          ]
+          "sessions_used": 3.0,
+          "tire_deg_slope": -0.02335528823383434,
+          "median_lap_time": 75.53700154042984,
+          "pace_performance": 0.8043650773926713,
+          "tire_deg_performance": 0.6494818514459076
         }
       },
       "current_season_performance": [
@@ -1803,36 +1729,110 @@
         0.7,
         0.9
       ],
-      "preseason_overall_performance": 0.74
+      "preseason_overall_performance": 0.74,
+      "testing_characteristics_profiles": {
+        "balanced": {
+          "top_speed": 0.5943,
+          "consistency": 0.3692,
+          "run_profile": "balanced",
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "overall_pace": 0.5331,
+          "sessions_used": 12,
+          "tire_deg_slope": 0.1108,
+          "sessions_blended": 12,
+          "circuits_observed": [
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Miami Grand Prix",
+            "Canadian Grand Prix"
+          ],
+          "braking_performance": 0.821,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.4286,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.4989,
+          "slow_corner_performance": 0.6312,
+          "medium_corner_performance": 0.5462
+        },
+        "long_run": {
+          "top_speed": 0.6133,
+          "consistency": 0.4887,
+          "run_profile": "long_run",
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "overall_pace": 0.4503,
+          "sessions_used": 12,
+          "tire_deg_slope": 0.1184,
+          "sessions_blended": 12,
+          "circuits_observed": [
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Miami Grand Prix",
+            "Canadian Grand Prix"
+          ],
+          "braking_performance": 0.6222,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.4154,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.4946,
+          "slow_corner_performance": 0.5256,
+          "medium_corner_performance": 0.4124
+        },
+        "short_run": {
+          "top_speed": 0.5607,
+          "consistency": 0.4825,
+          "run_profile": "short_run",
+          "last_updated": "2026-05-30T16:56:34.792102",
+          "overall_pace": 0.5452,
+          "sessions_used": 12,
+          "tire_deg_slope": 0.1171,
+          "sessions_blended": 12,
+          "circuits_observed": [
+            "Australian Grand Prix",
+            "Chinese Grand Prix",
+            "Japanese Grand Prix",
+            "Miami Grand Prix",
+            "Canadian Grand Prix"
+          ],
+          "braking_performance": 0.687,
+          "session_aggregation": "laps_weighted",
+          "tire_deg_performance": 0.3484,
+          "effective_blend_weight": 0.0722,
+          "fast_corner_performance": 0.5517,
+          "slow_corner_performance": 0.6829,
+          "medium_corner_performance": 0.5279
+        }
+      }
     }
   },
   "version": 13,
   "generated_at": "2026-02-27T15:34:51.528956",
   "last_updated": "2026-05-30T16:56:34.792102",
   "data_freshness": "LIVE_UPDATED",
+  "races_completed": 5,
   "directionality_meta": {
     "year": 2026,
-    "characteristics_year": 2026,
     "events": [
       "Canadian Grand Prix"
     ],
+    "cache_dir": "data/raw/.fastf1_cache",
+    "new_weight": 0.25,
+    "run_profile": "balanced",
     "sessions_loaded": [
       "Canadian Grand Prix::Sprint"
     ],
     "testing_backend": "auto",
-    "cache_dir": "data/raw/.fastf1_cache",
     "force_renew_cache": false,
-    "new_weight": 0.25,
-    "directionality_scale": 0.08,
-    "session_aggregation": "laps_weighted",
-    "run_profile": "balanced",
     "profiles_captured": [
       "balanced",
       "short_run",
       "long_run"
-    ]
+    ],
+    "session_aggregation": "laps_weighted",
+    "characteristics_year": 2026,
+    "directionality_scale": 0.08
   },
   "directionality_source": "SESSION_EXTRACTION",
-  "directionality_last_updated": "2026-05-30T16:56:34.792102",
-  "races_completed": 5
+  "directionality_last_updated": "2026-05-30T16:56:34.792102"
 }
