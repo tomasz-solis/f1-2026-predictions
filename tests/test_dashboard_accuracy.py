@@ -1,9 +1,11 @@
 """Focused tests for the target-aware accuracy pipeline."""
 
+from src.dashboard import accuracy_view
 from src.dashboard.accuracy import (
     AccuracyPipeline,
     CheckpointAccuracyPoint,
     CheckpointStatusPoint,
+    SeasonTrendPoint,
     TargetAccuracySummary,
 )
 from src.dashboard.accuracy_view import (
@@ -14,7 +16,20 @@ from src.dashboard.accuracy_view import (
     build_saved_prediction_view_model,
     build_target_metric_cards,
 )
+from src.dashboard.chart_styles import checkpoint_line_color
 from src.utils.accuracy_snapshots import accuracy_snapshot_artifact_key
+
+
+class _ColumnContext:
+    """Tiny context-manager stand-in for Streamlit column containers."""
+
+    def __enter__(self):
+        """Return the fake column for a Streamlit ``with`` block."""
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        """Leave exceptions untouched so test failures stay visible."""
+        return False
 
 
 def test_accuracy_snapshot_artifact_key_normalizes_checkpoint_identity():
@@ -826,6 +841,116 @@ def test_build_progression_checkpoint_state_returns_excluded_checkpoints():
     assert result["scored_checkpoints"] == ["FP2"]
     assert result["excluded_checkpoints"] == ["FP3"]
     assert result["pending_checkpoints"] == []
+
+
+def test_render_trend_charts_uses_stable_checkpoint_colors(patcher):
+    """Trend charts should color checkpoint labels the same across weekend subsets."""
+    figures = []
+    target_summary = TargetAccuracySummary(
+        target_key="main_qualifying",
+        label="Main Qualifying",
+        season_trend=[
+            SeasonTrendPoint(
+                target_key="main_qualifying",
+                weekend_format="normal",
+                race_name="Australian Grand Prix",
+                race_order=1,
+                checkpoint_session="PRE",
+                checkpoint_index=0,
+                metrics={"overall_mae": 2.9},
+            ),
+            SeasonTrendPoint(
+                target_key="main_qualifying",
+                weekend_format="normal",
+                race_name="Japanese Grand Prix",
+                race_order=3,
+                checkpoint_session="PRE",
+                checkpoint_index=0,
+                metrics={"overall_mae": 2.8},
+            ),
+            SeasonTrendPoint(
+                target_key="main_qualifying",
+                weekend_format="normal",
+                race_name="Australian Grand Prix",
+                race_order=1,
+                checkpoint_session="FP1",
+                checkpoint_index=1,
+                metrics={"overall_mae": 4.6},
+            ),
+            SeasonTrendPoint(
+                target_key="main_qualifying",
+                weekend_format="normal",
+                race_name="Japanese Grand Prix",
+                race_order=3,
+                checkpoint_session="FP2",
+                checkpoint_index=2,
+                metrics={"overall_mae": 2.3},
+            ),
+            SeasonTrendPoint(
+                target_key="main_qualifying",
+                weekend_format="normal",
+                race_name="Japanese Grand Prix",
+                race_order=3,
+                checkpoint_session="FP3",
+                checkpoint_index=3,
+                metrics={"overall_mae": 3.3},
+            ),
+            SeasonTrendPoint(
+                target_key="main_qualifying",
+                weekend_format="sprint",
+                race_name="Chinese Grand Prix",
+                race_order=2,
+                checkpoint_session="PRE",
+                checkpoint_index=0,
+                metrics={"overall_mae": 2.6},
+            ),
+            SeasonTrendPoint(
+                target_key="main_qualifying",
+                weekend_format="sprint",
+                race_name="Miami Grand Prix",
+                race_order=4,
+                checkpoint_session="FP1",
+                checkpoint_index=1,
+                metrics={"overall_mae": 4.0},
+            ),
+            SeasonTrendPoint(
+                target_key="main_qualifying",
+                weekend_format="sprint",
+                race_name="Miami Grand Prix",
+                race_order=4,
+                checkpoint_session="SQ",
+                checkpoint_index=2,
+                metrics={"overall_mae": 3.5},
+            ),
+        ],
+    )
+
+    patcher.setattr(accuracy_view.st, "markdown", lambda *_args, **_kwargs: None)
+    patcher.setattr(
+        accuracy_view.st, "columns", lambda _count: [_ColumnContext(), _ColumnContext()]
+    )
+    patcher.setattr(accuracy_view.st, "caption", lambda *_args, **_kwargs: None)
+    patcher.setattr(accuracy_view.st, "info", lambda *_args, **_kwargs: None)
+    patcher.setattr(
+        accuracy_view.st,
+        "plotly_chart",
+        lambda figure, **_kwargs: figures.append(figure),
+    )
+
+    accuracy_view._render_trend_charts(target_summary, "overall_mae")
+
+    assert len(figures) == 2
+    normal_colors = {trace.name: trace.line.color for trace in figures[0].data}
+    sprint_colors = {trace.name: trace.line.color for trace in figures[1].data}
+    assert normal_colors["PRE"] == sprint_colors["PRE"] == checkpoint_line_color("PRE")
+    assert normal_colors["FP1"] == sprint_colors["FP1"] == checkpoint_line_color("FP1")
+    assert sprint_colors["SQ"] == checkpoint_line_color("SQ")
+    assert sprint_colors["SQ"] not in {
+        normal_colors["PRE"],
+        normal_colors["FP1"],
+        normal_colors["FP2"],
+        normal_colors["FP3"],
+    }
 
 
 def test_build_target_metric_cards_surfaces_qualifying_summary_values():

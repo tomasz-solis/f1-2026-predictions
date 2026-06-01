@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from src.dashboard.accuracy import SeasonAccuracySummary, TargetAccuracySummary
+from src.dashboard.chart_styles import checkpoint_line_color
 from src.dashboard.rendering import display_prediction_result
 from src.utils.accuracy_targets import (
     CHECKPOINT_ORDER,
@@ -801,6 +802,7 @@ def _render_trend_charts(target_summary: TargetAccuracySummary, metric_name: str
                 ),
             )
             for checkpoint_session in checkpoint_sessions:
+                trace_color = checkpoint_line_color(checkpoint_session)
                 lookup = {
                     point.race_name: point.metrics[metric_name]
                     for point in points
@@ -812,6 +814,8 @@ def _render_trend_charts(target_summary: TargetAccuracySummary, metric_name: str
                         y=[lookup.get(race_name) for race_name in race_names],
                         mode="lines+markers",
                         name=checkpoint_session,
+                        line={"color": trace_color},
+                        marker={"color": trace_color},
                         connectgaps=False,
                     )
                 )
