@@ -25,9 +25,9 @@ from src.predictors import Baseline2026Predictor
 
 
 def main():
-    print("=" * 70)
+    print()
     print("Predictor Test with ArtifactStore")
-    print("=" * 70)
+    print()
     print(f"\nStorage mode: {USE_DB_STORAGE}")
 
     # Initialize predictor
@@ -76,9 +76,9 @@ def main():
         traceback.print_exc()
         return 1
 
-    print("\n" + "=" * 70)
+    print()
     print("[OK] All tests passed! Predictor works with ArtifactStore.")
-    print("=" * 70)
+    print()
 
     return 0
 

@@ -3,19 +3,19 @@
 Reads all stored prediction artifacts for a season, pairs each one with its
 saved actual results, and produces review-oriented analyses:
 
-  1. Accuracy and segment breakdowns — where does the model hold up or fail?
-  2. Calibration — are the Monte Carlo p5/p95 bands empirically honest?
-  3. Systematic bias — which drivers and teams does the model consistently
+  1. Accuracy and segment breakdowns - where does the model hold up or fail?
+  2. Calibration - are the Monte Carlo p5/p95 bands empirically honest?
+  3. Systematic bias - which drivers and teams does the model consistently
      get wrong in the same direction?
-  4. Baseline comparison — does the model beat the naive previous-race
+  4. Baseline comparison - does the model beat the naive previous-race
      classifier on MAE and rank correlation?
-  5. Error analysis — which weekends and drivers show up repeatedly among
+  5. Error analysis - which weekends and drivers show up repeatedly among
      the biggest misses?
 
 Outputs:
-  data/evaluation/<year>_evaluation_report.json   — raw numbers
-  docs/MODEL_CALIBRATION.md                       — human-readable summary
-  docs/MODEL_ERROR_ANALYSIS.md                    — compact failure-mode summary
+  data/evaluation/<year>_evaluation_report.json - raw numbers
+  docs/MODEL_CALIBRATION.md - human-readable summary
+  docs/MODEL_ERROR_ANALYSIS.md - compact failure-mode summary
 
 Usage:
   python scripts/generate_evaluation_report.py --year 2026
@@ -259,7 +259,7 @@ def _build_naive_baseline(
 ) -> list[list[dict[str, Any]]]:
     """Predict race N as the actual result of race N-1 (previous-race classifier).
 
-    Returns a list aligned with actual_grids[1:] — the first race has no
+    Returns a list aligned with actual_grids[1:] - the first race has no
     predecessor so the baseline cannot score it.
     """
     return [actual_grids[i] for i in range(len(actual_grids) - 1)]
@@ -672,7 +672,7 @@ def _build_baseline_comparison_section(
         }
 
     naive_baseline = _build_naive_baseline(actual)
-    # Trim model predictions to match — skip the first race (no predecessor)
+    # Trim model predictions to match - skip the first race (no predecessor)
     model_trimmed = predicted[1:]
     actual_trimmed = actual[1:]
 
@@ -835,7 +835,7 @@ def render_error_analysis_markdown(report: dict[str, Any]) -> str:
     """Render a shorter standalone error-analysis document from the main report."""
     error_analysis = report.get("error_analysis", {})
     lines = [
-        f"# Model Error Analysis — {report.get('year')}",
+        f"# Model Error Analysis - {report.get('year')}",
         "",
         f"*Generated: {report.get('generated_at', 'unknown')}*",
         "",
@@ -889,7 +889,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     ignored_counts = evaluation_scope.get("ignored_intermediate_checkpoints", {})
 
     lines: list[str] = [
-        f"# Model Calibration Report — {year} Season",
+        f"# Model Calibration Report - {year} Season",
         "",
         f"*Generated: {generated}*",
         "",
@@ -1014,7 +1014,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         [
             "## 2. Confidence Interval Calibration (Qualifying)",
             "",
-            "The Monte Carlo simulation produces a p5–p95 position interval for each",
+            "The Monte Carlo simulation produces a p5 - p95 position interval for each",
             "driver. A well-calibrated model should have ~90% of actual outcomes fall",
             "inside that interval.",
             "",
@@ -1032,15 +1032,15 @@ def render_markdown(report: dict[str, Any]) -> str:
         calibration_verdict = ""
         if cal_error is not None:
             if abs(cal_error) <= 0.03:
-                calibration_verdict = "✅ Well-calibrated (within 3% of nominal)."
+                calibration_verdict = "OK Well-calibrated (within 3% of nominal)."
             elif cal_error < 0:
                 calibration_verdict = (
-                    f"⚠️ Intervals are too **tight** — model is overconfident "
+                    f"Warning: Intervals are too **tight** - model is overconfident "
                     f"by {abs(cal_error) * 100:.1f}pp."
                 )
             else:
                 calibration_verdict = (
-                    f"⚠️ Intervals are too **wide** — model is underconfident "
+                    f"Warning: Intervals are too **wide** - model is underconfident "
                     f"by {cal_error * 100:.1f}pp."
                 )
 
@@ -1057,7 +1057,7 @@ def render_markdown(report: dict[str, Any]) -> str:
             calibration_verdict,
             "",
             "**Interpretation:** A negative calibration error means intervals are",
-            "too tight — the model is more certain than it should be. A positive",
+            "too tight - the model is more certain than it should be. A positive",
             "error means intervals are too wide.",
             "",
         ]
@@ -1140,7 +1140,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         "## 5. Baseline Comparison",
         "",
         "Naive baseline: predict race N using the actual results of race N-1",
-        "(previous-race classification). This is a realistic lower bar — it",
+        "(previous-race classification). This is a realistic lower bar - it",
         "requires no modelling, just memory of last week.",
         "",
         "### Qualifying",
@@ -1157,9 +1157,9 @@ def render_markdown(report: dict[str, Any]) -> str:
         imp = section.get("improvement", {})
         beats = section.get("model_beats_baseline_on_mae", False)
         verdict = (
-            "✅ Model beats naive baseline on MAE"
+            "OK Model beats naive baseline on MAE"
             if beats
-            else "❌ Model does not beat naive baseline on MAE"
+            else "Failed Model does not beat naive baseline on MAE"
         )
         return [
             f"Based on {events} races.",
@@ -1167,7 +1167,7 @@ def render_markdown(report: dict[str, Any]) -> str:
             "| Metric | Model | Naive baseline | Δ |",
             "|---|---|---|---|",
             f"| MAE | {_flt(model_m.get('mae'))} | {_flt(base_m.get('mae'))} | {_flt(imp.get('mae_improvement'))} |",
-            f"| Within-3 rate | {_pct(model_m.get('within_3_rate', 0) / 100 if model_m.get('within_3_rate') else None)} | {_pct(base_m.get('within_3_rate', 0) / 100 if base_m.get('within_3_rate') else None)} | — |",
+            f"| Within-3 rate | {_pct(model_m.get('within_3_rate', 0) / 100 if model_m.get('within_3_rate') else None)} | {_pct(base_m.get('within_3_rate', 0) / 100 if base_m.get('within_3_rate') else None)} | - |",
             f"| Spearman ρ | {_flt(model_m.get('spearman_rank'))} | {_flt(base_m.get('spearman_rank'))} | {_flt(imp.get('spearman_rank_delta'))} |",
             f"| Kendall τ | {_flt(model_m.get('kendall_tau'))} | {_flt(base_m.get('kendall_tau'))} | {_flt(imp.get('kendall_tau_delta'))} |",
             "",
@@ -1265,7 +1265,7 @@ def main() -> int:
     n_r = report["race_pairs"]
     if n_q == 0 and n_r == 0:
         logger.warning(
-            "No races with actuals found — report generated but contains no results. "
+            "No races with actuals found - report generated but contains no results. "
             "Run scripts/update_from_race.py first to reconcile actuals."
         )
     else:

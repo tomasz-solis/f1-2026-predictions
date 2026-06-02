@@ -181,9 +181,9 @@ def _print_report(
     apply: bool,
 ) -> None:
     """Print a compact stale-row summary."""
-    print("=" * 72)
+    print()
     print("Stale Precompute Runtime State")
-    print("=" * 72)
+    print()
     print(f"Season year: {int(target_year)}")
     print(f"Current artifact hash: {current_artifact_hash}")
     print(f"Apply deletes: {bool(apply)}")

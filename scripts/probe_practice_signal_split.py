@@ -341,7 +341,7 @@ def _configure_fastf1(*, cache_dir: Path) -> Any:
 def _fmt(value: Any) -> str:
     """Format numeric report values compactly."""
     if value is None or pd.isna(value):
-        return "—"
+        return " - "
     return f"{float(value):.4f}"
 
 

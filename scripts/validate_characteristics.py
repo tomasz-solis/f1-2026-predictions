@@ -504,9 +504,9 @@ def main():
 
     data_dir = Path(args.data_dir)
 
-    print("=" * 60)
+    print()
     print("Characteristics Validation")
-    print("=" * 60)
+    print()
     print()
 
     all_valid = True
@@ -596,17 +596,17 @@ def main():
         all_warnings.extend(track_warnings)
 
     print()
-    print("=" * 60)
+    print()
 
     if all_valid:
         print("[OK] All characteristics files are VALID!")
         if all_warnings:
             print(f"[WARN] Validation passed with {len(all_warnings)} expectation warnings")
-        print("=" * 60)
+        print()
         return 0
     else:
         print(f"[ERROR] Validation FAILED with {len(all_errors)} total errors")
-        print("=" * 60)
+        print()
         print()
         print("[WARN] Data has blocking validation errors and should not be used for predictions.")
         print("   To regenerate characteristics, run:")

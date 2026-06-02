@@ -7,7 +7,7 @@ This script creates baseline characteristics for the 2026 season:
   uncertainty, or an opt-in testing model trained on reset-aware seasons
 - Driver characteristics: Carried over from 2025 end-of-season
 
-WHY THIS MATTERS:
+Purpose:
 - 2026 has new regulations → nobody knows team performance yet
 - Tracks don't change much → use historical data
 - Driver skills persist → carry over from 2025
@@ -722,19 +722,19 @@ def main():
     )
     team_seed_mode = args.team_seed_mode or ("neutral" if args.neutral_teams else "standings")
 
-    logger.info("=" * 60)
+    logger.info("")
     logger.info("Generating 2026 Baseline Data from Historical Averages")
-    logger.info("=" * 60)
+    logger.info("")
     logger.info(f"Years: {years}")
     logger.info(f"Output: {output_dir}")
     logger.info("")
 
-    # Step 1: Track characteristics from historical data
+    # Track characteristics from historical data
     if not args.skip_tracks:
         calculate_track_characteristics(years, output_dir)
         logger.info("")
 
-    # Step 2: Neutral team characteristics (nobody knows 2026 performance yet!)
+    # Neutral team characteristics (nobody knows 2026 performance yet!)
     if not args.skip_teams:
         generate_team_characteristics(
             output_dir,
@@ -748,18 +748,18 @@ def main():
         )
         logger.info("")
 
-    # Step 3: Copy 2025 driver characteristics (skills persist)
+    # Copy 2025 driver characteristics (skills persist)
     if not args.skip_drivers:
         copy_2025_driver_characteristics(output_dir)
         logger.info("")
 
-    # Step 4: Reset learning state
+    # Reset learning state
     reset_learning_state()
     logger.info("")
 
-    logger.info("=" * 60)
+    logger.info("")
     logger.info("[OK] 2026 Baseline Generation Complete!")
-    logger.info("=" * 60)
+    logger.info("")
     logger.info("")
     logger.info("Next steps:")
     logger.info("1. After testing (Feb 2026): Run update_from_testing.py")

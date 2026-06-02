@@ -258,7 +258,7 @@ def trace_2026_through_miami() -> pd.DataFrame:
                     "BOT": 22,
                 },
             ),
-            # Sketch race 2 onward — fill in with actual finishing positions
+            # Sketch race 2 onward - fill in with actual finishing positions
             # from your project artifacts before drawing conclusions.
         ]
     )

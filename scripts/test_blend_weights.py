@@ -113,7 +113,7 @@ def main() -> None:
             continue
 
         print("Blend Weight | MAE")
-        print("------------------")
+        print()
         for weight, mae in sorted(results.items()):
             print(f"{weight:>11.2f} | {mae:.2f}")
 

@@ -632,9 +632,9 @@ def _emit_review_packet_markdown(output_path: Path, packet: dict[str, Any]) -> N
         [
             "## Artifacts",
             "",
-            "- `evaluation_packet.json` — machine-readable summary for review and CI",
-            "- `recommendations.md` — experiment ranking and selection notes",
-            "- `experiment_comparison.csv` — all experiment summaries in one table",
+            "- `evaluation_packet.json` - machine-readable summary for review and CI",
+            "- `recommendations.md` - experiment ranking and selection notes",
+            "- `experiment_comparison.csv` - all experiment summaries in one table",
         ]
     )
 

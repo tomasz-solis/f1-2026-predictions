@@ -143,9 +143,9 @@ def main() -> None:
         logger.error(f"Testing directionality update failed: {exc}")
         raise SystemExit(1) from exc
 
-    logger.info("=" * 70)
+    logger.info("")
     logger.info("Testing directionality update complete")
-    logger.info("=" * 70)
+    logger.info("")
     logger.info(f"Year: {summary['year']}")
     logger.info(f"Characteristics year: {summary['characteristics_year']}")
     logger.info(f"Events: {', '.join(summary['events'])}")

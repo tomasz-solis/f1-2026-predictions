@@ -371,7 +371,7 @@ def main():
     # Print ranked summary
     by_skill = sorted(ratings.items(), key=lambda x: x[1]["wet_skill"], reverse=True)
     print(f"\n{'Driver':<6} {'Rating':>6} {'Wet':>4} {'Dry':>4} {'Effect':>8} {'Conf'}")
-    print("-" * 42)
+    print()
     for driver, info in by_skill:
         print(
             f"{driver:<6} {info['wet_skill']:>6.2f} {info['wet_sessions']:>4} "
@@ -385,7 +385,7 @@ def main():
             chars = json.load(f)
         drivers = chars.get("drivers", {})
         print(f"\n{'Driver':<6} {'Computed':>8} {'Prior':>6} {'Delta':>6}")
-        print("-" * 32)
+        print()
         for driver, info in by_skill:
             prior = drivers.get(driver, {}).get("wet_skill")
             if prior is not None:

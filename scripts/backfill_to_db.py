@@ -544,9 +544,9 @@ def main():
 
     args = parser.parse_args()
 
-    print("=" * 70)
+    print()
     print("Backfill Script: Migrate JSON Files to Supabase")
-    print("=" * 70)
+    print()
 
     # Check storage mode
     if not args.dry_run and USE_DB_STORAGE == "file_only":
@@ -600,7 +600,7 @@ def main():
 
     # Confirm before proceeding
     if not args.dry_run and not args.yes:
-        print("\n" + "=" * 70)
+        print()
         response = input("Proceed with backfill? [y/N]: ")
         if response.lower() != "y":
             print("Aborted.")
@@ -625,9 +625,9 @@ def main():
     failure = artifact_failure + runtime_failure
 
     # Summary
-    print("\n" + "=" * 70)
+    print()
     print("Summary")
-    print("=" * 70)
+    print()
     total_units = len(artifacts) + runtime_record_count
     print(f"[OK] Success: {success}/{total_units}")
     print(f"[ERROR] Failure: {failure}/{total_units}")

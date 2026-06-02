@@ -327,7 +327,7 @@ def _soft_driver_metric_clip(value: float) -> float:
     """Compress top-end driver scores so no driver exceeds ~0.95.
 
     Uses tanh compression above 0.85 to keep the field spread realistic.
-    The asymptote is 0.85 + 0.10 = 0.95 — even the best driver on the
+    The asymptote is 0.85 + 0.10 = 0.95 - even the best driver on the
     grid should not saturate a 0-1 percentile scale.
     """
     if value <= 0.85:
@@ -1019,15 +1019,15 @@ def main():
     cache_dir.mkdir(parents=True, exist_ok=True)
     ff1.Cache.enable_cache(str(cache_dir))
 
-    logger.info("=" * 60)
+    logger.info("")
     logger.info("Fixed Driver Characteristics Extraction")
-    logger.info("=" * 60)
+    logger.info("")
     logger.info("")
 
-    # Step 0: Load driver debuts
+    # Load driver debuts
     driver_debuts = load_driver_debuts()
 
-    # Step 1: Extract teammate comparisons
+    # Extract teammate comparisons
     comparisons, race_summaries = extract_teammate_comparisons(years)
     if not comparisons:
         raise RuntimeError(
@@ -1035,16 +1035,16 @@ def main():
             "Verify FastF1 data availability and the selected --years range."
         )
 
-    # Step 2: Solve global ratings
+    # Solve global ratings
     pace_ratings = solve_global_ratings(comparisons, iterations=15)
 
-    # Step 3: Calculate racecraft adjustments
+    # Calculate racecraft adjustments
     racecraft_adjustments = calculate_racecraft_scores(years, pace_ratings, race_summaries)
 
-    # Step 4: Calculate experience and consistency
+    # Calculate experience and consistency
     experience_data = calculate_experience_and_consistency(years, driver_debuts, race_summaries)
 
-    # Step 5: Calculate championship overperformance (car vs driver finish)
+    # Calculate championship overperformance (car vs driver finish)
     # This rewards drivers who overdeliver in bad cars (ALO, HAM in 2024)
     championship_bonuses = calculate_championship_overperformance(
         years,
@@ -1055,7 +1055,7 @@ def main():
     current_lineups, lineup_season = _load_lineup_seed_context(Path(args.lineup_file))
     rookie_debut_year = int(lineup_season or (max(years) + 1))
 
-    # Step 6: Combine into final ratings
+    # Combine into final ratings
     final_ratings = {}
 
     for driver in pace_ratings:
@@ -1108,7 +1108,7 @@ def main():
             },
         }
 
-    # Step 7: Fill missing lineup drivers from current lineups with team-based priors.
+    # Fill missing lineup drivers from current lineups with team-based priors.
     for team_name, team_drivers in current_lineups.items():
         for driver_code in team_drivers:
             if driver_code in final_ratings:
@@ -1126,7 +1126,7 @@ def main():
                 rookie_debut_year=rookie_debut_year,
             )
 
-    # Step 8: Seed initial Bayesian state so file-based fallbacks can use it.
+    # Seed initial Bayesian state so file-based fallbacks can use it.
     _seed_initial_bayesian_state(
         final_ratings,
         grid_size=_resolve_bayesian_seed_grid_size(final_ratings, current_lineups),
@@ -1150,10 +1150,10 @@ def main():
         json.dump(output, f, indent=2)
 
     logger.info("")
-    logger.info("=" * 60)
+    logger.info("")
     logger.info(f"[OK] Extracted {len(final_ratings)} drivers")
     logger.info(f" Saved to: {output_path}")
-    logger.info("=" * 60)
+    logger.info("")
     logger.info("")
     logger.info("Sample ratings:")
 

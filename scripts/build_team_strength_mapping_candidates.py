@@ -164,7 +164,7 @@ def _driver_mu_by_kind(prior_artifact: dict[str, Any]) -> dict[str, dict[str, fl
 def _fmt(value: Any) -> str:
     """Format compact Markdown table values."""
     if value is None:
-        return "—"
+        return " - "
     return f"{float(value):.3f}"
 
 

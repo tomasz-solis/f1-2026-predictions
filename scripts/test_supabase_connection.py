@@ -20,9 +20,9 @@ from src.persistence.db import check_connection
 
 
 def main():
-    print("=" * 60)
+    print()
     print("Supabase Connection Test")
-    print("=" * 60)
+    print()
 
     # Test 1: Health check
     print("\n1. Testing Supabase connection...")
@@ -83,9 +83,9 @@ def main():
         print(f"   [ERROR] Failed to list: {e}")
         return 1
 
-    print("\n" + "=" * 60)
+    print()
     print("[OK] All tests passed! Supabase is ready to use.")
-    print("=" * 60)
+    print()
     return 0
 
 

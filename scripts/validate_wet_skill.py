@@ -171,7 +171,7 @@ def main():
     advantages = compute_predicted_advantage(priors, race_laps=60)
 
     print(f"\n{'Driver':<6} {'WetSkill':>8} {'Predicted':>10} {'Actual':>6}")
-    print("-" * 35)
+    print()
     for d in sorted(drivers_in_both, key=lambda x: actual[x]):
         ws = priors.get(d, 0.70)
         adv = advantages.get(d, 0.0)

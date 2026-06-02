@@ -211,13 +211,13 @@ def run_simulation_loop(year=2026):
 
 if __name__ == "__main__":
     try:
-        # Step 1: Prep Data
+        # Prep Data
         check_and_update_data(force_update=False)
 
-        # Step 2: Load Configs
+        # Load Configs
         load_static_configs()
 
-        # Step 3: Run Engine
+        # Run Engine
         run_simulation_loop()
 
         logger.info("\n[OK] PIPELINE SUCCESS")

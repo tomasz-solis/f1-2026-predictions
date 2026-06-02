@@ -178,7 +178,7 @@ def _load_candidate_diagnostics(path: Path) -> dict[str, Any]:
 def _fmt(value: Any) -> str:
     """Format optional numeric values for Markdown."""
     if value is None:
-        return "—"
+        return " - "
     return f"{float(value):.3f}"
 
 

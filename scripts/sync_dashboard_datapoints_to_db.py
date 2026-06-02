@@ -345,9 +345,9 @@ def main() -> int:
         include_auxiliary_targets=bool(args.include_auxiliary_targets),
     )
 
-    print("=" * 72)
+    print()
     print("Dashboard Datapoint Sync")
-    print("=" * 72)
+    print()
     print(f"Race: {race_name} ({int(args.year)})")
     print(f"Checkpoints: {', '.join(checkpoints)}")
     print(f"Data root: {data_root}")

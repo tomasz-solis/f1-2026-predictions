@@ -360,9 +360,9 @@ def main():
     cache_dir.mkdir(parents=True, exist_ok=True)
     ff1.Cache.enable_cache(str(cache_dir))
 
-    logger.info("=" * 60)
+    logger.info("")
     logger.info(f"Calculating {args.year} Team Performance")
-    logger.info("=" * 60)
+    logger.info("")
     logger.info("")
 
     # Calculate
@@ -389,10 +389,10 @@ def main():
         json.dump(output, f, indent=2)
 
     logger.info("")
-    logger.info("=" * 60)
+    logger.info("")
     logger.info(f"[OK] Calculated {len(team_chars)} team ratings")
     logger.info(f" Saved to: {output_path}")
-    logger.info("=" * 60)
+    logger.info("")
     logger.info("")
     logger.info("Top 5 teams:")
     sorted_teams = sorted(

@@ -93,7 +93,7 @@ def calculate_overtaking_likelihood(years=None):
     overtaking_data = {}
 
     print("Extracting overtaking data from races...")
-    print("=" * 70)
+    print()
 
     for year in years:
         print(f"\nProcessing {year}...")
@@ -208,9 +208,9 @@ if __name__ == "__main__":
     overtaking_data = calculate_overtaking_likelihood(years=[2024, 2025])
 
     # Show results
-    print("\n" + "=" * 70)
+    print()
     print("OVERTAKING LIKELIHOOD BY TRACK")
-    print("=" * 70)
+    print()
 
     sorted_tracks = sorted(overtaking_data.items(), key=lambda x: x[1]["avg_changes_per_lap"])
 
