@@ -385,7 +385,7 @@ def test_qualifying_regression(update_golden_files):
 
 
 def test_race_regression(update_golden_files):
-    """Fixed-seed Australia race output should stay stable."""
+    """Fixed-seed Australia race output should keep the front group stable."""
     payload = _race_payload()
     _assert_matches_or_update(
         golden_path=GOLDEN_DIR / "golden_race_australia.json",
@@ -394,6 +394,8 @@ def test_race_regression(update_golden_files):
         row_key="finish_order",
         max_position_delta=7,
         mean_position_delta=2.5,
+        top_overlap_count=8,
+        min_top_overlap=7,
     )
 
 
@@ -426,7 +428,7 @@ def test_sprint_race_regression(update_golden_files):
 
 
 def test_china_main_qualifying_regression(update_golden_files):
-    """Fixed-seed China main qualifying output should stay stable."""
+    """Fixed-seed China main qualifying output should keep the front group stable."""
     payload = _china_main_qualifying_payload()
     _assert_matches_or_update(
         golden_path=GOLDEN_DIR / "golden_qualifying_china.json",
@@ -435,6 +437,8 @@ def test_china_main_qualifying_regression(update_golden_files):
         row_key="grid",
         max_position_delta=9,
         mean_position_delta=2.0,
+        top_overlap_count=8,
+        min_top_overlap=7,
     )
 
 

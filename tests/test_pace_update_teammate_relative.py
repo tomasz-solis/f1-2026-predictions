@@ -138,7 +138,7 @@ class TestRacePaceTeammateRelative:
 
         # PIA's pace should not be substantially below 0.5 despite finishing P18 absolute
         assert pia_pace >= 0.46, (
-            f"PIA's race_pace ({pia_pace:.3f}) too low — absolute position leaking in "
+            f"PIA's race_pace ({pia_pace:.3f}) too low - absolute position leaking in "
             "despite teammate-relative normalization"
         )
 
@@ -189,7 +189,7 @@ class TestRacePaceTeammateRelative:
             race_positions={"VER": 1, "NOR": 3, "SAI": 5},
             lineups=lineups,
         )
-        # SAI should still get updated — just without teammate normalization
+        # SAI should still get updated - just without teammate normalization
         assert "race_pace" in result["SAI"]["pace"]
         assert 0.05 <= result["SAI"]["pace"]["race_pace"] <= 0.99
 
@@ -356,7 +356,7 @@ class TestQualifyingBayesianInteraction:
             quali_positions={"VER": 1, "NOR": 2},
         )
 
-        # Both drivers did well in quali too — their ratings should be at least
+        # Both drivers did well in quali too - their ratings should be at least
         # as high as race-only, since the qualifying update adds positive signal
         assert race_and_quali["VER"] >= race_only["VER"], (
             "VER's rating dropped after adding a confirming qualifying update"
@@ -366,7 +366,7 @@ class TestQualifyingBayesianInteraction:
         """The combined race+quali shift should not greatly exceed the race-only shift.
 
         With qualifying confidence at 0.15 and race at 0.35, qualifying should
-        add a modest nudge — not double the effect. We allow up to 2x the race-only
+        add a modest nudge - not double the effect. We allow up to 2x the race-only
         delta as the ceiling; anything beyond that suggests amplification.
         """
         initial_mu = 11.0
@@ -399,7 +399,7 @@ class TestQualifyingBayesianInteraction:
             race_positions={"VER": 1, "NOR": 5},
             quali_positions=None,
         )
-        # NOR qualifies P8 but races to P5 — modest conflict
+        # NOR qualifies P8 but races to P5 - modest conflict
         race_and_quali = self._run_with_real_bayesian(
             race_positions={"VER": 1, "NOR": 5},
             quali_positions={"VER": 1, "NOR": 8},
@@ -416,7 +416,7 @@ class TestBayesianSequentialUpdates:
     """Validate that sequential Bayesian updates across a race weekend don't amplify badly.
 
     These tests cover the order in which updater.py ingests completed session results
-    into the ratings store — not the on-track session calendar order.
+    into the ratings store - not the on-track session calendar order.
 
     On-track calendar:
       Normal:  FP1 -> FP2 -> FP3 -> Qualifying -> Race
@@ -426,7 +426,7 @@ class TestBayesianSequentialUpdates:
       Normal:  race results first, then qualifying appended in the same
                update_bayesian_driver_ratings() call (updater.py:425, 480).
       Sprint:  sprint (Saturday, update_from_sprint_race) -> race -> qualifying
-               (Sunday, update_bayesian_driver_ratings — race then quali internally).
+               (Sunday, update_bayesian_driver_ratings - race then quali internally).
     """
 
     @staticmethod
@@ -443,7 +443,7 @@ class TestBayesianSequentialUpdates:
     def test_normal_weekend_sequential_shift_bounded(self):
         """Normal weekend: race then qualifying update should not over-amplify.
 
-        Qualifying and race at the same weekend are correlated — grid advantage
+        Qualifying and race at the same weekend are correlated - grid advantage
         carries over. The combined shift is allowed to be up to 1.5x the sum of
         the individual shifts, which catches runaway amplification while still
         permitting normal accumulation.
@@ -464,7 +464,7 @@ class TestBayesianSequentialUpdates:
         quali_only.update(quali_obs, session_name="Qualifying", confidence=0.15)
         quali_shift = {d: abs(quali_only.ratings[d][0] - 11.0) for d in race_obs}
 
-        # Combined: race first, then qualifying — production order
+        # Combined: race first, then qualifying - production order
         combined = self._fresh_ranker()
         combined.update(race_obs, session_name="Race", confidence=0.35)
         combined.update(quali_obs, session_name="Qualifying", confidence=0.15)
@@ -482,7 +482,7 @@ class TestBayesianSequentialUpdates:
 
         Sprint weekends have three Bayesian update calls across Saturday and Sunday
         (update_from_sprint_race, then update_bayesian_driver_ratings which does
-        race then qualifying). All three are correlated — the same car advantage
+        race then qualifying). All three are correlated - the same car advantage
         shows up in each session. The combined shift must stay within 1.5x the
         sum of the three individual shifts.
         """
@@ -502,7 +502,7 @@ class TestBayesianSequentialUpdates:
         quali_only.update(quali_obs, session_name="Qualifying", confidence=0.15)
         quali_shift = {d: abs(quali_only.ratings[d][0] - 11.0) for d in race_obs}
 
-        # Combined: sprint -> race -> qualifying — production order for sprint weekends
+        # Combined: sprint -> race -> qualifying - production order for sprint weekends
         combined = self._fresh_ranker()
         combined.update(sprint_obs, session_name="Sprint", confidence=0.20)
         combined.update(race_obs, session_name="Race", confidence=0.35)
@@ -519,8 +519,7 @@ class TestBayesianSequentialUpdates:
     def test_qualifying_update_smaller_than_race_for_same_positions(self):
         """Qualifying shift should be smaller than race shift for identical finishing order.
 
-        Qualifying confidence (0.15) is lower than race confidence (0.35) by design —
-        one flying lap in controlled conditions is a noisier signal than full race pace.
+        Qualifying confidence (0.15) is lower than race confidence (0.35) by design - one flying lap in controlled conditions is a noisier signal than full race pace.
         """
         positions = {"VER": 1, "NOR": 5, "PIA": 15}
 

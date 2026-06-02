@@ -63,7 +63,7 @@ def test_portable_skill_not_double_blended():
         return
     raw_skill = ver_data.get("racecraft", {}).get("skill_score", 0.5)
 
-    # Passing an absurd base_skill should not affect the result — the function
+    # Passing an absurd base_skill should not affect the result - the function
     # must read from driver_data["racecraft"]["skill_score"] for eligible drivers.
     portable = predictor._build_portable_skill_signal("VER", 999.0)
 
@@ -72,7 +72,7 @@ def test_portable_skill_not_double_blended():
         "instead of raw skill_score from driver_data"
     )
     assert portable <= raw_skill, (
-        f"portable ({portable:.4f}) exceeds raw skill ({raw_skill:.4f}) — "
+        f"portable ({portable:.4f}) exceeds raw skill ({raw_skill:.4f}) - "
         "the Bayesian blend should pull toward the mean, not above"
     )
 

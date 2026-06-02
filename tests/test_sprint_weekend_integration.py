@@ -175,7 +175,7 @@ def test_sprint_weekend_full_cascade_workflow():
 
     race_name = "Miami Grand Prix"
 
-    # Step 1: Sprint Qualifying
+    # Sprint Qualifying
     sq_result = predictor.predict_qualifying(
         2026, race_name=race_name, qualifying_stage="sprint", n_simulations=50
     )
@@ -184,7 +184,7 @@ def test_sprint_weekend_full_cascade_workflow():
     assert len(sprint_quali_grid) >= 20
     assert all(entry["position"] == idx + 1 for idx, entry in enumerate(sprint_quali_grid))
 
-    # Step 2: Sprint Race (uses Sprint Quali grid)
+    # Sprint Race (uses Sprint Quali grid)
     sprint_race_result = predictor.predict_race(
         race_name=race_name,
         qualifying_grid=sprint_quali_grid,
@@ -195,7 +195,7 @@ def test_sprint_weekend_full_cascade_workflow():
 
     assert len(sprint_finish) >= 20
 
-    # Step 3: Main Qualifying (independent of sprint)
+    # Main Qualifying (independent of sprint)
     main_quali_result = predictor.predict_qualifying(
         2026, race_name=race_name, qualifying_stage="main", n_simulations=50
     )
@@ -203,7 +203,7 @@ def test_sprint_weekend_full_cascade_workflow():
 
     assert len(main_quali_grid) >= 20
 
-    # Step 4: Main Race (uses Main Quali grid)
+    # Main Race (uses Main Quali grid)
     main_race_result = predictor.predict_race(
         race_name=race_name,
         qualifying_grid=main_quali_grid,

@@ -1,11 +1,27 @@
 """Tests for wet-weather skill system across qualifying and race paths."""
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
 import pytest
+
+_DRIVER_CHARACTERISTICS_PATHS = (
+    Path("data/processed/driver_characteristics/2026_driver_characteristics.json"),
+    Path("data/processed/driver_characteristics.json"),
+)
+
+
+def _load_committed_driver_characteristics() -> dict[str, object]:
+    """Load committed driver characteristics from the current data layout."""
+    for path in _DRIVER_CHARACTERISTICS_PATHS:
+        if path.exists():
+            return json.loads(path.read_text())
+
+    searched = ", ".join(str(path) for path in _DRIVER_CHARACTERISTICS_PATHS)
+    pytest.fail(f"No committed driver characteristics file found; checked: {searched}")
 
 
 class TestWetSkillQualifying:
@@ -188,10 +204,7 @@ class TestWetSkillDataPresence:
 
     def test_all_drivers_have_wet_skill(self):
         """Every driver in the characteristics file must have wet_skill."""
-        import json
-
-        with open("data/processed/driver_characteristics.json") as f:
-            data = json.load(f)
+        data = _load_committed_driver_characteristics()
 
         drivers = data.get("drivers", {})
         assert len(drivers) > 0
@@ -200,10 +213,7 @@ class TestWetSkillDataPresence:
 
     def test_wet_skill_values_in_range(self):
         """All wet_skill values between 0.0 and 1.0."""
-        import json
-
-        with open("data/processed/driver_characteristics.json") as f:
-            data = json.load(f)
+        data = _load_committed_driver_characteristics()
 
         for code, d in data.get("drivers", {}).items():
             ws = d.get("wet_skill")
@@ -212,10 +222,7 @@ class TestWetSkillDataPresence:
 
     def test_wet_skill_spread_meaningful(self):
         """Spread must be >= 0.25 to produce differentiated predictions."""
-        import json
-
-        with open("data/processed/driver_characteristics.json") as f:
-            data = json.load(f)
+        data = _load_committed_driver_characteristics()
 
         values = [d["wet_skill"] for d in data["drivers"].values() if "wet_skill" in d]
         assert len(values) >= 20

@@ -114,7 +114,7 @@ def test_qualifying_skill_blend_can_follow_weekend_bayesian_form() -> None:
 
 
 def test_bayesian_ratings_reflect_driver_form_not_just_car() -> None:
-    """Teammate-relative updates should elevate the stronger driver signal across teams."""
+    """Teammate-relative updates should raise the stronger driver signal across teams."""
     from src.models.bayesian import BayesianDriverRanking, DriverPrior
 
     priors = {

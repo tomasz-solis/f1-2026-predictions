@@ -77,8 +77,8 @@ def _run_update(
 ) -> tuple[dict[str, dict], dict[str, tuple[float, float]]]:
     """Run one update cycle. Returns (mutated drivers, post-update bayesian ratings).
 
-    The Bayesian model is wired up so its posterior gets recorded — unlike the
-    earlier pace-only test which mocked it out — because we need to assert
+    The Bayesian model is wired up so its posterior gets recorded - unlike the
+    earlier pace-only test which mocked it out - because we need to assert
     against the rating mu, not just the pace fields.
     """
     from src.models.bayesian import BayesianDriverRanking, DriverPrior
@@ -404,7 +404,7 @@ class TestTeammatePairAtFieldMedianDoesNotDrift:
     This is the only "neutral" case the de-carring formula handles correctly:
     when team_mean equals field_mean for that pair, adjusted == raw, and the
     Bayesian update is driven by raw position vs prior. We use a pair finishing
-    P11/P12 in the middle of a 22-driver grid — exactly at field median.
+    P11/P12 in the middle of a 22-driver grid - exactly at field median.
 
     NOTE: this test deliberately does NOT make the *whole grid* neutral.
     Earlier drafts did, and discovered that the de-carring formula compresses
@@ -432,7 +432,7 @@ class TestTeammatePairAtFieldMedianDoesNotDrift:
         all_drivers = [d for team_drivers in lineups.values() for d in team_drivers]
         drivers = {code: _make_driver_entry(rating_mu=11.5) for code in all_drivers}
 
-        # Haas pair lands at P11/P12 — exactly the field median for grid_size=22.
+        # Haas pair lands at P11/P12 - exactly the field median for grid_size=22.
         # Other teams are arranged so the field is symmetric.
         race_positions = {
             "NOR": 1,

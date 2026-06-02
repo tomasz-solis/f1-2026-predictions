@@ -108,7 +108,7 @@ def test_race_pace_blend_is_partial():
     A single race result should only partially move race_pace, not replace it.
 
     With blend=0.25 and a P1 finish, a driver starting at 0.50 should land
-    around 0.625 — not jump all the way to 1.0.
+    around 0.625 - not jump all the way to 1.0.
     """
     drivers = {"NOR": _make_driver_payload(0.50, 0.50, 0.60)}
     result = _run_update(drivers, race_positions={"NOR": 1}, quali_positions={"NOR": 2})

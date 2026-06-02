@@ -46,7 +46,7 @@ def _make_grid_reference(finish_order: list[dict]) -> dict:
 
 
 def _make_samples(finish_order: list[dict], n_samples: int = 50) -> dict:
-    """Generate random samples for each driver — enough for quantile logic to engage."""
+    """Generate random samples for each driver - enough for quantile logic to engage."""
     rng = np.random.default_rng(42)
     return {row["driver"]: rng.uniform(0.0, 1.0, n_samples).tolist() for row in finish_order}
 
@@ -115,7 +115,7 @@ class TestMovementFloorTrackScale:
         # floor = min(ceiling, base_floor + 1.0 * track_scale)
         #       = min(ceiling, 0.70 + 0.25) = min(ceiling, 0.95)
         # ceiling = max(0.70, 2.5 - 1.0 * 0.70) = max(0.70, 1.80) = 1.80
-        # So floor = min(1.80, 0.95) = 0.95 — well within ceiling.
+        # So floor = min(1.80, 0.95) = 0.95 - well within ceiling.
         # This test confirms the function does not raise or produce absurd output.
         finish = _make_finish_order()
         apply_main_race_movement_constraints(

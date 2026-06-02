@@ -972,7 +972,7 @@ def test_temporal_split_preserves_calendar_order():
     train_names = [r["race_name"] for r in train]
     test_names = [r["race_name"] for r in test]
 
-    # First 7 races are training, last 3 are test — no shuffling
+    # First 7 races are training, last 3 are test - no shuffling
     assert train_names == [f"Race_{i:02d}" for i in range(1, 8)]
     assert test_names == [f"Race_{i:02d}" for i in range(8, 11)]
 
@@ -991,7 +991,7 @@ def test_random_split_is_not_necessarily_ordered():
     """Random strategy should sometimes differ from temporal order (probabilistic).
 
     This test seeds the RNG to a value known to produce a shuffle; it verifies
-    that the random strategy is distinct from temporal — not that it's wrong,
+    that the random strategy is distinct from temporal - not that it's wrong,
     but that the two strategies are actually different.
     """
     results = _make_race_results(10)
@@ -1003,7 +1003,7 @@ def test_random_split_is_not_necessarily_ordered():
 
     # Random split with seed=99 should not be identical to the ordered temporal split
     assert temporal_names != random_names, (
-        "random split coincidentally matches temporal order with this seed — "
+        "random split coincidentally matches temporal order with this seed - "
         "change the seed in the test"
     )
 
