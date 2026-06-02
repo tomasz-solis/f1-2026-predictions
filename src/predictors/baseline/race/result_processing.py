@@ -239,7 +239,7 @@ def apply_hypothetical_points_floor(
     if reference_grid_pos > top_grid_limit:
         return position_blend_score, blended_position_samples
 
-    # Gate on raw extraction skill — the team-independent driver quality signal.
+    # Gate on raw extraction skill - the team-independent driver quality signal.
     raw_skill = float(info.get("raw_skill", info.get("skill", 0.5)))
     portable_skill_threshold = float(
         cfg.get(

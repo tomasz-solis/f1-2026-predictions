@@ -1029,7 +1029,7 @@ def _read_json(path: Path) -> dict[str, Any]:
 def _fmt(value: Any) -> str:
     """Format optional numbers for Markdown."""
     numeric = _coerce_float(value)
-    return "—" if numeric is None else f"{numeric:.3f}"
+    return " - " if numeric is None else f"{numeric:.3f}"
 
 
 def _json_safe(value: Any) -> Any:

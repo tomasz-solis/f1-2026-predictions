@@ -189,7 +189,7 @@ def format_schedule_summary(schedule: ScheduleType) -> str:
 
     lines = [
         f"Weight Schedule: {schedule.upper()}",
-        "=" * 60,
+        "",
     ]
 
     for race_num in sorted(schedule_def.keys()):

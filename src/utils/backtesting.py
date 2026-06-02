@@ -1156,7 +1156,7 @@ def split_train_test_results(
 
     ``random`` replicates the original shuffle behaviour and is provided only
     for comparison. It is NOT appropriate for evaluating a learning system that
-    consumes races in calendar order — use it only to measure how much the
+    consumes races in calendar order - use it only to measure how much the
     choice of split strategy changes the reported metrics.
 
     Args:

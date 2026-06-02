@@ -908,7 +908,7 @@ def _build_quali_sim_config(
         )
     )
 
-    # Regularization — resolved here because it requires cfg lookup
+    # Regularization - resolved here because it requires cfg lookup
     apply_testing_fallback_teammate_guard = (
         ctx.use_model_only_profile
         and ctx.has_testing_fallback_data

@@ -92,7 +92,7 @@ def get_compound_max_age(
     """Return the lap count at which compound degradation enters the cliff zone.
 
     Scales the global default cliff age from config by Pirelli tire stress score
-    (1–5 scale) and track temperature. A stress score of 3.0 applies no scaling.
+    (1 - 5 scale) and track temperature. A stress score of 3.0 applies no scaling.
     Higher stress and hotter tracks pull the cliff in; lower stress and cooler
     tracks extend it.
 

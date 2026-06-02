@@ -203,7 +203,7 @@ def build_testing_short_run_fallback(
     """Build a qualifying fallback from stored short-run testing profiles.
 
     Qualifying is mostly about single-lap bite: tire warm-up, rotation on low
-    fuel, and how much peak grip the car can unlock in a short window. That is
+    fuel, and how much peak grip the car can find in a short window. That is
     why the fallback leans on the stored short-run profile first and only uses a
     balanced profile as a stabilizer when the short-run signal looks noisy.
     Race-style long-run behavior still matters later on Sunday, but it is the
@@ -649,9 +649,9 @@ def build_driver_list_with_strengths_core(
     """Build driver list with blended team/driver strengths and testing modifiers.
 
     Delegates to three focused helpers:
-    1. ``_compute_model_strengths`` — raw team strength per team from weight schedule.
-    2. ``_blend_strengths`` — select and apply FP/testing/model-only blending strategy.
-    3. ``_build_driver_record`` — resolve per-driver skill/pace/experience signals.
+    1. ``_compute_model_strengths`` - raw team strength per team from weight schedule.
+    2. ``_blend_strengths`` - select and apply FP/testing/model-only blending strategy.
+    3. ``_build_driver_record`` - resolve per-driver skill/pace/experience signals.
     """
     uses_checkpoint_practice_profiles = (
         practice_like_profile_label is not None

@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 #   race_adv_ratio (0.80):    race advantage signal weighted at 80% of raw pace
 #   track_ease_ratio (0.51):  track overtaking factor contributes ~half weight
 #   pass_probability_sensitivity (0.45): how steeply pass probability rises
-#                             above the threshold — tuned to avoid runaway
+#                             above the threshold - tuned to avoid runaway
 #                             overtaking in race realism tests
 _OVERTAKE_INTERNAL = {
     "pass_window_ratio": 0.67,
@@ -74,11 +74,11 @@ def _expand_overtake_cfg(compact: dict[str, Any]) -> dict[str, Any]:
     """Expand 5 user-facing overtake params into the full internal set.
 
     The 5 exposed params and their defaults:
-        dirty_air_window_s  (1.8)  – active aero / slipstream proximity window
-        pace_weight         (0.55) – importance of raw pace delta
-        racecraft_weight    (0.25) – combined attacker/defender skill weight
-        track_factor        (0.35) – track influence on passing difficulty
-        pass_chance_base    (0.30) – base pass probability when threshold met
+        dirty_air_window_s  (1.8) - active aero / slipstream proximity window
+        pace_weight         (0.55) - importance of raw pace delta
+        racecraft_weight    (0.25) - combined attacker/defender skill weight
+        track_factor        (0.35) - track influence on passing difficulty
+        pass_chance_base    (0.30) - base pass probability when threshold met
 
     If callers still supply the old 11+ detailed keys they are used directly
     for backward compatibility.
@@ -470,7 +470,7 @@ def simulate_race_lap_by_lap(
 
             chaos = 0.0
 
-            # Lap 1 chaos (incidents, battles) — with track-specific risk modifier
+            # Lap 1 chaos (incidents, battles) - with track-specific risk modifier
             if lap_num == 1:
                 chaos += _get_lap1_chaos(state["position"], race_params, rng)
 

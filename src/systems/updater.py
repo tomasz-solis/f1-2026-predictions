@@ -768,8 +768,7 @@ def update_bayesian_driver_ratings(
         )
 
     # Persist Bayesian state only. Prediction-time blending in
-    # _blend_race_skill_with_bayesian_form handles the skill_score adjustment —
-    # keeping it in one place avoids double-counting. This must happen after the
+    # _blend_race_skill_with_bayesian_form handles the skill_score adjustment - # keeping it in one place avoids double-counting. This must happen after the
     # qualifying update above so the stored posterior reflects both sessions.
     touched_skill_drivers = (
         _persist_bayesian_ratings_to_drivers(
@@ -1068,9 +1067,9 @@ def update_from_race(
     3. Update Bayesian driver ratings
     4. Reduce uncertainty
     """
-    logger.info("=" * 60)
+    logger.info("")
     logger.info("Updating from %s %s", year, race_name)
-    logger.info("=" * 60)
+    logger.info("")
 
     try:
         race_results, session = load_race_session(year, race_name)
@@ -1144,7 +1143,7 @@ def update_from_sprint_race(
 ) -> None:
     """Update driver ratings from a sprint race result.
 
-    Call this after sprint results are available — typically Saturday.
+    Call this after sprint results are available - typically Saturday.
     It runs independently from update_from_race (Sunday) because the two
     sessions have different timing; the pipeline layer decides the order.
 
@@ -1327,7 +1326,7 @@ def update_from_sprint_race(
         else {}
     )
 
-    # Sprint race pace EMA — lower blend than main race because sprint is ~1/3 distance.
+    # Sprint race pace EMA - lower blend than main race because sprint is ~1/3 distance.
     driver_to_team: dict[str, str] = {}
     for team_name, team_drivers in (lineups or {}).items():
         for d in team_drivers:
@@ -1351,7 +1350,7 @@ def update_from_sprint_race(
         else 0
     )
 
-    # Sprint wet_skill EMA — quarter weight of main race
+    # Sprint wet_skill EMA - quarter weight of main race
     touched_wet = 0
     wet_skill_updated_drivers: set[str] = set()
     if sprint_weather_key in {"rain", "mixed"}:

@@ -80,7 +80,7 @@ class ProductionConfig:
             "N/A",
         )
         lines.append("PRODUCTION CONFIGURATION")
-        lines.append("=" * 70)
+        lines.append("")
         lines.append(f"Source: {source_notebook}")
         lines.append(f"Races analyzed: {notes.get('total_races_analyzed', 'N/A')}")
         lines.append(f"Last updated: {notes.get('last_updated', 'N/A')}")

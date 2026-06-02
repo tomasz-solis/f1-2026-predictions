@@ -570,7 +570,7 @@ class _WarmupRunState:
     weather_scenarios: list[str]
     targets: WarmupTargets
     checkpoint_context: CheckpointContext
-    detector: Any  # SessionDetector — avoid circular import type
+    detector: Any  # SessionDetector - avoid circular import type
     summary: WarmupSummary
 
     # Populated during the compute stage
@@ -1002,15 +1002,15 @@ def run_warmup_precompute_cycle(
 
     Delegates to five stage functions in order:
 
-    1. ``_stage_refresh_practice`` — pull completed FP sessions and update
+    1. ``_stage_refresh_practice`` - pull completed FP sessions and update
        car characteristics for the anchor race.
-    2. ``_stage_load_predictor`` — resolve artifact hash and load the baseline
+    2. ``_stage_load_predictor`` - resolve artifact hash and load the baseline
        predictor.
-    3. ``_stage_compute_predictions`` — for each target race, ensure base
+    3. ``_stage_compute_predictions`` - for each target race, ensure base
        features exist then generate per-weather predictions.
-    4. ``_stage_save_horizon_index`` — persist the horizon index and mark
+    4. ``_stage_save_horizon_index`` - persist the horizon index and mark
        which races have full weather coverage.
-    5. ``_stage_reconcile_completed_accuracy`` — attach completed-session
+    5. ``_stage_reconcile_completed_accuracy`` - attach completed-session
        actuals and rebuild accuracy snapshots for recent races when enabled.
 
     Each stage reads and writes shared state through a ``_WarmupRunState``

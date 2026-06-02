@@ -33,7 +33,7 @@ bayesian:
   # Confidence weight for teammate-relative Bayesian updates
   teammate_relative_confidence: 0.35
 
-  # Qualifying results are one lap in controlled conditions — noisier than race.
+  # Qualifying results are one lap in controlled conditions - noisier than race.
   qualifying_update_confidence: 0.15
 
   # Sprint races are ~1/3 race distance with less strategic variation.
@@ -192,7 +192,7 @@ baseline_predictor:
     # Wet/mixed qualifying behaviour.
     # Wet qualifying increases noise (red flags, track evolution, aquaplaning risk)
     # and applies a per-driver wet_skill modifier that shifts their score relative
-    # to their dry pace. wet_skill_neutral is the reference point — drivers above
+    # to their dry pace. wet_skill_neutral is the reference point - drivers above
     # it gain, drivers below it lose. Mixed blends dry and wet effects.
     wet_noise_multiplier: 1.60        # noise_std scale in pure wet qualifying
     mixed_noise_multiplier: 1.28      # noise_std scale in mixed conditions
@@ -643,8 +643,8 @@ baseline_predictor:
       # tracks with average-to-high thermal stress. High-deg circuits (Bahrain,
       # Spain) hit the cliff earlier; low-deg circuits (Monaco) later. Per-circuit
       # compound data in car_characteristics overrides these when enough laps exist.
-      # cliff_multiplier: 2.8 — degradation rate multiplies by this factor beyond
-      # max age. Calibrated to produce ~1–3s pace loss per lap in the cliff zone,
+      # cliff_multiplier: 2.8 - degradation rate multiplies by this factor beyond
+      # max age. Calibrated to produce ~1 - 3s pace loss per lap in the cliff zone,
       # consistent with observed F1 radio calls and strategy decisions when teams
       # are clearly managing tyres past their window.
       compound_max_age:
@@ -675,13 +675,13 @@ baseline_predictor:
       # At 0.80, a driver at 0.90 wet_skill gains 0.16s/lap over neutral,
       # accumulating to ~9.1s over 57 laps (typical race distance).
       # Pairwise noise (sqrt(2)*0.42) accumulates to ~4.5s, giving
-      # signal-to-noise of ~2.0 sigma — dominant in wet conditions,
+      # signal-to-noise of ~2.0 sigma - dominant in wet conditions,
       # which matches F1 reality where wet skill is the primary
       # differentiator in rain races.
       # Qualifying uses 0.18 (higher signal in single-lap format).
       wet_skill_lap_weight: 0.80
       # Neutral set at 0.70 (not 0.50) because F1 drivers are a
-      # pre-selected population — the typical F1 driver is above-average
+      # pre-selected population - the typical F1 driver is above-average
       # at wet driving. Most drivers cluster here; only drivers with
       # clear evidence of above/below-average wet ability deviate.
       wet_skill_neutral: 0.70

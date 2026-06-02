@@ -595,13 +595,13 @@ def prediction_action_state(
         )
     elif stale_reason == "boundary_mismatch":
         pending_message = (
-            "Current session boundary is ahead of the warmed horizon. Predictions will unlock "
+            "Current session boundary is ahead of the warmed horizon. Predictions will be available "
             "after the next hourly warmup persists this checkpoint."
         )
     elif bool(precompute_filter_meta.get("scope_applied")):
         pending_message = (
             "Persisted horizon metadata is still warming for the current checkpoint. "
-            "The dashboard will unlock after the next hourly warmup completes."
+            "The dashboard will update after the next hourly warmup completes."
         )
     else:
         pending_message = (

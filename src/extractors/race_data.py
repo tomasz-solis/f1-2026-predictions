@@ -106,7 +106,7 @@ def extract_season(year: int, verbose: bool = True) -> SeasonRaceData:
 
     if verbose:
         logger.info("Extracting %s races from %s", len(races), year)
-        logger.info("%s", "=" * 70)
+        logger.info("")
 
     driver_data = defaultdict(list)
 

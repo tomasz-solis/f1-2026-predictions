@@ -682,7 +682,7 @@ def _render_race_result(df: pd.DataFrame) -> None:
 
     has_ci = "p5" in race_df.columns and "p95" in race_df.columns
     if has_ci:
-        race_df["ci_range"] = race_df.apply(lambda r: f"P{int(r['p5'])}–P{int(r['p95'])}", axis=1)
+        race_df["ci_range"] = race_df.apply(lambda r: f"P{int(r['p5'])} - P{int(r['p95'])}", axis=1)
 
     input_confidence = race_df.attrs.get("input_confidence")
 

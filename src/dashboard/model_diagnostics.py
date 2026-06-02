@@ -163,11 +163,11 @@ def render_model_diagnostics(
 
     cols = st_module.columns(4)
     with cols[0]:
-        st_module.metric("Replay races", source_state.get("replay_race_count", "—"))
+        st_module.metric("Replay races", source_state.get("replay_race_count", " - "))
     with cols[1]:
         st_module.metric(
             "Live races",
-            source_state.get("live_artifact_races_completed", "—"),
+            source_state.get("live_artifact_races_completed", " - "),
         )
     with cols[2]:
         st_module.metric("Dry leakage corr", _fmt(dry_leakage.get("correlation")))
@@ -372,7 +372,7 @@ def _render_refit_candidate_test(
     decision = refit_test.get("decision_assessment", {})
     if isinstance(decision, Mapping):
         st_module.caption(
-            f"Decision state: `{decision.get('state', 'unknown')}` — "
+            f"Decision state: `{decision.get('state', 'unknown')}` - "
             f"{decision.get('recommendation', '')}"
         )
 
@@ -404,7 +404,7 @@ def _render_prediction_replay_test(
     decision = replay_test.get("decision_assessment", {})
     if isinstance(decision, Mapping):
         st_module.caption(
-            f"Decision state: `{decision.get('state', 'unknown')}` — "
+            f"Decision state: `{decision.get('state', 'unknown')}` - "
             f"{decision.get('recommendation', '')}"
         )
 
@@ -431,5 +431,5 @@ def _fmt(value: Any) -> str:
     try:
         numeric = float(value)
     except (TypeError, ValueError):
-        return "—"
+        return " - "
     return f"{numeric:.3f}"

@@ -725,13 +725,13 @@ def _coerce_float(value: Any) -> float | None:
 def _fmt(value: Any) -> str:
     """Format optional numbers for Markdown."""
     numeric = _coerce_float(value)
-    return "—" if numeric is None else f"{numeric:.3f}"
+    return " - " if numeric is None else f"{numeric:.3f}"
 
 
 def _fmt_pct(value: Any) -> str:
     """Format optional percentage deltas for Markdown."""
     numeric = _coerce_float(value)
-    return "—" if numeric is None else f"{numeric:+.1f}%"
+    return " - " if numeric is None else f"{numeric:+.1f}%"
 
 
 def _round_frame(frame: pd.DataFrame, decimals: int = 6) -> pd.DataFrame:
