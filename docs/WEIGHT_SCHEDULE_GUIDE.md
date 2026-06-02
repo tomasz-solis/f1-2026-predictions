@@ -14,15 +14,15 @@ In a regulation-change season, last year's championship standings are a weak
 anchor, not a season template. A team that dominated on the previous rules might
 have gotten the new concept wrong. A midfield team might have nailed it.
 
-Pre-season testing gives you directional signals — who looks fast, who looks
-fragile — but teams deliberately mask their true pace. Treating testing lap times
+Pre-season testing gives you directional signals - who looks fast, who looks
+fragile - but teams deliberately mask their true pace. Treating testing lap times
 as ground truth is a mistake.
 
 The weight schedule handles this by being explicit about which source of evidence
 you trust at each point in the season. At Race 1, you blend all three signals
 because you don't have much else. By Race 3, you're almost entirely running on
 what teams have actually shown in competition. The trust shift is configurable
-and auditable — not hidden inside a model.
+and auditable - not hidden inside a model.
 
 For 2026 analysis, treat 2022 and 2014 as the closest regulation-reset analogs.
 Use 2025 as a carryover sanity check only; it should not be the representative

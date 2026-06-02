@@ -4,7 +4,7 @@ This guide shows what the app does on a normal prediction click and what still n
 
 ## During `Predict`
 
-When the user clicks **Predict** in `src/dashboard/pages.py` (called by `app.py`):
+When the user clicks Predict in `src/dashboard/pages.py` (called by `app.py`):
 
 1. Weekend format is resolved for the selected race.
 2. Session-boundary freshness is checked for the selected race.

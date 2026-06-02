@@ -1,4 +1,4 @@
-# Model Error Analysis — 2026
+# Model Error Analysis - 2026
 
 *Generated: 2026-04-20T14:07:50.230271+00:00*
 

@@ -26,7 +26,7 @@ another. Apply the rules below per artifact, not per outlet.
 
 ### 1.1 Accepted
 
-A source is **accepted** for hard validation only if it satisfies all of:
+A source is accepted for hard validation only if it satisfies all of:
 
 - it publishes a numeric teammate gap in seconds (or a per-lap delta that
   can be converted to seconds without an undocumented coefficient);
@@ -52,7 +52,7 @@ case, not blanket-approved:
 
 ### 1.2 Conditionally Accepted
 
-A source is **conditionally accepted** when the construct or scope partly
+A source is conditionally accepted when the construct or scope partly
 matches but requires translation. Use the row only if the translation is
 mechanical and documented.
 
@@ -70,7 +70,7 @@ Examples:
 
 ### 1.3 Rejected
 
-A source is **rejected** for hard validation if any of the following hold:
+A source is rejected for hard validation if any of the following hold:
 
 - the methodology is opaque or unstated;
 - the source reports a derived rating on its own scale rather than a
@@ -91,10 +91,10 @@ F1Metrics and similar independent driver-rating projects publish numbers
 that look like validation evidence but partly overlap with what this prior
 estimates. The rule for v1:
 
-- F1Metrics-style sources are **conditionally acceptable** when they
+- F1Metrics-style sources are conditionally acceptable when they
   publish a numeric teammate seconds delta with enough methodology to
   understand the construct (which sessions, which laps, what filters).
-- They are **not acceptable as the sole hard threshold** when the
+- They are not acceptable as the sole hard threshold when the
   published value is a model-derived driver rating on its own scale rather
   than a numeric teammate seconds delta with documented methodology.
 - They may corroborate another timing source (broadcast charts, F1TV
@@ -108,10 +108,10 @@ This rule applies to any independent driver-rating project that estimates
 the same quantity this prior estimates. F1Metrics is named because it is a
 likely candidate source; the rule is not F1Metrics-specific.
 
-**Decision (2026-05-12) — F1Metrics tightening.** F1Metrics-style
-sources are **SUPPLEMENTAL only**, never HARD. They are reported
-separately per Section 6 and **do not count toward the Section 7 lock
-rule's "at least 3 race + 2 quali HARD checks" requirement**. A row
+Decision (2026-05-12) - F1Metrics tightening. F1Metrics-style
+sources are SUPPLEMENTAL only, never HARD. They are reported
+separately per Section 6 and do not count toward the Section 7 lock
+rule's "at least 3 race + 2 quali HARD checks" requirement. A row
 whose only available source is F1Metrics remains CUT unless an
 independent acceptable source surfaces. This decision overrides the
 "conditionally acceptable as sole source" framing earlier in this
@@ -120,7 +120,7 @@ itself a HARD source.
 
 ### 1.3.6 Motorsport / PACETEQ Source Family Rule
 
-**Decision (2026-05-12, amended 2026-05-17).** Motorsport.com and
+Decision (2026-05-12, amended 2026-05-17). Motorsport.com and
 Motorsport-Total articles that publish PACETEQ teammate pace deltas are useful
 external timing-analysis evidence, but they are not HARD-capable for the
 current v1 extractor unless the article proves a same-construct match.
@@ -149,7 +149,7 @@ Limits:
 
 ### 1.3.7 Construct Audit
 
-**Decision (2026-05-17).** The available PACETEQ race and qualifying rows are
+Decision (2026-05-17). The available PACETEQ race and qualifying rows are
 no longer HARD acceptance gates for the current v1 extractor.
 
 The qualifying mismatch is direct: the current local qualifying construct is a
@@ -173,23 +173,23 @@ Those rows remain useful external context, but they are now classified as
 Most cuts come from construct mismatch, not source quality. The five
 patterns to watch for:
 
-- **race pace vs qualifying pace.** A driver may be 0.15s/lap faster than
+- race pace vs qualifying pace. A driver may be 0.15s/lap faster than
   the teammate over long runs but 0.30s/lap faster on a single push lap.
   The prior estimates these separately. A row that uses qualifying
   evidence to validate the race prior is mismatched.
-- **teammate-relative vs global.** The prior is a teammate-relative
+- teammate-relative vs global. The prior is a teammate-relative
   residual. A source that reports "VER is the fastest driver in F1 by
   0.4s" is a global statement. It does not pin the VER-PER teammate gap.
-- **single-season vs multi-season aggregate.** A row that says
+- single-season vs multi-season aggregate. A row that says
   `verstappen_perez_race_2022_2024` aggregates three seasons of car
   development, Pérez's documented 2024 form drop, and 2022 vs 2023 vs 2024
   reliability. Most published deltas are season-by-season. Aggregating
   them across seasons requires assumptions the source did not make.
-- **model-derived rating vs published timing delta.** A source that runs
+- model-derived rating vs published timing delta. A source that runs
   its own driver-rating model and publishes the rating outputs is partly
   circular as validation: it is doing what the prior is doing. Prefer
   sources that publish raw timing deltas.
-- **opaque broadcast number vs documented method.** Sky/F1TV graphics
+- opaque broadcast number vs documented method. Sky/F1TV graphics
   often quote teammate seconds-per-lap during a stint, but the underlying
   filter (which laps, what tire age) is rarely visible. Acceptable only
   if the broadcast also names the lap window and the prior-side construct can
@@ -207,14 +207,14 @@ must be explicit. Scratch notes are not validation evidence.
 Each candidate from the original scaffold is reviewed against the
 criteria in Section 1. Action codes:
 
-- `KEEP` — row is well-scoped; proceed to source research.
-- `SPLIT` — scope is too broad; split into per-season rows or narrower
+- `KEEP` - row is well-scoped; proceed to source research.
+- `SPLIT` - scope is too broad; split into per-season rows or narrower
   comparisons before sourcing.
-- `NARROW` — scope is too aggressive; tighten the relationship or the
+- `NARROW` - scope is too aggressive; tighten the relationship or the
   sample window.
-- `QUALITATIVE` — magnitude unlikely to be sourceable; convert to a
+- `QUALITATIVE` - magnitude unlikely to be sourceable; convert to a
   unit-test smoke check (sign-only) and remove from the validation set.
-- `CUT` — sample too thin or construct mismatch unlikely to be fixable;
+- `CUT` - sample too thin or construct mismatch unlikely to be fixable;
   remove the row entirely.
 
 ### 2.1 Race Candidates
@@ -305,12 +305,12 @@ criteria in Section 1. Action codes:
 
 After applying the audit and the 2026-05-12 Phase 1 source research pass:
 
-- **Race**: 7 PACETEQ rows remain as `EXTERNAL_CONTEXT` after the 2026-05-17
+- Race: 7 PACETEQ rows remain as `EXTERNAL_CONTEXT` after the 2026-05-17
   construct audit; none currently counts as a HARD gate for the paired race
   extractor. Three Bottas-Zhou rows are cut or supplemental; the
   Russell-Latifi 2022 row is cut as an impossible pairing/year; Tsunoda-De
   Vries remains cut.
-- **Quali**: 6 PACETEQ rows remain as `EXTERNAL_CONTEXT`; none currently
+- Quali: 6 PACETEQ rows remain as `EXTERNAL_CONTEXT`; none currently
   counts as a HARD gate for the multi-run qualifying extractor. Leclerc-Sainz
   remains smoke-only because the original relationship was hedged and
   contested.
@@ -328,14 +328,14 @@ Phase 1 source research pass.
 Each row also acquires an `evidence_tier` value during Phase 1, per
 Section 6:
 
-- HARD — counts toward pass/fail in the validation report;
-- EXTERNAL_CONTEXT — useful external evidence that does not yet match the
+- HARD - counts toward pass/fail in the validation report;
+- EXTERNAL_CONTEXT - useful external evidence that does not yet match the
   fitted construct closely enough to gate the fit;
-- SUPPLEMENTAL — F1Metrics-style or partly model-derived; reported
+- SUPPLEMENTAL - F1Metrics-style or partly model-derived; reported
   separately, does not count toward pass/fail;
-- SMOKE_ONLY — direction-only smoke check; does not appear in the
+- SMOKE_ONLY - direction-only smoke check; does not appear in the
   validation report;
-- CUT — researched and rejected; cut reason recorded.
+- CUT - researched and rejected; cut reason recorded.
 
 The evidence_tier is recorded in the Status column. HARD rows count toward
 the validation report; EXTERNAL_CONTEXT, SUPPLEMENTAL, and CUT rows do not.
@@ -575,20 +575,20 @@ Cut or downgraded during Phase 1 source research:
 Phase 1 research is closed for this validation set. Future rows should follow
 the same discipline:
 
-1. **Read Section 1 in full** before opening any source. Source acceptance
+1. Read Section 1 in full before opening any source. Source acceptance
    is a methodology call, not a reputation call.
-2. **Pick a target shape for the validation set** before sourcing. A
+2. Pick a target shape for the validation set before sourcing. A
    reasonable target: 4-6 race rows filled, 2-3 quali rows filled. If
    sources do not support that, reduce the count rather than soften the
    criteria.
-3. **Scratch-file protocol (Decision 2026-05-12).** Candidate links live in
+3. Scratch-file protocol (Decision 2026-05-12). Candidate links live in
    `docs/fixes/phase_1_source_research.md` until promoted here. That file is
-   **research notes only** and is **not validation evidence**. It must not be
+   research notes only and is not validation evidence. It must not be
    referenced as validation evidence by any downstream doc, fit artifact, or
    replay output.
-4. **For each candidate row, in audit order:**
+4. For each candidate row, in audit order:
    - identify candidate sources (assistant may help by surfacing links
-     into the scratch file from step 3);
+     into the scratch file from the previous validation pass);
    - read each candidate source against Section 1.1-1.4;
    - if accepted, record `source_url`, `source_type`, `threshold_s`,
      `pass_rule`, and `date_accessed` in Section 3 of this doc;
@@ -598,11 +598,11 @@ the same discipline:
      change the row's status to `CUT_<reason>`;
    - never leave a worked row unresolved; either
      promote it to filled, or cut it.
-5. **Do not chase a target row count.** If a row cannot be sourced
+5. Do not chase a target row count. If a row cannot be sourced
    defensibly, cut it. The validation report acknowledges undersourced
    areas (especially quali) by widening initial sigma and tightening
    replay diagnostics, not by inventing thresholds.
-6. **Record cut reasons.** A cut row carries information: it tells future
+6. Record cut reasons. A cut row carries information: it tells future
    readers why a check was not made. Never silently delete a candidate.
 
 After Phase 1 closes, write a one-page "Validation Set Provenance" note
@@ -635,19 +635,19 @@ the row's notes column or as a separate column once the table is
 edited:
 
 ```text
-HARD             — independent numeric seconds delta, methodology
+HARD - independent numeric seconds delta, methodology
                    stated or accepted under the Motorsport / PACETEQ
                    source-family rule. Counts toward pass/fail.
-EXTERNAL_CONTEXT — independent numeric seconds delta with useful context,
+EXTERNAL_CONTEXT - independent numeric seconds delta with useful context,
                    but not a proven same-construct match for the current
                    fitted target. Reported separately.
-SUPPLEMENTAL     — F1Metrics-style or partly model-derived; methodology
+SUPPLEMENTAL - F1Metrics-style or partly model-derived; methodology
                    stated; or accepted-source evidence too near zero to
                    carry a hard threshold. Reported separately.
-SMOKE_ONLY       — direction-only check, lives in
+SMOKE_ONLY - direction-only check, lives in
                    tests/test_prior_signs.py, not in the validation
                    report.
-CUT              — researched and rejected; cut reason recorded.
+CUT - researched and rejected; cut reason recorded.
 ```
 
 The validation report counts only HARD rows toward "passed/failed".

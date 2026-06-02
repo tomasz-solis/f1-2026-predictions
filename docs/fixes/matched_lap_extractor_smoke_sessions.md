@@ -144,11 +144,11 @@ The candidate selections were verified against FastF1 cache via the Phase 2
 read-only inspector. Inspector output is the evidence basis for each row's
 expected behavior.
 
-- **Clean dry race** (2024 Bahrain): needs no rain, no red-flag-truncated
+- Clean dry race (2024 Bahrain): needs no rain, no red-flag-truncated
   session, normal pit windows, and at least two two-car teams with full lap
   counts. Inspector confirmed dry weather, no retirements, and ten two-car
   teams.
-- **Wet/mixed race** (2024 British): needs lap-level weather variation
+- Wet/mixed race (2024 British): needs lap-level weather variation
   FastF1 actually records. Inspector confirmed 51 `Rainfall=True` and 96
   `Rainfall=False` samples, about a 35% rain fraction. This is real evidence,
   not edge noise, and lap-interval mapping is expected to produce a mix of
@@ -159,13 +159,13 @@ expected behavior.
   so dry and wet matched rows should be observable in the same diagnostic
   output. If implementation later splits dry-rating and wet-skill diagnostics,
   preserve the same expectation across the two dumps.
-- **Early teammate DNF** (2024 Australian): needs at least one team where one
+- Early teammate DNF (2024 Australian): needs at least one team where one
   driver retired early (lap < 10) and the other completed. Inspector
   confirmed VER retired lap 4, while PER finished. This is a useful boundary
   case: the residual candidate laps are below `min_matched_pairs_race = 8`,
   so the smoke check distinguishes `insufficient_matched_pairs` from
   `teammate_dnf_no_matched_laps` and can catch filter-chain bugs.
-- **Strategy-asymmetric race** (2024 Miami): needs visible mid-race safety-car
+- Strategy-asymmetric race (2024 Miami): needs visible mid-race safety-car
   or VSC that split strategies between teammates. Inspector confirmed one SC
   row and two VSC rows, with all teams represented by two drivers and only SAR
   retiring late. Direct cached-lap inspection showed the VSC window overlapping
@@ -174,7 +174,7 @@ expected behavior.
   stopping before the neutralization while PER stopped during it, NOR stopping
   under SC while PIA had already stopped and later stopped again, and ALO/STR
   splitting VSC/SC-era stops.
-- **Representative qualifying** (2024 Bahrain): needs common-segment logic
+- Representative qualifying (2024 Bahrain): needs common-segment logic
   exercised on more than one branch. Inspector confirmed four teams with both
   drivers reaching Q3 (Red Bull, Ferrari, McLaren, Mercedes), one team with
   both drivers reaching Q2 only (RB), two teams where both drivers stopped in

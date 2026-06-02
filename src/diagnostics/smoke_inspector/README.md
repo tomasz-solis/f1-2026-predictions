@@ -13,7 +13,7 @@ In scope:
 - emit JSON + text evidence files the analyst attaches alongside the
   smoke-session lock.
 
-Out of scope (Phase 3 — matched-lap extractor):
+Out of scope (Phase 3 - matched-lap extractor):
 
 - pairing teammate laps;
 - classifying laps as dry / wet / unreliable;
@@ -21,8 +21,8 @@ Out of scope (Phase 3 — matched-lap extractor):
 - deciding what counts as a comparable lap.
 
 The deletion test, from master execution plan Phase 2:
-**could this package be deleted after Phase 2 closes without losing
-anything Phase 3 needs to implement?** If yes, scope is right. If no,
+could this package be deleted after Phase 2 closes without losing
+anything Phase 3 needs to implement? If yes, scope is right. If no,
 the extractor has leaked into Phase 2.
 
 ## Usage
@@ -36,8 +36,8 @@ python scripts/inspect_smoke_sessions.py \
 For each smoke-session candidate, two evidence files are written to
 the output directory:
 
-- `<year>_<category>.json` — full structured summary;
-- `<year>_<category>.txt` — short human-readable summary
+- `<year>_<category>.json` - full structured summary;
+- `<year>_<category>.txt` - short human-readable summary
   (also printed to stdout).
 
 The session list is hard-coded in `scripts/inspect_smoke_sessions.py`

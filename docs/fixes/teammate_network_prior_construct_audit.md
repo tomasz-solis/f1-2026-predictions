@@ -11,19 +11,19 @@ prior fit. The question is narrow:
 > Are the failed source-backed rows measuring the same object as the local
 > matched-lap extractor?
 
-The answer is **mostly no for qualifying** and **not proven for race pace**.
+The answer is mostly no for qualifying and not proven for race pace.
 That does not automatically make the extractor wrong. It means the current
 HARD validation set is grading several non-identical constructs as though
 they were one construct.
 
-## Executive Summary
+## Summary
 
-1. The local qualifying extractor does **not** estimate "best qualifying lap
+1. The local qualifying extractor does not estimate "best qualifying lap
    gap." It estimates the median of run-order-matched quick laps, starting
    from the highest common segment and then pulling in lower segments until it
    reaches three paired laps.
 2. The strongest 2024 PACETEQ wording found during the audit says the
-   qualifying comparison uses the drivers' **best qualifying times**. That is
+   qualifying comparison uses the drivers' best qualifying times. That is
    a different target from the local multi-lap median.
 3. The current prior fit then adds a second difference: session observations
    are weighted by effective pair count and inverse SE, while the published
@@ -69,7 +69,7 @@ Relevant implementation points:
 - `src/extractors/matched_laps.py:836-888`
 - `src/extractors/matched_laps.py:1052-1067`
 
-That is a reasonable **repeatable qualifying execution** statistic. It is not a
+That is a reasonable repeatable qualifying execution statistic. It is not a
 single-lap peak statistic.
 
 Two details matter:
@@ -112,7 +112,7 @@ The 2023 Motorsport/PACETEQ review says it compiled teammate:
 - only representative laps;
 - with obvious invalid cases removed.
 
-It does **not** publish enough detail to show:
+It does not publish enough detail to show:
 
 - whether qualifying uses best laps or multiple push laps;
 - whether lower qualifying segments are mixed with later segments;
@@ -125,7 +125,7 @@ validator than the current lock implies.
 ### 2024 PACETEQ duel articles
 
 The clearest 2024 wording found in the Red Bull duel article says the method
-compares the drivers' **best qualifying times** and race pace. The same article
+compares the drivers' best qualifying times and race pace. The same article
 reports:
 
 - qualifying pace: Verstappen faster than Perez by `0.66s`;

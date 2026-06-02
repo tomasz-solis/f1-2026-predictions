@@ -2,7 +2,7 @@
 
 This guide covers how compound-specific pace and degradation are extracted and then folded into race simulation.
 
-## Overview
+## What It Covers
 
 Teams behave differently across compounds (`SOFT`, `MEDIUM`, `HARD`). This system captures those differences from session data and feeds them into race simulation.
 
@@ -11,36 +11,36 @@ Teams behave differently across compounds (`SOFT`, `MEDIUM`, `HARD`). This syste
 ### Data Sources
 
 Compound performance is extracted from:
-- **Race sessions** ([src/systems/updater.py](../src/systems/updater.py))
-- **Practice sessions (FP1/FP2/FP3)** ([src/systems/testing_updater.py](../src/systems/testing_updater.py))
-- **Pre-season testing** (via testing_updater)
+- Race sessions ([src/systems/updater.py](../src/systems/updater.py))
+- Practice sessions (FP1/FP2/FP3) ([src/systems/testing_updater.py](../src/systems/testing_updater.py))
+- Pre-season testing (via testing_updater)
 
 ### Metrics Extracted
 
 For each team and compound combination, we collect:
 
-1. **Median lap time** (raw seconds)
+1. Median lap time (raw seconds)
    - Most representative lap time on that compound
    - Resistant to outliers (uses median, not mean)
 
-2. **Tire degradation slope** (seconds/lap)
+2. Tire degradation slope (seconds/lap)
    - How much lap time increases per lap
    - Linear regression across stint
    - Filtered: only slopes between -0.3 and +1.0 accepted
 
-3. **Consistency** (standard deviation)
+3. Consistency (standard deviation)
    - Lap time variance across stint
    - Lower = more consistent
 
-4. **Laps sampled** (count)
+4. Laps sampled (count)
    - How many laps contributed to these metrics
    - Used for reliability weighting
 
 ### MIN_LAPS_PER_COMPOUND Threshold
 
-**Threshold: 8 laps minimum** ([src/systems/compound_analyzer.py:22](../src/systems/compound_analyzer.py#L22))
+Threshold: 8 laps minimum ([src/systems/compound_analyzer.py:22](../src/systems/compound_analyzer.py#L22))
 
-**Rationale:**
+Rationale:
 - First 2-3 laps = tire warm-up (not representative)
 - Laps 4-8+ = stable performance window
 - <8 laps = insufficient data, skipped
@@ -51,7 +51,7 @@ This prevents noise from short stints or out-laps.
 
 ### Track-Specific Normalization
 
-**Critical:** Compound performance is normalized **within each track**, never across tracks.
+Compound performance is normalized within each track, never across tracks.
 
 Why? Melbourne SOFT ≠ Monaco SOFT
 - Different track surfaces
@@ -82,11 +82,11 @@ Implemented in:
 
 Uses [data/2025_pirelli_info.json](../data/2025_pirelli_info.json) (fallback for 2026):
 - Calculate average stress: (traction + braking + lateral + abrasion) / 4
-- **High stress (>threshold):** HARD compound (Bahrain, Singapore, Hungary)
-- **Low stress (<threshold):** SOFT compound (Monaco, Canada)
-- **Medium stress (between thresholds):** MEDIUM compound (most tracks)
+- High stress (>threshold): HARD compound (Bahrain, Singapore, Hungary)
+- Low stress (<threshold): SOFT compound (Monaco, Canada)
+- Medium stress (between thresholds): MEDIUM compound (most tracks)
 
-**Thresholds configured in [config/default.yaml](../config/default.yaml):**
+Thresholds configured in [config/default.yaml](../config/default.yaml):
 ```yaml
 baseline_predictor:
   compound_selection:
@@ -125,7 +125,7 @@ Flow:
 
 ## When Compound Adjustments Are Used
 
-**Reliability Check:** [src/utils/compound_performance.py:106-133](../src/utils/compound_performance.py#L106-L133)
+Reliability Check: [src/utils/compound_performance.py:106-133](../src/utils/compound_performance.py#L106-L133)
 
 Compound data is only applied if:
 - ≥2 compounds have data
@@ -166,8 +166,8 @@ Location: [data/processed/car_characteristics/2026_car_characteristics.json](../
 ## Track-Aware Blending
 
 When new session data arrives ([src/systems/compound_analyzer.py:277-351](../src/systems/compound_analyzer.py#L277-L351)):
-- **Same track:** Blend old + new (default 50/50 weight)
-- **Different track:** Replace entirely (no cross-track contamination)
+- Same track: Blend old + new (default 50/50 weight)
+- Different track: Replace entirely (no cross-track contamination)
 
 This prevents Monaco SOFT data from contaminating Monza SOFT data.
 
@@ -177,7 +177,7 @@ This prevents Monaco SOFT data from contaminating Monza SOFT data.
 
 The race predictor now uses full lap-by-lap simulation with multi-compound pit stop strategies:
 
-**Architecture:** Three core modules
+Architecture: Three core modules
 - [src/utils/tire_degradation.py](../src/utils/tire_degradation.py) - Tire physics and fuel effects
 - [src/utils/pit_strategy.py](../src/utils/pit_strategy.py) - Monte Carlo pit strategy generation
 - [src/utils/lap_by_lap_simulator.py](../src/utils/lap_by_lap_simulator.py) - Race simulation engine
@@ -189,21 +189,21 @@ fuel load (heavier = faster wear), a fresh-tire advantage window (SOFT 0.5 s,
 MEDIUM 0.3 s, HARD 0.1 s over the first 2-3 laps), and a traffic-dependent
 correction (front-runners get ~5 % better tire life, backmarkers ~5 % worse).
 Pit-stop loss is track-specific using real circuit data (Monaco 19 s, Singapore
-24 s). Strategy generation is driven by tire stress — high-stress tracks see
+24 s). Strategy generation is driven by tire stress - high-stress tracks see
 roughly 80 % two-stop probability.
 
-**Configuration:** All parameters in [config/default.yaml](../config/default.yaml) under `baseline_predictor.race`:
+Configuration: All parameters in [config/default.yaml](../config/default.yaml) under `baseline_predictor.race`:
 - `tire_strategy.windows` - Pit stop lap windows (1-stop, 2-stop)
 - `tire_strategy.stop_probability` - Stress-based stop count probabilities
 - `tire_physics.fresh_tire_advantage` - Compound-specific fresh tire gains
 - `strategy_constraints` - FIA rules, safety margins, optimality ratio
 
-**Data Sources:**
+Data Sources:
 - Tire degradation slopes: [data/processed/car_characteristics/2026_car_characteristics.json](../data/processed/car_characteristics/2026_car_characteristics.json)
 - Tire stress scores: [data/2025_pirelli_info.json](../data/2025_pirelli_info.json)
 - Track-specific pit loss: [data/processed/track_characteristics/2026_track_characteristics.json](../data/processed/track_characteristics/2026_track_characteristics.json)
 
-**Example Output:**
+Example Output:
 ```
 Tire Compound Strategies
 SOFT→MEDIUM: 62.5%
@@ -216,18 +216,18 @@ L30-35: 28 stops
 L20-25: 12 stops
 ```
 
-**Relevant tests:**
+Relevant tests:
 - [tests/test_tire_degradation.py](../tests/test_tire_degradation.py) (18 tests)
 - [tests/test_pit_strategy.py](../tests/test_pit_strategy.py) (22 tests)
 
 ## Current Limitations
 
-1. **No wet compound modeling**
+1. No wet compound modeling
    - INTERMEDIATE and WET compounds collected but not used in predictions
    - Fallback: Base team strength in rain conditions
    - Future: Apply compound adjustments for wet races
 
-2. **Temperature sensitivity not modeled**
+2. Temperature sensitivity not modeled
    - Track temperature affects compound performance
    - Hot tracks favor HARD, cool tracks favor SOFT
    - Future: Integrate temperature forecast data into compound selection
@@ -249,22 +249,22 @@ With compound adjustments (realistic scenario):
 
 ## Planned Extensions
 
-1. **Temperature sensitivity**
+1. Temperature sensitivity
    - Track temperature affects compound performance
    - Hot tracks favor HARD, cool tracks favor SOFT
    - Integration point: `get_fresh_tire_advantage()` already has track_temp parameter
 
-2. **Track evolution**
+2. Track evolution
    - Rubber buildup improves grip over race
    - Affects compound degradation patterns
    - Could reduce tire_deg_slope dynamically as race progresses
 
-3. **Compound-specific driver skill**
+3. Compound-specific driver skill
    - Some drivers excel at managing tire deg
    - Could add driver × compound interaction effects
    - Would require collecting driver-level stint data
 
-4. **Undercut/overcut dynamics**
+4. Undercut/overcut dynamics
    - Model strategic pit stop timing advantages
    - Track position changes during pit stop phases
    - Requires modeling gap intervals between cars

@@ -9,11 +9,11 @@ their phase; this plan owns the dependencies between phases.
 
 Two non-negotiable rules:
 
-- **Live updater changes are last.** Every prior phase exists so that the
+- Live updater changes are last. Every prior phase exists so that the
   live updater is changed only when the new prior, mappings, schema, and
   diagnostics are in place. Reordering this surfaces bugs in production
   state that are then expensive to migrate out of.
-- **No phase starts until its predecessor's acceptance criteria are met.**
+- No phase starts until its predecessor's acceptance criteria are met.
   This includes Phase 0. A doc that still has TODO entries in lock-required
   fields is not closed.
 
@@ -30,7 +30,7 @@ Current local gate state as of 2026-05-20:
 
 ---
 
-## Phase 0 — Documentation Lock Gates
+## Phase 0 - Documentation Lock Gates
 
 Goal: make the design assumptions visible and reviewable before any code is
 written.
@@ -64,7 +64,7 @@ Dependencies: none.
 
 ---
 
-## Phase 1 — Source-Backed Validation Evidence
+## Phase 1 - Source-Backed Validation Evidence
 
 Goal: build the only thing that can grade the prior fit honestly.
 
@@ -103,9 +103,9 @@ Dependencies: Phase 0.
 
 ---
 
-## Phase 2 — Smoke-Session Lock
+## Phase 2 - Smoke-Session Lock
 
-Goal: lock the extractor smoke set so step 4 is not gut-graded.
+Goal: lock the extractor smoke set so extractor validation is not gut-graded.
 
 Tasks:
 
@@ -118,9 +118,9 @@ Tasks:
 
 Allowed pre-extractor exception (read-only FastF1 inspection):
 
-- Ad-hoc notebooks or scripts that **load** FastF1 sessions, **inspect**
+- Ad-hoc notebooks or scripts that load FastF1 sessions, inspect
   weather samples, lap counts, retirement laps, track status events,
-  and team participation, and **emit** human-readable summaries used
+  and team participation, and emit human-readable summaries used
   to fill expected behavior, are allowed under Phase 2.
 - Saved exploration outputs (CSV/JSON/notebook) are retained as
   evidence for the locked expected behavior.
@@ -146,7 +146,7 @@ Dependencies: Phase 0.
 
 ---
 
-## Phase 3 — Matched-Lap Extractor
+## Phase 3 - Matched-Lap Extractor
 
 Goal: implement the canonical extractor exactly as specified.
 
@@ -190,7 +190,7 @@ Dependencies: Phases 0, 1, 2.
 
 ---
 
-## Phase 4 — Extractor Validation
+## Phase 4 - Extractor Validation
 
 Goal: verify the extractor on the locked smoke sessions before bulk run.
 
@@ -216,7 +216,7 @@ Dependencies: Phases 0, 1, 2, 3.
 
 ---
 
-## Phase 5 — Bulk Historical Extraction
+## Phase 5 - Bulk Historical Extraction
 
 Goal: produce the canonical historical observation set.
 
@@ -240,7 +240,7 @@ Dependencies: Phase 4.
 
 ---
 
-## Phase 6 — Teammate-Network Prior Builder
+## Phase 6 - Teammate-Network Prior Builder
 
 Goal: fit the race and qualifying priors.
 
@@ -272,7 +272,7 @@ Dependencies: Phases 1, 5.
 
 ---
 
-## Phase 7 — Team-Strength Seconds Mapping
+## Phase 7 - Team-Strength Seconds Mapping
 
 Goal: calibrate the only fitted seconds conversion in the system.
 
@@ -285,7 +285,7 @@ calibration form are settled by this plan. If the first migration still has
 one stored `team_strength` scalar, fit separate race and qualifying mappings
 over that same scalar.
 
-Current state decision on the stored scalar: do **not** split it into
+Current state decision on the stored scalar: do not split it into
 independent short-run and long-run team-strength states in v1 yet. The
 pre-2026 conventional-weekend probe does not show the required accuracy gain:
 on the currently cached rows, `shared_long_run` beats the split policy on
@@ -398,7 +398,7 @@ Dependencies: Phase 6.
 
 ---
 
-## Phase 8 — Replay And Leakage Diagnostics
+## Phase 8 - Replay And Leakage Diagnostics
 
 Goal: verify orthogonality before changing live state.
 
@@ -516,7 +516,7 @@ Dependencies: Phase 7.
 
 ---
 
-## Phase 9 — Schema Migration
+## Phase 9 - Schema Migration
 
 Goal: add the new fields safely without breaking existing reads.
 
@@ -533,14 +533,14 @@ Tasks (in order):
   jobs, dashboard rendering, checkpoint reconstruction, evaluation reports,
   local artifact stores, and Supabase persistence must all prefer the new
   fields at reader cutover.
-- **K=3 removal rule (canonical):** old fields and fallback reader paths
-  are removed only after **3 consecutive completed race weekends** using
+- K=3 removal rule (canonical): old fields and fallback reader paths
+  are removed only after 3 consecutive completed race weekends using
   the new path with no validation regression flagged in the per-weekend
   trace. The counter starts when the new path reaches production, not
   when Phase 14 begins. If a regression is flagged inside the 3-weekend
   window, the counter resets and the issue is investigated before any
-  further removal attempt. Removal is a **separate change set / separate
-  release step** (not bundled with any other refactor), executed only under
+  further removal attempt. Removal is a separate change set / separate
+  release step (not bundled with any other refactor), executed only under
   this rule. Other phases reference this rule rather than restating it.
 
 Acceptance criteria:
@@ -554,7 +554,7 @@ Dependencies: Phase 8.
 
 ---
 
-## Phase 10 — Bayesian Race/Quali State Split
+## Phase 10 - Bayesian Race/Quali State Split
 
 Goal: separate the previously-shared Bayesian state into race and
 qualifying.
@@ -573,12 +573,12 @@ April 2026 review flagged `update_from_sprint_race` as unwired dead
 code; before Phase 10 implementation begins, verify the current state
 of both the sprint race path and the sprint qualifying path:
 
-- **Wired path (sprint update reaches production state and
-  persistence):** implement the 0.5 confidence multipliers and add unit
+- Wired path (sprint update reaches production state and
+  persistence): implement the 0.5 confidence multipliers and add unit
   tests covering sprint update behavior, sprint-vs-main confidence
   ratio, and the race/quali state isolation requirement.
-- **Unwired path (sprint code exists but isn't called by the live
-  pipeline):** document explicitly that sprint updates remain
+- Unwired path (sprint code exists but isn't called by the live
+  pipeline): document explicitly that sprint updates remain
   production-unwired for this release, file a named follow-up task to
   wire them, and do not silently treat sprint as "handled." The 0.5
   rule still stands as the v1 design choice for whenever the wiring
@@ -608,7 +608,7 @@ Dependencies: Phase 9.
 
 ---
 
-## Phase 11 — Wet-Skill Migration
+## Phase 11 - Wet-Skill Migration
 
 Goal: move wet-skill to the same teammate-relative lap-time observation
 basis as the dry ratings.
@@ -641,7 +641,7 @@ Dependencies: Phase 10.
 
 ---
 
-## Phase 12 — Retire Or Demote Duplicate EMAs
+## Phase 12 - Retire Or Demote Duplicate EMAs
 
 Goal: stop double-counting through legacy `race_pace` and `quali_pace`
 EMAs.
@@ -665,7 +665,7 @@ Dependencies: Phase 10.
 
 ---
 
-## Phase 13 — Test Rewrite
+## Phase 13 - Test Rewrite
 
 Goal: bring the test suite into alignment with the new contract.
 
@@ -693,9 +693,9 @@ Dependencies: Phase 12.
 
 ---
 
-## Phase 14 — Final Rollout
+## Phase 14 - Final Rollout
 
-Goal: validate end-to-end before promoting to production.
+Goal: validate the full path before promoting to production.
 
 Tasks:
 
@@ -722,7 +722,7 @@ Dependencies: Phases 1 through 13.
 
 ## Cross-Phase Notes
 
-**Things this plan deliberately does not include:**
+Things this plan deliberately does not include:
 
 - A "soft validation" tier. Magnitude checks are either source-backed
   hard checks or unit-test smoke checks. Nothing in between.
@@ -734,7 +734,7 @@ Dependencies: Phases 1 through 13.
   Regulation-reset drift triggers a between-version refit, not a live
   one.
 
-**Phase boundaries that are easy to violate:**
+Phase boundaries that are easy to violate:
 
 - Phase 3 (extractor implementation) without Phase 1 and 2 closed:
   produces an extractor with nothing to validate against.
@@ -746,7 +746,7 @@ Dependencies: Phases 1 through 13.
 - Phase 14 final removal of old fields without Phases 1-13 acceptance:
   removes the rollback path before the new path is verified.
 
-**Ownership notes:**
+Ownership notes:
 
 - The prior design doc owns Phases 0-7 design content.
 - The team-strength mapping doc owns the Phase 7 pre-phase blocker

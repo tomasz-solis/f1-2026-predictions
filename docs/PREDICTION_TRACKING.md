@@ -16,7 +16,7 @@ This is the storage path for checkpoint predictions, later actuals, and derived 
 
 ## How Saving Works
 
-1. Click **Predict**.
+1. Click Predict.
 2. App detects the latest completed session for the weekend type.
 3. If no completed session exists yet, the checkpoint is saved as `PRE`.
 4. The save path extracts every tracked target that is still a real forecast at that checkpoint.
@@ -104,7 +104,7 @@ python scripts/update_prediction_actuals.py "Bahrain Grand Prix" FP1 --year 2026
 
 This script now fetches actual results per stored target session and writes them into the matching prediction artifact.
 
-The accuracy page renders from stored predictions and snapshots first. Scheduled workers own freshness: session automation reconciles actuals after race completion, and warmup also runs the same reconciliation after precompute when `dashboard.prediction_precompute.reconcile_accuracy_after_warmup` is enabled. The **Refresh Actuals** button remains a repair control, not the normal update path.
+The accuracy page renders from stored predictions and snapshots first. Scheduled workers own freshness: session automation reconciles actuals after race completion, and warmup also runs the same reconciliation after precompute when `dashboard.prediction_precompute.reconcile_accuracy_after_warmup` is enabled. The Refresh Actuals button remains a repair control, not the normal update path.
 
 To backfill missing snapshot artifacts from already stored prediction truth:
 
@@ -168,7 +168,7 @@ valid-session gate.
 
 ## Accuracy View
 
-In the dashboard **Prediction Accuracy** page, metrics are computed per target.
+In the dashboard Prediction Accuracy page, metrics are computed per target.
 
 Primary metrics:
 

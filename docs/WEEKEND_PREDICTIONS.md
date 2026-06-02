@@ -2,7 +2,7 @@
 
 This is the dashboard prediction cascade behind `src/dashboard/pages.py` and `app.py`.
 
-## Overview
+## Flow
 
 The app produces a cascade of predictions based on weekend format.
 
@@ -111,9 +111,9 @@ Practice/session blending is used in qualifying prediction through `Baseline2026
 
 Important details:
 
-- The predictor builds a **short-stint weighted blend** from available sessions.
-- If weekend practice pace is unavailable, it can use a **testing short-run profile fallback**.
-- If both are unavailable, qualifying runs in **model-only** mode.
+- The predictor builds a short-stint weighted blend from available sessions.
+- If weekend practice pace is unavailable, it can use a testing short-run profile fallback.
+- If both are unavailable, qualifying runs in model-only mode.
 
 Session blend inputs from `src/utils/fp_blending.py`:
 
@@ -139,7 +139,7 @@ Current sprint adjustments in baseline predictor:
 
 ## Prediction Tracking Integration
 
-When tracking is enabled in the **Settings** expander:
+When tracking is enabled in the Settings expander:
 
 - one prediction artifact is saved per detected completed session,
 - dashboard flow enforces max one save per race/session key,
@@ -153,7 +153,7 @@ See `docs/PREDICTION_TRACKING.md` for file structure and update workflow.
 
 ## Accuracy Outputs
 
-The dashboard **Prediction Accuracy** page now separates two questions that used to be mixed together:
+The dashboard Prediction Accuracy page now separates two questions that used to be mixed together:
 
 - how accuracy changes over the weekend
 - how accuracy changes over the season

@@ -45,10 +45,10 @@ system. It is not re-fit during a season.
 
 The orthogonality contract depends on a procedural rule that this doc
 must state explicitly. Driver residuals within a session are computed
-against the **observed** same-session team median, not against any
+against the observed same-session team median, not against any
 version of `team_strength` (prior or posterior). The team_strength
 state is updated from observed team-vs-field evidence and is then used
-for **future** prediction and trace; it is not the subtraction anchor
+for future prediction and trace; it is not the subtraction anchor
 for same-session driver residuals. Subtracting posterior team_strength
 would let team-model error and any seconds-mapping error leak into
 `race_rating_mu_s`.
@@ -59,8 +59,8 @@ Within a completed session:
 2. update `team_strength` from observed team-vs-field evidence; this
    record is for trace and for future-session prediction, not for the
    same-session driver subtraction;
-3. compute driver residuals from the **observed same-session team
-   median**:
+3. compute driver residuals from the observed same-session team
+   median:
    `driver_residual_s = observed_team_median_s - observed_driver_median_s`
    (or the equivalent paired teammate-gap formulation per Section 4.3);
    do not compute driver residuals against `predicted_team_strength` or
@@ -112,15 +112,15 @@ expectation, the next step is to audit the input construct or updater rule.
 These are not blockers; they are open risks that should sit visibly so
 they are not rediscovered as bugs later.
 
-**Shared driver improvement is entangled with car improvement at the
-within-team level.** Within a single team-session or active-season
+Shared driver improvement is entangled with car improvement at the
+within-team level. Within a single team-session or active-season
 same-team update, shared driver improvement is structurally
 indistinguishable from car improvement and will be absorbed by
 `team_strength`. The historical teammate-network prior can anchor
 cross-team driver scale through driver moves and multi-year teammate
 links, so cross-era driver quality is partly identifiable. What the
-live updater **cannot** do is infer from same-team residuals alone that
-both current teammates improved together — that conclusion requires
+live updater cannot do is infer from same-team residuals alone that
+both current teammates improved together - that conclusion requires
 evidence the within-team observation does not contain. Contract tests
 asserting "team_strength moves and ratings stay neutral when only the
 car changed" are therefore evaluable in synthetic data only. Real-data
@@ -131,20 +131,19 @@ declared extractor and calibration parameters
 `max_position_change_for_clean_lap`, `traffic_stint_sigma_threshold`,
 `tire_age_fallback_window_laps`, observation-noise SE floors).
 
-**Validation evidence may over-index on large gaps.** The current
+Validation evidence may over-index on large gaps. The current
 validation candidate set (see validation evidence file Section 3) is
 biased toward clear large-margin pairings. Tight teammate gaps are
 where small bias matters most for race-outcome prediction. Phase 1 of
 the master execution plan includes a deliberate search for small-gap
 source-backed checks. If no defensible small-gap source surfaces,
-the validation report records the gap as a validation limitation —
-that is a statement about validation strength, not about model
+the validation report records the gap as a validation limitation - that is a statement about validation strength, not about model
 uncertainty. Initial sigma on close pairings is widened only if
-**internal diagnostics** support it: weak posterior evidence, low
+internal diagnostics support it: weak posterior evidence, low
 effective sample size on the relevant teammate edge, fragile
 component connectivity, high sensitivity in per-fold replay, or
 unstable per-driver residuals across folds. The decision is documented
-either way — widened with the diagnostic that justified it, or held at
+either way - widened with the diagnostic that justified it, or held at
 the fitted value with the limitation logged.
 
 ## 2. Scope
@@ -155,7 +154,7 @@ In scope for this document:
 - Canonical matched-lap extractor specification.
 - Race and qualifying network model specification.
 - Connected-component handling.
-- Robust weighting and uncertainty rules.
+- Weighting and uncertainty rules.
 - Output artifact contract.
 - Prior-validation gates.
 
@@ -201,7 +200,7 @@ can be added later as separate, lower-confidence evidence.
 
 Race-weekend practice sessions are excluded from the offline
 teammate-network prior fit because run programs are not comparable enough for
-source-backed driver residuals. They are **not** excluded from the live
+source-backed driver residuals. They are not excluded from the live
 prediction system. FP1/FP2/FP3 remain valid runtime evidence for car features,
 session pace blending, confidence, and team-strength updates when the local
 feature logic marks them usable.
@@ -329,7 +328,7 @@ Valid race lap pairs must satisfy:
 
 Primary matching is same compound and same stint-lap index. The tire-age
 fallback may be used only if strict matching does not produce enough valid
-pairs **and** the smoke-session checks (Section 12.2) show that the fallback
+pairs and the smoke-session checks (Section 12.2) show that the fallback
 is not adding strategic noise.
 
 If the teammate has fewer than the required matched samples, both drivers
@@ -451,7 +450,7 @@ comparison_driver_delta_s = -matched_gap_median_s / 2
 ```
 
 These derived rows are used only for live driver-rating updates; they are
-**not** used as independent observations in the prior fit. The prior fitter
+not used as independent observations in the prior fit. The prior fitter
 sees one row per teammate pair.
 
 Estimate `matched_gap_se_s` by bootstrap over matched lap pairs. If the
@@ -942,7 +941,7 @@ must happen in this order:
 `_DRIVER_BAYESIAN_SCHEMA` currently has `additionalProperties: False`, so
 the schema must accept the new fields before any writer persists them.
 
-Implementation must update the whole project, not just the immediate writer.
+Implementation must update the whole project, not only the immediate writer.
 Readers, validators, warmup jobs, dashboard rendering, evaluation reports,
 checkpoint reconstruction, local artifact stores, and Supabase persistence
 must all prefer the new artifacts once the migration phase reaches reader

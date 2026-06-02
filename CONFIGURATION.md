@@ -138,20 +138,20 @@ training adaptive calibration.
 
 The race predictor now uses lap-by-lap simulation with tire degradation and pit stops. Edit:
 
-**Tire physics:**
+Tire physics:
 - `baseline_predictor.race.tire_physics.fresh_tire_advantage` - Initial pace advantage per compound (SOFT/MEDIUM/HARD)
 - `baseline_predictor.race.tire_physics.fresh_tire_duration` - Laps fresh tire advantage lasts
 - `baseline_predictor.race.tire_physics.default_deg_slope` - Fallback degradation if no compound data
 - `baseline_predictor.race.tire_physics.clean_air_bonus` - P1-5 tire life advantage (default 0.05 = 5%)
 - `baseline_predictor.race.tire_physics.traffic_deg_penalty` - P16+ tire life penalty (default 0.05 = 5%)
 
-**Fuel effects:**
+Fuel effects:
 - `baseline_predictor.race.fuel.initial_load_kg` - Starting fuel load (default 110kg for 60-lap race)
 - `baseline_predictor.race.fuel.burn_rate_kg_per_lap` - Fuel consumed per lap (default 1.5kg)
 - `baseline_predictor.race.fuel.effect_per_lap` - Lap time penalty per 10kg fuel (default 0.035s)
 - `baseline_predictor.race.fuel.deg_multiplier` - How fuel load affects tire degradation (default 0.10 = 10%)
 
-**Pit stop strategy:**
+Pit stop strategy:
 - `baseline_predictor.race.tire_strategy.windows.one_stop` - Lap window for 1-stop (default [23, 37])
 - `baseline_predictor.race.tire_strategy.windows.two_stop_first` - First stop window for 2-stop (default [15, 25])
 - `baseline_predictor.race.tire_strategy.windows.two_stop_second` - Second stop window for 2-stop (default [35, 45])
@@ -159,14 +159,14 @@ The race predictor now uses lap-by-lap simulation with tire degradation and pit 
 - `baseline_predictor.race.pit_stops.loss_duration` - Base pit stop time loss (track-specific override available)
 - `baseline_predictor.race.pit_stops.overtake_loss_range` - Extra time loss if overtaken during stop
 
-**Strategy constraints:**
+Strategy constraints:
 - `baseline_predictor.race.strategy_constraints.min_pit_lap` - Earliest allowed pit lap (default 5)
 - `baseline_predictor.race.strategy_constraints.max_pit_lap_from_end` - Latest allowed pit lap from end (default 5)
 - `baseline_predictor.race.strategy_constraints.min_laps_between_stops` - Minimum stint length (default 8)
 - `baseline_predictor.race.strategy_constraints.pit_lap_variance` - Randomness in pit timing (one_stop: 3.0, two_stop: 2.0)
 - `baseline_predictor.race.strategy_constraints.strategy_optimality` - % of optimal strategies (default 0.60 = 60%)
 
-**Lap time modeling:**
+Lap time modeling:
 - `baseline_predictor.race.lap_time.reference_base` - Reference lap time in seconds (default 90.0)
 - `baseline_predictor.race.lap_time.team_pace_penalty_range` - Max penalty for slowest team (default 5.0s)
 - `baseline_predictor.race.lap_time.skill_improvement_max` - Max driver skill advantage (config currently 0.35; code fallback 0.5 if key missing)

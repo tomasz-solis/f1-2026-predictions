@@ -1,4 +1,4 @@
-# Model Calibration Report — 2026 Season
+# Model Calibration Report - 2026 Season
 
 *Generated: 2026-04-20T14:07:50.230271+00:00*
 
@@ -14,13 +14,13 @@ it current.
 
 ## Coverage
 
-- Prediction files analyzed: **14**
-- Latest qualifying checkpoints selected: **3**
-- Latest race checkpoints selected: **3**
-- Qualifying races with actuals: **3**
-- Race results with actuals: **3**
-- Intermediate qualifying checkpoints ignored in canonical evaluation: **11**
-- Intermediate race checkpoints ignored in canonical evaluation: **11**
+- Prediction files analyzed: 14
+- Latest qualifying checkpoints selected: 3
+- Latest race checkpoints selected: 3
+- Qualifying races with actuals: 3
+- Race results with actuals: 3
+- Intermediate qualifying checkpoints ignored in canonical evaluation: 11
+- Intermediate race checkpoints ignored in canonical evaluation: 11
 
 ---
 
@@ -114,7 +114,7 @@ Canonical evaluation uses `latest_checkpoint_per_race_and_target` so each race/t
 
 ## 2. Confidence Interval Calibration (Qualifying)
 
-The Monte Carlo simulation produces a p5–p95 position interval for each
+The Monte Carlo simulation produces a p5 - p95 position interval for each
 driver. A well-calibrated model should have ~90% of actual outcomes fall
 inside that interval.
 
@@ -127,10 +127,10 @@ inside that interval.
 | Calibration error | -0.10 (-9.7%) |
 | Mean interval width | 7.86 positions |
 
-⚠️ Intervals are too **tight** — model is overconfident by 9.7pp.
+Warning: intervals are too tight - model is overconfident by 9.7pp.
 
-**Interpretation:** A negative calibration error means intervals are
-too tight — the model is more certain than it should be. A positive
+Interpretation: A negative calibration error means intervals are
+too tight - the model is more certain than it should be. A positive
 error means intervals are too wide.
 
 ---
@@ -139,7 +139,7 @@ error means intervals are too wide.
 
 ### Qualifying
 
-Evaluated **3** event(s).
+Evaluated 3 event(s).
 
 Worst weekends:
 - Japanese Grand Prix (`permanent`, `normal`, `dry`) MAE=3.27, winner=LEC -> ANT
@@ -153,7 +153,7 @@ Drivers that show up repeatedly among the largest misses:
 
 ### Race
 
-Evaluated **3** event(s).
+Evaluated 3 event(s).
 
 Worst weekends:
 - Australian Grand Prix (`street`, `normal`, `dry`) MAE=4.18, winner=LEC -> RUS
@@ -177,22 +177,22 @@ Positive = model predicted *worse* than reality (underestimated the driver).
 
 Based on 3 races.
 
-**Most overestimated teams:**
+Most overestimated teams:
 - RB: mean signed error -2.83 (MAE 3.50, n=6)
 - Ferrari: mean signed error -1.67 (MAE 2.67, n=6)
 - Williams: mean signed error -1.33 (MAE 2.00, n=6)
 
-**Most underestimated teams:**
+Most underestimated teams:
 - McLaren: mean signed error 4.67 (MAE 5.00, n=6)
 - Mercedes: mean signed error 1.83 (MAE 1.83, n=6)
 - Cadillac F1: mean signed error 1.00 (MAE 1.67, n=6)
 
-**Most overestimated drivers:**
+Most overestimated drivers:
 - LAW: mean signed error -5.33 (MAE 5.33, n=3)
 - VER: mean signed error -4.67 (MAE 8.00, n=3)
 - LEC: mean signed error -3.33 (MAE 3.33, n=3)
 
-**Most underestimated drivers:**
+Most underestimated drivers:
 - PIA: mean signed error 4.67 (MAE 4.67, n=3)
 - NOR: mean signed error 4.67 (MAE 5.33, n=3)
 - HAD: mean signed error 3.33 (MAE 4.67, n=3)
@@ -201,12 +201,12 @@ Based on 3 races.
 
 Based on 3 races.
 
-**Most overestimated drivers:**
+Most overestimated drivers:
 - HUL: mean signed error -8.33 (MAE 8.33, n=3)
 - HAD: mean signed error -5.33 (MAE 8.67, n=3)
 - LIN: mean signed error -3.00 (MAE 4.33, n=3)
 
-**Most underestimated drivers:**
+Most underestimated drivers:
 - GAS: mean signed error 5.67 (MAE 5.67, n=3)
 - PER: mean signed error 4.33 (MAE 4.33, n=3)
 - COL: mean signed error 3.33 (MAE 3.33, n=3)
@@ -216,7 +216,7 @@ Based on 3 races.
 ## 5. Baseline Comparison
 
 Naive baseline: predict race N using the actual results of race N-1
-(previous-race classification). This is a realistic lower bar — it
+(previous-race classification). This is a realistic lower bar - it
 requires no modelling, just memory of last week.
 
 ### Qualifying
@@ -226,11 +226,11 @@ Based on 2 races.
 | Metric | Model | Naive baseline | Δ |
 |---|---|---|---|
 | MAE | 2.91 | 2.68 | -0.23 |
-| Within-3 rate | 68.2% | 75.0% | — |
+| Within-3 rate | 68.2% | 75.0% | - |
 | Spearman ρ | 0.77 | 0.83 | -0.06 |
 | Kendall τ | 0.62 | 0.66 | -0.04 |
 
-❌ Model does not beat naive baseline on MAE
+Failed Model does not beat naive baseline on MAE
 
 ### Race
 
@@ -239,11 +239,11 @@ Based on 2 races.
 | Metric | Model | Naive baseline | Δ |
 |---|---|---|---|
 | MAE | 3.50 | 3.32 | -0.18 |
-| Within-3 rate | 59.1% | 70.5% | — |
+| Within-3 rate | 59.1% | 70.5% | - |
 | Spearman ρ | 0.74 | 0.71 | 0.03 |
 | Kendall τ | 0.58 | 0.54 | 0.04 |
 
-❌ Model does not beat naive baseline on MAE
+Failed Model does not beat naive baseline on MAE
 
 ---
 

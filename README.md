@@ -1,97 +1,65 @@
 # Trackside Labs
 
-Production ML system for F1 race weekend predictions under data scarcity.
+Trackside Labs is an F1 race-weekend prediction system for the 2026 regulation
+reset. It produces checkpointed qualifying and race forecasts, then updates them
+as practice, qualifying, sprint, and race data arrives.
 
-The 2026 regulation reset is the core constraint: every team's historical performance
-baseline became unreliable at once. There is no prior season to learn from. The system
-has to start from pre-season testing data — three days of limited running — and improve
-its predictions across each weekend as new session data arrives.
+The hard part is not running a simulation. The hard part is deciding how much to
+trust each source of evidence when the car concept has just changed and the
+season has almost no current data. A 2025 baseline is useful, but stale. Testing
+is current, but teams hide pace. Friday practice is fresh, but noisy. The system
+is built around that tradeoff.
 
-That constraint shapes every design decision in here.
+## Current Model Work
 
-## Planned Model Fixes
+The next planned model change is the driver-rating de-carring work described in
+`docs/fixes/`. It separates team strength from driver residuals so driver skill
+is not accidentally estimated through car performance.
 
-The next planned model change is the driver-rating de-carring and
-race/qualifying split described in `docs/fixes/`. The work is intentionally
-staged because it touches historical extraction, validation, local artifacts,
-Supabase persistence, dashboard diagnostics, and live prediction readers.
+Planned direction:
 
-Current planned direction:
+- keep active-season learning centred on `team_strength`
+- split driver residuals into `race_rating_mu_s` and `quali_rating_mu_s`
+- store driver residuals directly in seconds
+- make driver ratings slower-moving than team strength during the season
+- use separate mappings from team strength to qualifying and race pace
+- migrate local JSON artifacts and Supabase rows together
+- add dashboard diagnostics for scale drift, residuals, slope, and R-squared
 
-- keep active-season learning focused mainly on `team_strength`, which should
-  move as new race weekends complete;
-- split driver residuals into `race_rating_mu_s` and `quali_rating_mu_s`,
-  stored directly in seconds;
-- keep driver ratings slow-moving during the season, with full teammate-network
-  refits after the season, during longer breaks, or on demand;
-- use separate race and qualifying team-strength-to-seconds mappings;
-- migrate local JSON artifacts and Supabase rows together, so code reads the
-  new artifacts instead of silently falling back to deprecated fields;
-- add a dashboard diagnostics tab for team-strength scale drift, R-squared,
-  slope, and per-driver residual monitoring.
+This work is staged because it touches extraction, validation, local artifacts,
+Supabase persistence, dashboard diagnostics, and live prediction readers. The
+matched-lap extractor comes first; live updater changes come last.
 
-This is a multi-day to multi-week change set. The current plan is to implement
-it in phases, with the matched-lap extractor first and live updater changes
-last.
+## Prediction Problem
 
----
+At race 1, the model has three days of pre-season testing and no 2026 race
+results. By race 5, it has testing, four race weekends, and several sessions of
+practice and qualifying evidence. The model has to behave sensibly at both ends
+of that range.
 
-## The Engineering Problem
+Main modelling constraints:
 
-Most ML systems for sports prediction start with years of historical data and train a
-model. That approach doesn't work here.
+- Pre-season testing is directional evidence, not ground truth. Fuel load,
+  engine mode, run plan, and sandbagging all matter.
+- The blend must move quickly from stale priors toward current-season results.
+- Compound performance is circuit-specific and is only used once there are
+  enough laps for that compound and team.
+- Rookie and missing-driver cases fall back to a team baseline with added
+  uncertainty.
+- Predictions need to refresh after each session without making the dashboard
+  slow for users.
 
-At Race 1, you have:
-- three days of pre-season testing (limited laps, teams sandbagging)
-- no race results at all
+## How The Model Works
 
-By Race 5, you have:
-- testing data
-- four race weekends of FP1/FP2/FP3/qualifying/race
+Team strength is blended from three signals:
 
-The model needs to work in both situations and degrade gracefully in between.
-
-The specific challenges this creates:
-
-**Signal scarcity at season start.** Pre-season testing is intentionally misleading.
-Teams run different fuel loads, different modes, different programs. The system extracts
-directional signals (who improved relative to last year, who looks strong on high-stress
-tracks) rather than treating raw lap times as ground truth.
-
-**Progressive trust shifting.** As in-season data accumulates, the weight on testing
-signals drops and the weight on actual race performance rises. By Race 3, the system
-is running mostly on current-season evidence. The weight schedule is configurable;
-the current reset-year runtime uses `rapid_adaptive`.
-
-**Compound data scarcity.** Tire compound characteristics can only be learned
-track-by-track. A team's SOFT performance at Monaco tells you nothing useful about
-their SOFT performance at Bahrain. The system tracks compound metrics per team per
-circuit and only applies compound adjustments when enough laps exist to make them
-reliable (minimum 8 laps per compound per team).
-
-**Rookie and missing-driver handling.** New drivers have no performance history.
-The system falls back to team baseline with a calibrated rookie uncertainty
-adjustment, rather than treating missing data as zero.
-
-**Session-level freshness.** Predictions improve as each session completes. The
-system tracks checkpoint state (PRE → FP1 → FP2 → FP3 → Q) and rebuilds predictions
-when new session data becomes available, without user-facing latency spikes.
-
----
-
-## How It Works
-
-### Signal blending
-
-Team strength is built from three signals blended by a race-number-aware weight schedule:
-
-```
+```text
 blended_strength = w_baseline * baseline
                  + w_testing * testing_modifier
                  + w_current * current_season_mean
 ```
 
-In the current 2026 reset-year runtime:
+The active reset-year schedule is intentionally aggressive:
 
 | Race | Baseline | Testing | Current |
 |------|----------|---------|---------|
@@ -100,109 +68,97 @@ In the current 2026 reset-year runtime:
 | 3    | 8%       | 5%      | 87%     |
 | 4+   | 5%       | 0%      | 95%     |
 
-Before any races exist, `current` falls back to `baseline` rather than zero.
+Before current-season races exist, the current-season term falls back to the
+baseline rather than zero.
 
-### Qualifying prediction
+### Qualifying
 
-```
-blended team strength (weight schedule)
-  → session pace blend from available FP/sprint sessions
-  → confidence-scaled blend weight (more data = more session trust)
-  → combine team + driver skill
-  → Monte Carlo simulations (300 runs)
-  → median grid position + confidence band
-```
+Qualifying prediction combines team strength, available session pace, driver
+skill, and uncertainty:
 
-Session blend priority:
-- Normal weekend: FP3 + FP2 + FP1 (FP3-weighted)
-- Sprint weekend: Sprint Qualifying + FP1 + Sprint
-
-If no session data exists, qualifying runs model-only.
-
-### Race prediction
-
-```
-qualifying grid (actual or predicted)
-  → per-driver compound strengths from session history
-  → Monte Carlo pit strategy generation
-  → lap-by-lap simulation (300 runs)
-    → tire degradation (compound-specific slopes)
-    → fuel load effect
-    → traffic-position correction (front: +5% tire life, back: -5%)
-    → track-specific pit loss (Monaco: 19s, Singapore: 24s)
-    → safety car, lap-1 chaos, DNF probability
-  → finish order + strategy distribution + podium probability
+```text
+team strength
+session pace from available FP or sprint sessions
+confidence-scaled session weight
+driver skill adjustment
+Monte Carlo simulation
+median grid position and interval
 ```
 
-### Adaptive calibration
+Normal weekends weight FP3 most heavily, then FP2 and FP1. Sprint weekends use
+sprint qualifying, FP1, and sprint evidence when those sessions exist. If no
+session data is available, the model runs from priors only.
 
-After each race, the system updates per-driver EMA error state and teammate-gap
-calibration using actual results. These learned adjustments feed into the next
-prediction cycle automatically.
+### Race
 
-Learning is gated. Retrospective predictions, duplicate run IDs, missing actuals,
-and tiny actual overlaps are skipped so the model does not train on contaminated
-or partial records.
+Race prediction starts from the actual or predicted grid, then runs a lap-level
+simulation:
 
----
+```text
+grid position
+compound strengths from session history
+pit strategy sampling
+lap-by-lap tire degradation and fuel effect
+traffic and clean-air adjustments
+track-specific pit loss
+safety car, lap-1, and DNF events
+finish order and probability table
+```
 
-## System Design
+Each race forecast currently uses 300 Monte Carlo runs. Outputs include finish
+order, strategy distribution, podium probability, and uncertainty bands.
 
-The dashboard request path is intentionally read-only. All prediction artifact
-generation happens in background workers:
+### Learning
 
-- `scripts/warmup_precompute.py` — checkpoint-aware warmup, runs every 5 minutes in production
-- `scripts/run_session_automation.py` — applies post-session updates, reconciles actuals
-- `scripts/update_from_race.py` — manual race update trigger
-- `scripts/update_from_testing.py` — manual testing/practice directionality update
+After a race, the system updates driver error state and teammate-gap calibration
+from actual results. Those adjustments feed the next prediction cycle.
 
-This keeps user-facing latency predictable regardless of when sessions complete.
+Learning is gated. Retrospective runs, duplicate run IDs, missing actuals, and
+tiny actual overlaps are skipped so the model does not train on partial or
+contaminated records.
 
-Artifacts are persisted through `ArtifactStore` with configurable storage backends:
+## Runtime Design
+
+The dashboard request path is read-only. Artifact generation runs in background
+workers:
+
+- `scripts/warmup_precompute.py`: checkpoint-aware warmup used in production
+- `scripts/run_session_automation.py`: post-session updates and actuals
+- `scripts/update_from_race.py`: manual race update trigger
+- `scripts/update_from_testing.py`: manual testing and practice directionality update
+
+Artifacts are read and written through `ArtifactStore`.
 
 | Mode | Behaviour |
 |------|-----------|
-| `file_only` | Local JSON (default) |
+| `file_only` | Local JSON only |
 | `fallback` | DB-first read, file fallback |
-| `dual_write` | Write both, DB-first read (migration mode) |
+| `dual_write` | Write file and DB during migration |
 | `db_only` | Supabase only |
 
----
+## Evaluation
 
-## Accuracy Tracking
+The system stores predictions at each checkpoint and compares them with actuals
+after sessions complete. Accuracy is tracked by target and checkpoint:
 
-The system tracks predictions at each checkpoint and compares them to actuals after
-sessions complete. Accuracy is tracked per target (qualifying, race, sprint qualifying,
-sprint race) and per checkpoint.
+- qualifying
+- race
+- sprint qualifying
+- sprint race
 
-Current season metrics are stored in Supabase and surfaced in the **Prediction
-Accuracy** dashboard tab.
+The evaluation bundle is written to:
 
-The evaluation script writes a fuller review bundle to
-[`docs/MODEL_CALIBRATION.md`](docs/MODEL_CALIBRATION.md) and
-[`docs/MODEL_ERROR_ANALYSIS.md`](docs/MODEL_ERROR_ANALYSIS.md):
+- `docs/MODEL_CALIBRATION.md`
+- `docs/MODEL_ERROR_ANALYSIS.md`
 
-The live predictor also keeps residual history from completed events so it can
-apply a learned minimum interval radius when recent Monte Carlo bands have been
-too tight.
+It covers interval calibration, segment breakdowns, systematic bias, baseline
+comparison, error analysis, and promotion gates for experimental components.
 
-- **Calibration** — do the p5–p95 Monte Carlo intervals cover ~90% of actual outcomes?
-- **Segment breakdowns** — where does accuracy shift by weekend format, weather, and track type?
-- **Systematic bias** — which drivers or teams does the model consistently get wrong
-  in the same direction across multiple races?
-- **Baseline comparison** — does it beat a naive previous-race classifier on MAE and
-  rank correlation?
-- **Error analysis** — which weekends and drivers keep showing up among the biggest misses?
-- **Promotion gates** — whether experimental components improved central MAE
-  without degrading headline accuracy or making most weekends worse.
-
-To regenerate after new races complete:
+Regenerate the report after new races complete:
 
 ```bash
 make evaluation-report
 ```
-
----
 
 ## Quick Start
 
@@ -232,67 +188,8 @@ Update from the most recent race:
 python scripts/update_from_race.py "Bahrain Grand Prix" --year 2026
 ```
 
-Run the full check pipeline (lint + mypy + tests):
+Run lint, type checks, and tests:
 
 ```bash
 make check
 ```
-
----
-
-## Tests
-
-```bash
-.venv/bin/pytest tests/
-```
-
-Targeted test suites:
-
-```bash
-pytest tests/test_baseline_2026_integration.py
-pytest tests/test_tire_degradation.py        # 18 tests
-pytest tests/test_pit_strategy.py            # 22 tests
-pytest tests/test_dashboard_smoke.py
-```
-
-Nightly live FastF1 checks (CI):
-
-```bash
-make test-live-fastf1
-```
-
-Backtesting against 2025 season data:
-
-```bash
-python scripts/backtest_2025_season.py --year 2025 --max-races 6 --evaluation-mode historical --learning-mode both
-```
-
-Reviewer-facing artifacts land in `reports/backtest_2025/`:
-`evaluation_packet.json`, `REVIEW_PACKET.md`, per-experiment summaries, and
-recommendation output for ablations.
-
----
-
-## Documentation
-
-- `ARCHITECTURE.md` — component map and data flow
-- `CONFIGURATION.md` — all tunable parameters
-- `LIMITATIONS.md` — known model boundaries, assumptions, and what would fix them
-- `docs/MODEL_CALIBRATION.md` — calibration, bias, and baseline comparison (auto-generated)
-- `docs/MODEL_ERROR_ANALYSIS.md` — worst weekends, repeat misses, and failure patterns
-- `reports/backtest_2025/REVIEW_PACKET.md` — reproducible historical evaluation bundle summary
-- `docs/WEIGHT_SCHEDULE_GUIDE.md` — signal blending and trust progression
-- `docs/FP_BLENDING_SYSTEM.md` — session blend mechanics
-- `docs/COMPOUND_ANALYSIS.md` — tire compound performance system
-- `docs/WEEKEND_PREDICTIONS.md` — normal vs sprint weekend cascade
-- `docs/PREDICTION_TRACKING.md` — checkpoint prediction storage and accuracy
-- `docs/PERSISTENCE_SUPABASE.md` — ArtifactStore modes and migration
-- `docs/WARMUP_PRECOMPUTE.md` — background warmup worker
-- `docs/DASHBOARD_AUTO_UPDATE.md` — what's automatic vs manual
-
----
-
-## Stack
-
-Python 3.11 · FastF1 · Streamlit · Supabase · Render · uv · pre-commit ·
-mypy · pytest · GitHub Actions
