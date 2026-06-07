@@ -597,7 +597,9 @@ def test_update_from_testing_sessions_persists_to_artifact_store_when_db_enabled
     second_call = store_instance.save_artifact.call_args_list[1].kwargs
     assert second_call["artifact_type"] == "car_characteristics_snapshot"
     assert second_call["artifact_key"] == "2026::Bahrain Grand Prix::FP1"
-    assert second_call["version"] == 1
+    # Snapshots auto-increment (version=None) so a re-extraction supersedes the latest
+    # version the reader (load_artifact version="latest") picks up.
+    assert second_call["version"] is None
 
 
 def test_backfill_session_snapshot_history_writes_only_snapshots(tmp_path, patcher):

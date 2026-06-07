@@ -89,6 +89,30 @@ def get_artifact_versions(year: int = _DEFAULT_SEASON) -> dict[str, tuple[int, s
             logger.warning("Failed to load version for %s::%s: %s", artifact_type, artifact_key, e)
             versions[f"{artifact_type}::{artifact_key}"] = (0, "")
 
+    # Fold in the most-recent checkpoint snapshot so the prediction cache key changes when
+    # a snapshot is (re)written. Checkpoint reconstructions read snapshots at predict time,
+    # but the cache key derives from this function on both the warmup-write and dashboard-read
+    # sides; without this, a snapshot correction (with no season-artifact change) would keep
+    # serving a stale precomputed prediction. Snapshots auto-increment, so the newest row's
+    # version + created_at advances on every (re)write. Defensive: never break serving.
+    snapshot_fingerprint_key = f"car_characteristics_snapshot::{season_year}"
+    try:
+        recent_snapshots = store.list_artifacts(
+            "car_characteristics_snapshot",
+            key_prefix=f"{season_year}::",
+            limit=1,
+        )
+        if recent_snapshots:
+            newest = recent_snapshots[0]
+            snapshot_version = int(newest.get("version", 0) or 0)
+            snapshot_marker = f"{newest.get('artifact_key', '')}|{newest.get('created_at', '')}"
+            versions[snapshot_fingerprint_key] = (snapshot_version, snapshot_marker)
+        else:
+            versions[snapshot_fingerprint_key] = (0, "")
+    except Exception as exc:  # noqa: BLE001 - cache fingerprint must never break serving
+        logger.warning("Failed to fingerprint car_characteristics_snapshot: %s", exc)
+        versions[snapshot_fingerprint_key] = (0, "")
+
     # In DB-backed modes, ignore mutable local runtime files so hashes remain
     # consistent across web/worker instances (for example Render web + cron).
     file_fingerprints = _get_file_timestamps(

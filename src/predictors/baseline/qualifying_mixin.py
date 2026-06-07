@@ -240,6 +240,39 @@ class BaselineQualifyingMixin:
 
         return float(np.clip(testing_fallback_confidence, 0.0, 1.0))
 
+    def _resolve_snapshot_sufficiency_factor(self) -> float:
+        """Return a [floor, 1.0] factor reflecting how much clean running a checkpoint had.
+
+        Reads ``team_clean_lap_counts`` recorded on the stored snapshot. When the typical
+        team had plenty of clean short-run laps the factor is 1.0 (no penalty); when the
+        session was thin (few green laps across the field) the factor shrinks toward a
+        configured floor, lowering data confidence and therefore the blend weight. Returns
+        1.0 when the snapshot does not carry lap-count metadata (older snapshots).
+        """
+        cfg = getattr(self, "config", config_loader)
+        snapshot_meta = getattr(self, "car_characteristics_snapshot", {})
+        counts = (
+            snapshot_meta.get("team_clean_lap_counts")
+            if isinstance(snapshot_meta, dict)
+            else None
+        )
+        if not isinstance(counts, dict) or not counts:
+            return 1.0
+        values = [float(v) for v in counts.values() if isinstance(v, int | float)]
+        if not values:
+            return 1.0
+
+        min_clean_laps = float(
+            cfg.get("baseline_predictor.qualifying.snapshot_min_clean_laps", 4.0)
+        )
+        floor = float(cfg.get("baseline_predictor.qualifying.snapshot_sufficiency_floor", 0.6))
+        floor = float(np.clip(floor, 0.0, 1.0))
+        median_count = float(np.median(values))
+        if min_clean_laps <= 0 or median_count >= min_clean_laps:
+            return 1.0
+        factor = floor + (1.0 - floor) * (median_count / min_clean_laps)
+        return float(np.clip(factor, floor, 1.0))
+
     def _resolve_fp_blend_weight(self, data_confidence_score: float) -> float:
         """Scale FP blend weight by weekend data confidence."""
         cfg = getattr(self, "config", config_loader)
@@ -566,8 +599,19 @@ class BaselineQualifyingMixin:
             confidence_session_name,
             testing_fallback_used=testing_fallback_used,
         )
-        effective_fp_blend_weight = self._resolve_fp_blend_weight(data_confidence_score)
         practice_like_stored_profiles = weekend_snapshot_session_name is not None
+        if practice_like_stored_profiles:
+            # Scale confidence by how much clean running the checkpoint actually had, so a
+            # thin/odd session (few green laps, e.g. a red-flag/breakdown-shortened FP)
+            # carries less weight than the fixed session ordinal would otherwise imply.
+            data_confidence_score = float(
+                np.clip(
+                    data_confidence_score * self._resolve_snapshot_sufficiency_factor(),
+                    0.0,
+                    1.0,
+                )
+            )
+        effective_fp_blend_weight = self._resolve_fp_blend_weight(data_confidence_score)
         if practice_like_stored_profiles:
             effective_fp_blend_weight = self._adjust_stored_checkpoint_blend_weight(
                 effective_fp_blend_weight

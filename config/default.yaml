@@ -281,6 +281,19 @@ baseline_predictor:
     checkpoint_driver_profile_smoothing_seconds: 0.35
     checkpoint_driver_profile_quali_scale: 0.10
     checkpoint_driver_profile_skill_scale: 0.02
+    # Reject checkpoint teammate deltas larger than this (seconds). Real one-lap teammate
+    # gaps are sub-second; larger values indicate an unrepresentative lap survived snapshot
+    # extraction, so the delta is ignored rather than saturating the per-driver cap.
+    checkpoint_driver_delta_max_seconds: 2.0
+    # Data-sufficiency gate for stored checkpoint snapshots.
+    # If the typical team had fewer than snapshot_min_clean_laps clean short-run laps, scale
+    # data confidence (and thus blend weight) down toward snapshot_sufficiency_floor, so a
+    # thin/red-flag-shortened session does not fully override the season prior.
+    snapshot_min_clean_laps: 4.0
+    snapshot_sufficiency_floor: 0.6
+    # Hard cap on how far one stored checkpoint may move a team's blended strength from its
+    # season-learned prior (0-1 strength scale). Bounds catastrophic single-session swings.
+    stored_checkpoint_max_strength_move: 0.40
     testing_fallback_short_weight_min: 0.35
     testing_fallback_short_weight_max: 0.85
     testing_fallback_divergence_scale: 1.4

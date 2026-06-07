@@ -1074,6 +1074,15 @@ class BaselineDataMixin:
         if not driver_code:
             return None
 
+        cfg = getattr(self, "config", config_loader)
+        # Reject implausible single-lap teammate gaps. A snapshot delta of several seconds
+        # means an unrepresentative lap survived extraction; consuming it would saturate the
+        # downstream per-driver adjustment cap and flip teammate order on noise. Skipping it
+        # falls back to the model's own driver skill/pace signal.
+        max_delta_seconds = float(
+            cfg.get("baseline_predictor.qualifying.checkpoint_driver_delta_max_seconds", 2.0)
+        )
+
         for profile_name in preferred_profiles:
             profile_deltas = checkpoint_driver_deltas.get(profile_name)
             if not isinstance(profile_deltas, dict):
@@ -1085,7 +1094,7 @@ class BaselineDataMixin:
                 delta_seconds = float(raw_delta)
             except (TypeError, ValueError):
                 continue
-            if np.isfinite(delta_seconds):
+            if np.isfinite(delta_seconds) and abs(delta_seconds) <= max_delta_seconds:
                 return delta_seconds
 
         return None

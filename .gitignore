@@ -8,6 +8,12 @@ __pycache__/
 dist/
 build/
 
+# Secrets and local analysis artifacts (never commit)
+.env
+.env.local
+.env.*.local
+supabase_artifacts/
+
 # Virtual Environment
 venv/
 env/
@@ -63,3 +69,6 @@ PROGRESS_REPORT.md
 FIXME.md
 reports/
 notebooks/
+
+# Local Claude preview scaffolding (machine-specific)
+.claude/launch.json

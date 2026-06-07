@@ -110,6 +110,62 @@ def test_get_artifact_versions_combines_store_and_file_timestamps(patcher):
     assert versions["config/default.yaml"] == (9, "9.1")
 
 
+def test_get_artifact_versions_includes_snapshot_fingerprint(patcher):
+    snapshot_row = {
+        "artifact_key": "2026::Monaco Grand Prix::FP3",
+        "version": 4,
+        "created_at": "2026-06-06T12:00:00",
+    }
+
+    class _Store:
+        def __init__(self, data_root: str):
+            assert data_root == "data"
+
+        def load_artifact(self, artifact_type: str, artifact_key: str):
+            return {"version": 1, "last_updated": "2026-02-01T00:00:00"}
+
+        def list_artifacts(self, artifact_type, key_prefix=None, limit=100):
+            assert artifact_type == "car_characteristics_snapshot"
+            assert key_prefix == "2026::"
+            assert limit == 1
+            return [snapshot_row]
+
+    patcher.setattr(cache, "ArtifactStore", _Store)
+    patcher.setattr(
+        cache, "_get_file_timestamps", lambda year=2026, include_runtime_files=False: {}
+    )
+    patcher.setattr(cache, "should_read_db_first", lambda: True)
+
+    versions = cache.get_artifact_versions()
+
+    # Fingerprint advances when a snapshot is (re)written (new version / created_at).
+    assert versions["car_characteristics_snapshot::2026"] == (
+        4,
+        "2026::Monaco Grand Prix::FP3|2026-06-06T12:00:00",
+    )
+
+
+def test_get_artifact_versions_snapshot_fingerprint_is_defensive(patcher):
+    class _Store:
+        def __init__(self, data_root: str):
+            pass
+
+        def load_artifact(self, artifact_type: str, artifact_key: str):
+            return {"version": 1, "last_updated": "2026-02-01T00:00:00"}
+
+        # No list_artifacts -> snapshot fingerprint lookup must degrade gracefully.
+
+    patcher.setattr(cache, "ArtifactStore", _Store)
+    patcher.setattr(
+        cache, "_get_file_timestamps", lambda year=2026, include_runtime_files=False: {}
+    )
+    patcher.setattr(cache, "should_read_db_first", lambda: True)
+
+    versions = cache.get_artifact_versions()
+
+    assert versions["car_characteristics_snapshot::2026"] == (0, "")
+
+
 def test_get_artifact_versions_supports_non_default_year(patcher):
     class _Store:
         def __init__(self, data_root: str):

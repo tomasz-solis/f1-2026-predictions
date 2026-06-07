@@ -29,7 +29,15 @@ from src.systems.testing_updater import (
     _select_program_aware_laps,
     _testing_session_has_started,
 )
-from src.systems.testing_updater_metrics import _session_rain_fraction
+from src.predictors.baseline.qualifying_preparation import _blend_strengths
+from src.systems.testing_updater_metrics import (
+    _drop_implausible_laps,
+    _filter_valid_laps,
+    _select_short_run_laps,
+    _session_rain_fraction,
+)
+from src.utils.car_snapshot_history import detect_snapshot_anomalies
+from src.utils.fp_blending import blend_team_strength
 
 
 def test_canonicalize_team_name_aliases():
@@ -286,21 +294,25 @@ def test_select_program_aware_laps_balanced_prefers_representatives():
     assert len(selected) == 2
 
 
-def test_select_program_aware_laps_uses_fastest_short_stint_lap():
+def test_select_program_aware_laps_short_run_is_pace_based_not_stint_length():
+    # The fast green laps live inside a long (6-lap) stint; a 2-lap cooldown stint at the
+    # end of the session is far slower. Short-run pace must be selected by lap pace, so the
+    # quick laps are kept and the slow cooldown stint is excluded -- this is the Monaco-FP2
+    # failure mode (a cooldown stint was previously chosen as "short run").
     laps = pd.DataFrame(
         {
             "Driver": ["DRV"] * 8,
-            "Stint": [1, 1, 1, 1, 2, 2, 2, 2],
+            "Stint": [1, 1, 1, 1, 1, 1, 2, 2],
             "Compound": ["C3"] * 8,
             "LapTime": [
                 pd.to_timedelta("0:01:35"),
-                pd.to_timedelta("0:01:30"),
-                pd.to_timedelta("0:01:55"),
+                pd.to_timedelta("0:01:30"),  # fastest
                 pd.to_timedelta("0:01:31"),
-                pd.to_timedelta("0:01:42"),
-                pd.to_timedelta("0:01:40"),
-                pd.to_timedelta("0:01:41"),
-                pd.to_timedelta("0:01:43"),
+                pd.to_timedelta("0:01:33"),
+                pd.to_timedelta("0:01:36"),
+                pd.to_timedelta("0:01:38"),
+                pd.to_timedelta("0:02:13"),  # cooldown
+                pd.to_timedelta("0:02:19"),  # cooldown
             ],
             "PitOutTime": [pd.NaT] * 8,
             "PitInTime": [pd.NaT] * 8,
@@ -308,11 +320,134 @@ def test_select_program_aware_laps_uses_fastest_short_stint_lap():
     )
 
     selected = _select_program_aware_laps(laps, run_profile="short_run")
-    selected_seconds = (
+    selected_seconds = sorted(
         pd.to_timedelta(selected["LapTime"], errors="coerce").dt.total_seconds().tolist()
     )
 
-    assert selected_seconds == [90.0, 100.0]
+    # Picks the driver's fastest clean green laps; cooldown laps are excluded by pace.
+    assert selected_seconds == [90.0, 91.0, 93.0]
+    assert max(selected_seconds) < 120.0
+
+
+def test_select_short_run_laps_keeps_fast_lap_from_long_stint():
+    # A driver who only ran long push-stints still gets a representative short-run sample.
+    laps = pd.DataFrame(
+        {
+            "Driver": ["AAA"] * 7 + ["BBB"] * 2,
+            "Stint": [1, 1, 1, 1, 1, 1, 1, 5, 5],
+            "LapTime": [pd.to_timedelta(f"0:01:{34 + i:02d}") for i in range(7)]
+            + [pd.to_timedelta("0:02:10"), pd.to_timedelta("0:02:15")],
+            "PitOutTime": [pd.NaT] * 9,
+            "PitInTime": [pd.NaT] * 9,
+        }
+    )
+    selected = _select_short_run_laps(laps, top_n=3)
+    by_driver = {
+        drv: sorted(pd.to_timedelta(g["LapTime"]).dt.total_seconds().tolist())
+        for drv, g in selected.groupby("Driver")
+    }
+    assert by_driver["AAA"] == [94.0, 95.0, 96.0]  # fastest 3 of the long stint
+    assert by_driver["BBB"] == [130.0, 135.0]  # only laps available for BBB
+
+
+def test_drop_implausible_laps_removes_cooldown_and_inout():
+    laps = pd.DataFrame(
+        {
+            "Driver": ["DRV"] * 5,
+            "LapTime": [
+                pd.to_timedelta("0:01:14"),  # best 74s
+                pd.to_timedelta("0:01:15"),
+                pd.to_timedelta("0:01:18"),  # heavy fuel, within 20% -> kept
+                pd.to_timedelta("0:02:13"),  # cooldown -> dropped
+                pd.to_timedelta("0:01:44"),  # in/out-ish 104s -> dropped (>74*1.2)
+            ],
+        }
+    )
+    kept = _drop_implausible_laps(laps)
+    kept_seconds = sorted(pd.to_timedelta(kept["LapTime"]).dt.total_seconds().tolist())
+    assert kept_seconds == [74.0, 75.0, 78.0]
+
+
+def test_detect_snapshot_anomalies_flags_slow_pace_and_big_delta():
+    payload = {
+        "teams": {
+            "Ferrari": {
+                "profiles": {"short_run": {"overall_pace_seconds": 73.1}},
+                "driver_deltas_seconds": {"short_run": {"HAM": -0.1, "LEC": 0.1}},
+            },
+            "McLaren": {
+                "profiles": {"short_run": {"overall_pace_seconds": 104.3}},  # +31s off field
+                "driver_deltas_seconds": {"short_run": {"NOR": -29.0, "PIA": 29.0}},
+            },
+        }
+    }
+    warnings = detect_snapshot_anomalies(payload)
+    text = " ".join(warnings)
+    assert any("McLaren" in w and "off the field best" in w for w in warnings)
+    assert "NOR" in text and "PIA" in text
+    # The clean team raises no warning.
+    assert not any("Ferrari" in w for w in warnings)
+
+
+def test_detect_snapshot_anomalies_clean_snapshot_has_no_warnings():
+    payload = {
+        "teams": {
+            "Ferrari": {
+                "profiles": {"short_run": {"overall_pace_seconds": 73.1}},
+                "driver_deltas_seconds": {"short_run": {"HAM": -0.1, "LEC": 0.1}},
+            },
+            "McLaren": {
+                "profiles": {"short_run": {"overall_pace_seconds": 74.95}},
+                "driver_deltas_seconds": {"short_run": {"NOR": 0.62, "PIA": -0.62}},
+            },
+        }
+    }
+    assert detect_snapshot_anomalies(payload) == []
+
+
+def test_blend_strengths_caps_checkpoint_move_from_prior():
+    # A corrupted checkpoint score (0.14) would drag a 0.671 prior to ~0.255 at 0.784 weight;
+    # the move cap bounds the swing to prior - limit.
+    model_strengths = {"McLaren": 0.671, "Ferrari": 0.83}
+    checkpoint_perf = {"McLaren": 0.14, "Ferrari": 0.94}
+    blended = _blend_strengths(
+        model_strengths=model_strengths,
+        fp_performance=None,
+        testing_fallback_performance=checkpoint_perf,
+        uses_checkpoint_practice_profiles=True,
+        checkpoint_practice_blend_weight=0.784,
+        checkpoint_testing_fallback_performance=checkpoint_perf,
+        fp_blend_weight=0.784,
+        practice_like_profile_label="FP2",
+        practice_like_blend_weight=0.784,
+        blend_team_strength_fn=blend_team_strength,
+        apply_testing_fallback_adjustment_fn=lambda **_: model_strengths,
+        checkpoint_max_strength_move=0.40,
+    )
+    # Without the cap McLaren would land ~0.255; the cap holds it at >= 0.671 - 0.40.
+    assert blended["McLaren"] >= 0.671 - 0.40 - 1e-9
+    assert blended["McLaren"] == pytest.approx(0.271, abs=1e-3)
+    # Ferrari moves up only modestly and stays within the cap of its prior.
+    assert abs(blended["Ferrari"] - 0.83) <= 0.40 + 1e-9
+
+
+def test_filter_valid_laps_applies_absolute_pace_floor():
+    laps = pd.DataFrame(
+        {
+            "Driver": ["DRV"] * 4,
+            "LapTime": [
+                pd.to_timedelta("0:01:14"),
+                pd.to_timedelta("0:01:16"),
+                pd.to_timedelta("0:02:13"),  # 133s junk -> dropped by floor
+                pd.NaT,  # untimed -> dropped
+            ],
+            "PitOutTime": [pd.NaT] * 4,
+            "PitInTime": [pd.NaT] * 4,
+        }
+    )
+    valid = _filter_valid_laps(laps)
+    secs = sorted(pd.to_timedelta(valid["LapTime"]).dt.total_seconds().tolist())
+    assert secs == [74.0, 76.0]
 
 
 def test_extract_team_payload_uses_per_lap_top_speed_traps():
@@ -508,10 +643,14 @@ def test_collect_session_metrics_attaches_raw_top_speed_from_all_valid_laps(monk
     )
 
     assert tire == {}
-    assert captured_payload["Ferrari"]["FP1"]["speed_profile"]["top_speed"] == 301.0
+    # speed_profile is now derived from the three fastest clean laps (median SpeedST of
+    # 299/300/301 = 300.0) rather than a single best-stint lap.
+    assert captured_payload["Ferrari"]["FP1"]["speed_profile"]["top_speed"] == 300.0
     assert perf["Ferrari"]["top_speed"] == 0.12
     assert perf["Ferrari"]["top_speed_kph"] == pytest.approx(319.9, abs=1e-4)
-    assert perf["Ferrari"]["overall_pace_seconds"] == 90.0
+    # Short-run pace is the robust median of the driver's three fastest clean laps
+    # (90/91/92s) -> 91.0, instead of the single best lap.
+    assert perf["Ferrari"]["overall_pace_seconds"] == 91.0
 
 
 def test_count_team_selected_laps_avoids_short_stint_cooldown_laps():
@@ -542,7 +681,9 @@ def test_count_team_selected_laps_avoids_short_stint_cooldown_laps():
 
     counts = _count_team_selected_laps(session, {"McLaren"}, run_profile="short_run")
 
-    assert counts["McLaren"] == 2.0
+    # Pace-based short-run keeps the driver's three fastest clean laps (90/91/95s);
+    # the 115s cooldown lap is still excluded.
+    assert counts["McLaren"] == 3.0
 
 
 def test_testing_event_and_session_parsing():

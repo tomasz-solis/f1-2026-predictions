@@ -31,6 +31,17 @@ _LONG_STINT_MIN_LAPS = 8
 _STINT_OUTLIER_BUFFER_SECONDS = 5.0
 _MIN_VALID_TEAM_LAPS = 5
 _WET_SESSION_RAIN_THRESHOLD = 0.30
+# Absolute pace sanity floor: drop laps slower than (team-best valid lap) * (1 + ratio).
+# Removes in/out, cooldown, and aborted laps that are not representative pace before any
+# stint/representative selection runs. 0.20 keeps genuine heavy-fuel long runs (~+5-8%) while
+# discarding the +20%-and-worse non-laps (e.g. a 133s Monaco "lap" against a 74s best).
+_GARBAGE_LAP_PACE_RATIO = 0.20
+# Short-run pace = median of each driver's quickest N clean green laps (pace-based, not
+# stint-length based). Mirrors src/utils/fp_blending.py::_extract_short_run_lap_time.
+_SHORT_RUN_TOP_N = 3
+# Plausibility bound for a single-lap teammate delta. Real one-lap teammate gaps are well
+# under a second; anything larger is a data artifact and is clamped.
+_MAX_TEAMMATE_DELTA_SECONDS = 1.5
 _RAW_TOP_SPEED_METRIC = "top_speed_kph"
 _RAW_OVERALL_PACE_METRIC = "overall_pace_seconds"
 _RAW_SLOW_CORNER_METRIC = "slow_corner_seconds"
@@ -42,6 +53,33 @@ _RAW_BRAKING_METRIC = "braking_pct"
 def _canonicalize_team_name(raw_team: str, known_teams: set[str]) -> str | None:
     """Map session team name to canonical team key used in characteristics JSON."""
     return map_team_to_characteristics(raw_team, known_teams=known_teams)
+
+
+def _drop_implausible_laps(
+    laps: pd.DataFrame, pace_ratio: float = _GARBAGE_LAP_PACE_RATIO
+) -> pd.DataFrame:
+    """Drop laps far slower than the team's own fastest valid lap.
+
+    Practice/qualifying lap logs contain in/out, cooldown, and aborted laps that are
+    tens of seconds off representative pace. Earlier selection only used *relative*
+    per-stint filtering, so a stint that contained only slow laps (e.g. a 2-lap
+    end-of-session cooldown, or a car that broke down) had its slow lap accepted as
+    the team's "representative" pace. This applies an absolute floor relative to the
+    team's own best clean lap so such non-laps never reach representative selection.
+    """
+    if laps.empty or "LapTime" not in laps.columns:
+        return laps
+    lap_seconds = _lap_seconds_series(laps)
+    if lap_seconds.empty:
+        return laps
+    reference = float(lap_seconds.min())
+    if not np.isfinite(reference) or reference <= 0:
+        return laps
+    threshold = reference * (1.0 + max(0.0, float(pace_ratio)))
+    keep_idx = lap_seconds[lap_seconds <= threshold].index
+    if len(keep_idx) == 0:
+        return laps
+    return laps.loc[keep_idx].copy()
 
 
 def _filter_valid_laps(team_laps: pd.DataFrame) -> pd.DataFrame:
@@ -62,7 +100,9 @@ def _filter_valid_laps(team_laps: pd.DataFrame) -> pd.DataFrame:
         if accurate.notna().any() and bool(accurate_true.any()):
             mask &= accurate_true
 
-    return team_laps[mask].copy()
+    # Absolute pace floor: reject non-representative laps (in/out, cooldown, aborted)
+    # that are far slower than the team's own best clean lap.
+    return _drop_implausible_laps(team_laps[mask].copy())
 
 
 def _session_rain_fraction(session: fastf1.core.Session) -> float | None:
@@ -202,13 +242,42 @@ def _select_stint_representative_laps(team_laps: pd.DataFrame) -> pd.DataFrame:
     return team_laps.loc[representative_indices].copy()
 
 
+def _select_short_run_laps(
+    team_laps: pd.DataFrame, top_n: int = _SHORT_RUN_TOP_N
+) -> pd.DataFrame:
+    """Select each driver's quickest clean green laps as the short-run sample.
+
+    Short-run (qualifying-sim) pace is about single-lap bite on low fuel, not stint
+    length. Selecting by lap *pace* per driver — instead of by stint length — keeps a
+    fast lap that happened inside a longer stint and rejects a slow 2-lap cooldown
+    stint that a driver who ran a full program may leave at the end of a session.
+    Mirrors ``src/utils/fp_blending.py::_extract_short_run_lap_time``.
+    """
+    clean = _strip_in_out_laps(team_laps)
+    if clean.empty:
+        clean = team_laps
+    if clean.empty or "Driver" not in clean.columns:
+        return clean
+
+    keep_index: list = []
+    for _, driver_laps in clean.groupby("Driver", dropna=False):
+        lap_seconds = _lap_seconds_series(driver_laps)
+        if lap_seconds.empty:
+            continue
+        keep_index.extend(list(lap_seconds.nsmallest(max(1, int(top_n))).index))
+
+    if not keep_index:
+        return clean
+    return clean.loc[keep_index].copy()
+
+
 def _select_program_aware_laps(team_laps: pd.DataFrame, run_profile: str) -> pd.DataFrame:
     """
     Select representative laps with program-aware run filtering.
 
     Modes:
     - all: use all valid laps
-    - short_run: prefer short stints
+    - short_run: per-driver quickest clean green laps (pace-based, not stint-length)
     - long_run: prefer long stints
     - balanced: blend short + long stints
     """
@@ -220,13 +289,17 @@ def _select_program_aware_laps(team_laps: pd.DataFrame, run_profile: str) -> pd.
             f"Invalid run_profile '{run_profile}'. Use one of: {', '.join(_RUN_PROFILE_MODES)}"
         )
 
+    # Short-run pace is selected by lap pace per driver, not stint length, so a quick
+    # lap inside a long stint counts and an end-of-session cooldown stint does not.
+    if run_profile == "short_run":
+        short_run_laps = _select_short_run_laps(team_laps)
+        return short_run_laps if not short_run_laps.empty else team_laps
+
     if run_profile == "all":
         selected = team_laps
     else:
         short_laps, long_laps = _classify_run_laps(team_laps)
-        if run_profile == "short_run":
-            selected = short_laps if not short_laps.empty else team_laps
-        elif run_profile == "long_run":
+        if run_profile == "long_run":
             selected = long_laps if not long_laps.empty else team_laps
         else:
             if not short_laps.empty and not long_laps.empty:

@@ -97,6 +97,7 @@ def build_car_characteristics_snapshot_payload(
     round_number: int | None = None,
     session_started_at: str | None = None,
     season_characteristics_version: int | None = None,
+    team_clean_lap_counts: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     """Build a persisted payload for one session-level car profile snapshot.
 
@@ -146,8 +147,63 @@ def build_car_characteristics_snapshot_payload(
         payload["session_started_at"] = str(session_started_at)
     if season_characteristics_version is not None:
         payload["season_characteristics_version"] = int(season_characteristics_version)
+    if isinstance(team_clean_lap_counts, dict) and team_clean_lap_counts:
+        payload["team_clean_lap_counts"] = {
+            str(team): int(count)
+            for team, count in team_clean_lap_counts.items()
+            if isinstance(count, int | float) and count == count
+        }
 
     return payload
+
+
+def detect_snapshot_anomalies(
+    payload: dict[str, Any],
+    *,
+    max_pace_gap_seconds: float = 8.0,
+    max_teammate_delta_seconds: float = 2.0,
+) -> list[str]:
+    """Flag teams whose stored short-run pace or teammate delta looks unrepresentative.
+
+    Capture-time guard (log-only): a short-run "representative" lap many seconds off the
+    field's best, or a multi-second single-lap teammate gap, indicates a non-representative
+    lap survived extraction. Returns human-readable warnings; callers decide how to surface
+    them (the extractor logs them before persisting).
+    """
+    teams = payload.get("teams", {})
+    if not isinstance(teams, dict) or not teams:
+        return []
+
+    short_run_seconds: dict[str, float] = {}
+    for team_name, entry in teams.items():
+        if not isinstance(entry, dict):
+            continue
+        short_run = (entry.get("profiles") or {}).get("short_run") or {}
+        seconds = short_run.get("overall_pace_seconds") if isinstance(short_run, dict) else None
+        if isinstance(seconds, int | float) and seconds == seconds:
+            short_run_seconds[str(team_name)] = float(seconds)
+
+    field_min = min(short_run_seconds.values()) if short_run_seconds else None
+
+    warnings: list[str] = []
+    for team_name, entry in teams.items():
+        if not isinstance(entry, dict):
+            continue
+        seconds = short_run_seconds.get(str(team_name))
+        if field_min is not None and seconds is not None and (seconds - field_min) > max_pace_gap_seconds:
+            warnings.append(
+                f"{team_name}: short-run pace {seconds:.1f}s is {seconds - field_min:.1f}s "
+                "off the field best (possible unrepresentative lap)"
+            )
+        deltas = (entry.get("driver_deltas_seconds") or {}).get("short_run") or {}
+        if isinstance(deltas, dict):
+            for driver, delta in deltas.items():
+                if isinstance(delta, int | float) and abs(float(delta)) > max_teammate_delta_seconds:
+                    warnings.append(
+                        f"{team_name}/{driver}: teammate delta {float(delta):+.2f}s exceeds a "
+                        "plausible single-lap gap"
+                    )
+    return warnings
 
 
 def sort_snapshot_payloads(payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:

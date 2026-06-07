@@ -361,12 +361,16 @@ def build_snapshot_overlay_car_characteristics(
     if not applied_snapshot_profiles:
         raise ValueError("Snapshot payload does not contain any valid team profiles")
 
+    clean_lap_counts = snapshot_payload.get("team_clean_lap_counts")
     merged_payload["checkpoint_snapshot"] = {
         "event_name": str(snapshot_payload.get("event_name", "")).strip(),
         "session_name": str(snapshot_payload.get("session_name", "")).strip().upper(),
         "source": str(snapshot_payload.get("source", "")).strip(),
         "captured_at": snapshot_payload.get("captured_at"),
         "session_started_at": snapshot_payload.get("session_started_at"),
+        "team_clean_lap_counts": (
+            clean_lap_counts if isinstance(clean_lap_counts, dict) else {}
+        ),
     }
     return merged_payload
 

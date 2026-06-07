@@ -444,6 +444,7 @@ def _blend_strengths(
     practice_like_blend_weight: float | None,
     blend_team_strength_fn: Callable[..., dict[str, float]],
     apply_testing_fallback_adjustment_fn: Callable[..., dict[str, float]],
+    checkpoint_max_strength_move: float | None = None,
 ) -> dict[str, float]:
     """Select and apply the appropriate strength-blending strategy.
 
@@ -461,11 +462,27 @@ def _blend_strengths(
     if uses_checkpoint_practice_profiles:
         assert checkpoint_practice_blend_weight is not None
         assert checkpoint_testing_fallback_performance is not None
-        return blend_team_strength_fn(
+        blended = blend_team_strength_fn(
             model_strengths,
             checkpoint_testing_fallback_performance,
             blend_weight=checkpoint_practice_blend_weight,
         )
+        # Quality gate: bound how far a single stored checkpoint can move a team from its
+        # season-learned prior. A representative session moves a team only modestly; a
+        # catastrophic swing (e.g. a corrupted snapshot dragging a top car to last) is
+        # clamped so one odd session cannot override the season posterior wholesale.
+        if checkpoint_max_strength_move is not None and checkpoint_max_strength_move >= 0:
+            limit = float(checkpoint_max_strength_move)
+            return {
+                team: float(
+                    min(
+                        model_strengths.get(team, value) + limit,
+                        max(model_strengths.get(team, value) - limit, value),
+                    )
+                )
+                for team, value in blended.items()
+            }
+        return blended
     return apply_testing_fallback_adjustment_fn(
         model_strengths=model_strengths,
         testing_fallback_performance=testing_fallback_performance,
@@ -702,6 +719,14 @@ def build_driver_list_with_strengths_core(
         uses_checkpoint_practice_profiles=uses_checkpoint_practice_profiles,
     )
 
+    checkpoint_max_strength_move = cfg.get(
+        "baseline_predictor.qualifying.stored_checkpoint_max_strength_move", 0.40
+    )
+    try:
+        checkpoint_max_strength_move = float(checkpoint_max_strength_move)
+    except (TypeError, ValueError):
+        checkpoint_max_strength_move = 0.40
+
     blended_strengths = _blend_strengths(
         model_strengths=model_strengths,
         fp_performance=fp_performance,
@@ -714,6 +739,7 @@ def build_driver_list_with_strengths_core(
         practice_like_blend_weight=practice_like_blend_weight,
         blend_team_strength_fn=blend_team_strength_fn,
         apply_testing_fallback_adjustment_fn=apply_testing_fallback_adjustment_fn,
+        checkpoint_max_strength_move=checkpoint_max_strength_move,
     )
 
     all_drivers: list[dict[str, Any]] = []

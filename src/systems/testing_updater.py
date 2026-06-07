@@ -45,6 +45,7 @@ from src.systems.testing_updater_flow import (
     write_characteristics_if_needed as _write_characteristics_if_needed,
 )
 from src.systems.testing_updater_metrics import (
+    _MAX_TEAMMATE_DELTA_SECONDS,
     _aggregate_metric_samples,
     _blend_directionality,
     _build_directionality_from_metrics,
@@ -110,6 +111,7 @@ from src.systems.testing_updater_sessions import (
 from src.utils.car_snapshot_history import (
     SNAPSHOT_ARTIFACT_TYPE,
     build_car_characteristics_snapshot_payload,
+    detect_snapshot_anomalies,
     snapshot_artifact_key,
 )
 from src.utils.file_operations import atomic_json_write
@@ -232,12 +234,20 @@ def _persist_session_snapshot_records(
             round_number=snapshot_record.get("round_number"),
             session_started_at=snapshot_record.get("session_started_at"),
             season_characteristics_version=season_characteristics_version,
+            team_clean_lap_counts=snapshot_record.get("team_clean_lap_counts"),
         )
+        # Capture-time guard: surface any team whose stored short-run pace or teammate
+        # delta still looks unrepresentative before the snapshot is persisted.
+        for anomaly in detect_snapshot_anomalies(snapshot_payload):
+            logger.warning("Snapshot anomaly [%s %s]: %s", event_name, session_name, anomaly)
         artifact_store.save_artifact(
             artifact_type=SNAPSHOT_ARTIFACT_TYPE,
             artifact_key=artifact_key,
             data=snapshot_payload,
-            version=1,
+            # Auto-increment to a new latest version. The reader loads the snapshot with
+            # version="latest" (max version), so a hardcoded version=1 made re-extractions
+            # of any session that had ever reached version >= 2 invisible to the predictor.
+            version=None,
         )
         persisted_keys.append(artifact_key)
 
@@ -955,12 +965,18 @@ def _extract_session_driver_deltas(
                 continue
             driver_medians[driver_code] = float(median_seconds)
 
+        # Only drivers with a representative clean lap define the team reference, so a
+        # car with no clean lap (breakdown, in/out only) cannot skew teammate deltas.
         if len(driver_medians) < 2:
             continue
 
         team_reference = float(sum(driver_medians.values()) / len(driver_medians))
+        # Clamp to a plausible single-lap teammate gap. Real one-lap gaps are sub-second;
+        # larger values are data artifacts (an unrepresentative lap survived selection)
+        # and must not saturate the downstream per-driver adjustment cap.
+        max_delta = float(_MAX_TEAMMATE_DELTA_SECONDS)
         driver_deltas = {
-            driver_code: round(driver_time - team_reference, 4)
+            driver_code: round(max(-max_delta, min(max_delta, driver_time - team_reference)), 4)
             for driver_code, driver_time in driver_medians.items()
         }
         if driver_deltas:

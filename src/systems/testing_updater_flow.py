@@ -240,6 +240,14 @@ def collect_sessions_for_events(
                 driver_profile_results=driver_profile_results,
             )
             if snapshot_record is not None:
+                # Record per-team clean short-run lap counts so downstream prediction can
+                # gate confidence/blend on data sufficiency (a thin/broken session should
+                # not override a team's season prior at full checkpoint weight).
+                snapshot_record["team_clean_lap_counts"] = count_team_selected_laps(
+                    session=session,
+                    known_teams=known_teams,
+                    run_profile="short_run",
+                )
                 result.session_snapshot_records[session_id] = snapshot_record
 
             normalized_perf, normalized_tire = profile_results.get(run_profile, ({}, {}))

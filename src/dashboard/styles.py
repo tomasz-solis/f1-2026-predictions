@@ -334,7 +334,7 @@ h2 {
   border-radius: 12px;
   padding: 0.34rem;
   width: 100%;
-  max-width: var(--ts-readable-max);
+  max-width: var(--ts-page-max);
   margin: 0 auto 0.9rem;
   overflow-x: auto;
   flex-wrap: nowrap;
@@ -366,7 +366,7 @@ h2 {
 }
 [data-testid="stTabs"] [role="tabpanel"] {
   width: 100%;
-  max-width: var(--ts-readable-max);
+  max-width: var(--ts-page-max);
   margin: 0 auto;
   padding-top: 0.35rem;
 }

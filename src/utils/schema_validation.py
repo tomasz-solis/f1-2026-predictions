@@ -240,6 +240,10 @@ _CHECKPOINT_SNAPSHOT_SCHEMA = {
         "source": {"type": "string"},
         "captured_at": _STRING_OR_NULL,
         "session_started_at": _STRING_OR_NULL,
+        "team_clean_lap_counts": {
+            "type": "object",
+            "additionalProperties": {"type": "number"},
+        },
     },
     "additionalProperties": False,
 }
