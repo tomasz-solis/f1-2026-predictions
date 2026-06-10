@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,6 +12,42 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+
+def _load_env_file(env_file: Path) -> None:
+    """Load ``KEY=VALUE`` pairs from a file into the environment.
+
+    Existing environment variables take precedence (the file only fills gaps), so an
+    explicitly exported value is never overwritten.
+    """
+    if not env_file.exists():
+        raise FileNotFoundError(f"Env file not found: {env_file}")
+    for raw_line in env_file.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if key:
+            os.environ.setdefault(key, value.strip())
+
+
+def _preload_env_file_from_argv(argv: list[str]) -> None:
+    """Load ``--env-file`` before the persistence layer validates credentials.
+
+    ``src.persistence.config`` checks Supabase credentials at import time, so the env
+    file must be applied before the heavy imports below rather than in ``main()``.
+    """
+    for index, arg in enumerate(argv):
+        if arg == "--env-file" and index + 1 < len(argv):
+            _load_env_file(Path(argv[index + 1]))
+            return
+        if arg.startswith("--env-file="):
+            _load_env_file(Path(arg.split("=", 1)[1]))
+            return
+
+
+_preload_env_file_from_argv(sys.argv[1:])
 
 from src.dashboard.warmup import run_warmup_precompute_cycle  # noqa: E402
 from src.persistence.config import (  # noqa: E402
@@ -40,6 +77,15 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=datetime.now(UTC).year,
         help="Season year to warm (default: current UTC year).",
+    )
+    parser.add_argument(
+        "--env-file",
+        type=Path,
+        default=None,
+        help=(
+            "Load KEY=VALUE pairs (e.g. .env.local) before connecting to Supabase, so DB-backed "
+            "warmups have credentials. Already-exported environment variables take precedence."
+        ),
     )
     parser.add_argument(
         "--dry-run",

@@ -229,6 +229,57 @@ def test_blend_weight_script_uses_shared_results_fetcher():
     assert module.fetch_actual_session_results.__module__ == "src.data.actual_results_fetcher"
 
 
+def test_warmup_env_file_fills_missing_without_overriding(tmp_path, monkeypatch):
+    """`--env-file` should supply missing Supabase creds but never override exported vars."""
+    module = _load_module("warmup_env_file_script", "scripts/warmup_precompute.py")
+    env_file = tmp_path / ".env.local"
+    env_file.write_text(
+        "# comment line\n"
+        "SUPABASE_URL=https://example.supabase.co\n"
+        "SUPABASE_KEY=service-key\n"
+        "USE_DB_STORAGE=db_only\n",
+        encoding="utf-8",
+    )
+    # SUPABASE_* absent (should be filled); USE_DB_STORAGE already set (must win).
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_KEY", raising=False)
+    monkeypatch.setenv("USE_DB_STORAGE", "dual_write")
+
+    module._load_env_file(env_file)
+
+    import os
+
+    assert os.environ["SUPABASE_URL"] == "https://example.supabase.co"
+    assert os.environ["SUPABASE_KEY"] == "service-key"
+    assert os.environ["USE_DB_STORAGE"] == "dual_write"  # exported value preserved
+
+
+def test_warmup_load_env_file_missing_raises(tmp_path):
+    module = _load_module("warmup_env_file_missing_script", "scripts/warmup_precompute.py")
+    with pytest.raises(FileNotFoundError):
+        module._load_env_file(tmp_path / "does-not-exist.env")
+
+
+@pytest.mark.parametrize("use_equals_form", [False, True])
+def test_warmup_preload_env_file_from_argv(tmp_path, monkeypatch, use_equals_form: bool):
+    """The pre-import preloader handles both `--env-file X` and `--env-file=X`."""
+    module = _load_module("warmup_preload_script", "scripts/warmup_precompute.py")
+    env_file = tmp_path / "creds.env"
+    env_file.write_text("SUPABASE_KEY=from-file\n", encoding="utf-8")
+    monkeypatch.delenv("SUPABASE_KEY", raising=False)
+
+    argv = (
+        [f"--env-file={env_file}"]
+        if use_equals_form
+        else ["--year", "2026", "--env-file", str(env_file)]
+    )
+    module._preload_env_file_from_argv(argv)
+
+    import os
+
+    assert os.environ["SUPABASE_KEY"] == "from-file"
+
+
 @pytest.mark.parametrize(
     ("module_name", "relative_path"),
     [
