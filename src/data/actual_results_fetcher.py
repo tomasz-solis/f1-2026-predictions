@@ -20,6 +20,35 @@ _MIN_COMPETITIVE_ENTRIES_BY_SESSION = {
     "R": 18,
 }
 _QUALIFYING_LIKE_SESSIONS = {"Q", "SQ"}
+_RACE_LIKE_SESSIONS = {"R", "SPRINT"}
+
+
+def _clean_result_str(value: Any) -> str:
+    """Coerce a FastF1 result cell to a trimmed string, treating NaN/none as empty."""
+    if value is None:
+        return ""
+    if isinstance(value, float) and value != value:  # NaN
+        return ""
+    text = str(value).strip()
+    return "" if text.lower() in {"", "nan", "none"} else text
+
+
+def _result_row_is_dnf(row: Any) -> bool:
+    """Return whether a race-result row is a did-not-finish / not-classified outcome.
+
+    ``ClassifiedPosition`` is authoritative when present: a numeric value means the
+    driver was classified (finished, possibly lapped), while a letter (``R``etired,
+    ``D``isqualified, ``E``xcluded, ``W``ithdrawn, ``N``ot classified, ...) means a
+    DNF. When it is absent the FastF1 ``Status`` string is used, where only
+    "Finished" and "+N Lap(s)"/"Lapped" count as classified.
+    """
+    classified = _clean_result_str(row.get("ClassifiedPosition"))
+    if classified:
+        return not classified.isdigit()
+    status = _clean_result_str(row.get("Status")).lower()
+    if status:
+        return not (status.startswith("finished") or "lap" in status)
+    return False
 
 
 def _session_load_options(session_name: str) -> dict[str, bool]:
@@ -188,6 +217,7 @@ def fetch_actual_session_results(
             return None
 
         # Extract relevant data; skip malformed rows.
+        is_race_like_session = str(session_name).strip().upper() in _RACE_LIKE_SESSIONS
         grid_rows: list[dict[str, Any]] = []
         for row_index, (_, row) in enumerate(results.iterrows(), start=1):
             try:
@@ -206,13 +236,16 @@ def fetch_actual_session_results(
                 if position is None:
                     position = _coerce_optional_position(row.get("ClassifiedPosition"))
 
-                grid_rows.append(
-                    {
-                        "driver": driver,
-                        "team": str(team).strip(),
-                        "position": position,
-                    }
-                )
+                grid_row: dict[str, Any] = {
+                    "driver": driver,
+                    "team": str(team).strip(),
+                    "position": position,
+                }
+                # Record DNF status for race-like sessions so finisher-only MAE and DNF
+                # calibration can use it. Qualifying has no DNF concept.
+                if is_race_like_session:
+                    grid_row["dnf"] = _result_row_is_dnf(row)
+                grid_rows.append(grid_row)
             except (AttributeError, KeyError, TypeError, ValueError) as e:
                 logger.error(
                     "Malformed FastF1 results for %s %s at row %s: %s",

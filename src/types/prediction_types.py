@@ -13,6 +13,9 @@ class QualifyingGridEntry(TypedDict):
     p5: NotRequired[int]
     p95: NotRequired[int]
     confidence: NotRequired[float]
+    # True for race-session results where the driver did not finish / was not classified.
+    # Used by finisher-only MAE and DNF calibration; absent for qualifying and predictions.
+    dnf: NotRequired[bool]
 
 
 class DriverRaceInfo(TypedDict):

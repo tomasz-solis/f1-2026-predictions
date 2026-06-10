@@ -33,6 +33,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 os.environ.setdefault("USE_DB_STORAGE", "file_only")
@@ -40,6 +42,7 @@ os.environ.setdefault("USE_DB_STORAGE", "file_only")
 from src.analysis.model_evaluation import (
     build_confidence_bands,
     compute_calibration_metrics,
+    compute_dnf_calibration,
     compute_improvement_over_baseline,
     compute_prediction_accuracy,
     identify_systematic_errors,
@@ -361,10 +364,61 @@ def _build_accuracy_section(
         "label": label,
         "events_evaluated": len(per_event_metrics),
         "mae": _mean("mae"),
+        # Position-importance weighted MAE: errors at the sharp end of the grid count for more,
+        # since getting the front order right matters more than shuffling the backmarkers.
+        "weighted_mae": _mean("weighted_mae"),
+        # MAE over cars that actually finished, so unpredictable retirements do not dominate.
+        "finisher_mae": _mean("finisher_mae"),
+        "total_dnf_count": sum(int(row.get("dnf_count", 0)) for row in per_event_metrics),
         "exact_match_rate": _mean("exact_match_rate"),
         "within_3_rate": _mean("within_3_rate"),
         "spearman_rank": _mean("spearman_rank"),
         "kendall_tau": _mean("kendall_tau"),
+    }
+
+
+def _build_dnf_calibration_section(
+    predicted: list[list[dict[str, Any]]],
+    actual: list[list[dict[str, Any]]],
+) -> dict[str, Any]:
+    """Aggregate DNF-probability calibration (Brier score) across race events.
+
+    DNF is scored separately from finishing position so an unpredictable
+    retirement does not pollute position MAE, while still tracking whether the
+    per-driver ``dnf_probability`` output is honest. Requires actuals that carry
+    a DNF/status signal; degrades to ``events_scored: 0`` otherwise.
+    """
+    per_event = [
+        compute_dnf_calibration(predicted_rows, actual_rows)
+        for predicted_rows, actual_rows in zip(predicted, actual, strict=True)
+        if predicted_rows and actual_rows
+    ]
+    scored = [row for row in per_event if float(row.get("scored_drivers", 0)) > 0]
+    labelled = [row for row in scored if not np.isnan(float(row.get("brier_score", float("nan"))))]
+    if not labelled:
+        return {
+            "events_scored": 0,
+            "note": (
+                "DNF calibration needs actuals with a DNF/status flag; "
+                "none were available in the evaluated set."
+            ),
+        }
+
+    def _weighted(key: str) -> float:
+        total_drivers = sum(float(row["scored_drivers"]) for row in labelled)
+        if total_drivers <= 0:
+            return 0.0
+        return (
+            sum(float(row[key]) * float(row["scored_drivers"]) for row in labelled) / total_drivers
+        )
+
+    return {
+        "events_scored": len(labelled),
+        "scored_drivers": sum(int(row["scored_drivers"]) for row in labelled),
+        "actual_dnf_count": sum(int(row["actual_dnf_count"]) for row in labelled),
+        "brier_score": _weighted("brier_score"),
+        "baseline_brier": _weighted("baseline_brier"),
+        "brier_skill_score": _weighted("brier_skill_score"),
     }
 
 
@@ -737,6 +791,7 @@ def build_report(year: int, predictions_dir: Path) -> dict[str, Any]:
         "segment_breakdown": _build_segment_breakdown(selected_predictions, year=year),
         "qualifying_accuracy": _build_accuracy_section(pred_quali, act_quali, "qualifying"),
         "race_accuracy": _build_accuracy_section(pred_race, act_race, "race"),
+        "race_dnf_calibration": _build_dnf_calibration_section(pred_race, act_race),
         "calibration": _build_calibration_section(pred_quali, act_quali),
         "error_analysis": _build_error_analysis(selected_predictions, year=year),
         "qualifying_bias": _build_bias_section(pred_quali, act_quali, "qualifying"),
@@ -1250,13 +1305,13 @@ def main() -> int:
     md = render_markdown(report)
     md_out = Path(args.out)
     md_out.parent.mkdir(parents=True, exist_ok=True)
-    md_out.write_text(md)
+    md_out.write_text(md, encoding="utf-8")
     logger.info("Wrote markdown report: %s", md_out)
 
     error_md = render_error_analysis_markdown(report)
     error_out = Path(args.error_out)
     error_out.parent.mkdir(parents=True, exist_ok=True)
-    error_out.write_text(error_md)
+    error_out.write_text(error_md, encoding="utf-8")
     logger.info("Wrote error analysis report: %s", error_out)
 
     # Exit summary

@@ -139,6 +139,10 @@ class PredictionLogger:
                         "driver": result["driver"],
                         "team": result["team"],
                         "confidence": result.get("confidence"),
+                        # predict_race emits the per-driver DNF probability under
+                        # "dnf_probability"; persist it so DNF calibration (Brier) can score it.
+                        # Keep the legacy "dnf_risk" key for backward compatibility.
+                        "dnf_probability": result.get("dnf_probability", result.get("dnf_risk")),
                         "dnf_risk": result.get("dnf_risk"),
                     }
                     for i, result in enumerate(race_prediction)

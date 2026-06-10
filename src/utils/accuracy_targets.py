@@ -323,16 +323,28 @@ def sanitize_prediction_rows(rows: Any) -> list[dict[str, Any]]:
 
 
 def sanitize_actual_rows(rows: Any) -> list[dict[str, Any]]:
-    """Return stored actual rows with only accuracy-relevant fields."""
+    """Return stored actual rows with only accuracy-relevant fields.
+
+    A DNF signal is preserved when the source carries one (``dnf`` flag,
+    ``status`` string, or ``classified`` boolean) so finisher-only and DNF
+    calibration metrics can use it. Position-only actuals are unaffected.
+    """
     sanitized_rows = sanitize_prediction_rows(rows)
-    return [
-        {
+    result: list[dict[str, Any]] = []
+    for row in sanitized_rows:
+        entry: dict[str, Any] = {
             "position": row["position"],
             "driver": row["driver"],
             "team": row["team"],
         }
-        for row in sanitized_rows
-    ]
+        if "dnf" in row:
+            entry["dnf"] = bool(row.get("dnf"))
+        elif row.get("status"):
+            entry["status"] = str(row.get("status"))
+        elif "classified" in row and row.get("classified") is not None:
+            entry["classified"] = bool(row.get("classified"))
+        result.append(entry)
+    return result
 
 
 def mean_confidence_from_rows(rows: Any) -> float | None:

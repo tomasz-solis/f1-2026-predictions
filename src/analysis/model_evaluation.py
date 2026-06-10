@@ -39,8 +39,64 @@ def build_confidence_bands(
     return bands
 
 
+_DNF_STATUS_MARKERS = ("dnf", "retired", "did not finish", "disqualified", "dns", "dnq", "dsq")
+
+
+def row_is_dnf(row: dict[str, Any]) -> bool:
+    """Return whether one result row represents a did-not-finish outcome.
+
+    Tolerant of the several shapes actuals can take: an explicit ``dnf`` flag, a
+    FastF1-style ``status`` string, or a ``classified``/``finished`` boolean.
+    Returns ``False`` when no DNF signal is present, so position-only actuals
+    (older artifacts) are simply treated as all-finished.
+    """
+    if not isinstance(row, dict):
+        return False
+    if "dnf" in row:
+        return bool(row.get("dnf"))
+    if "classified" in row and row.get("classified") is not None:
+        return not bool(row.get("classified"))
+    if "finished" in row and row.get("finished") is not None:
+        return not bool(row.get("finished"))
+    status = str(row.get("status", "")).strip().lower()
+    if status:
+        return any(marker in status for marker in _DNF_STATUS_MARKERS)
+    return False
+
+
+def position_weight(
+    position: float,
+    *,
+    field_size: int,
+    scheme: str = "reciprocal",
+    tau: float = 5.0,
+) -> float:
+    """Return a top-heavy importance weight for a finishing position.
+
+    Lower (better) positions carry more weight, so an error at the sharp end of
+    the grid counts for more than an error among the backmarkers. Schemes:
+
+    - ``reciprocal`` (default): ``1 / position`` — P1 matters most, decaying fast.
+    - ``linear``: ``(field_size - position + 1) / field_size`` — gentle gradient.
+    - ``exponential``: ``exp(-(position - 1) / tau)`` — tunable decay length.
+    """
+    pos = max(1.0, float(position))
+    normalized_scheme = str(scheme).strip().lower()
+    if normalized_scheme == "linear":
+        size = max(1, int(field_size))
+        return max(0.0, (size - pos + 1.0) / size)
+    if normalized_scheme == "exponential":
+        return float(np.exp(-(pos - 1.0) / max(1e-6, float(tau))))
+    return 1.0 / pos
+
+
 def _coerce_ranked_rows(rows: Sequence[str | dict[str, Any]]) -> list[dict[str, Any]]:
-    """Normalize ranking inputs into ``driver/team/position`` rows."""
+    """Normalize ranking inputs into ``driver/team/position`` rows.
+
+    Optional ``dnf``/``status``/``classified`` and ``dnf_probability`` fields are
+    preserved when present so finisher-only and DNF-calibration metrics can use
+    them without changing the ranking behaviour for callers that ignore them.
+    """
     normalized: list[dict[str, Any]] = []
     for default_position, row in enumerate(rows, start=1):
         if isinstance(row, str):
@@ -52,6 +108,8 @@ def _coerce_ranked_rows(rows: Sequence[str | dict[str, Any]]) -> list[dict[str, 
                     "driver": driver,
                     "team": "",
                     "position": default_position,
+                    "dnf": False,
+                    "dnf_probability": None,
                 }
             )
             continue
@@ -69,11 +127,27 @@ def _coerce_ranked_rows(rows: Sequence[str | dict[str, Any]]) -> list[dict[str, 
         except (TypeError, ValueError):
             position = default_position
 
+        # Accept both the live "dnf_probability" key and the persisted "dnf_risk" alias.
+        raw_dnf_probability = row.get("dnf_probability")
+        if raw_dnf_probability is None:
+            raw_dnf_probability = row.get("dnf_risk")
+        try:
+            dnf_probability = (
+                float(raw_dnf_probability) if raw_dnf_probability is not None else None
+            )
+        except (TypeError, ValueError):
+            dnf_probability = None
+        # Some artifacts persist DNF risk as a percentage (0-100); normalise to a 0-1 fraction.
+        if dnf_probability is not None and dnf_probability > 1.0:
+            dnf_probability = dnf_probability / 100.0
+
         normalized.append(
             {
                 "driver": driver,
                 "team": str(row.get("team", "")).strip(),
                 "position": position,
+                "dnf": row_is_dnf(row),
+                "dnf_probability": dnf_probability,
             }
         )
 
@@ -98,18 +172,33 @@ def _aligned_positions(
 def compute_prediction_accuracy(
     predicted: Sequence[str | dict[str, Any]],
     actual: Sequence[str | dict[str, Any]],
+    *,
+    weight_scheme: str = "reciprocal",
+    weight_tau: float = 5.0,
 ) -> dict[str, float]:
     """Compute ranking accuracy for one predicted order.
 
     This works with plain driver lists or with result rows that already include
-    positions and team names.
+    positions and team names. In addition to plain MAE it reports:
+
+    - ``weighted_mae``: position-importance weighted MAE (sharp-end errors count
+      more), weighted by the better of the predicted/actual position so both
+      "missed a real top finisher" and "wrongly hyped a backmarker" are penalised.
+    - ``finisher_mae``: MAE over drivers who actually finished, so a handful of
+      unpredictable retirements do not dominate the position score. Equals
+      ``mae`` when the actuals carry no DNF information.
     """
     aligned = _aligned_positions(predicted, actual)
+    field_size = max(1, len(actual))
     if not aligned:
         return {
             "field_size": float(len(actual)),
             "compared_drivers": 0.0,
             "mae": float("inf"),
+            "weighted_mae": float("inf"),
+            "finisher_mae": float("inf"),
+            "finisher_count": 0.0,
+            "dnf_count": 0.0,
             "exact_match_rate": 0.0,
             "within_3_rate": 0.0,
             "spearman_rank": 0.0,
@@ -119,6 +208,31 @@ def compute_prediction_accuracy(
     predicted_positions = np.array([row["position"] for row, _ in aligned], dtype=float)
     actual_positions = np.array([row["position"] for _, row in aligned], dtype=float)
     abs_errors = np.abs(predicted_positions - actual_positions)
+
+    weights = np.array(
+        [
+            position_weight(
+                min(float(predicted_row["position"]), float(actual_row["position"])),
+                field_size=field_size,
+                scheme=weight_scheme,
+                tau=weight_tau,
+            )
+            for predicted_row, actual_row in aligned
+        ],
+        dtype=float,
+    )
+    weight_total = float(np.sum(weights))
+    weighted_mae = (
+        float(np.sum(weights * abs_errors) / weight_total)
+        if weight_total > 0
+        else float(np.mean(abs_errors))
+    )
+
+    actual_dnf_mask = np.array([bool(actual_row["dnf"]) for _, actual_row in aligned], dtype=bool)
+    finisher_errors = abs_errors[~actual_dnf_mask]
+    finisher_mae = (
+        float(np.mean(finisher_errors)) if finisher_errors.size > 0 else float(np.mean(abs_errors))
+    )
 
     spearman_value = 0.0
     kendall_value = 0.0
@@ -134,10 +248,74 @@ def compute_prediction_accuracy(
         "field_size": float(len(actual)),
         "compared_drivers": float(len(aligned)),
         "mae": float(np.mean(abs_errors)),
+        "weighted_mae": weighted_mae,
+        "finisher_mae": finisher_mae,
+        "finisher_count": float(int(np.sum(~actual_dnf_mask))),
+        "dnf_count": float(int(np.sum(actual_dnf_mask))),
         "exact_match_rate": float(np.mean(abs_errors == 0.0) * 100.0),
         "within_3_rate": float(np.mean(abs_errors <= 3.0) * 100.0),
         "spearman_rank": spearman_value,
         "kendall_tau": kendall_value,
+    }
+
+
+def compute_dnf_calibration(
+    predicted: Sequence[str | dict[str, Any]],
+    actual: Sequence[str | dict[str, Any]],
+) -> dict[str, float]:
+    """Score predicted DNF probabilities against actual retirements (Brier score).
+
+    DNF prediction is a calibration problem, not a positioning one. Scoring it
+    separately keeps unpredictable retirements from polluting position MAE while
+    still tracking whether the per-driver ``dnf_probability`` is honest.
+
+    ``brier_score`` is the mean squared error between predicted probability and
+    the realised 0/1 outcome (lower is better). ``baseline_brier`` is the score
+    of always predicting the field base rate, so ``brier_skill_score`` > 0 means
+    the model beats that naive baseline.
+    """
+    predicted_rows = _coerce_ranked_rows(predicted)
+    actual_rows = _coerce_ranked_rows(actual)
+    actual_by_driver = {row["driver"]: row for row in actual_rows}
+
+    probabilities: list[float] = []
+    outcomes: list[float] = []
+    for predicted_row in predicted_rows:
+        actual_row = actual_by_driver.get(predicted_row["driver"])
+        if actual_row is None:
+            continue
+        probability = predicted_row.get("dnf_probability")
+        if probability is None:
+            continue
+        probabilities.append(float(np.clip(float(probability), 0.0, 1.0)))
+        outcomes.append(1.0 if bool(actual_row["dnf"]) else 0.0)
+
+    if not probabilities:
+        return {
+            "scored_drivers": 0.0,
+            "actual_dnf_count": 0.0,
+            "actual_dnf_rate": 0.0,
+            "brier_score": float("nan"),
+            "baseline_brier": float("nan"),
+            "brier_skill_score": float("nan"),
+        }
+
+    probability_array = np.array(probabilities, dtype=float)
+    outcome_array = np.array(outcomes, dtype=float)
+    base_rate = float(np.mean(outcome_array))
+    brier_score = float(np.mean((probability_array - outcome_array) ** 2))
+    baseline_brier = float(np.mean((base_rate - outcome_array) ** 2))
+    brier_skill = (
+        float(1.0 - (brier_score / baseline_brier)) if baseline_brier > 0 else float("nan")
+    )
+
+    return {
+        "scored_drivers": float(len(probabilities)),
+        "actual_dnf_count": float(int(np.sum(outcome_array))),
+        "actual_dnf_rate": base_rate,
+        "brier_score": brier_score,
+        "baseline_brier": baseline_brier,
+        "brier_skill_score": brier_skill,
     }
 
 
