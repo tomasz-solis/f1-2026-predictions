@@ -21,7 +21,8 @@
     "top_level_race_result_mode": "PREDICTED",
     "top_level_qualifying_grid_source": "PREDICTED",
     "top_level_race_grid_source": "PREDICTED",
-    "recovered_at": "2026-03-15T20:01:45.228510+00:00"
+    "recovered_at": "2026-03-15T20:01:45.228510+00:00",
+    "dnf_backfilled_at": "2026-06-10T09:55:17.571775+00:00"
   },
   "qualifying": {
     "predicted_grid": [
@@ -1422,112 +1423,134 @@
       {
         "position": 1,
         "driver": "RUS",
-        "team": "Mercedes"
+        "team": "Mercedes",
+        "dnf": false
       },
       {
         "position": 2,
         "driver": "LEC",
-        "team": "Ferrari"
+        "team": "Ferrari",
+        "dnf": false
       },
       {
         "position": 3,
         "driver": "HAM",
-        "team": "Ferrari"
+        "team": "Ferrari",
+        "dnf": false
       },
       {
         "position": 4,
         "driver": "NOR",
-        "team": "McLaren"
+        "team": "McLaren",
+        "dnf": false
       },
       {
         "position": 5,
         "driver": "ANT",
-        "team": "Mercedes"
+        "team": "Mercedes",
+        "dnf": false
       },
       {
         "position": 6,
         "driver": "PIA",
-        "team": "McLaren"
+        "team": "McLaren",
+        "dnf": false
       },
       {
         "position": 7,
         "driver": "LAW",
-        "team": "RB"
+        "team": "RB",
+        "dnf": false
       },
       {
         "position": 8,
         "driver": "BEA",
-        "team": "Haas F1 Team"
+        "team": "Haas F1 Team",
+        "dnf": false
       },
       {
         "position": 9,
         "driver": "VER",
-        "team": "Red Bull Racing"
+        "team": "Red Bull Racing",
+        "dnf": false
       },
       {
         "position": 10,
         "driver": "OCO",
-        "team": "Haas F1 Team"
+        "team": "Haas F1 Team",
+        "dnf": false
       },
       {
         "position": 11,
         "driver": "GAS",
-        "team": "Alpine"
+        "team": "Alpine",
+        "dnf": false
       },
       {
         "position": 12,
         "driver": "SAI",
-        "team": "Williams"
+        "team": "Williams",
+        "dnf": false
       },
       {
         "position": 13,
         "driver": "BOR",
-        "team": "Audi"
+        "team": "Audi",
+        "dnf": false
       },
       {
         "position": 14,
         "driver": "COL",
-        "team": "Alpine"
+        "team": "Alpine",
+        "dnf": false
       },
       {
         "position": 15,
         "driver": "HAD",
-        "team": "Red Bull Racing"
+        "team": "Red Bull Racing",
+        "dnf": false
       },
       {
         "position": 16,
         "driver": "ALB",
-        "team": "Williams"
+        "team": "Williams",
+        "dnf": false
       },
       {
         "position": 17,
         "driver": "ALO",
-        "team": "Aston Martin"
+        "team": "Aston Martin",
+        "dnf": false
       },
       {
         "position": 18,
         "driver": "STR",
-        "team": "Aston Martin"
+        "team": "Aston Martin",
+        "dnf": false
       },
       {
         "position": 19,
         "driver": "PER",
-        "team": "Cadillac F1"
+        "team": "Cadillac F1",
+        "dnf": false
       },
       {
         "position": 20,
         "driver": "HUL",
-        "team": "Audi"
+        "team": "Audi",
+        "dnf": true
       },
       {
         "position": 21,
         "driver": "BOT",
-        "team": "Cadillac F1"
+        "team": "Cadillac F1",
+        "dnf": true
       },
       {
         "position": 22,
         "driver": "LIN",
-        "team": "RB"
+        "team": "RB",
+        "dnf": true
       }
     ],
     "targets": {
@@ -1647,112 +1670,134 @@
         {
           "position": 1,
           "driver": "ANT",
-          "team": "Mercedes"
+          "team": "Mercedes",
+          "dnf": false
         },
         {
           "position": 2,
           "driver": "RUS",
-          "team": "Mercedes"
+          "team": "Mercedes",
+          "dnf": false
         },
         {
           "position": 3,
           "driver": "HAM",
-          "team": "Ferrari"
+          "team": "Ferrari",
+          "dnf": false
         },
         {
           "position": 4,
           "driver": "LEC",
-          "team": "Ferrari"
+          "team": "Ferrari",
+          "dnf": false
         },
         {
           "position": 5,
           "driver": "BEA",
-          "team": "Haas F1 Team"
+          "team": "Haas F1 Team",
+          "dnf": false
         },
         {
           "position": 6,
           "driver": "GAS",
-          "team": "Alpine"
+          "team": "Alpine",
+          "dnf": false
         },
         {
           "position": 7,
           "driver": "LAW",
-          "team": "RB"
+          "team": "RB",
+          "dnf": false
         },
         {
           "position": 8,
           "driver": "HAD",
-          "team": "Red Bull Racing"
+          "team": "Red Bull Racing",
+          "dnf": false
         },
         {
           "position": 9,
           "driver": "SAI",
-          "team": "Williams"
+          "team": "Williams",
+          "dnf": false
         },
         {
           "position": 10,
           "driver": "COL",
-          "team": "Alpine"
+          "team": "Alpine",
+          "dnf": false
         },
         {
           "position": 11,
           "driver": "HUL",
-          "team": "Audi"
+          "team": "Audi",
+          "dnf": false
         },
         {
           "position": 12,
           "driver": "LIN",
-          "team": "RB"
+          "team": "RB",
+          "dnf": false
         },
         {
           "position": 13,
           "driver": "BOT",
-          "team": "Cadillac F1"
+          "team": "Cadillac F1",
+          "dnf": false
         },
         {
           "position": 14,
           "driver": "OCO",
-          "team": "Haas F1 Team"
+          "team": "Haas F1 Team",
+          "dnf": false
         },
         {
           "position": 15,
           "driver": "PER",
-          "team": "Cadillac F1"
+          "team": "Cadillac F1",
+          "dnf": false
         },
         {
           "position": 16,
           "driver": "VER",
-          "team": "Red Bull Racing"
+          "team": "Red Bull Racing",
+          "dnf": true
         },
         {
           "position": 17,
           "driver": "ALO",
-          "team": "Aston Martin"
+          "team": "Aston Martin",
+          "dnf": true
         },
         {
           "position": 18,
           "driver": "STR",
-          "team": "Aston Martin"
+          "team": "Aston Martin",
+          "dnf": true
         },
         {
           "position": 19,
           "driver": "PIA",
-          "team": "McLaren"
+          "team": "McLaren",
+          "dnf": true
         },
         {
           "position": 20,
           "driver": "NOR",
-          "team": "McLaren"
+          "team": "McLaren",
+          "dnf": true
         },
         {
           "position": 21,
           "driver": "BOR",
-          "team": "Audi"
+          "team": "Audi",
+          "dnf": true
         },
         {
           "position": 22,
           "driver": "ALB",
-          "team": "Williams"
+          "team": "Williams",
+          "dnf": true
         }
       ],
       "sprint_qualifying": [
@@ -1871,112 +1916,134 @@
         {
           "position": 1,
           "driver": "RUS",
-          "team": "Mercedes"
+          "team": "Mercedes",
+          "dnf": false
         },
         {
           "position": 2,
           "driver": "LEC",
-          "team": "Ferrari"
+          "team": "Ferrari",
+          "dnf": false
         },
         {
           "position": 3,
           "driver": "HAM",
-          "team": "Ferrari"
+          "team": "Ferrari",
+          "dnf": false
         },
         {
           "position": 4,
           "driver": "NOR",
-          "team": "McLaren"
+          "team": "McLaren",
+          "dnf": false
         },
         {
           "position": 5,
           "driver": "ANT",
-          "team": "Mercedes"
+          "team": "Mercedes",
+          "dnf": false
         },
         {
           "position": 6,
           "driver": "PIA",
-          "team": "McLaren"
+          "team": "McLaren",
+          "dnf": false
         },
         {
           "position": 7,
           "driver": "LAW",
-          "team": "RB"
+          "team": "RB",
+          "dnf": false
         },
         {
           "position": 8,
           "driver": "BEA",
-          "team": "Haas F1 Team"
+          "team": "Haas F1 Team",
+          "dnf": false
         },
         {
           "position": 9,
           "driver": "VER",
-          "team": "Red Bull Racing"
+          "team": "Red Bull Racing",
+          "dnf": false
         },
         {
           "position": 10,
           "driver": "OCO",
-          "team": "Haas F1 Team"
+          "team": "Haas F1 Team",
+          "dnf": false
         },
         {
           "position": 11,
           "driver": "GAS",
-          "team": "Alpine"
+          "team": "Alpine",
+          "dnf": false
         },
         {
           "position": 12,
           "driver": "SAI",
-          "team": "Williams"
+          "team": "Williams",
+          "dnf": false
         },
         {
           "position": 13,
           "driver": "BOR",
-          "team": "Audi"
+          "team": "Audi",
+          "dnf": false
         },
         {
           "position": 14,
           "driver": "COL",
-          "team": "Alpine"
+          "team": "Alpine",
+          "dnf": false
         },
         {
           "position": 15,
           "driver": "HAD",
-          "team": "Red Bull Racing"
+          "team": "Red Bull Racing",
+          "dnf": false
         },
         {
           "position": 16,
           "driver": "ALB",
-          "team": "Williams"
+          "team": "Williams",
+          "dnf": false
         },
         {
           "position": 17,
           "driver": "ALO",
-          "team": "Aston Martin"
+          "team": "Aston Martin",
+          "dnf": false
         },
         {
           "position": 18,
           "driver": "STR",
-          "team": "Aston Martin"
+          "team": "Aston Martin",
+          "dnf": false
         },
         {
           "position": 19,
           "driver": "PER",
-          "team": "Cadillac F1"
+          "team": "Cadillac F1",
+          "dnf": false
         },
         {
           "position": 20,
           "driver": "HUL",
-          "team": "Audi"
+          "team": "Audi",
+          "dnf": true
         },
         {
           "position": 21,
           "driver": "BOT",
-          "team": "Cadillac F1"
+          "team": "Cadillac F1",
+          "dnf": true
         },
         {
           "position": 22,
           "driver": "LIN",
-          "team": "RB"
+          "team": "RB",
+          "dnf": true
         }
       ]
     }
