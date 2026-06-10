@@ -190,7 +190,11 @@ def detect_snapshot_anomalies(
         if not isinstance(entry, dict):
             continue
         seconds = short_run_seconds.get(str(team_name))
-        if field_min is not None and seconds is not None and (seconds - field_min) > max_pace_gap_seconds:
+        if (
+            field_min is not None
+            and seconds is not None
+            and (seconds - field_min) > max_pace_gap_seconds
+        ):
             warnings.append(
                 f"{team_name}: short-run pace {seconds:.1f}s is {seconds - field_min:.1f}s "
                 "off the field best (possible unrepresentative lap)"
@@ -198,7 +202,10 @@ def detect_snapshot_anomalies(
         deltas = (entry.get("driver_deltas_seconds") or {}).get("short_run") or {}
         if isinstance(deltas, dict):
             for driver, delta in deltas.items():
-                if isinstance(delta, int | float) and abs(float(delta)) > max_teammate_delta_seconds:
+                if (
+                    isinstance(delta, int | float)
+                    and abs(float(delta)) > max_teammate_delta_seconds
+                ):
                     warnings.append(
                         f"{team_name}/{driver}: teammate delta {float(delta):+.2f}s exceeds a "
                         "plausible single-lap gap"

@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 from fastf1.exceptions import DataNotLoadedError
 
+from src.predictors.baseline.qualifying_preparation import _blend_strengths
 from src.systems.testing_updater import (
     _aggregate_metric_samples,
     _blend_directionality,
@@ -29,7 +30,6 @@ from src.systems.testing_updater import (
     _select_program_aware_laps,
     _testing_session_has_started,
 )
-from src.predictors.baseline.qualifying_preparation import _blend_strengths
 from src.systems.testing_updater_metrics import (
     _drop_implausible_laps,
     _filter_valid_laps,

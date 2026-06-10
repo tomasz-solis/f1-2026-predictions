@@ -242,9 +242,7 @@ def _select_stint_representative_laps(team_laps: pd.DataFrame) -> pd.DataFrame:
     return team_laps.loc[representative_indices].copy()
 
 
-def _select_short_run_laps(
-    team_laps: pd.DataFrame, top_n: int = _SHORT_RUN_TOP_N
-) -> pd.DataFrame:
+def _select_short_run_laps(team_laps: pd.DataFrame, top_n: int = _SHORT_RUN_TOP_N) -> pd.DataFrame:
     """Select each driver's quickest clean green laps as the short-run sample.
 
     Short-run (qualifying-sim) pace is about single-lap bite on low fuel, not stint

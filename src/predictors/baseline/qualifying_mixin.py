@@ -252,9 +252,7 @@ class BaselineQualifyingMixin:
         cfg = getattr(self, "config", config_loader)
         snapshot_meta = getattr(self, "car_characteristics_snapshot", {})
         counts = (
-            snapshot_meta.get("team_clean_lap_counts")
-            if isinstance(snapshot_meta, dict)
-            else None
+            snapshot_meta.get("team_clean_lap_counts") if isinstance(snapshot_meta, dict) else None
         )
         if not isinstance(counts, dict) or not counts:
             return 1.0

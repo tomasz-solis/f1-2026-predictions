@@ -27,7 +27,7 @@ import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -132,9 +132,9 @@ def _backfill_actuals(
     # Legacy top-level race actuals: pick the matching session (sprint vs Grand Prix).
     legacy_rows = actuals.get("race")
     if isinstance(legacy_rows, list) and legacy_rows:
-        session_name = _match_session_for_block(legacy_rows, fetched)
-        if session_name is not None:
-            _merge_dnf_into_block(legacy_rows, _dnf_by_driver(fetched.get(session_name)))
+        matched_session = _match_session_for_block(legacy_rows, fetched)
+        if matched_session is not None:
+            _merge_dnf_into_block(legacy_rows, _dnf_by_driver(fetched.get(matched_session)))
 
     return labelled
 
@@ -188,7 +188,7 @@ def _fill_missing_dnf_probabilities(
 
     filled = 0
     for (_target_key, is_sprint), rows in target_rows.items():
-        if not _needs_fill(rows):
+        if not isinstance(rows, list) or not _needs_fill(rows):
             continue
         result = predictor.predict_race(
             qualifying_grid=grid,
@@ -237,7 +237,8 @@ def backfill_file(
     fetched: dict[str, list[dict[str, Any]] | None] = {}
     for session_name in ("R", "Sprint"):
         try:
-            fetched[session_name] = fetch_actual_session_results(year, race_name, session_name)
+            result = fetch_actual_session_results(year, race_name, session_name)
+            fetched[session_name] = cast("list[dict[str, Any]] | None", result)
         except Exception as exc:  # noqa: BLE001 - best effort per session
             logger.warning("Could not fetch %s %s: %s", race_name, session_name, exc)
             fetched[session_name] = None

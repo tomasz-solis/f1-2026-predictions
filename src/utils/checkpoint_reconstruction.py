@@ -368,9 +368,7 @@ def build_snapshot_overlay_car_characteristics(
         "source": str(snapshot_payload.get("source", "")).strip(),
         "captured_at": snapshot_payload.get("captured_at"),
         "session_started_at": snapshot_payload.get("session_started_at"),
-        "team_clean_lap_counts": (
-            clean_lap_counts if isinstance(clean_lap_counts, dict) else {}
-        ),
+        "team_clean_lap_counts": (clean_lap_counts if isinstance(clean_lap_counts, dict) else {}),
     }
     return merged_payload
 
