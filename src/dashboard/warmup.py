@@ -44,6 +44,7 @@ from src.dashboard.update_flow import (
     boundary_signature,
     build_event_boundary_snapshot,
 )
+from src.data.circuit_registry import CircuitResolutionError, resolve_circuit
 from src.persistence.config import should_read_db_first, should_write_to_db
 from src.persistence.runtime_state_store import RuntimeStateStore
 from src.utils.accuracy_targets import legacy_target_keys_for_prediction, weekend_format_name
@@ -991,6 +992,30 @@ def _stage_reconcile_completed_accuracy(ctx: _WarmupRunState) -> None:
     )
 
 
+def _validate_target_circuits(target_races: tuple[str, ...], year: int) -> None:
+    """Hard-fail the warmup if any target race cannot be mapped to a known circuit.
+
+    Prevents an unrecognised or migrating GP name from being warmed with another
+    circuit's characteristics; the circuit registry must be updated first.
+    """
+    from src.utils.schedule_location import location_for_race
+
+    unresolved: list[str] = []
+    for race_name in target_races:
+        name = str(race_name).strip()
+        if not name:
+            continue
+        try:
+            resolve_circuit(name, year=int(year), location=location_for_race(int(year), name))
+        except CircuitResolutionError as exc:
+            unresolved.append(f"{name}: {exc}")
+    if unresolved:
+        raise CircuitResolutionError(
+            "Warmup aborted - unrecognised circuit(s). Register them in "
+            "src/data/circuit_registry.py, then re-run:\n  " + "\n  ".join(unresolved)
+        )
+
+
 def run_warmup_precompute_cycle(
     year: int,
     *,
@@ -1055,6 +1080,11 @@ def run_warmup_precompute_cycle(
 
     summary.anchor_race_name = targets.anchor_race_name
     summary.target_races = list(targets.target_races)
+
+    # Hard-fail before producing any prediction if a target race cannot be mapped to a
+    # known physical circuit, so a migrating/unknown GP name (e.g. Spanish GP -> Madrid)
+    # never inherits another circuit's data. Update the registry, then re-run.
+    _validate_target_circuits(targets.target_races, int(year))
 
     detector = SessionDetector()
     checkpoint_context = _resolve_checkpoint_context(

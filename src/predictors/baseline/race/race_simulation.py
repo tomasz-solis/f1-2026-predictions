@@ -167,6 +167,7 @@ def predict_race_core(
     cfg: Any,
     base_seed: int,
     deps: RaceSimulationDeps,
+    location: str | None = None,
 ) -> dict[str, Any]:
     """Run the full race prediction flow with injectable dependencies."""
     from src.models.conformal_calibration import resolve_race_data_regime
@@ -175,11 +176,16 @@ def predict_race_core(
     weather = normalize_weather_key(weather)
     _ = race_compound
 
+    # ``location`` (schedule venue) makes circuit resolution authoritative; falls back to
+    # name/year when absent or when a dep predates the kwarg.
     try:
-        track_params = deps.load_track_specific_params(race_name, year=year)
+        track_params = deps.load_track_specific_params(race_name, year=year, location=location)
     except TypeError:
-        # Backward compatibility for patched/legacy callables without year kwargs.
-        track_params = deps.load_track_specific_params(race_name)
+        try:
+            track_params = deps.load_track_specific_params(race_name, year=year)
+        except TypeError:
+            # Backward compatibility for patched/legacy callables without kwargs.
+            track_params = deps.load_track_specific_params(race_name)
     base_params = deps.load_race_params()
 
     race_params = {**base_params, **track_params}

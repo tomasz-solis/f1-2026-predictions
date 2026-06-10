@@ -14,6 +14,8 @@ import fastf1 as ff1
 import numpy as np
 import pandas as pd
 
+from src.data.circuit_registry import circuit_aggregation_key
+
 logging.getLogger("fastf1").setLevel(logging.CRITICAL)
 logger = logging.getLogger(__name__)
 
@@ -125,17 +127,22 @@ def calculate_overtaking_likelihood(years: list[int] | None = None) -> dict[str,
             if "Testing" in str(race_name):
                 continue
 
+            # Aggregate by physical circuit, not GP name, so a circuit's history groups
+            # across name changes (Barcelona/Spanish GP -> Catalunya) and the 2026 Madrid
+            # Spanish GP does not merge into Barcelona's history.
+            circuit_key = circuit_aggregation_key(
+                str(race_name), year=int(year), location=event.get("Location")
+            )
+
             stats = extract_overtakes_from_race(year, race_name)
 
             if stats:
-                if race_name not in overtaking_data:
-                    overtaking_data[race_name] = []
-
-                overtaking_data[race_name].append(stats)
+                overtaking_data.setdefault(circuit_key, []).append(stats)
                 logger.info(
-                    "%s %s: %.1f changes/lap",
+                    "%s %s -> %s: %.1f changes/lap",
                     year,
                     race_name,
+                    circuit_key,
                     stats["avg_changes_per_lap"],
                 )
             else:

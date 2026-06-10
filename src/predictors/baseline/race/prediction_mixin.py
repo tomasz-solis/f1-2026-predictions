@@ -311,9 +311,20 @@ class BaselineRacePredictionMixin:
         year: int | None = None,
         input_confidence: float | None = None,
         prediction_context: PredictionContext | None = None,
+        location: str | None = None,
     ) -> dict[str, Any]:
-        """Predict race result using lap-by-lap Monte Carlo simulation with tire deg and pit stops."""
+        """Predict race result using lap-by-lap Monte Carlo simulation with tire deg and pit stops.
+
+        ``location`` (the schedule venue) makes circuit resolution authoritative for track
+        params; callers that know it (warmup, dashboard prediction flow) pass it. When it is
+        omitted, circuit lookups fall back to name/year resolution.
+        """
         cfg = getattr(self, "config", config_loader)
+        resolved_year = (
+            year
+            if year is not None
+            else int(getattr(self, "season_year", getattr(self, "year", 2026)))
+        )
         with activate_prediction_runtime(config=cfg, prediction_context=prediction_context):
             validate_enum(weather, "weather", ["dry", "rain", "mixed"])
             validate_positive_int(n_simulations, "n_simulations", min_val=1)
@@ -326,9 +337,8 @@ class BaselineRacePredictionMixin:
                 is_sprint=is_sprint,
                 race_compound=race_compound,
                 input_confidence=input_confidence,
-                year=year
-                if year is not None
-                else int(getattr(self, "season_year", getattr(self, "year", 2026))),
+                location=location,
+                year=resolved_year,
                 cfg=cfg,
                 base_seed=int(getattr(self, "seed", 42)),
                 deps=RaceSimulationDeps(

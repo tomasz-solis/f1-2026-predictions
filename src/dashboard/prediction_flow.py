@@ -185,6 +185,8 @@ def _predict_race_with_optional_confidence(
     input_confidence: float,
 ) -> dict[str, Any]:
     """Call predictor.predict_race with fallback for legacy signatures."""
+    from src.utils.schedule_location import location_for_race
+
     kwargs = {
         "qualifying_grid": qualifying_grid,
         "weather": weather,
@@ -192,11 +194,14 @@ def _predict_race_with_optional_confidence(
         "n_simulations": _resolve_dashboard_simulation_count("race"),
         "year": year,
         "input_confidence": input_confidence,
+        # Authoritative circuit venue so track params resolve by physical track, not GP name.
+        "location": location_for_race(year, race_name),
     }
     try:
         return predictor.predict_race(**kwargs)
     except TypeError:
         kwargs.pop("input_confidence", None)
+        kwargs.pop("location", None)
         return predictor.predict_race(**kwargs)
 
 

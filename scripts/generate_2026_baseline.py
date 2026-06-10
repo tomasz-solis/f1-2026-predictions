@@ -26,6 +26,7 @@ import fastf1
 import numpy as np
 import pandas as pd
 
+from src.data.circuit_registry import circuit_aggregation_key
 from src.models.testing_team_seed import (
     build_testing_model_team_payload,
     write_validation_report,
@@ -341,13 +342,20 @@ def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
                 race_name = event["EventName"]
                 logger.info(f"  Analyzing {race_name}...")
 
+                # Key track stats by physical circuit, not GP name, so a circuit's history
+                # groups across name changes (Barcelona/Spanish GP -> Catalunya) and the
+                # 2026 Madrid Spanish GP does not merge into Barcelona's history.
+                circuit_key = circuit_aggregation_key(
+                    str(race_name), year=int(year), location=event.get("Location")
+                )
+
                 try:
                     session = fastf1.get_session(year, race_name, "R")
                     session.load()
 
                     # Initialize track if not exists
-                    if race_name not in track_stats:
-                        track_stats[race_name] = {
+                    if circuit_key not in track_stats:
+                        track_stats[circuit_key] = {
                             "pit_times": [],
                             "sc_laps": [],
                             "total_laps": [],
@@ -359,12 +367,12 @@ def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
                     if hasattr(session, "laps") and session.laps is not None:
                         pit_times = _estimate_pit_losses_from_laps(session.laps)
                         if pit_times:
-                            track_stats[race_name]["pit_times"].extend(pit_times)
+                            track_stats[circuit_key]["pit_times"].extend(pit_times)
 
                     # Safety car laps
                     if hasattr(session, "laps") and session.laps is not None:
                         total_laps = len(session.laps["LapNumber"].unique())
-                        track_stats[race_name]["total_laps"].append(total_laps)
+                        track_stats[circuit_key]["total_laps"].append(total_laps)
 
                         # Check for safety car (simplified - would need telemetry)
                         # For now, use a heuristic based on lap time variations
@@ -372,13 +380,13 @@ def calculate_track_characteristics(years: list[int], output_dir: Path) -> None:
                         if len(lap_times) > 0:
                             # High variation suggests SC/VSC
                             sc_laps = 0  # Default when telemetry-based SC detection is unavailable
-                            track_stats[race_name]["sc_laps"].append(sc_laps)
+                            track_stats[circuit_key]["sc_laps"].append(sc_laps)
 
                     # Overtaking difficulty (from position changes)
                     if hasattr(session, "laps") and session.laps is not None:
                         changes_per_lap = _estimate_overtaking_changes_per_lap(session.laps)
                         if changes_per_lap is not None:
-                            track_stats[race_name]["overtaking_changes_per_lap"].append(
+                            track_stats[circuit_key]["overtaking_changes_per_lap"].append(
                                 changes_per_lap
                             )
 

@@ -264,7 +264,20 @@ class BaselineRacePreparationMixin:
                 track_data = json.load(f)
                 validate_track_characteristics(track_data, expected_year=season_year)
                 tracks = track_data["tracks"]
-                return tracks.get(race_name, {}).get("overtaking_difficulty", 0.5)
+                # Key on the resolved physical circuit, not the GP name, so a migrating
+                # name (e.g. Spanish GP -> Madrid) never reads another circuit's value.
+                from src.data.circuit_registry import (
+                    CircuitResolutionError,
+                    resolve_track_data_key,
+                )
+
+                try:
+                    data_key = resolve_track_data_key(race_name, year=season_year)
+                except CircuitResolutionError:
+                    data_key = race_name
+                if not data_key:
+                    return 0.5
+                return tracks.get(data_key, {}).get("overtaking_difficulty", 0.5)
         except (FileNotFoundError, KeyError, json.JSONDecodeError, ValueError) as e:
             logger.warning("Could not load track characteristics: %s. Using default 0.5.", e)
             return 0.5

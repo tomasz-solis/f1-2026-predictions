@@ -387,7 +387,7 @@ def test_run_warmup_precompute_cycle_skips_target_with_unknown_weekend_type(patc
         lambda year, now_utc, horizon_races: warmup.WarmupTargets(
             anchor_race_name="Bahrain Grand Prix",
             anchor_is_sprint=False,
-            target_races=("Bahrain Grand Prix", "Mystery Grand Prix"),
+            target_races=("Bahrain Grand Prix", "Emilia Romagna Grand Prix"),
         ),
     )
     patcher.setattr(
@@ -409,7 +409,7 @@ def test_run_warmup_precompute_cycle_skips_target_with_unknown_weekend_type(patc
     patcher.setattr(warmup, "load_precomputed_prediction", lambda **kwargs: None)
 
     def _is_sprint_weekend(year, race_name):
-        if race_name == "Mystery Grand Prix":
+        if race_name == "Emilia Romagna Grand Prix":
             raise ValueError("missing schedule row")
         return False
 
@@ -425,7 +425,7 @@ def test_run_warmup_precompute_cycle_skips_target_with_unknown_weekend_type(patc
     assert result.status == "partial_success"
     assert result.ready_races == ["Bahrain Grand Prix"]
     assert [context["race_name"] for context in result.target_contexts] == ["Bahrain Grand Prix"]
-    assert any("Mystery Grand Prix [weekend_format]" in error for error in result.errors)
+    assert any("Emilia Romagna Grand Prix [weekend_format]" in error for error in result.errors)
 
 
 def test_run_warmup_precompute_cycle_returns_quickly_when_checkpoint_not_ready(patcher):
@@ -1212,3 +1212,36 @@ def test_compute_weather_predictions_passes_sprint_race_input_confidence(patcher
 
     assert predictor.sprint_kwargs is not None
     assert predictor.sprint_kwargs["input_confidence"] == pytest.approx(0.58)
+
+
+def test_run_warmup_precompute_cycle_hard_fails_on_unregistered_circuit(patcher):
+    """An unrecognised circuit must abort the warmup so the registry is updated first."""
+    from src.data.circuit_registry import CircuitResolutionError
+
+    fixed_now = datetime(2026, 3, 5, 12, 0, tzinfo=UTC)
+    patcher.setattr(warmup, "should_write_to_db", lambda: False)
+    patcher.setattr(warmup, "_refresh_anchor_practice_characteristics", lambda **kwargs: {})
+    patcher.setattr(
+        warmup,
+        "get_prediction_precompute_config",
+        lambda: {
+            "enabled": True,
+            "horizon_races": 3,
+            "weather_scenarios": ["dry"],
+            "max_file_entries": 2048,
+        },
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_warmup_targets",
+        lambda year, now_utc, horizon_races: warmup.WarmupTargets(
+            anchor_race_name="Kyalami Grand Prix",
+            anchor_is_sprint=False,
+            target_races=("Kyalami Grand Prix",),
+        ),
+    )
+
+    with pytest.raises(CircuitResolutionError, match="Kyalami"):
+        warmup.run_warmup_precompute_cycle(
+            2026, now_utc=fixed_now, dry_run=True, verify_db_writes=False
+        )

@@ -118,6 +118,7 @@ class BaselineQualifyingMixin:
             year: int | None = None,
             input_confidence: float | None = None,
             prediction_context: PredictionContext | None = None,
+            location: str | None = None,
         ) -> dict[str, Any]:
             """Run a race simulation and return finishing probabilities."""
             ...

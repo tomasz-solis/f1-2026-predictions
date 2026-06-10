@@ -11,6 +11,7 @@ import fastf1
 import numpy as np
 from fastf1.exceptions import DataNotLoadedError
 
+from src.data.circuit_registry import CircuitResolutionError, resolve_track_data_key
 from src.utils import config_loader
 from src.utils.prediction_context import get_config_value, get_prediction_reference_now
 from src.utils.track_overtaking import get_track_overtaking_baseline
@@ -559,6 +560,7 @@ def _normalize_overtaking_difficulty(
     raw_value: object,
     *,
     raw_likelihood: object | None = None,
+    baseline_key: str | None,
 ) -> float | None:
     """Normalize overtaking difficulty to a bounded 0..1 scale.
 
@@ -596,7 +598,7 @@ def _normalize_overtaking_difficulty(
                 return inferred
 
         baseline = get_track_overtaking_baseline(
-            race_name,
+            baseline_key,
             default=float(_cfg_get("track_defaults.overtaking_difficulty", 0.5)),
         )
         logger.info(
@@ -615,6 +617,7 @@ def _blend_overtaking_with_transition_prior(
     observed_overtaking: float,
     *,
     observed_races: int | None,
+    baseline_key: str | None,
 ) -> float:
     """Blend observed overtaking with track prior for gradual regulation adaptation.
 
@@ -628,7 +631,7 @@ def _blend_overtaking_with_transition_prior(
         return observed_overtaking
 
     prior = get_track_overtaking_baseline(
-        race_name,
+        baseline_key,
         default=float(_cfg_get("track_defaults.overtaking_difficulty", 0.5)),
     )
 
@@ -680,7 +683,9 @@ def _blend_overtaking_with_transition_prior(
     return blended
 
 
-def load_track_specific_params(race_name: str | None = None, year: int = 2026) -> dict:
+def load_track_specific_params(
+    race_name: str | None = None, year: int = 2026, location: str | None = None
+) -> dict:
     """Load track-specific parameters from track_characteristics.
 
     Returns dict with track-specific overrides for race simulation:
@@ -707,7 +712,20 @@ def load_track_specific_params(race_name: str | None = None, year: int = 2026) -
                 track_data = json.load(f)
 
             tracks = track_data.get("tracks", {})
-            track_info = tracks.get(race_name)
+            # Resolve the physical circuit, not the (migrating) GP name, so e.g. the 2026
+            # Barcelona GP uses the Catalunya data while the 2026 Spanish GP (Madrid) does
+            # NOT inherit it. An unidentifiable circuit falls back to safe config defaults
+            # here; the warmup gate hard-fails such races up front.
+            try:
+                data_key = resolve_track_data_key(race_name, year=year, location=location)
+            except CircuitResolutionError as exc:
+                # Unregistered race: fall back to a direct name lookup (legacy behavior).
+                # The warmup gate hard-fails unknown circuits before warming, so this path
+                # only matters for ad-hoc/legacy names; a resolved circuit with no data
+                # (data_key is None, e.g. Madrid) correctly yields defaults instead.
+                logger.debug("Circuit not registered for '%s' (%s): %s", race_name, year, exc)
+                data_key = race_name
+            track_info = tracks.get(data_key) if data_key else None
 
             if track_info:
                 # Extract track-specific pit stop loss
@@ -731,11 +749,14 @@ def load_track_specific_params(race_name: str | None = None, year: int = 2026) -
                 if multi_sc_prob is not None:
                     track_params["multi_sc_prob"] = float(multi_sc_prob)
 
-                # Extract overtaking difficulty
+                # Extract overtaking difficulty. The prior is looked up by the resolved
+                # circuit key (not the GP name) so e.g. the Madrid 'Spanish Grand Prix'
+                # does not inherit Barcelona's overtaking prior.
                 overtaking = _normalize_overtaking_difficulty(
                     race_name,
                     track_info.get("overtaking_difficulty"),
                     raw_likelihood=track_info.get("overtaking_likelihood"),
+                    baseline_key=data_key,
                 )
                 if overtaking is not None:
                     observed_races_raw = _coerce_float(track_info.get("overtaking_observed_races"))
@@ -746,6 +767,7 @@ def load_track_specific_params(race_name: str | None = None, year: int = 2026) -
                         race_name,
                         overtaking,
                         observed_races=observed_races,
+                        baseline_key=data_key,
                     )
                     track_params["track_overtaking"] = overtaking
 
