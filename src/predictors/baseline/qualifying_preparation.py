@@ -431,6 +431,31 @@ def _compute_model_strengths(
     return model_strengths, teams_with_short_profile
 
 
+def _clamp_strength_move(
+    blended: dict[str, float],
+    model_strengths: dict[str, float],
+    max_move: float | None,
+) -> dict[str, float]:
+    """Bound how far a single session may move each team from its season prior.
+
+    A representative session moves a team only modestly; a catastrophic swing
+    (e.g. a top car genuinely slowest in one compromised/odd session) is clamped
+    so one session cannot override the season posterior wholesale.
+    """
+    if max_move is None or max_move < 0:
+        return blended
+    limit = float(max_move)
+    return {
+        team: float(
+            min(
+                model_strengths.get(team, value) + limit,
+                max(model_strengths.get(team, value) - limit, value),
+            )
+        )
+        for team, value in blended.items()
+    }
+
+
 def _blend_strengths(
     *,
     model_strengths: dict[str, float],
@@ -445,6 +470,7 @@ def _blend_strengths(
     blend_team_strength_fn: Callable[..., dict[str, float]],
     apply_testing_fallback_adjustment_fn: Callable[..., dict[str, float]],
     checkpoint_max_strength_move: float | None = None,
+    fp_max_strength_move: float | None = None,
 ) -> dict[str, float]:
     """Select and apply the appropriate strength-blending strategy.
 
@@ -454,11 +480,15 @@ def _blend_strengths(
     3. No session data → apply testing-fallback adjustment to model strengths.
     """
     if fp_performance is not None:
-        return blend_team_strength_fn(
+        blended = blend_team_strength_fn(
             model_strengths,
             fp_performance,
             blend_weight=fp_blend_weight,
         )
+        # Same single-session quality gate the stored-checkpoint path already uses, applied
+        # to live FP sessions so a compromised practice run (a DNF/limited run that leaves a
+        # team looking unrepresentatively slow) cannot drag a strong car to the back of the grid.
+        return _clamp_strength_move(blended, model_strengths, fp_max_strength_move)
     if uses_checkpoint_practice_profiles:
         assert checkpoint_practice_blend_weight is not None
         assert checkpoint_testing_fallback_performance is not None
@@ -471,18 +501,7 @@ def _blend_strengths(
         # season-learned prior. A representative session moves a team only modestly; a
         # catastrophic swing (e.g. a corrupted snapshot dragging a top car to last) is
         # clamped so one odd session cannot override the season posterior wholesale.
-        if checkpoint_max_strength_move is not None and checkpoint_max_strength_move >= 0:
-            limit = float(checkpoint_max_strength_move)
-            return {
-                team: float(
-                    min(
-                        model_strengths.get(team, value) + limit,
-                        max(model_strengths.get(team, value) - limit, value),
-                    )
-                )
-                for team, value in blended.items()
-            }
-        return blended
+        return _clamp_strength_move(blended, model_strengths, checkpoint_max_strength_move)
     return apply_testing_fallback_adjustment_fn(
         model_strengths=model_strengths,
         testing_fallback_performance=testing_fallback_performance,
@@ -727,6 +746,12 @@ def build_driver_list_with_strengths_core(
     except (TypeError, ValueError):
         checkpoint_max_strength_move = 0.40
 
+    fp_max_strength_move = cfg.get("baseline_predictor.qualifying.fp_max_strength_move", 0.25)
+    try:
+        fp_max_strength_move = float(fp_max_strength_move)
+    except (TypeError, ValueError):
+        fp_max_strength_move = 0.25
+
     blended_strengths = _blend_strengths(
         model_strengths=model_strengths,
         fp_performance=fp_performance,
@@ -740,6 +765,7 @@ def build_driver_list_with_strengths_core(
         blend_team_strength_fn=blend_team_strength_fn,
         apply_testing_fallback_adjustment_fn=apply_testing_fallback_adjustment_fn,
         checkpoint_max_strength_move=checkpoint_max_strength_move,
+        fp_max_strength_move=fp_max_strength_move,
     )
 
     all_drivers: list[dict[str, Any]] = []

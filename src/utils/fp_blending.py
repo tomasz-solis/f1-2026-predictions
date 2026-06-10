@@ -10,10 +10,15 @@ from pathlib import Path
 from typing import Any
 
 import fastf1 as ff1
+import numpy as np
 import pandas as pd
 from fastf1.exceptions import DataNotLoadedError
 
-from src.utils.fp_blending_flow import blend_available_sessions, build_session_priority
+from src.utils.fp_blending_flow import (
+    blend_available_sessions,
+    build_session_priority,
+    robust_spread,
+)
 from src.utils.fp_blending_flow import (
     extract_team_performance_from_laps as _extract_team_performance_from_laps,
 )
@@ -468,6 +473,17 @@ def get_fp_team_performance(
         long_run_trim_ends = bool(
             get_config_value("baseline_predictor.race.long_run_trim_ends", True)
         )
+        fp_normalization = (
+            str(get_config_value("baseline_predictor.qualifying.fp_normalization", "robust"))
+            .strip()
+            .lower()
+        )
+        fp_spread_k = float(
+            get_config_value("baseline_predictor.qualifying.fp_robust_spread_k", 2.0)
+        )
+        fp_min_driver_laps = int(
+            get_config_value("baseline_predictor.qualifying.fp_min_driver_laps", 4)
+        )
 
         # Reject red-flagged/truncated sessions (<10 total laps)
         if len(laps) < 10:
@@ -488,6 +504,9 @@ def get_fp_team_performance(
             long_run_trim_ends=long_run_trim_ends,
             extract_representative_lap_time_fn=_extract_representative_lap_time,
             map_team_to_characteristics_fn=map_team_to_characteristics,
+            normalization=fp_normalization,
+            spread_k=fp_spread_k,
+            min_driver_laps=fp_min_driver_laps,
         )
         if team_performance is None:
             return None, None, FPDataError.INSUFFICIENT_LAPS
@@ -663,12 +682,62 @@ def get_best_fp_performance_with_session_laps(
     return None, None, None, session_laps_by_code
 
 
+def _scale_align_fp_to_model(
+    model_strength: dict[str, float],
+    fp_performance: dict[str, float],
+    missing_from_fp: set[str],
+) -> dict[str, float]:
+    """Re-express the FP signal on the model strength's location and spread.
+
+    The raw FP signal and the model strength are not on the same scale: FP pace
+    is normalized within a single session (full 0-1 band, anchored to session
+    extremes) while model strength lives in a calibrated, compressed band. Mixing
+    them directly lets a noisy session push a team far outside its plausible
+    range. Aligning the FP signal's median and (robust) spread onto the model's
+    means a session can only *reorder teams within the model's band* rather than
+    replace the prior wholesale. Returns aligned FP scores for the teams shared
+    by both inputs; callers fall back to the raw value for any other team.
+    """
+    if not bool(get_config_value("baseline_predictor.qualifying.fp_scale_align", True)):
+        return dict(fp_performance)
+
+    common = [t for t in model_strength if t in fp_performance and t not in missing_from_fp]
+    if len(common) < 3:
+        # Too few shared teams to estimate a stable spread; leave FP untouched.
+        return dict(fp_performance)
+
+    fp_vals = np.asarray([float(fp_performance[t]) for t in common], dtype=float)
+    model_vals = np.asarray([float(model_strength[t]) for t in common], dtype=float)
+    fp_median = float(np.median(fp_vals))
+    model_median = float(np.median(model_vals))
+    fp_spread = robust_spread(fp_vals)
+    model_spread = robust_spread(model_vals)
+
+    if fp_spread <= 1e-9:
+        # FP carries no usable spread; keep the model's own location for these teams.
+        return {team: float(model_strength[team]) for team in common}
+
+    ratio = float(get_config_value("baseline_predictor.qualifying.fp_align_spread_ratio", 1.0))
+    target_spread = model_spread * max(0.0, ratio)
+    return {
+        team: float(
+            np.clip(
+                model_median
+                + (float(fp_performance[team]) - fp_median) * (target_spread / fp_spread),
+                0.0,
+                1.0,
+            )
+        )
+        for team in common
+    }
+
+
 def blend_team_strength(
     model_strength: dict[str, float],
     fp_performance: dict[str, float] | None,
     blend_weight: float = 0.7,
 ) -> dict[str, float]:
-    """Blend model predictions with FP data (70% practice + 30% model)."""
+    """Blend model strength with scale-aligned FP pace (default 70% practice)."""
     if fp_performance is None:
         return model_strength
 
@@ -690,23 +759,26 @@ def blend_team_strength(
             "Teams in FP data but not in model (ignoring): %s", ", ".join(sorted(extra_in_fp))
         )
 
+    aligned_fp = _scale_align_fp_to_model(model_strength, fp_performance, missing_from_fp)
+
     blended = {}
 
     for team, model_score in model_strength.items():
-        fp_score = fp_performance.get(team, model_score)
-
         if team in missing_from_fp:
             logger.debug("  %s: Model-only (no FP data) = %s", team, format(model_score, ".3f"))
             blended[team] = model_score
-        else:
-            blended_score = blend_weight * fp_score + (1 - blend_weight) * model_score
-            logger.debug(
-                "  %s: FP=%s, Model=%s → Blended=%s",
-                team,
-                format(fp_score, ".3f"),
-                format(model_score, ".3f"),
-                format(blended_score, ".3f"),
-            )
-            blended[team] = blended_score
+            continue
+
+        fp_score = aligned_fp.get(team, fp_performance.get(team, model_score))
+        blended_score = blend_weight * fp_score + (1 - blend_weight) * model_score
+        logger.debug(
+            "  %s: FP=%s (raw %s), Model=%s → Blended=%s",
+            team,
+            format(fp_score, ".3f"),
+            format(float(fp_performance.get(team, model_score)), ".3f"),
+            format(model_score, ".3f"),
+            format(blended_score, ".3f"),
+        )
+        blended[team] = blended_score
 
     return blended

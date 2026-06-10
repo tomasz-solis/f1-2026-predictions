@@ -459,6 +459,12 @@ class BaselineQualifyingConfig(StrictConfigModel):
     fp_blend_weight_max: float = Field(default=0.85, ge=0.0, le=1.0)
     fp_blend_confidence_scale: float = Field(default=0.30, ge=0.0)
     fp_blend_weight_testing: bool = True
+    fp_normalization: str = Field(default="robust", pattern="^(robust|minmax)$")
+    fp_robust_spread_k: float = Field(default=2.0, gt=0.0)
+    fp_scale_align: bool = True
+    fp_align_spread_ratio: float = Field(default=1.0, ge=0.0)
+    fp_min_driver_laps: int = Field(default=4, ge=0)
+    fp_max_strength_move: float = Field(default=0.25, ge=0.0, le=1.0)
     practice_data_team_weight_multiplier: float = Field(default=0.94, ge=0.0)
     practice_data_skill_weight_multiplier: float = Field(default=1.12, ge=0.0)
     practice_data_team_compression_multiplier: float = Field(default=0.88, ge=0.0)

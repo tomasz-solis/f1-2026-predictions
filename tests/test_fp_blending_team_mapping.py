@@ -20,9 +20,9 @@ def reset_circuit_breaker():
 
 def test_get_fp_team_performance_maps_fastf1_team_names():
     """FastF1 sponsor-form team names should map to characteristics team names."""
-    # Need at least 10 laps to pass red flag detection
+    # Need at least 10 laps to pass red flag detection, and >= fp_min_driver_laps per driver.
     lap_data = []
-    for lap_num in range(3):  # 3 laps per driver × 4 drivers = 12 total laps
+    for lap_num in range(4):  # 4 laps per driver × 4 drivers = 16 total laps
         lap_data.extend(
             [
                 {

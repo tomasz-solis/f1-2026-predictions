@@ -294,6 +294,10 @@ baseline_predictor:
     # Hard cap on how far one stored checkpoint may move a team's blended strength from its
     # season-learned prior (0-1 strength scale). Bounds catastrophic single-session swings.
     stored_checkpoint_max_strength_move: 0.40
+    # Same hard cap for the live FP-session blend path. A single compromised practice run (a
+    # DNF/red-flag/limited run that leaves a strong car looking slow) can no longer drag a team
+    # more than this far from its season-learned prior on the 0-1 strength scale.
+    fp_max_strength_move: 0.25
     testing_fallback_short_weight_min: 0.35
     testing_fallback_short_weight_max: 0.85
     testing_fallback_divergence_scale: 1.4
@@ -351,6 +355,23 @@ baseline_predictor:
     fp_blend_weight_max: 0.85
     fp_blend_confidence_scale: 0.30
     fp_blend_weight_testing: true
+    # Practice-session normalization. "robust" centres the field median at 0.5 and scales
+    # gaps by an outlier-resistant spread (MAD), so one sandbagging or compromised team can no
+    # longer be forced to the 0.0 anchor and redefine the whole grid's scale. "minmax" is the
+    # legacy fastest=1.0 / slowest=0.0 behaviour.
+    fp_normalization: robust
+    fp_robust_spread_k: 2.0
+    # Per-driver lap-sufficiency gate: a driver with fewer than this many clean laps in a
+    # session (e.g. a car that stopped early) is excluded so an unrepresentative DNF run does
+    # not drag its team's pace. The teammate carries the team; a fully thin team falls back to
+    # model-only strength.
+    fp_min_driver_laps: 4
+    # Scale-align the FP signal onto the model strength's location and spread before blending,
+    # so a single session can only reorder teams *within* the model's calibrated band instead
+    # of replacing the season prior on a different (full 0-1) scale.
+    fp_scale_align: true
+    # Allowed FP spread relative to the model spread after alignment (1.0 = match the model).
+    fp_align_spread_ratio: 1.0
     practice_data_team_weight_multiplier: 0.94
     practice_data_skill_weight_multiplier: 1.12
     practice_data_team_compression_multiplier: 0.88
