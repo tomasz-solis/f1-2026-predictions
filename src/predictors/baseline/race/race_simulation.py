@@ -296,17 +296,28 @@ def predict_race_core(
         driver: [] for driver in driver_info_map.keys()
     }
 
-    race_distance = deps.resolve_race_distance_laps(
-        year=year,
-        race_name=race_name,
-        is_sprint=is_sprint,
-    )
+    try:
+        race_distance = deps.resolve_race_distance_laps(
+            year=year,
+            race_name=race_name,
+            is_sprint=is_sprint,
+            location=location,
+        )
+    except TypeError:
+        race_distance = deps.resolve_race_distance_laps(
+            year=year,
+            race_name=race_name,
+            is_sprint=is_sprint,
+        )
 
     try:
-        tire_stress_score = deps.get_tire_stress_score(race_name, year=year)
+        tire_stress_score = deps.get_tire_stress_score(race_name, year=year, location=location)
     except TypeError:
-        # Backward compatibility for patched/legacy callables without year kwargs.
-        tire_stress_score = deps.get_tire_stress_score(race_name)
+        try:
+            tire_stress_score = deps.get_tire_stress_score(race_name, year=year)
+        except TypeError:
+            # Backward compatibility for patched/legacy callables without kwargs.
+            tire_stress_score = deps.get_tire_stress_score(race_name)
     # Make stress score available to the lap-by-lap simulator for per-track cliff ages.
     race_params["tire_stress_score"] = float(tire_stress_score)
     available_compounds = deps.get_available_compounds(race_name, weather=weather)

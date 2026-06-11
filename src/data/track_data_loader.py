@@ -795,14 +795,17 @@ def load_track_specific_params(
     return track_params
 
 
-def get_tire_stress_score(race_name: str | None = None, year: int = 2026) -> float:
+def get_tire_stress_score(
+    race_name: str | None = None, year: int = 2026, location: str | None = None
+) -> float:
     """Get tire stress score for race from Pirelli data.
 
     Returns average of traction + braking + lateral + abrasion.
     Defaults to 3.0 (medium stress) if data missing.
     """
+    default_stress = _cfg_get("baseline_predictor.compound_selection.default_stress_fallback", 3.0)
     if not race_name:
-        return _cfg_get("baseline_predictor.compound_selection.default_stress_fallback", 3.0)
+        return default_stress
 
     pirelli_path = _resolve_pirelli_path(year)
     if pirelli_path is None:
@@ -810,14 +813,24 @@ def get_tire_stress_score(race_name: str | None = None, year: int = 2026) -> flo
             "Pirelli data file not found for year %s (or fallbacks). Using default stress (3.0).",
             year,
         )
-        return _cfg_get("baseline_predictor.compound_selection.default_stress_fallback", 3.0)
+        return default_stress
+
+    # Resolve the physical circuit so tyre stress is read for the right track (e.g. the 2026
+    # Barcelona GP reads the Catalunya data; the Madrid Spanish GP gets the default, never
+    # Barcelona's). data_key is None for a known circuit without data -> safe default.
+    try:
+        data_key = resolve_track_data_key(race_name, year=year, location=location)
+    except CircuitResolutionError:
+        data_key = race_name
+    if data_key is None:
+        return default_stress
 
     try:
         with open(pirelli_path) as f:
             pirelli_data = json.load(f)
 
-        # Normalize race name (lowercase, underscores)
-        race_key = race_name.lower().replace(" ", "_")
+        # Normalize the resolved circuit key (lowercase, underscores)
+        race_key = data_key.lower().replace(" ", "_")
         race_info = pirelli_data.get(race_key)
 
         if race_info and "tyre_stress" in race_info:
@@ -1080,7 +1093,9 @@ def resolve_non_competitive_weather_features(
 
 
 @lru_cache(maxsize=128)
-def resolve_race_distance_laps(year: int, race_name: str | None, is_sprint: bool) -> int:
+def resolve_race_distance_laps(
+    year: int, race_name: str | None, is_sprint: bool, location: str | None = None
+) -> int:
     """
     Resolve race distance in laps from FastF1 session metadata.
 
@@ -1090,9 +1105,17 @@ def resolve_race_distance_laps(year: int, race_name: str | None, is_sprint: bool
     if not race_name:
         return default_distance
 
-    known_laps = (KNOWN_SPRINT_LAPS if is_sprint else KNOWN_MAIN_RACE_LAPS).get(race_name)
-    if known_laps:
-        return known_laps
+    # Look up known laps by physical circuit, not GP name, so the 2026 Barcelona GP gets
+    # Catalunya's distance and the Madrid Spanish GP does not inherit it (data_key None ->
+    # fall through to live metadata / default rather than borrowing Barcelona's value).
+    try:
+        data_key = resolve_track_data_key(race_name, year=year, location=location)
+    except CircuitResolutionError:
+        data_key = race_name
+    if data_key is not None:
+        known_laps = (KNOWN_SPRINT_LAPS if is_sprint else KNOWN_MAIN_RACE_LAPS).get(data_key)
+        if known_laps:
+            return known_laps
 
     session_name = "S" if is_sprint else "R"
     try:
