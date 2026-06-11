@@ -19,6 +19,18 @@ Typical usage:
       --env-file .env.local \
       --require-db \
       --apply
+
+To force a clean re-warm after a code-only change that does not move the artifact
+hash (for example a bug fix in circuit/track-data routing), the stale-hash filter is
+not enough - the old rows still carry the current hash. Use ``--all-hashes`` to purge
+every precompute row for the year so the next warmup regenerates from scratch:
+
+    uv run python scripts/prune_stale_precompute_state.py \
+      --year 2026 \
+      --env-file .env.local \
+      --require-db \
+      --all-hashes \
+      --apply
 """
 
 from __future__ import annotations
@@ -127,6 +139,16 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Delete stale rows. Without this flag, the script is a dry-run report.",
     )
+    parser.add_argument(
+        "--all-hashes",
+        action="store_true",
+        help=(
+            "Purge ALL precompute rows for the year regardless of artifact hash. "
+            "Use this to force a clean re-warm after a code-only change (one that "
+            "does not move the artifact hash), where stale rows still carry the "
+            "current hash and would otherwise be reused."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -145,8 +167,15 @@ def _stale_records_for_year(
     store: RuntimeStateStore,
     target_year: int,
     current_artifact_hash: str,
+    all_hashes: bool = False,
 ) -> list[StaleStateRecord]:
-    """Return stale precompute rows for a season year and current artifact hash."""
+    """Return precompute rows to delete for a season year.
+
+    By default only rows whose artifact hash differs from ``current_artifact_hash``
+    are returned. When ``all_hashes`` is set, every precompute row for the year is
+    returned regardless of hash - the purge mode used to force a clean re-warm after
+    a code-only change that does not move the artifact hash.
+    """
     stale_records: list[StaleStateRecord] = []
     for namespace in _PRECOMPUTE_NAMESPACES:
         rows = _load_namespace_rows(store=store, namespace=namespace)
@@ -160,13 +189,13 @@ def _stale_records_for_year(
             if payload_year != int(target_year):
                 continue
             artifact_hash = str(payload.get("artifact_hash", "")).strip()
-            if not artifact_hash or artifact_hash == current_artifact_hash:
+            if not all_hashes and (not artifact_hash or artifact_hash == current_artifact_hash):
                 continue
             stale_records.append(
                 StaleStateRecord(
                     namespace=namespace,
                     state_key=str(state_key).strip(),
-                    artifact_hash=artifact_hash,
+                    artifact_hash=artifact_hash or "(unset)",
                     payload_year=payload_year,
                 )
             )
@@ -179,17 +208,19 @@ def _print_report(
     current_artifact_hash: str,
     stale_records: list[StaleStateRecord],
     apply: bool,
+    all_hashes: bool = False,
 ) -> None:
     """Print a compact stale-row summary."""
     print()
-    print("Stale Precompute Runtime State")
+    print("Purge ALL Precompute Runtime State" if all_hashes else "Stale Precompute Runtime State")
     print()
     print(f"Season year: {int(target_year)}")
     print(f"Current artifact hash: {current_artifact_hash}")
+    print(f"Mode: {'purge all hashes' if all_hashes else 'stale hashes only'}")
     print(f"Apply deletes: {bool(apply)}")
 
     if not stale_records:
-        print("\nNo stale precompute runtime-state rows found.")
+        print("\nNo matching precompute runtime-state rows found.")
         return
 
     by_namespace: dict[str, list[StaleStateRecord]] = defaultdict(list)
@@ -225,12 +256,14 @@ def main() -> int:
         store=store,
         target_year=int(args.year),
         current_artifact_hash=current_artifact_hash,
+        all_hashes=bool(args.all_hashes),
     )
     _print_report(
         target_year=int(args.year),
         current_artifact_hash=current_artifact_hash,
         stale_records=stale_records,
         apply=bool(args.apply),
+        all_hashes=bool(args.all_hashes),
     )
 
     if not args.apply or not stale_records:
