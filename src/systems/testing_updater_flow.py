@@ -296,6 +296,18 @@ def collect_sessions_for_events(
     return result
 
 
+class NoUsableSessionTelemetryError(ValueError):
+    """Sessions were discovered but yielded no usable team telemetry yet.
+
+    This is distinct from a hard misconfiguration: it is typically a transient
+    data-availability lag during a live session weekend (FastF1 has not yet
+    backfilled enough completed laps for the session). Subclasses ``ValueError``
+    so existing callers that catch/expect ``ValueError`` keep working, while the
+    warmup auto-capture path can catch it specifically and treat it as a
+    graceful skip-and-retry rather than a fatal error.
+    """
+
+
 def raise_if_no_loaded_sessions(
     discovered_sessions: list[str],
     loaded_sessions: list[str],
@@ -316,7 +328,7 @@ def raise_if_no_loaded_sessions(
             if len(unique_discovered) >= 5:
                 break
 
-        raise ValueError(
+        raise NoUsableSessionTelemetryError(
             "Sessions were found, but no usable team telemetry could be extracted yet. "
             "This usually means the session has too little completed running. "
             f"Detected sessions: {unique_discovered}. "

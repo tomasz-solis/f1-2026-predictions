@@ -122,6 +122,7 @@ class WarmupSummary:
     practice_completed_sessions: list[str] = field(default_factory=list)
     practice_teams_updated: int = 0
     practice_retried_events: list[str] = field(default_factory=list)
+    practice_deferred_sessions: list[str] = field(default_factory=list)
     reconciled_actuals: list[str] = field(default_factory=list)
     accuracy_snapshots: int = 0
     errors: list[str] = field(default_factory=list)
@@ -150,6 +151,7 @@ class WarmupSummary:
             "practice_completed_sessions": list(self.practice_completed_sessions),
             "practice_teams_updated": int(self.practice_teams_updated),
             "practice_retried_events": list(self.practice_retried_events),
+            "practice_deferred_sessions": list(self.practice_deferred_sessions),
             "reconciled_actuals": list(self.reconciled_actuals),
             "accuracy_snapshots": int(self.accuracy_snapshots),
             "errors": list(self.errors),
@@ -603,6 +605,11 @@ def _stage_refresh_practice(ctx: _WarmupRunState) -> None:
     if isinstance(retried_events, list):
         ctx.summary.practice_retried_events = [
             str(e).strip() for e in retried_events if str(e).strip()
+        ]
+    deferred_sessions = practice_update.get("deferred_sessions", [])
+    if isinstance(deferred_sessions, list):
+        ctx.summary.practice_deferred_sessions = [
+            str(s).strip() for s in deferred_sessions if str(s).strip()
         ]
 
 

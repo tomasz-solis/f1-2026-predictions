@@ -563,6 +563,7 @@ def auto_update_practice_characteristics_if_needed(
         force_recheck: If True, ignores cached state and re-checks session completion
         session_detector: Optional pre-built detector instance for call-level memoization
     """
+    from src.systems.testing_updater_flow import NoUsableSessionTelemetryError
     from src.utils import config_loader
     from src.utils.session_detector import SessionDetector
 
@@ -635,6 +636,7 @@ def auto_update_practice_characteristics_if_needed(
     all_updated_teams: set[str] = set()
     focus_updated_teams: set[str] = set()
     retried_events: list[str] = []
+    deferred_sessions: list[str] = []
     state_store = _get_runtime_state_store()
     for event_name, _full_completed_sessions, sessions_to_update in pending_updates:
         lock_owner = uuid4().hex
@@ -670,15 +672,41 @@ def auto_update_practice_characteristics_if_needed(
             event_updated_teams: set[str] = set()
             event_had_update = False
             for session_name in sessions_to_update:
-                summary = _run_practice_capture_session_update(
-                    year=year,
-                    event_name=event_name,
-                    session_name=session_name,
-                    practice_new_weight=practice_new_weight,
-                    practice_directionality_scale=practice_directionality_scale,
-                    practice_session_aggregation=practice_session_aggregation,
-                    practice_run_profile=practice_run_profile,
-                )
+                try:
+                    summary = _run_practice_capture_session_update(
+                        year=year,
+                        event_name=event_name,
+                        session_name=session_name,
+                        practice_new_weight=practice_new_weight,
+                        practice_directionality_scale=practice_directionality_scale,
+                        practice_session_aggregation=practice_session_aggregation,
+                        practice_run_profile=practice_run_profile,
+                    )
+                except NoUsableSessionTelemetryError as exc:
+                    # The session is scheduled-complete but FastF1 has not yet
+                    # backfilled enough laps to extract team telemetry. Defer it
+                    # without marking it processed so a later run retries once the
+                    # data lands, instead of failing the whole warmup cycle.
+                    deferred_session_id = f"{event_name}::{session_name}"
+                    deferred_sessions.append(deferred_session_id)
+                    logger.warning(
+                        "Deferring practice capture for %s: %s",
+                        deferred_session_id,
+                        exc,
+                    )
+                    record_counter(
+                        "practice_capture_telemetry_not_ready_total",
+                        labels={"year": year, "race_name": event_name},
+                    )
+                    record_alert(
+                        "practice_capture_telemetry_not_ready",
+                        (
+                            f"Deferred {deferred_session_id}: session is scheduled-complete "
+                            "but no usable team telemetry is available yet."
+                        ),
+                        labels={"year": year, "race_name": event_name},
+                    )
+                    continue
 
                 updated_teams = (
                     summary.get("updated_teams", []) if isinstance(summary, dict) else []
@@ -715,6 +743,7 @@ def auto_update_practice_characteristics_if_needed(
             "updated": False,
             "completed_fp_sessions": focus_completed_sessions,
             "retried_events": retried_events,
+            "deferred_sessions": deferred_sessions,
         }
 
     if race_key not in state["races"] and race_name in completed_by_race:
@@ -732,4 +761,5 @@ def auto_update_practice_characteristics_if_needed(
         "updated_events": all_updated_events,
         "total_teams_updated": len(all_updated_teams),
         "retried_events": retried_events,
+        "deferred_sessions": deferred_sessions,
     }

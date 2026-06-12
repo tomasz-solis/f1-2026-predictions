@@ -337,6 +337,52 @@ def test_auto_update_practice_characteristics_updates_state(patcher, tmp_path):
     assert race_state["teams_updated"] == 3
 
 
+def test_auto_update_practice_characteristics_defers_when_telemetry_not_ready(patcher, tmp_path):
+    state_file = tmp_path / "practice_state.json"
+    patcher.setattr(update_flow, "_PRACTICE_UPDATE_STATE_FILE", state_file)
+
+    class _Detector:
+        def get_completed_sessions(self, year: int, race_name: str, is_sprint: bool):
+            del year, race_name, is_sprint
+            return ["FP1"]
+
+    patcher.setattr("src.utils.session_detector.SessionDetector", _Detector)
+    patcher.setattr(
+        "src.utils.config_loader.get",
+        lambda key, default=None: default,
+    )
+
+    from src.systems.testing_updater_flow import NoUsableSessionTelemetryError
+
+    def _telemetry_not_ready(**kwargs):
+        del kwargs
+        raise NoUsableSessionTelemetryError(
+            "Sessions were found, but no usable team telemetry could be extracted yet. "
+            "This usually means the session has too little completed running."
+        )
+
+    patcher.setattr(
+        "src.systems.testing_updater.update_from_testing_sessions",
+        _telemetry_not_ready,
+    )
+
+    # A scheduled-complete session whose telemetry has not landed yet must be a
+    # graceful skip, not a fatal error that fails the whole warmup cycle.
+    result = update_flow.auto_update_practice_characteristics_if_needed(
+        year=2026,
+        race_name="Spanish Grand Prix",
+        is_sprint=False,
+    )
+
+    assert result["updated"] is False
+    assert result["deferred_sessions"] == ["Spanish Grand Prix::FP1"]
+
+    # The session must NOT be marked processed, so a later run retries it.
+    assert not state_file.exists() or "2026::Spanish Grand Prix" not in json.loads(
+        state_file.read_text()
+    ).get("races", {})
+
+
 def test_auto_update_practice_characteristics_updates_only_new_sessions(patcher, tmp_path):
     state_file = tmp_path / "practice_state.json"
     state_file.write_text(
