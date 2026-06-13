@@ -289,6 +289,16 @@ class ConformalCalibrationConfig(StrictConfigModel):
     min_samples: int = Field(default=20, ge=1)
 
 
+class OrderConfidenceConfig(StrictConfigModel):
+    """Calibrated order-confidence metric settings (P(finish within tolerance))."""
+
+    tolerance: float = Field(default=1.0, ge=0.0)
+    spread_inflation: float = Field(default=1.0, gt=0.0)
+    max_interval_scale: float = Field(default=3.0, ge=1.0)
+    min: float = Field(default=2.0, ge=0.0, le=100.0)
+    max: float = Field(default=99.0, ge=0.0, le=100.0)
+
+
 class EarlySeasonTeamUncertaintyConfig(StrictConfigModel):
     """How preseason team uncertainty should fade through the opening races."""
 
@@ -476,6 +486,7 @@ class BaselineQualifyingConfig(StrictConfigModel):
     session_confidence_scale: float = Field(default=10.0, ge=0.0)
     confidence_cap: int = Field(default=60, ge=1)
     confidence_min: int = Field(default=40, ge=1)
+    order_confidence: OrderConfidenceConfig = Field(default_factory=OrderConfidenceConfig)
     early_season_team_uncertainty: EarlySeasonTeamUncertaintyConfig = Field(
         default_factory=EarlySeasonTeamUncertaintyConfig
     )
@@ -911,6 +922,7 @@ class StrategyConstraintsConfig(StrictConfigModel):
 class BaselineRaceConfig(StrictConfigModel):
     """Detailed baseline race configuration."""
 
+    order_confidence: OrderConfidenceConfig = Field(default_factory=OrderConfidenceConfig)
     default_experience_tier: str = Field(default="developing")
     missing_driver_teammate_weight: float = Field(default=0.75, ge=0.0, le=1.0)
     missing_driver_default_dnf_rate: float = Field(default=0.10, ge=0.0, le=1.0)

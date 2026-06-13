@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from src.models.order_confidence import compute_order_confidence
 from src.predictors.baseline.early_season_uncertainty import (
     resolve_early_season_confidence_penalty,
     resolve_early_season_interval_extension,
@@ -853,6 +854,7 @@ class BaselineQualifyingMixin:
                     "p5": p5,
                     "p95": p95,
                     "confidence": float(round(confidence, 1)),
+                    "order_confidence": None,
                 }
             )
             mean_positions[driver_info["driver"]] = mean_pos
@@ -869,6 +871,30 @@ class BaselineQualifyingMixin:
 
         for i, item in enumerate(grid):
             item["position"] = i + 1
+
+        oc_tolerance = float(
+            cfg.get("baseline_predictor.qualifying.order_confidence.tolerance", 1.0)
+        )
+        oc_spread_inflation = float(
+            cfg.get("baseline_predictor.qualifying.order_confidence.spread_inflation", 1.0)
+        )
+        oc_max_interval_scale = float(
+            cfg.get("baseline_predictor.qualifying.order_confidence.max_interval_scale", 3.0)
+        )
+        oc_min = float(cfg.get("baseline_predictor.qualifying.order_confidence.min", 2.0))
+        oc_max = float(cfg.get("baseline_predictor.qualifying.order_confidence.max", 99.0))
+        for item in grid:
+            item["order_confidence"] = compute_order_confidence(
+                samples=position_records.get(item["driver"], []),
+                predicted_position=float(item["position"]),
+                tolerance=oc_tolerance,
+                spread_inflation=oc_spread_inflation,
+                published_p5=item.get("p5"),
+                published_p95=item.get("p95"),
+                max_interval_scale=oc_max_interval_scale,
+                conf_min=oc_min,
+                conf_max=oc_max,
+            )
 
         return grid
 

@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 
+from src.models.order_confidence import compute_order_confidence
 from src.predictors.baseline.early_season_uncertainty import (
     resolve_early_season_confidence_penalty,
     resolve_early_season_interval_extension,
@@ -683,6 +684,7 @@ def build_finish_order(
                 "p5": int(np.percentile(blended_position_samples, 5)),
                 "p95": int(np.percentile(blended_position_samples, 95)),
                 "confidence": round(confidence, 1),
+                "order_confidence": None,
                 "podium_probability": 0.0,
                 "dnf_probability": round(
                     float(
@@ -749,7 +751,56 @@ def build_finish_order(
         cfg=cfg,
         field_size=max(1, field_size),
     )
+    assign_order_confidence(
+        finish_order=finish_order,
+        rank_samples_by_driver=rank_samples_by_driver,
+        blended_samples_by_driver=blended_samples_by_driver,
+        cfg=cfg,
+        prefix="baseline_predictor.race",
+    )
     return finish_order
+
+
+def assign_order_confidence(
+    *,
+    finish_order: list[dict[str, Any]],
+    rank_samples_by_driver: dict[str, list[int]],
+    blended_samples_by_driver: dict[str, list[float]],
+    cfg: Any,
+    prefix: str,
+) -> None:
+    """Attach a calibrated ``order_confidence`` (0-100) to each finish-order row.
+
+    The probability is estimated from the same finishing-position samples that
+    back the published P5/P95 interval and is centred on each row's *final*
+    position, so the displayed number and range describe one distribution. It is
+    deliberately uncapped (beyond honest 2-99 bounds) unlike the legacy
+    ``confidence`` heuristic it supplements.
+    """
+    tolerance = float(cfg.get(f"{prefix}.order_confidence.tolerance", 1.0))
+    spread_inflation = float(cfg.get(f"{prefix}.order_confidence.spread_inflation", 1.0))
+    max_interval_scale = float(cfg.get(f"{prefix}.order_confidence.max_interval_scale", 3.0))
+    conf_min = float(cfg.get(f"{prefix}.order_confidence.min", 2.0))
+    conf_max = float(cfg.get(f"{prefix}.order_confidence.max", 99.0))
+
+    for row in finish_order:
+        driver = row.get("driver")
+        samples = rank_samples_by_driver.get(driver) or blended_samples_by_driver.get(driver) or []
+        try:
+            predicted_position = float(row.get("position", row.get("median_position", 1)))
+        except (TypeError, ValueError):
+            predicted_position = 1.0
+        row["order_confidence"] = compute_order_confidence(
+            samples=samples,
+            predicted_position=predicted_position,
+            tolerance=tolerance,
+            spread_inflation=spread_inflation,
+            published_p5=row.get("p5"),
+            published_p95=row.get("p95"),
+            max_interval_scale=max_interval_scale,
+            conf_min=conf_min,
+            conf_max=conf_max,
+        )
 
 
 def _compute_podium_probabilities(

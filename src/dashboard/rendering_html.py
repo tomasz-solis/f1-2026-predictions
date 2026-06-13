@@ -355,6 +355,15 @@ def _build_prediction_highlight_cards(
         return []
 
     ordered = df.sort_values("position", ascending=True).reset_index(drop=True)
+    # Surface the calibrated order-confidence probability where available, falling back
+    # per-row to the legacy heuristic for predictions saved before it existed.
+    if "order_confidence" in ordered.columns:
+        resolved_confidence = pd.to_numeric(ordered["order_confidence"], errors="coerce")
+        if "confidence" in ordered.columns:
+            resolved_confidence = resolved_confidence.fillna(
+                pd.to_numeric(ordered["confidence"], errors="coerce")
+            )
+        ordered["confidence"] = resolved_confidence
     result_mode = str(result.get("result_mode", "")).strip().upper()
 
     if result_mode == "ACTUAL":

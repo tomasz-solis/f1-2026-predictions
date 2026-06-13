@@ -659,6 +659,13 @@ def _style_race_table(df_display: pd.DataFrame):
 def _render_race_result(df: pd.DataFrame) -> None:
     """Render race prediction table and summary cards."""
     race_df = df.copy()
+    # Prefer the calibrated order-confidence probability; fall back per-row to the legacy
+    # heuristic for artifacts saved before order_confidence existed.
+    if "order_confidence" in race_df.columns:
+        order_conf = pd.to_numeric(race_df["order_confidence"], errors="coerce")
+        if "confidence" in race_df.columns:
+            order_conf = order_conf.fillna(pd.to_numeric(race_df["confidence"], errors="coerce"))
+        race_df["confidence"] = order_conf
     has_confidence = "confidence" in race_df.columns
     has_podium_probability = "podium_probability" in race_df.columns
     has_dnf_probability = "dnf_probability" in race_df.columns
@@ -690,11 +697,11 @@ def _render_race_result(df: pd.DataFrame) -> None:
     mean_confidence = (
         float(race_df["confidence"].mean()) if has_confidence and not race_df.empty else None
     )
-    if isinstance(mean_confidence, float) and mean_confidence < 56.0:
+    if isinstance(mean_confidence, float) and mean_confidence < 50.0:
         warnings.append(
-            "Wide projected-finish spread: mean order confidence is "
-            f"{mean_confidence:.1f}%. This reflects simulation spread; input-data "
-            "confidence is tracked separately."
+            "Tightly-packed field: mean order confidence is "
+            f"{mean_confidence:.1f}% (avg chance a driver finishes within one place of "
+            "the projected slot). Input-data confidence is tracked separately."
         )
 
     if isinstance(input_confidence, int | float) and float(input_confidence) < 0.60:
@@ -768,6 +775,10 @@ def _render_race_result(df: pd.DataFrame) -> None:
     if has_confidence:
         display_cols.append("confidence")
         display_names.append("Order Confidence %")
+        st.caption(
+            "`Order Confidence %` is the simulated chance a driver finishes within one place of "
+            "the projected slot — high for clear-cut placements, low where the field is tightly packed."
+        )
 
     df_display = race_df[display_cols].copy()
     df_display.columns = display_names

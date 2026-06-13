@@ -34,6 +34,20 @@ def _render_qualifying_result(df: pd.DataFrame) -> None:
             "`90% Range` shows where each driver lands in 90% of qualifying simulations. "
             "Ranges should tighten as weekend and season data accumulates."
         )
+    confidence_col = (
+        "order_confidence"
+        if "order_confidence" in df.columns
+        and pd.to_numeric(df["order_confidence"], errors="coerce").notna().any()
+        else ("confidence" if "confidence" in df.columns else None)
+    )
+    if confidence_col is not None:
+        df_display["Order Confidence %"] = (
+            pd.to_numeric(df[confidence_col], errors="coerce").round(1).to_numpy()
+        )
+        st.caption(
+            "`Order Confidence %` is the simulated chance a driver qualifies within one place of "
+            "the projected slot — high for clear-cut placements, low where the field is tightly packed."
+        )
     st.caption(
         "Read left to right as qualifying stages (Q1 -> Q2 -> Q3). "
         "`Grid` remains the full projected final order."

@@ -386,8 +386,21 @@ baseline_predictor:
     session_confidence_scale: 10.0
 
     # Confidence / fallback defaults
+    # NOTE: confidence_cap/confidence_min bound the legacy ``confidence`` heuristic, which is
+    # retained as an internal grid-stability / data-quality proxy (it feeds race grid-perturbation
+    # and the conformal regime bucket). The user-facing "Order Confidence %" now comes from the
+    # calibrated ``order_confidence`` metric below, which is NOT capped at 60.
     confidence_cap: 60
     confidence_min: 40
+    # Calibrated order-confidence: P(grid slot lands within `tolerance` places of prediction),
+    # estimated from the same simulation samples that back P5/P95. Tune `spread_inflation` from
+    # backtest calibration (predicted confidence vs empirical within-tolerance hit rate).
+    order_confidence:
+      tolerance: 1.0          # "within one grid place"
+      spread_inflation: 1.0   # >1.0 lowers confidence to offset a too-narrow simulation spread
+      max_interval_scale: 3.0 # cap on published-vs-raw interval widening reflected in the metric
+      min: 2.0
+      max: 99.0
     early_season_team_uncertainty:
       activation_floor: 0.22
       scale: 0.20
@@ -416,6 +429,16 @@ baseline_predictor:
 
   # Race simulation parameters
   race:
+    # Calibrated order-confidence: P(finish within `tolerance` places of predicted position),
+    # estimated from the same rank samples that back P5/P95 and centred on the published slot.
+    # Replaces the legacy [40,60]-clamped `confidence` heuristic for the "Order Confidence %"
+    # the dashboard shows. confidence.min/max below still bound the internal heuristic.
+    order_confidence:
+      tolerance: 1.0          # "within one finishing place"
+      spread_inflation: 1.0   # >1.0 lowers confidence to offset a too-narrow simulation spread
+      max_interval_scale: 3.0 # cap on published-vs-raw interval widening reflected in the metric
+      min: 2.0
+      max: 99.0
     # Defaults when an active-lineup driver is missing from characteristics
     default_experience_tier: developing
     missing_driver_teammate_weight: 0.75

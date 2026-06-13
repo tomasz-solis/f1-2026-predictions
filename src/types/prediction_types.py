@@ -13,6 +13,10 @@ class QualifyingGridEntry(TypedDict):
     p5: NotRequired[int]
     p95: NotRequired[int]
     confidence: NotRequired[float]
+    # Calibrated probability (0-100) that the entrant finishes within the configured
+    # tolerance of its predicted position. Supplements the legacy ``confidence`` heuristic
+    # and is what the dashboard surfaces as "Order Confidence %".
+    order_confidence: NotRequired[float | None]
     # True for race-session results where the driver did not finish / was not classified.
     # Used by finisher-only MAE and DNF calibration; absent for qualifying and predictions.
     dnf: NotRequired[bool]

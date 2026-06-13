@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "run_id": "be832dfc-b8b8-4a9a-a9a9-d9b1f1bf029a",
+    "year": 2026,
+    "race_name": "Japanese Grand Prix",
+    "session_name": "FP3",
+    "predicted_at": "2026-06-12T18:30:32.468808+00:00",
+    "weather": "dry",
+    "fp_blend_info": {},
+    "source": "warmup_precompute",
+    "weekend_format": "normal",
+    "top_level_qualifying_target": "main_qualifying",
+    "top_level_race_target": "grand_prix_race",
+    "top_level_qualifying_eligible_at_save": true,
+    "top_level_race_eligible_at_save": true,
+    "top_level_qualifying_result_mode": "PREDICTED",
+    "top_level_race_result_mode": "PREDICTED",
+    "top_level_qualifying_grid_source": "PREDICTED",
+    "top_level_race_grid_source": "PREDICTED",
+    "model_version": "2.2"
+  },
+  "qualifying": {
+    "predicted_grid": [
+      {
+        "position": 1,
+        "driver": "RUS",
+        "team": "Mercedes",
+        "expected_time": null,
+        "confidence": null,
+        "p5": null,
+        "p95": null
+      },
+      {
+        "position": 2,
+        "driver": "LEC",
+        "team": "Ferrari",
+        "expected_time": null,
+        "confidence": null,
+        "p5": null,
+        "p95": null
+      }
+    ]
+  },
+  "race": {
+    "predicted_results": [
+      {
+        "position": 1,
+        "driver": "RUS",
+        "team": "Mercedes",
+        "confidence": 78.4,
+        "dnf_probability": null,
+        "dnf_risk": null
+      },
+      {
+        "position": 2,
+        "driver": "LEC",
+        "team": "Ferrari",
+        "confidence": 71.2,
+        "dnf_probability": null,
+        "dnf_risk": null
+      }
+    ]
+  },
+  "targets": {
+    "main_qualifying": {
+      "target_session": "Q",
+      "predicted_order": [
+        {
+          "position": 1,
+          "driver": "RUS",
+          "team": "Mercedes"
+        },
+        {
+          "position": 2,
+          "driver": "LEC",
+          "team": "Ferrari"
+        }
+      ],
+      "result_mode": "PREDICTED",
+      "grid_source": "PREDICTED",
+      "fp_blend_info": {},
+      "mean_confidence": null,
+      "eligible_at_save": true
+    },
+    "grand_prix_race": {
+      "target_session": "R",
+      "predicted_order": [
+        {
+          "position": 1,
+          "driver": "RUS",
+          "team": "Mercedes",
+          "confidence": 78.4
+        },
+        {
+          "position": 2,
+          "driver": "LEC",
+          "team": "Ferrari",
+          "confidence": 71.2
+        }
+      ],
+      "result_mode": "PREDICTED",
+      "grid_source": "PREDICTED",
+      "fp_blend_info": {},
+      "mean_confidence": 74.80000000000001,
+      "eligible_at_save": true
+    }
+  },
+  "actuals": {
+    "qualifying": null,
+    "race": null,
+    "targets": {
+      "main_qualifying": null,
+      "grand_prix_race": null
+    }
+  }
+}

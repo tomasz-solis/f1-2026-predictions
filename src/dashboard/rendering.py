@@ -117,14 +117,21 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
                     "Medium-confidence qualifying mode: using testing-derived team pace without "
                     "weekend laps. Expect wider position ranges."
                 )
-        if "confidence" in df.columns and not df.empty:
+        confidence_col = (
+            "order_confidence"
+            if "order_confidence" in df.columns
+            and pd.to_numeric(df["order_confidence"], errors="coerce").notna().any()
+            else "confidence"
+        )
+        if confidence_col in df.columns and not df.empty:
             mean_qualifying_confidence = float(
-                pd.to_numeric(df["confidence"], errors="coerce").mean()
+                pd.to_numeric(df[confidence_col], errors="coerce").mean()
             )
-            if mean_qualifying_confidence < 56.0:
+            if mean_qualifying_confidence < 50.0:
                 qualifying_warning_messages.append(
-                    "Wide predicted-order spread: mean order confidence is "
-                    f"{mean_qualifying_confidence:.1f}%. This reflects simulation spread, "
+                    "Tightly-packed grid: mean order confidence is "
+                    f"{mean_qualifying_confidence:.1f}% (avg chance a driver qualifies within one "
+                    "place of the projected slot). This reflects how separable the field is, "
                     "not just how many weekends the model has learned."
                 )
         else:

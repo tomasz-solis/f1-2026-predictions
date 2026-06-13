@@ -104,6 +104,22 @@ def validate_qualifying_grid(
 
             validated_entry["confidence"] = confidence
 
+        if "order_confidence" in entry and entry["order_confidence"] is not None:
+            try:
+                order_confidence = float(entry["order_confidence"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"Grid order_confidence must be numeric, got {entry['order_confidence']!r}"
+                ) from exc
+
+            if not math.isfinite(order_confidence) or order_confidence < 0.0:
+                raise ValueError(
+                    "Grid order_confidence must be a finite non-negative number "
+                    f"(got {entry['order_confidence']!r})"
+                )
+
+            validated_entry["order_confidence"] = order_confidence
+
         if "dnf" in entry and entry["dnf"] is not None:
             validated_entry["dnf"] = bool(entry["dnf"])
 

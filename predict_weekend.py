@@ -160,7 +160,8 @@ def run_weekend_predictions(year, race_name, weather="dry"):
     )
 
     q_df = pd.DataFrame(q_result["grid"])
-    _print_table(q_df, ["position", "driver", "team", "confidence"])
+    q_conf_col = "order_confidence" if "order_confidence" in q_df.columns else "confidence"
+    _print_table(q_df, ["position", "driver", "team", q_conf_col])
 
     # =========================================================
     # PART B: PREDICT RACE (ALWAYS RUNS)
@@ -185,7 +186,8 @@ def run_weekend_predictions(year, race_name, weather="dry"):
     )
 
     r_df = pd.DataFrame(r_result["finish_order"])
-    _print_table(r_df, ["position", "driver", "team", "confidence", "podium_probability"])
+    r_conf_col = "order_confidence" if "order_confidence" in r_df.columns else "confidence"
+    _print_table(r_df, ["position", "driver", "team", r_conf_col, "podium_probability"])
 
 
 def _convert_team_ranks_to_grid(team_ranks, year, race_name):

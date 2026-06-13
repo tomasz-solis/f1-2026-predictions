@@ -121,6 +121,7 @@ class PredictionLogger:
                         "team": result["team"],
                         "expected_time": result.get("expected_time"),
                         "confidence": result.get("confidence"),
+                        "order_confidence": result.get("order_confidence"),
                         # p5/p95 are the 5th and 95th percentile finish positions
                         # across Monte Carlo simulations. Together they form a
                         # nominal 90% prediction interval that calibration analysis
@@ -139,6 +140,7 @@ class PredictionLogger:
                         "driver": result["driver"],
                         "team": result["team"],
                         "confidence": result.get("confidence"),
+                        "order_confidence": result.get("order_confidence"),
                         # predict_race emits the per-driver DNF probability under
                         # "dnf_probability"; persist it so DNF calibration (Brier) can score it.
                         # Keep the legacy "dnf_risk" key for backward compatibility.

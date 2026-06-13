@@ -263,7 +263,7 @@ def test_render_race_result_warns_on_low_confidence_signals(patcher):
     rendering._render_race_result(df)
 
     details = [value for kind, value in calls if kind == "markdown"]
-    assert any("Wide projected-finish spread" in text for text in details)
+    assert any("Tightly-packed field" in text for text in details)
     assert any("(+1 more)" in text for text in details)
     assert any("mean order confidence" in text for text in details)
     assert any("Low input-data confidence" in text for text in details)
@@ -449,7 +449,7 @@ def test_display_prediction_result_explains_low_qualifying_order_confidence(patc
     )
 
     details = [value for kind, value in calls if kind == "markdown"]
-    assert any("Wide predicted-order spread" in text for text in details)
+    assert any("Tightly-packed grid" in text for text in details)
     assert any("not just how many weekends" in text for text in details)
 
 

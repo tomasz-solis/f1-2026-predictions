@@ -16,6 +16,8 @@ import yaml  # type: ignore[import-untyped,unused-ignore]
 
 from src.analysis.model_evaluation import compute_calibration_metrics
 from src.data.actual_results_fetcher import fetch_actual_session_results
+from src.models.order_confidence import within_tolerance
+from src.utils import config_loader
 from src.utils.prediction_context import PredictionContext, build_historical_prediction_context
 from src.utils.prediction_metrics import PredictionMetrics
 from src.utils.weekend import get_weekend_type
@@ -536,6 +538,75 @@ def _compute_interval_metrics(
     }
 
 
+def _compute_order_confidence_metrics(
+    predicted_entries: Iterable[dict[str, Any]],
+    actual_entries: Iterable[dict[str, Any]],
+    *,
+    tolerance: float,
+) -> dict[str, Any]:
+    """Measure calibration of the published ``order_confidence`` probability.
+
+    For every predicted row that carries an ``order_confidence`` and matches an
+    actual classification, we compare the stated probability against whether the
+    driver actually finished within ``tolerance`` places of the predicted slot.
+    ``calibration_error`` is ``mean_predicted - empirical_hit_rate`` (positive ⇒
+    overconfident); driving it toward zero is what ``spread_inflation`` tunes.
+    """
+    actual_positions_by_driver: dict[str, int] = {}
+    for row in actual_entries:
+        driver_code = str(row.get("driver", "")).strip()
+        raw_position: object = row.get("position")
+        if not isinstance(raw_position, int | float | str):
+            continue
+        try:
+            position = int(raw_position)
+        except (TypeError, ValueError):
+            continue
+        if driver_code:
+            actual_positions_by_driver[driver_code] = position
+
+    predicted_confidences: list[float] = []
+    within_tolerance_hits: list[float] = []
+    for row in predicted_entries:
+        driver_code = str(row.get("driver", "")).strip()
+        if not driver_code or driver_code not in actual_positions_by_driver:
+            continue
+        confidence = _coerce_float(row.get("order_confidence"))
+        predicted_position = _coerce_float(row.get("position"))
+        if confidence is None or predicted_position is None:
+            continue
+        predicted_confidences.append(confidence)
+        within_tolerance_hits.append(
+            1.0
+            if within_tolerance(
+                predicted_position=predicted_position,
+                actual_position=actual_positions_by_driver[driver_code],
+                tolerance=tolerance,
+            )
+            else 0.0
+        )
+
+    count = len(predicted_confidences)
+    if count == 0:
+        return {
+            "order_confidence_count": 0,
+            "order_confidence_mean": None,
+            "order_confidence_empirical_within_tolerance": None,
+            "order_confidence_calibration_error": None,
+            "order_confidence_tolerance": float(tolerance),
+        }
+
+    mean_confidence = sum(predicted_confidences) / count
+    empirical_within_tolerance = (sum(within_tolerance_hits) / count) * 100.0
+    return {
+        "order_confidence_count": count,
+        "order_confidence_mean": float(mean_confidence),
+        "order_confidence_empirical_within_tolerance": float(empirical_within_tolerance),
+        "order_confidence_calibration_error": float(mean_confidence - empirical_within_tolerance),
+        "order_confidence_tolerance": float(tolerance),
+    }
+
+
 def _resolve_prediction_context(
     *,
     evaluation_mode: EvaluationMode,
@@ -712,6 +783,22 @@ def run_single_race_backtest(
             race_prediction["finish_order"],
             race_actual,
         )
+        qualifying_oc_tolerance = float(
+            config_loader.get("baseline_predictor.qualifying.order_confidence.tolerance", 1.0)
+        )
+        race_oc_tolerance = float(
+            config_loader.get("baseline_predictor.race.order_confidence.tolerance", 1.0)
+        )
+        qualifying_order_confidence_metrics = _compute_order_confidence_metrics(
+            qualifying_prediction["grid"],
+            qualifying_actual,
+            tolerance=qualifying_oc_tolerance,
+        )
+        race_order_confidence_metrics = _compute_order_confidence_metrics(
+            race_prediction["finish_order"],
+            race_actual,
+            tolerance=race_oc_tolerance,
+        )
         learning_summary: dict[str, Any] | None = None
         if learning_mode == "adaptive":
             learning_system = getattr(predictor, "calibration_system", None)
@@ -756,6 +843,18 @@ def run_single_race_backtest(
             "qualifying_interval_average_miss_distance": qualifying_interval_metrics[
                 "average_miss_distance"
             ],
+            "qualifying_order_confidence_count": qualifying_order_confidence_metrics[
+                "order_confidence_count"
+            ],
+            "qualifying_order_confidence_mean": qualifying_order_confidence_metrics[
+                "order_confidence_mean"
+            ],
+            "qualifying_order_confidence_empirical_within_tolerance": (
+                qualifying_order_confidence_metrics["order_confidence_empirical_within_tolerance"]
+            ),
+            "qualifying_order_confidence_calibration_error": qualifying_order_confidence_metrics[
+                "order_confidence_calibration_error"
+            ],
             "qualifying_predicted_top10": _top_n_entries(qualifying_prediction["grid"]),
             "qualifying_actual_top10": _top_n_entries(qualifying_actual),
             "race_mae": race_metrics["mae"],
@@ -770,6 +869,14 @@ def run_single_race_backtest(
             "race_interval_calibration_error": race_interval_metrics["calibration_error"],
             "race_interval_width_mean": race_interval_metrics["mean_interval_width"],
             "race_interval_average_miss_distance": race_interval_metrics["average_miss_distance"],
+            "race_order_confidence_count": race_order_confidence_metrics["order_confidence_count"],
+            "race_order_confidence_mean": race_order_confidence_metrics["order_confidence_mean"],
+            "race_order_confidence_empirical_within_tolerance": race_order_confidence_metrics[
+                "order_confidence_empirical_within_tolerance"
+            ],
+            "race_order_confidence_calibration_error": race_order_confidence_metrics[
+                "order_confidence_calibration_error"
+            ],
             "race_predicted_top10": _top_n_entries(race_prediction["finish_order"]),
             "race_actual_top10": _top_n_entries(race_actual),
             "adaptive_learning": learning_summary,
@@ -962,6 +1069,47 @@ def aggregate_race_metrics(race_results: list[dict[str, Any]]) -> dict[str, Any]
                 f"{session_prefix}_interval_width_mean": width_numerator / total_count,
                 f"{session_prefix}_interval_average_miss_distance": (
                     miss_distance_numerator / total_count
+                ),
+            }
+        )
+
+    for session_prefix in ("qualifying", "race"):
+        oc_rows = [
+            row
+            for row in successful
+            if int(row.get(f"{session_prefix}_order_confidence_count") or 0) > 0
+            and row.get(f"{session_prefix}_order_confidence_mean") is not None
+        ]
+        if not oc_rows:
+            continue
+        oc_total = sum(
+            int(row.get(f"{session_prefix}_order_confidence_count") or 0) for row in oc_rows
+        )
+        if oc_total <= 0:
+            continue
+        mean_numerator = sum(
+            int(row.get(f"{session_prefix}_order_confidence_count") or 0)
+            * float(row.get(f"{session_prefix}_order_confidence_mean") or 0.0)
+            for row in oc_rows
+        )
+        empirical_numerator = sum(
+            int(row.get(f"{session_prefix}_order_confidence_count") or 0)
+            * float(row.get(f"{session_prefix}_order_confidence_empirical_within_tolerance") or 0.0)
+            for row in oc_rows
+        )
+        mean_predicted = mean_numerator / oc_total
+        empirical_within_tolerance = empirical_numerator / oc_total
+        summary.update(
+            {
+                f"{session_prefix}_order_confidence_races": len(oc_rows),
+                f"{session_prefix}_order_confidence_count": oc_total,
+                f"{session_prefix}_order_confidence_mean": mean_predicted,
+                f"{session_prefix}_order_confidence_empirical_within_tolerance": (
+                    empirical_within_tolerance
+                ),
+                # Positive => the published confidence is overstated vs reality.
+                f"{session_prefix}_order_confidence_calibration_error": (
+                    mean_predicted - empirical_within_tolerance
                 ),
             }
         )
