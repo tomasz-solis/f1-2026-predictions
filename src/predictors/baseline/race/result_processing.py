@@ -785,7 +785,12 @@ def assign_order_confidence(
 
     for row in finish_order:
         driver = row.get("driver")
-        samples = rank_samples_by_driver.get(driver) or blended_samples_by_driver.get(driver) or []
+        if isinstance(driver, str):
+            samples = (
+                rank_samples_by_driver.get(driver) or blended_samples_by_driver.get(driver) or []
+            )
+        else:
+            samples = []
         try:
             predicted_position = float(row.get("position", row.get("median_position", 1)))
         except (TypeError, ValueError):
