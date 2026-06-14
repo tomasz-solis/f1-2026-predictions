@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from .live_prediction_flow import PrecomputedPredictionUnavailableError
-from .prediction_flow import CompetitiveSessionStatusUnavailableError
 
 _SESSION_LABELS = {
     "FP1": "Free Practice 1",
@@ -32,6 +31,11 @@ _WATCHED_COUNTERS = [
     "fastf1_circuit_trip_total",
 ]
 _REGULATION_RESET_EVIDENCE_RACES = 3
+
+
+def _is_competitive_session_status_unavailable(error: Exception) -> bool:
+    """Avoid importing the full prediction stack only to recognize this exception."""
+    return error.__class__.__name__ == "CompetitiveSessionStatusUnavailableError"
 
 
 def coerce_completed_races_count(value: Any) -> int | None:
@@ -455,7 +459,7 @@ def prediction_failure_hint(error: Exception) -> str | None:
     message = str(error).strip()
     normalized_message = message.lower()
 
-    if isinstance(error, CompetitiveSessionStatusUnavailableError) or (
+    if _is_competitive_session_status_unavailable(error) or (
         "could not verify completion state" in normalized_message
         and "predicted grid" in normalized_message
     ):

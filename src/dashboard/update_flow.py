@@ -4,9 +4,9 @@ import hashlib
 import json
 import logging
 from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
-import fastf1
 import streamlit as st
 
 from src.persistence.config import should_read_db_first, should_write_to_db, should_write_to_file
@@ -49,6 +49,22 @@ _UPDATE_ERRORS = (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _fastf1_module() -> Any:
+    """Import FastF1 only when live event or schedule data is needed."""
+    import fastf1 as fastf1_module
+
+    return fastf1_module
+
+
+def __getattr__(name: str) -> Any:
+    """Backwards-compatible lazy access for tests and callers patching FastF1."""
+    if name == "fastf1":
+        module = _fastf1_module()
+        globals()[name] = module
+        return module
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _get_runtime_state_store() -> RuntimeStateStore:
@@ -136,7 +152,7 @@ def build_event_boundary_snapshot(
     detector = session_detector or SessionDetector()
 
     try:
-        event = fastf1.get_event(year, race_name)
+        event = _fastf1_module().get_event(year, race_name)
     except _UPDATE_ERRORS as exc:
         logger.debug("Could not load FastF1 event for boundary refresh check: %s", exc)
         return {
@@ -467,7 +483,7 @@ def _iter_candidate_practice_events(
     now_utc = datetime.now(UTC)
 
     try:
-        schedule = fastf1.get_event_schedule(year)
+        schedule = _fastf1_module().get_event_schedule(year)
     except _UPDATE_ERRORS as exc:
         logger.debug("Could not load schedule for backlog practice updates: %s", exc)
         return [(focus_race_name, focus_is_sprint)]

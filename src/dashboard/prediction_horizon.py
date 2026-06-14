@@ -372,6 +372,7 @@ def filter_race_options_to_precomputed_horizon(
     load_ready_races_from_current_store_fn: Any,
     current_anchor_boundary_signature_fn: Any,
     logger: logging.Logger,
+    validate_live_boundary: bool = True,
 ) -> tuple[list[str], dict[str, Any]]:
     """Filter race options to the warmed horizon for the active artifact state."""
     if not race_options:
@@ -445,6 +446,45 @@ def filter_race_options_to_precomputed_horizon(
             "stale_reason": "missing_anchor_or_boundary",
         }
 
+    ready_races_raw = index_payload.get("ready_races", [])
+    ready_races = (
+        [str(race).strip() for race in ready_races_raw if str(race).strip()]
+        if isinstance(ready_races_raw, list)
+        else []
+    )
+
+    if not validate_live_boundary:
+        option_by_race = {
+            option.replace(" (Sprint)", "").strip(): option for option in base_race_options
+        }
+        filtered_options = [
+            option_by_race[race_name] for race_name in ready_races if race_name in option_by_race
+        ]
+        if filtered_options:
+            return filtered_options, {
+                **scope_metadata,
+                "applied": True,
+                "artifact_hash": artifact_hash,
+                "anchor_race_name": anchor_race_name,
+                "anchor_session_name": str(index_payload.get("anchor_session_name", "")).strip(),
+                "boundary_signature": indexed_boundary,
+                "boundary_validation_deferred": True,
+                "expected_targets": [
+                    str(race).strip()
+                    for race in index_payload.get("expected_targets", [])
+                    if str(race).strip()
+                ]
+                if isinstance(index_payload.get("expected_targets"), list)
+                else [],
+                "ready_races": ready_races,
+            }
+
+        return scoped_race_options, {
+            **scope_metadata,
+            "artifact_hash": artifact_hash,
+            "boundary_validation_deferred": True,
+        }
+
     current_boundary = current_anchor_boundary_signature_fn(year, anchor_race_name)
     if not current_boundary:
         return scoped_race_options, {
@@ -456,12 +496,6 @@ def filter_race_options_to_precomputed_horizon(
         }
 
     if current_boundary != indexed_boundary:
-        ready_races_raw = index_payload.get("ready_races", [])
-        ready_races = (
-            [str(race).strip() for race in ready_races_raw if str(race).strip()]
-            if isinstance(ready_races_raw, list)
-            else []
-        )
         ready_set = set(ready_races)
         filtered_options = [
             option
@@ -521,13 +555,11 @@ def filter_race_options_to_precomputed_horizon(
             "current_boundary_signature": current_boundary,
         }
 
-    ready_races_raw = index_payload.get("ready_races", [])
     if not isinstance(ready_races_raw, list):
         return scoped_race_options, {
             **scope_metadata,
             "artifact_hash": artifact_hash,
         }
-    ready_races = [str(race).strip() for race in ready_races_raw if str(race).strip()]
     if not ready_races:
         return scoped_race_options, {
             **scope_metadata,

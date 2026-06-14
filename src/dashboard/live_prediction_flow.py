@@ -17,7 +17,6 @@ from src.dashboard.precomputed_predictions import (
     load_precompute_horizon_index,
     load_precomputed_prediction,
 )
-from src.dashboard.update_flow import boundary_signature, build_event_boundary_snapshot
 from src.utils.operational_observability import (
     drain_recent_alerts,
     snapshot_counters,
@@ -328,6 +327,8 @@ def _resolve_race_boundary_context(
     session_detector: Any | None = None,
 ) -> tuple[str, str]:
     """Return the current boundary signature and checkpoint label for one race."""
+    from src.dashboard.update_flow import boundary_signature, build_event_boundary_snapshot
+
     return _prediction_boundary.resolve_race_boundary_context(
         year=year,
         race_name=race_name,

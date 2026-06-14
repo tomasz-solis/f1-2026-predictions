@@ -4,14 +4,28 @@ import json
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
-
-import fastf1
+from typing import Any, Literal
 
 logger = logging.getLogger(__name__)
 _EXCLUDED_SCHEDULE_EVENT_NAMES: dict[int, frozenset[str]] = {
     2026: frozenset({"bahrain grand prix", "saudi arabian grand prix"})
 }
+
+
+def _fastf1_module() -> Any:
+    """Import FastF1 only when schedule data is requested."""
+    import fastf1 as fastf1_module
+
+    return fastf1_module
+
+
+def __getattr__(name: str) -> Any:
+    """Backwards-compatible lazy access for tests and callers patching FastF1."""
+    if name == "fastf1":
+        module = _fastf1_module()
+        globals()[name] = module
+        return module
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def should_skip_schedule_event(year: int, event_name: str) -> bool:
@@ -88,7 +102,7 @@ def _get_schedule_rows(year: int) -> tuple[tuple[str, str], ...]:
     rows: list[tuple[str, str]] = []
 
     try:
-        schedule = fastf1.get_event_schedule(year)
+        schedule = _fastf1_module().get_event_schedule(year)
         if "EventName" in schedule.columns and "EventFormat" in schedule.columns:
             for _, event in schedule.iterrows():
                 event_name = str(event.get("EventName", "")).strip()
@@ -121,6 +135,11 @@ def refresh_schedule_cache() -> None:
 def get_schedule_rows(year: int) -> tuple[tuple[str, str], ...]:
     """Return cached `(EventName, EventFormat)` rows for a season."""
     return _get_schedule_rows(year)
+
+
+def get_fallback_schedule_rows(year: int) -> tuple[tuple[str, str], ...]:
+    """Return local fallback schedule rows without importing FastF1."""
+    return _load_fallback_schedule_rows(year)
 
 
 def _find_event_format(year: int, race_name: str) -> str | None:

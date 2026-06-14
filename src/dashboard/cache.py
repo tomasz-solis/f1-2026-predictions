@@ -2,16 +2,17 @@
 
 import hashlib
 import logging
+from pathlib import Path
+from typing import Any
 
-import fastf1
 import streamlit as st
 
-from src.persistence.artifact_store import ArtifactStore
 from src.persistence.config import should_read_db_first
 from src.utils.data_paths import resolve_repo_data_path
 
 logger = logging.getLogger(__name__)
 _FASTF1_CACHE_DIR = resolve_repo_data_path("data/raw/.fastf1_cache")
+_FASTF1_CACHE_ENABLED_FOR: str | None = None
 _DEFAULT_SEASON = 2026
 _PREDICTION_CODE_FINGERPRINT_FILES = [
     "src/dashboard/checkpoint_predictor.py",
@@ -50,20 +51,57 @@ _RUNTIME_PREDICTION_INPUT_FILES = [
     "data/processed/track_characteristics/{year}_track_characteristics.json",
     "data/systems/practice_characteristics_state.json",
 ]
+_FILE_FINGERPRINT_CACHE: dict[str, tuple[int, int, tuple[int, str]]] = {}
+
+
+def _fastf1_module() -> Any:
+    """Import FastF1 only when a caller needs it."""
+    import fastf1 as fastf1_module
+
+    return fastf1_module
+
+
+def __getattr__(name: str) -> Any:
+    """Backwards-compatible lazy access to optional heavy modules."""
+    if name == "fastf1":
+        module = _fastf1_module()
+        globals()[name] = module
+        return module
+    if name == "ArtifactStore":
+        from src.persistence.artifact_store import ArtifactStore as artifact_store_class
+
+        return artifact_store_class
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def _artifact_store_class() -> Any:
+    patched = globals().get("ArtifactStore")
+    if patched is not None:
+        return patched
+    from src.persistence.artifact_store import ArtifactStore as artifact_store_class
+
+    return artifact_store_class
 
 
 def enable_fastf1_cache() -> None:
     """Enable FastF1 project-local cache."""
+    global _FASTF1_CACHE_ENABLED_FOR
+
     _FASTF1_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_dir_str = str(_FASTF1_CACHE_DIR)
+    if _FASTF1_CACHE_ENABLED_FOR == cache_dir_str:
+        return
+
     try:
-        fastf1.Cache.enable_cache(str(_FASTF1_CACHE_DIR))
+        _fastf1_module().Cache.enable_cache(cache_dir_str)
+        _FASTF1_CACHE_ENABLED_FOR = cache_dir_str
     except Exception as exc:
         logger.warning("Could not enable FastF1 cache at %s: %s", _FASTF1_CACHE_DIR, exc)
 
 
 def get_artifact_versions(year: int = _DEFAULT_SEASON) -> dict[str, tuple[int, str]]:
     """Get version and deterministic fingerprint for artifacts."""
-    store = ArtifactStore(data_root="data")
+    store = _artifact_store_class()(data_root="data")
     versions = {}
     season_year = int(year)
 
@@ -147,17 +185,43 @@ def _get_file_timestamps(
     for file in files:
         path = resolve_repo_data_path(file)
         if path.exists():
-            try:
-                raw = path.read_bytes()
-            except OSError:
-                timestamps[file] = (0, "")
-                continue
-            digest = hashlib.sha1(raw).hexdigest()
-            timestamps[file] = (len(raw), digest)
+            timestamps[file] = _fingerprint_file(path)
         else:
             timestamps[file] = (0, "")
 
     return timestamps
+
+
+def _fingerprint_file(path: Path) -> tuple[int, str]:
+    """Return a stable content fingerprint, reusing hashes when file metadata is unchanged."""
+    try:
+        stat_result = path.stat()
+    except (AttributeError, OSError):
+        stat_result = None
+
+    cache_key = str(path)
+    if stat_result is not None:
+        cached = _FILE_FINGERPRINT_CACHE.get(cache_key)
+        if (
+            cached is not None
+            and cached[0] == stat_result.st_mtime_ns
+            and cached[1] == stat_result.st_size
+        ):
+            return cached[2]
+
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        return (0, "")
+
+    fingerprint = (len(raw), hashlib.sha1(raw).hexdigest())
+    if stat_result is not None:
+        _FILE_FINGERPRINT_CACHE[cache_key] = (
+            stat_result.st_mtime_ns,
+            stat_result.st_size,
+            fingerprint,
+        )
+    return fingerprint
 
 
 @st.cache_resource(show_spinner=False)

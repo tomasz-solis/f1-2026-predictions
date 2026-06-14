@@ -1,18 +1,23 @@
 """Supabase client access for database-backed storage."""
 
 import logging
-
-from postgrest.exceptions import APIError
-from supabase import Client, create_client
+from typing import Any
 
 from .config import get_supabase_key, get_supabase_url, is_db_enabled
 
 logger = logging.getLogger(__name__)
 
-_supabase_client: Client | None = None
+_supabase_client: Any | None = None
 
 
-def get_supabase_client() -> Client:
+def create_client(supabase_url: str, supabase_key: str) -> Any:
+    """Create a Supabase client lazily so file-only imports stay lightweight."""
+    from supabase import create_client as supabase_create_client
+
+    return supabase_create_client(supabase_url, supabase_key)
+
+
+def get_supabase_client() -> Any:
     """Return the shared Supabase client for this process."""
     global _supabase_client
 
@@ -30,7 +35,7 @@ def get_supabase_client() -> Client:
         try:
             _supabase_client = create_client(supabase_url, supabase_key)
             logger.info("Supabase client initialized: %s", supabase_url)
-        except (APIError, OSError, RuntimeError, TypeError, ValueError) as e:
+        except Exception as e:
             logger.error("Failed to initialize Supabase client: %s", e)
             raise RuntimeError(f"Failed to connect to Supabase: {e}") from e
 
@@ -43,7 +48,7 @@ def check_connection() -> str:
         client = get_supabase_client()
         result = client.table("artifacts").select("id").limit(1).execute()
         return f"Supabase connection healthy ({len(result.data)} row(s) accessible)"
-    except (APIError, AttributeError, OSError, RuntimeError, TypeError, ValueError) as e:
+    except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as e:
         raise RuntimeError(f"Supabase connection failed: {e}") from e
 
 

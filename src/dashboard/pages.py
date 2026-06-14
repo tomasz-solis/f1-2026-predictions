@@ -7,23 +7,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import fastf1
 import streamlit as st
 
-from src.persistence.artifact_store import ArtifactStore
 from src.utils.data_paths import resolve_repo_data_path
-from src.utils.weekend import get_schedule_rows, is_sprint_weekend
+from src.utils.weekend import get_fallback_schedule_rows, get_schedule_rows, is_sprint_weekend
 
 from . import prediction_horizon as _prediction_horizon
 from . import prediction_messages as _prediction_messages
-from . import team_comparison as _team_comparison
-from .accuracy_view import (
-    METRIC_OPTIONS,
-    render_overall_accuracy_metrics,
-    render_saved_prediction_viewer,
-    render_saved_predictions_summary,
-    render_target_sections,
-)
 from .analytics import track_event
 from .cache import get_artifact_versions
 from .layout import BRAND_LAST_UPDATED, BRAND_MODEL_VERSION, ENABLE_PREDICTION_ACCURACY_TAB
@@ -49,20 +39,6 @@ from .precomputed_predictions import (
     load_precompute_horizon_index,
     load_precomputed_prediction,
 )
-from .prediction_flow import run_prediction
-from .rendering import (
-    display_prediction_result,
-    render_notice_banner,
-    render_page_hero_deck,
-    render_prediction_hero_deck,
-)
-from .update_flow import (
-    auto_update_if_needed,
-    auto_update_practice_characteristics_if_needed,
-    boundary_signature,
-    build_event_boundary_snapshot,
-    detect_event_boundary_refresh_if_needed,
-)
 
 logger = logging.getLogger(__name__)
 DEFAULT_SEASON = 2026
@@ -74,16 +50,108 @@ _FASTF1_CACHE_DIRS = (
 _NON_DISTINCT_RACE_TOKENS = {"grand", "prix", "gp"}
 
 # Backwards-compatible exports for tests and existing imports.
-_DEFAULT_TEAM_COLOR = _team_comparison._DEFAULT_TEAM_COLOR
-_build_team_comparison_dataframe = _team_comparison._build_team_comparison_dataframe
-_coerce_unit_metric = _team_comparison._coerce_unit_metric
-_collect_profile_names = _team_comparison._collect_profile_names
-_default_team_selection = _team_comparison._default_team_selection
-_hex_to_rgba = _team_comparison._hex_to_rgba
-_load_team_characteristics_payload = _team_comparison._load_team_characteristics_payload
-_render_team_comparison_section = _team_comparison._render_team_comparison_section
-_resolve_profile_metrics = _team_comparison._resolve_profile_metrics
-_team_brand_color = _team_comparison._team_brand_color
+_DEFAULT_TEAM_COLOR = "#B6BABD"
+
+
+def _fastf1_module() -> Any:
+    """Import FastF1 only when schedule data is requested."""
+    import fastf1 as fastf1_module
+
+    return fastf1_module
+
+
+def __getattr__(name: str) -> Any:
+    """Backwards-compatible lazy access for tests and callers patching FastF1."""
+    if name == "fastf1":
+        module = _fastf1_module()
+        globals()[name] = module
+        return module
+    if name == "ArtifactStore":
+        from src.persistence.artifact_store import ArtifactStore as artifact_store_class
+
+        return artifact_store_class
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def _artifact_store_class() -> Any:
+    patched = globals().get("ArtifactStore")
+    if patched is not None:
+        return patched
+    from src.persistence.artifact_store import ArtifactStore as artifact_store_class
+
+    return artifact_store_class
+
+
+def _team_comparison_attr(name: str) -> Any:
+    from . import team_comparison
+
+    return getattr(team_comparison, name)
+
+
+def _build_team_comparison_dataframe(*args, **kwargs):
+    return _team_comparison_attr("_build_team_comparison_dataframe")(*args, **kwargs)
+
+
+def _coerce_unit_metric(*args, **kwargs):
+    return _team_comparison_attr("_coerce_unit_metric")(*args, **kwargs)
+
+
+def _collect_profile_names(*args, **kwargs):
+    return _team_comparison_attr("_collect_profile_names")(*args, **kwargs)
+
+
+def _default_team_selection(*args, **kwargs):
+    return _team_comparison_attr("_default_team_selection")(*args, **kwargs)
+
+
+def _hex_to_rgba(*args, **kwargs):
+    return _team_comparison_attr("_hex_to_rgba")(*args, **kwargs)
+
+
+def _load_team_characteristics_payload(*args, **kwargs):
+    return _team_comparison_attr("_load_team_characteristics_payload")(*args, **kwargs)
+
+
+def _render_team_comparison_section(*args, **kwargs):
+    return _team_comparison_attr("_render_team_comparison_section")(*args, **kwargs)
+
+
+def _resolve_profile_metrics(*args, **kwargs):
+    return _team_comparison_attr("_resolve_profile_metrics")(*args, **kwargs)
+
+
+def _team_brand_color(*args, **kwargs):
+    return _team_comparison_attr("_team_brand_color")(*args, **kwargs)
+
+
+def display_prediction_result(*args, **kwargs):
+    from .rendering import display_prediction_result as _display_prediction_result
+
+    return _display_prediction_result(*args, **kwargs)
+
+
+def render_notice_banner(*args, **kwargs):
+    from .rendering import render_notice_banner as _render_notice_banner
+
+    return _render_notice_banner(*args, **kwargs)
+
+
+def render_page_hero_deck(*args, **kwargs):
+    from .rendering import render_page_hero_deck as _render_page_hero_deck
+
+    return _render_page_hero_deck(*args, **kwargs)
+
+
+def render_prediction_hero_deck(*args, **kwargs):
+    from .rendering import render_prediction_hero_deck as _render_prediction_hero_deck
+
+    return _render_prediction_hero_deck(*args, **kwargs)
+
+
+def _run_prediction(*args, **kwargs):
+    from .prediction_flow import run_prediction
+
+    return run_prediction(*args, **kwargs)
 
 
 def _available_seasons() -> list[int]:
@@ -237,7 +305,7 @@ def _load_race_options_cached(year: int) -> tuple[list[str], str | None]:
         return options
 
     try:
-        schedule = fastf1.get_event_schedule(year)
+        schedule = _fastf1_module().get_event_schedule(year)
         race_rows: list[tuple[str, str]] = []
         if "EventName" in schedule.columns and "EventFormat" in schedule.columns:
             for _, event in schedule.iterrows():
@@ -285,6 +353,19 @@ def _load_race_options(year: int = DEFAULT_SEASON) -> list[str]:
     return race_options
 
 
+def _load_local_race_options(year: int = DEFAULT_SEASON) -> list[str]:
+    """Load race options from local fallback data without touching FastF1."""
+    options: list[str] = []
+    for race_name, event_format in get_fallback_schedule_rows(year):
+        if not race_name or "testing" in race_name.lower():
+            continue
+        if "sprint" in str(event_format).lower():
+            options.append(f"{race_name} (Sprint)")
+        else:
+            options.append(race_name)
+    return options
+
+
 def _parse_refresh_timestamp(value: Any) -> datetime | None:
     """Parse a persisted refresh timestamp into UTC when possible."""
     return _prediction_horizon.parse_refresh_timestamp(value)
@@ -330,7 +411,7 @@ def _load_completed_races_count(year: int) -> int | None:
     """Read the completed Grand Prix race count from the active car artifact."""
     season_year = int(year)
     try:
-        payload = ArtifactStore(data_root="data").load_artifact(
+        payload = _artifact_store_class()(data_root="data").load_artifact(
             "car_characteristics",
             f"{season_year}::car_characteristics",
         )
@@ -370,7 +451,7 @@ def _load_schedule_event_rows_cached(year: int) -> tuple[tuple[str, str, str], .
     """Load cached schedule rows with serialized event dates for horizon filtering."""
     return _prediction_horizon.load_schedule_event_rows(
         year,
-        get_event_schedule_fn=fastf1.get_event_schedule,
+        get_event_schedule_fn=_fastf1_module().get_event_schedule,
         fallback_schedule_rows_fn=get_schedule_rows,
         logger=logger,
     )
@@ -388,6 +469,8 @@ def _resolve_dashboard_race_horizon(year: int, horizon_races: int) -> list[str]:
 def _current_anchor_boundary_signature(year: int, anchor_race_name: str) -> str | None:
     """Return the live boundary signature for the anchor race, if available."""
     from src.utils.session_detector import SessionDetector
+
+    from .update_flow import boundary_signature, build_event_boundary_snapshot
 
     return _prediction_horizon.current_anchor_boundary_signature(
         year,
@@ -455,13 +538,18 @@ def _filter_race_options_to_precomputed_horizon(
     *,
     year: int,
     race_options: list[str],
+    validate_live_boundary: bool = True,
 ) -> tuple[list[str], dict[str, Any]]:
     """Filter race options to the warmed horizon for the active artifact state."""
     return _prediction_horizon.filter_race_options_to_precomputed_horizon(
         year=year,
         race_options=race_options,
         get_prediction_precompute_config_fn=get_prediction_precompute_config,
-        resolve_dashboard_race_horizon_fn=_resolve_dashboard_race_horizon,
+        resolve_dashboard_race_horizon_fn=(
+            _resolve_dashboard_race_horizon
+            if validate_live_boundary
+            else lambda _year, _horizon: []
+        ),
         get_artifact_versions_fn=get_artifact_versions,
         compute_artifact_hash_fn=compute_artifact_hash,
         load_precompute_horizon_index_fn=load_precompute_horizon_index,
@@ -469,7 +557,29 @@ def _filter_race_options_to_precomputed_horizon(
         load_ready_races_from_current_store_fn=_load_ready_races_from_current_store,
         current_anchor_boundary_signature_fn=_current_anchor_boundary_signature,
         logger=logger,
+        validate_live_boundary=validate_live_boundary,
     )
+
+
+def _filter_race_options_for_initial_render(
+    *,
+    year: int,
+    race_options: list[str],
+) -> tuple[list[str], dict[str, Any]]:
+    """Fast initial-render wrapper that tolerates legacy monkeypatch signatures."""
+    try:
+        return _filter_race_options_to_precomputed_horizon(
+            year=year,
+            race_options=race_options,
+            validate_live_boundary=False,
+        )
+    except TypeError as exc:
+        if "validate_live_boundary" not in str(exc):
+            raise
+        return _filter_race_options_to_precomputed_horizon(
+            year=year,
+            race_options=race_options,
+        )
 
 
 def _prediction_action_state(
@@ -573,6 +683,12 @@ def execute_live_prediction_pipeline(
         force_refresh: Legacy compatibility flag. Manual request-path refresh is disabled.
         progress_callback: Optional callback for progress updates
     """
+    from .update_flow import (
+        auto_update_if_needed,
+        auto_update_practice_characteristics_if_needed,
+        detect_event_boundary_refresh_if_needed,
+    )
+
     return _execute_live_prediction_pipeline_core(
         race_name=race_name,
         weather=weather,
@@ -587,7 +703,7 @@ def execute_live_prediction_pipeline(
         clear_resource_cache_fn=st.cache_resource.clear,
         clear_data_cache_fn=st.cache_data.clear,
         get_artifact_versions_fn=get_artifact_versions,
-        run_prediction_fn=run_prediction,
+        run_prediction_fn=_run_prediction,
     )
 
 
@@ -708,8 +824,8 @@ def render_live_prediction_page(enable_logging: bool) -> None:
         )
     _set_selected_season(selected_season)
 
-    race_options = _load_race_options(selected_season)
-    race_options, precompute_filter_meta = _filter_race_options_to_precomputed_horizon(
+    race_options = _load_local_race_options(selected_season) or _load_race_options(selected_season)
+    race_options, precompute_filter_meta = _filter_race_options_for_initial_render(
         year=selected_season,
         race_options=race_options,
     )
@@ -720,11 +836,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
 
     with control_col3:
         weather = st.selectbox("Weather", ["dry", "rain", "mixed"])
-    selected_race_prediction_available = _selected_race_persisted_prediction_available(
-        year=selected_season,
-        race_name=race_name,
-        weather=weather,
-    )
+    selected_race_prediction_available = False
 
     selected_weekend_label = (
         "Sprint weekend" if race_selection.endswith("(Sprint)") else "Race weekend"
@@ -993,6 +1105,13 @@ def _render_accuracy_page_controls() -> tuple[int, bool]:
 
 def render_prediction_accuracy_page() -> None:
     """Render the target-aware accuracy dashboard."""
+    from .accuracy_view import (
+        METRIC_OPTIONS,
+        render_overall_accuracy_metrics,
+        render_saved_predictions_summary,
+        render_target_sections,
+    )
+
     selected_season = _get_selected_season()
     render_page_hero_deck(
         title="Prediction Accuracy Tracker",
@@ -1093,6 +1212,8 @@ def render_prediction_accuracy_page() -> None:
 
 def render_checkpoint_viewer_page() -> None:
     """Render a dedicated browser for saved checkpoint artifacts."""
+    from .accuracy_view import render_saved_prediction_viewer
+
     selected_season = _get_selected_season()
     render_page_hero_deck(
         title="Checkpoint Viewer",
