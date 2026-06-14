@@ -428,9 +428,11 @@ def test_resolve_track_temperature_profile_skips_fastf1_when_session_weather_dis
     with (
         patch(
             "src.data.track_data_loader._cfg_get",
-            side_effect=lambda key, default=None: False
-            if key == "baseline_predictor.race.track_temperature.session_weather_enabled"
-            else default,
+            side_effect=lambda key, default=None: (
+                False
+                if key == "baseline_predictor.race.track_temperature.session_weather_enabled"
+                else default
+            ),
         ),
         patch("src.data.track_data_loader.fastf1.get_event") as get_event,
     ):
@@ -589,9 +591,11 @@ def test_resolve_non_competitive_weather_features_skips_fastf1_when_disabled():
     with (
         patch(
             "src.data.track_data_loader._cfg_get",
-            side_effect=lambda key, default=None: False
-            if key == "baseline_predictor.race.weather_features.session_weather_enabled"
-            else default,
+            side_effect=lambda key, default=None: (
+                False
+                if key == "baseline_predictor.race.weather_features.session_weather_enabled"
+                else default
+            ),
         ),
         patch("src.data.track_data_loader.fastf1.get_event") as get_event,
     ):

@@ -9,15 +9,34 @@ repos:
         exclude: ^notebooks/
   - repo: local
     hooks:
-      - id: mypy-src
-        name: mypy (GitHub lint parity)
-        entry: .venv/bin/mypy --no-incremental src
+      - id: github-lint
+        name: ruff check (GitHub lint parity)
+        entry: ruff check src tests scripts app.py predict_weekend.py
+        language: system
+        pass_filenames: false
+        require_serial: true
+      - id: github-format-check
+        name: ruff format --check (GitHub lint parity)
+        entry: ruff format --check src tests scripts app.py predict_weekend.py
+        language: system
+        pass_filenames: false
+        require_serial: true
+      - id: github-typecheck
+        name: mypy src (GitHub lint parity)
+        entry: mypy src
         language: system
         pass_filenames: false
         require_serial: true
       - id: pytest-github-smoke
         name: pytest (GitHub smoke parity)
-        entry: make test-github-smoke
+        entry: pytest tests/test_prediction_regression.py tests/test_backtesting.py tests/test_backtest_review_packet.py tests/test_prediction_context_runtime.py tests/test_generate_evaluation_report.py tests/test_race_grid_blending.py -q
         language: system
         pass_filenames: false
         require_serial: true
+      - id: pytest-github-full
+        name: pytest (GitHub full parity, manual)
+        entry: pytest tests/ -v --cov=src --cov-report=xml --cov-report=term
+        language: system
+        pass_filenames: false
+        require_serial: true
+        stages: [manual]
