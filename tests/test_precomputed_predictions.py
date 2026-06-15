@@ -11,6 +11,7 @@ def test_get_prediction_precompute_config_includes_accuracy_reconcile_settings(p
         "dashboard.prediction_precompute.horizon_races": 2,
         "dashboard.prediction_precompute.weather_scenarios": ["dry"],
         "dashboard.prediction_precompute.max_file_entries": 128,
+        "dashboard.prediction_precompute.learn_completed_races_before_warmup": True,
         "dashboard.prediction_precompute.reconcile_accuracy_after_warmup": True,
         "dashboard.prediction_precompute.accuracy_reconcile_lookback_days": 6,
         "dashboard.prediction_precompute.qualifying_n_simulations": 40,
@@ -21,6 +22,7 @@ def test_get_prediction_precompute_config_includes_accuracy_reconcile_settings(p
     config = store.get_prediction_precompute_config()
 
     assert config["reconcile_accuracy_after_warmup"] is True
+    assert config["learn_completed_races_before_warmup"] is True
     assert config["accuracy_reconcile_lookback_days"] == 6
 
 

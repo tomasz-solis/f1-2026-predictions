@@ -22,9 +22,11 @@ from src.utils.model_version import get_model_version
 
 PredictionResults = dict[str, Any]
 logger = logging.getLogger(__name__)
+# ``Q`` is valid for race-only forecasts after qualifying; the qualifying target
+# itself is closed by the target-eligibility table.
 _NON_COMPETITIVE_PREDICTION_CHECKPOINTS = {
-    False: ("PRE", "FP1", "FP2", "FP3"),
-    True: ("PRE", "FP1", "SQ"),
+    False: ("PRE", "FP1", "FP2", "FP3", "Q"),
+    True: ("PRE", "FP1", "SQ", "Q"),
 }
 _CHECKPOINT_ORDER = {
     "PRE": 0,

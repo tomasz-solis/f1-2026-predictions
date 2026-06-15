@@ -3,7 +3,7 @@
 from src.dashboard import prediction_checkpointing
 
 
-def test_prediction_payload_for_session_clamps_late_sprint_sessions_to_sq_outputs():
+def test_prediction_payload_for_session_uses_main_outputs_after_sprint_weekend_q():
     prediction_results = {
         "sprint_quali": {"grid": [{"position": 1, "driver": "NOR", "team": "McLaren"}]},
         "sprint_race": {"finish_order": [{"position": 1, "driver": "NOR", "team": "McLaren"}]},
@@ -16,6 +16,27 @@ def test_prediction_payload_for_session_clamps_late_sprint_sessions_to_sq_output
             prediction_results=prediction_results,
             is_sprint=True,
             session_name="Q",
+        )
+    )
+
+    assert qualifying_grid == prediction_results["main_quali"]["grid"]
+    assert race_finish == prediction_results["main_race"]["finish_order"]
+    assert fp_blend_info == {}
+
+
+def test_prediction_payload_for_session_clamps_sprint_race_to_sq_outputs():
+    prediction_results = {
+        "sprint_quali": {"grid": [{"position": 1, "driver": "NOR", "team": "McLaren"}]},
+        "sprint_race": {"finish_order": [{"position": 1, "driver": "NOR", "team": "McLaren"}]},
+        "main_quali": {"grid": [{"position": 1, "driver": "VER", "team": "Red Bull"}]},
+        "main_race": {"finish_order": [{"position": 1, "driver": "VER", "team": "Red Bull"}]},
+    }
+
+    qualifying_grid, race_finish, fp_blend_info = (
+        prediction_checkpointing.prediction_payload_for_session(
+            prediction_results=prediction_results,
+            is_sprint=True,
+            session_name="Sprint",
         )
     )
 
@@ -45,7 +66,7 @@ def test_prediction_targets_for_checkpoint_excludes_actual_targets():
     assert set(targets) == {"grand_prix_race"}
 
 
-def test_save_prediction_if_enabled_core_prefers_prediction_context_boundary_over_override():
+def test_save_prediction_if_enabled_core_prefers_post_quali_boundary_over_override():
     class _Logger:
         def __init__(self) -> None:
             self.saved_session_name: str | None = None
@@ -102,4 +123,4 @@ def test_save_prediction_if_enabled_core_prefers_prediction_context_boundary_ove
         checkpoint_session_override="SPRINT",
     )
 
-    assert logger_instance.saved_session_name == "SQ"
+    assert logger_instance.saved_session_name == "Q"

@@ -53,6 +53,7 @@ from src.utils.race_input_confidence import cap_predicted_main_race_input_confid
 from src.utils.session_detector import SessionDetector
 from src.utils.weekend import is_sprint_weekend
 
+from . import prediction_horizon as _prediction_horizon
 from . import warmup_prediction_builders as _warmup_prediction_builders
 
 logger = logging.getLogger(__name__)
@@ -123,6 +124,8 @@ class WarmupSummary:
     practice_teams_updated: int = 0
     practice_retried_events: list[str] = field(default_factory=list)
     practice_deferred_sessions: list[str] = field(default_factory=list)
+    race_learning_updated: int = 0
+    race_learning_pending: list[str] = field(default_factory=list)
     reconciled_actuals: list[str] = field(default_factory=list)
     accuracy_snapshots: int = 0
     errors: list[str] = field(default_factory=list)
@@ -152,6 +155,8 @@ class WarmupSummary:
             "practice_teams_updated": int(self.practice_teams_updated),
             "practice_retried_events": list(self.practice_retried_events),
             "practice_deferred_sessions": list(self.practice_deferred_sessions),
+            "race_learning_updated": int(self.race_learning_updated),
+            "race_learning_pending": list(self.race_learning_pending),
             "reconciled_actuals": list(self.reconciled_actuals),
             "accuracy_snapshots": int(self.accuracy_snapshots),
             "errors": list(self.errors),
@@ -226,7 +231,7 @@ def _normalize_weather_scenarios(raw_weather: Any) -> list[str]:
 def _resolve_warmup_targets(
     year: int, *, now_utc: datetime, horizon_races: int
 ) -> WarmupTargets | None:
-    """Find anchor race (next upcoming) and horizon races from the current schedule."""
+    """Find anchor race and horizon races from the current race-window schedule."""
     try:
         schedule = fastf1.get_event_schedule(year)
     except _WARMUP_ERRORS as exc:
@@ -239,17 +244,17 @@ def _resolve_warmup_targets(
         event_format = str(event.get("EventFormat", "")).strip()
         if not _is_competitive_event(event_name, event_format):
             continue
-        event_date = _coerce_utc_datetime(event.get("EventDate"))
-        if event_date is None:
+        event_cutoff = _prediction_horizon.race_window_cutoff_datetime(event)
+        if event_cutoff is None:
             continue
-        events.append((event_name, event_format, event_date))
+        events.append((event_name, event_format, event_cutoff))
 
     if not events:
         return None
 
     anchor_index: int | None = None
-    for index, (_, _, event_date) in enumerate(events):
-        if event_date >= now_utc:
+    for index, (_, _, event_cutoff) in enumerate(events):
+        if event_cutoff >= now_utc:
             anchor_index = index
             break
     if anchor_index is None:
@@ -272,8 +277,8 @@ def _resolve_warmup_targets(
 def _checkpoint_sessions(is_sprint: bool) -> tuple[tuple[str, str], ...]:
     """Return checkpoint and FastF1 session bindings for the weekend type."""
     if is_sprint:
-        return (("FP1", "FP1"), ("SQ", "SQ"))
-    return (("FP1", "FP1"), ("FP2", "FP2"), ("FP3", "FP3"))
+        return (("FP1", "FP1"), ("SQ", "SQ"), ("Sprint", "Sprint"), ("Q", "Q"), ("R", "R"))
+    return (("FP1", "FP1"), ("FP2", "FP2"), ("FP3", "FP3"), ("Q", "Q"), ("R", "R"))
 
 
 def _resolve_checkpoint_context(
@@ -582,6 +587,45 @@ class _WarmupRunState:
     race_boundaries: dict[str, str] = field(default_factory=dict)
     race_weather_coverage: dict[str, set[str]] = field(default_factory=dict)
     max_file_entries: int = 2048
+
+
+def _stage_learn_completed_races(ctx: _WarmupRunState) -> None:
+    """Stage 0: learn from completed races before hashing prediction artifacts."""
+    if ctx.dry_run:
+        return
+    if not bool(ctx.settings.get("learn_completed_races_before_warmup", False)):
+        return
+
+    from src.utils.auto_updater import auto_update_from_races, needs_update
+
+    needs_update_flag, new_races = needs_update(year=ctx.year)
+    if not needs_update_flag:
+        return
+
+    normalized_new_races = [str(race).strip() for race in new_races if str(race).strip()]
+    if not normalized_new_races:
+        return
+
+    updated_count = auto_update_from_races(races_to_update=normalized_new_races, year=ctx.year)
+    ctx.summary.race_learning_updated += int(updated_count)
+    if int(updated_count) >= len(normalized_new_races):
+        return
+
+    remaining_races = list(normalized_new_races)
+    try:
+        still_pending, pending_after_update = needs_update(year=ctx.year)
+        if still_pending:
+            remaining_races = [
+                str(race).strip() for race in pending_after_update if str(race).strip()
+            ]
+    except _WARMUP_ERRORS as exc:
+        logger.warning("Could not re-check race-learning state after partial update: %s", exc)
+
+    ctx.summary.race_learning_pending = remaining_races
+    ctx.summary.errors.append(
+        "race_learning: "
+        f"updated {int(updated_count)} of {len(normalized_new_races)} completed race(s)"
+    )
 
 
 def _stage_refresh_practice(ctx: _WarmupRunState) -> None:
@@ -1034,6 +1078,8 @@ def run_warmup_precompute_cycle(
 
     Delegates to five stage functions in order:
 
+    0. ``_stage_learn_completed_races`` - apply completed race learning before
+       artifact hashing, when enabled.
     1. ``_stage_refresh_practice`` - pull completed FP sessions and update
        car characteristics for the anchor race.
     2. ``_stage_load_predictor`` - resolve artifact hash and load the baseline
@@ -1159,6 +1205,15 @@ def run_warmup_precompute_cycle(
     )
 
     try:
+        _stage_learn_completed_races(ctx)
+        if summary.race_learning_pending:
+            summary.status = "not_ready"
+            summary.reason = "race_learning_pending"
+            logger.info(
+                "Warmup skipped until completed race learning catches up: %s",
+                summary.race_learning_pending,
+            )
+            return summary
         _stage_refresh_practice(ctx)
         _stage_load_predictor(ctx)
         _stage_compute_predictions(ctx)

@@ -70,11 +70,11 @@ def _build_normal_weekend_predictor() -> MagicMock:
         ),
         pytest.param(
             "Q",
-            (TARGET_MAIN_QUALIFYING, TARGET_GRAND_PRIX_RACE),
-            "PREDICTED",
-            "PREDICTED",
-            True,
-            id="q-clamped-to-fp3",
+            (TARGET_GRAND_PRIX_RACE,),
+            "ACTUAL",
+            "ACTUAL",
+            False,
+            id="post-quali-race",
         ),
     ],
 )

@@ -76,6 +76,7 @@ def test_validate_config_accepts_default_yaml():
         == pytest.approx(0.55)
     )
     assert validated.dashboard.prediction_precompute.reconcile_accuracy_after_warmup is True
+    assert validated.dashboard.prediction_precompute.learn_completed_races_before_warmup is True
     assert validated.dashboard.prediction_precompute.accuracy_reconcile_lookback_days == 14
 
 

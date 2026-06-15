@@ -47,7 +47,7 @@ def _prediction_store_key(
 
 
 class _IntegrationPredictor:
-    """Minimal predictor that turns a predicted FP3 grid into a stable race payload."""
+    """Minimal predictor that turns a starting grid into a stable race payload."""
 
     def predict_qualifying(
         self,
@@ -61,7 +61,7 @@ class _IntegrationPredictor:
     ) -> dict[str, Any]:
         """Return one deterministic qualifying prediction for the integration path."""
         del year, race_name, qualifying_stage, n_simulations, practice_signal_mode
-        assert checkpoint_session_name == "FP3"
+        assert checkpoint_session_name == "Q"
         return {
             "grid": [
                 {"position": 1, "driver": "RUS", "team": "Mercedes"},
@@ -124,8 +124,16 @@ def test_warmup_cycle_persists_payload_that_dashboard_serves(monkeypatch):
         race_name: str,
         session_name: str,
     ) -> tuple[list[dict[str, Any]] | None, str]:
-        """Leave Q and R unresolved so the warmup path stays on the FP3 checkpoint."""
-        del year, race_name, session_name
+        """Resolve Q but leave R unresolved so the path is a post-quali race forecast."""
+        del year, race_name
+        if session_name == "Q":
+            return (
+                [
+                    {"position": 1, "driver": "RUS", "team": "Mercedes"},
+                    {"position": 2, "driver": "LEC", "team": "Ferrari"},
+                ],
+                "ACTUAL",
+            )
         return None, "INCOMPLETE"
 
     def _load_base_features(**kwargs: Any) -> dict[str, Any] | None:
@@ -230,10 +238,11 @@ def test_warmup_cycle_persists_payload_that_dashboard_serves(monkeypatch):
             boundary_signature=boundary_signature,
         )
     ]
-    assert warmed_prediction["qualifying"]["grid_source"] == "PREDICTED"
+    assert warmed_prediction["qualifying"]["grid_source"] == "ACTUAL"
+    assert warmed_prediction["qualifying"]["result_mode"] == "ACTUAL"
     assert warmed_prediction["qualifying"]["grid"][0]["driver"] == "RUS"
-    assert warmed_prediction["race"]["grid_source"] == "PREDICTED"
-    assert warmed_prediction["race"]["input_confidence"] == 0.95
+    assert warmed_prediction["race"]["grid_source"] == "ACTUAL"
+    assert warmed_prediction["race"]["input_confidence"] == 1.0
 
     live_prediction_flow.clear_prediction_result_cache()
     progress_messages: list[str] = []
@@ -291,7 +300,7 @@ def test_warmup_cycle_persists_payload_that_dashboard_serves(monkeypatch):
     )
 
     assert output["prediction_results"] == warmed_prediction
-    assert output["boundary_session_name"] == "FP3"
+    assert output["boundary_session_name"] == "Q"
     assert output["precompute_summary"]["ready_races"] == [race_name]
     assert output["prediction_cache_hit"] is False
     assert progress_messages[-1] == "Loaded persisted prediction..."
@@ -305,4 +314,4 @@ def test_warmup_cycle_persists_payload_that_dashboard_serves(monkeypatch):
     assert served_prediction["race"]["finish_order"][0]["position"] == 1
     assert served_prediction["race"]["finish_order"][0]["driver"] == "RUS"
     assert served_prediction["race"]["finish_order"][0]["confidence"] == 78.4
-    assert served_prediction["race"]["input_confidence"] == 0.95
+    assert served_prediction["race"]["input_confidence"] == 1.0

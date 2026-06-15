@@ -192,6 +192,7 @@ class DashboardPredictionPrecomputeConfig(StrictConfigModel):
     max_file_entries: int = Field(default=2048, ge=1)
     qualifying_n_simulations: int = Field(default=300, ge=1)
     race_n_simulations: int = Field(default=300, ge=1)
+    learn_completed_races_before_warmup: bool = True
     reconcile_accuracy_after_warmup: bool = True
     accuracy_reconcile_lookback_days: int = Field(default=14, ge=1)
 

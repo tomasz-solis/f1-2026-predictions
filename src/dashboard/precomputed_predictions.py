@@ -175,6 +175,12 @@ def get_prediction_precompute_config() -> dict[str, Any]:
         "horizon_races": horizon_races,
         "weather_scenarios": weather_scenarios,
         "max_file_entries": max_file_entries,
+        "learn_completed_races_before_warmup": bool(
+            config_loader.get(
+                "dashboard.prediction_precompute.learn_completed_races_before_warmup",
+                True,
+            )
+        ),
         "reconcile_accuracy_after_warmup": bool(
             config_loader.get(
                 "dashboard.prediction_precompute.reconcile_accuracy_after_warmup",

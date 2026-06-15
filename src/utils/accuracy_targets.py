@@ -47,11 +47,11 @@ CHECKPOINT_ORDER = {
 }
 TARGET_CHECKPOINTS = {
     ("normal", TARGET_MAIN_QUALIFYING): ("PRE", "FP1", "FP2", "FP3"),
-    ("normal", TARGET_GRAND_PRIX_RACE): ("PRE", "FP1", "FP2", "FP3"),
+    ("normal", TARGET_GRAND_PRIX_RACE): ("PRE", "FP1", "FP2", "FP3", "Q"),
     ("sprint", TARGET_SPRINT_QUALIFYING): ("PRE", "FP1"),
     ("sprint", TARGET_SPRINT_RACE): ("PRE", "FP1", "SQ"),
     ("sprint", TARGET_MAIN_QUALIFYING): ("PRE", "FP1", "SQ"),
-    ("sprint", TARGET_GRAND_PRIX_RACE): ("PRE", "FP1", "SQ"),
+    ("sprint", TARGET_GRAND_PRIX_RACE): ("PRE", "FP1", "SQ", "Q"),
 }
 _EVENT_BOUNDARY_STATE_PATH = resolve_repo_data_path(
     "data/systems/event_boundary_refresh_state.json"

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from collections.abc import Mapping
+from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 
+_RACE_SESSION_POST_START_HOLD = timedelta(hours=4)
 _LOOKUP_ERRORS = (
     AttributeError,
     KeyError,
@@ -15,6 +17,65 @@ _LOOKUP_ERRORS = (
     TypeError,
     ValueError,
 )
+
+
+def _event_value(event: Any, key: str) -> Any:
+    """Read a value from a schedule row without depending on a concrete row type."""
+    if isinstance(event, Mapping):
+        return event.get(key)
+    get_method = getattr(event, "get", None)
+    if callable(get_method):
+        try:
+            return get_method(key)
+        except (AttributeError, KeyError, TypeError, ValueError):
+            return None
+    try:
+        return event[key]
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return None
+
+
+def _coerce_utc_datetime(value: Any) -> datetime | None:
+    """Normalize schedule datetime-like values to UTC-aware datetimes."""
+    if value is None:
+        return None
+
+    candidate = value
+    if hasattr(candidate, "to_pydatetime"):
+        try:
+            candidate = candidate.to_pydatetime()
+        except (AttributeError, TypeError, ValueError):
+            return None
+
+    if not isinstance(candidate, datetime):
+        return None
+
+    if candidate.tzinfo is None:
+        return candidate.replace(tzinfo=UTC)
+
+    return candidate.astimezone(UTC)
+
+
+def race_window_cutoff_datetime(event: Any) -> datetime | None:
+    """
+    Return the timestamp after which a schedule row can stop anchoring the dashboard.
+
+    FastF1 ``EventDate`` is often midnight on race day. Using it directly advances
+    the dashboard to the next GP before the race has even started, so prefer the
+    scheduled race session and hold through the plausible race/result window.
+    """
+    for session_key in ("Session5DateUtc", "Session5Date"):
+        session_start = _coerce_utc_datetime(_event_value(event, session_key))
+        if session_start is not None:
+            return session_start + _RACE_SESSION_POST_START_HOLD
+
+    event_date = _coerce_utc_datetime(_event_value(event, "EventDate"))
+    if event_date is None:
+        return None
+
+    if event_date.timetz().replace(tzinfo=None) == time.min:
+        return event_date + timedelta(days=1)
+    return event_date + _RACE_SESSION_POST_START_HOLD
 
 
 def parse_refresh_timestamp(value: Any) -> datetime | None:
@@ -109,7 +170,7 @@ def load_schedule_event_rows(
     fallback_schedule_rows_fn: Any,
     logger: logging.Logger,
 ) -> tuple[tuple[str, str, str], ...]:
-    """Load schedule rows with ISO-formatted event dates."""
+    """Load schedule rows with ISO-formatted race-window cutoff timestamps."""
     rows: list[tuple[str, str, str]] = []
 
     try:
@@ -120,21 +181,9 @@ def load_schedule_event_rows(
                 event_format = str(event.get("EventFormat", "")).strip()
                 if not event_name:
                     continue
-                event_date = event.get("EventDate")
-                if hasattr(event_date, "to_pydatetime"):
-                    try:
-                        event_date = event_date.to_pydatetime()
-                    except (AttributeError, TypeError, ValueError):
-                        event_date = None
-                if isinstance(event_date, datetime):
-                    if event_date.tzinfo is None:
-                        event_date = event_date.replace(tzinfo=UTC)
-                    else:
-                        event_date = event_date.astimezone(UTC)
-                    event_date_iso = event_date.isoformat()
-                else:
-                    event_date_iso = ""
-                rows.append((event_name, event_format, event_date_iso))
+                event_cutoff = race_window_cutoff_datetime(event)
+                event_cutoff_iso = event_cutoff.isoformat() if event_cutoff else ""
+                rows.append((event_name, event_format, event_cutoff_iso))
     except _LOOKUP_ERRORS as exc:
         logger.warning("Could not load dated schedule rows for %s: %s", year, exc)
 
@@ -159,15 +208,15 @@ def resolve_dashboard_race_horizon(
         return []
 
     competitive_rows: list[tuple[str, datetime | None]] = []
-    for event_name, event_format, event_date_iso in schedule_rows:
+    for event_name, event_format, event_cutoff_iso in schedule_rows:
         normalized_name = str(event_name).strip()
         normalized_format = str(event_format).strip().lower()
         if not normalized_name:
             continue
         if "testing" in normalized_name.lower() or "testing" in normalized_format:
             continue
-        event_date: datetime | None = None
-        candidate = str(event_date_iso).strip()
+        event_cutoff: datetime | None = None
+        candidate = str(event_cutoff_iso).strip()
         if candidate:
             try:
                 parsed = datetime.fromisoformat(candidate)
@@ -175,10 +224,10 @@ def resolve_dashboard_race_horizon(
                 parsed = None
             if parsed is not None:
                 if parsed.tzinfo is None:
-                    event_date = parsed.replace(tzinfo=UTC)
+                    event_cutoff = parsed.replace(tzinfo=UTC)
                 else:
-                    event_date = parsed.astimezone(UTC)
-        competitive_rows.append((normalized_name, event_date))
+                    event_cutoff = parsed.astimezone(UTC)
+        competitive_rows.append((normalized_name, event_cutoff))
 
     if not competitive_rows:
         return []
@@ -186,10 +235,10 @@ def resolve_dashboard_race_horizon(
     horizon_size = max(1, int(horizon_races))
     current_time = now_utc or datetime.now(UTC)
     anchor_index: int | None = None
-    for index, (_race_name, event_date) in enumerate(competitive_rows):
-        if event_date is None:
+    for index, (_race_name, event_cutoff) in enumerate(competitive_rows):
+        if event_cutoff is None:
             continue
-        if event_date >= current_time:
+        if event_cutoff >= current_time:
             anchor_index = index
             break
 
@@ -198,7 +247,9 @@ def resolve_dashboard_race_horizon(
 
     return [
         race_name
-        for race_name, _event_date in competitive_rows[anchor_index : anchor_index + horizon_size]
+        for race_name, _event_cutoff in competitive_rows[
+            anchor_index : anchor_index + horizon_size
+        ]
     ]
 
 

@@ -151,6 +151,7 @@ dashboard:
     max_file_entries: 2048
     qualifying_n_simulations: 300
     race_n_simulations: 300
+    learn_completed_races_before_warmup: true
     reconcile_accuracy_after_warmup: true
     accuracy_reconcile_lookback_days: 14
 

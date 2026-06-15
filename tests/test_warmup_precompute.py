@@ -1,10 +1,63 @@
 """Tests for background warmup precompute orchestration."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
+import pandas as pd
 import pytest
 
 from src.dashboard import warmup
+
+
+def test_resolve_warmup_targets_keeps_current_gp_until_race_window_closes(patcher):
+    now_utc = datetime(2026, 6, 14, 10, 0, tzinfo=UTC)
+    barcelona_race_start = datetime(2026, 6, 14, 13, 0, tzinfo=UTC)
+    austria_race_start = datetime(2026, 6, 28, 13, 0, tzinfo=UTC)
+    schedule = pd.DataFrame(
+        {
+            "EventName": ["Barcelona Grand Prix", "Austrian Grand Prix"],
+            "EventFormat": ["conventional", "conventional"],
+            "EventDate": [
+                datetime(2026, 6, 14, 0, 0, tzinfo=UTC),
+                datetime(2026, 6, 28, 0, 0, tzinfo=UTC),
+            ],
+            "Session5DateUtc": [barcelona_race_start, austria_race_start],
+        }
+    )
+    patcher.setattr(warmup.fastf1, "get_event_schedule", lambda year: schedule)
+
+    targets = warmup._resolve_warmup_targets(2026, now_utc=now_utc, horizon_races=2)
+
+    assert targets == warmup.WarmupTargets(
+        anchor_race_name="Barcelona Grand Prix",
+        anchor_is_sprint=False,
+        target_races=("Barcelona Grand Prix", "Austrian Grand Prix"),
+    )
+
+
+def test_resolve_warmup_targets_advances_after_race_window_closes(patcher):
+    now_utc = datetime(2026, 6, 14, 18, 0, tzinfo=UTC)
+    barcelona_race_start = now_utc - timedelta(hours=5)
+    austria_race_start = datetime(2026, 6, 28, 13, 0, tzinfo=UTC)
+    schedule = pd.DataFrame(
+        {
+            "EventName": ["Barcelona Grand Prix", "Austrian Grand Prix"],
+            "EventFormat": ["conventional", "conventional"],
+            "EventDate": [
+                datetime(2026, 6, 14, 0, 0, tzinfo=UTC),
+                datetime(2026, 6, 28, 0, 0, tzinfo=UTC),
+            ],
+            "Session5DateUtc": [barcelona_race_start, austria_race_start],
+        }
+    )
+    patcher.setattr(warmup.fastf1, "get_event_schedule", lambda year: schedule)
+
+    targets = warmup._resolve_warmup_targets(2026, now_utc=now_utc, horizon_races=1)
+
+    assert targets == warmup.WarmupTargets(
+        anchor_race_name="Austrian Grand Prix",
+        anchor_is_sprint=False,
+        target_races=("Austrian Grand Prix",),
+    )
 
 
 def test_run_warmup_precompute_cycle_is_idempotent(patcher):
@@ -249,6 +302,162 @@ def test_run_warmup_precompute_cycle_refreshes_practice_before_hashing(patcher):
     assert result.practice_updated is True
     assert result.practice_completed_sessions == ["FP1"]
     assert result.practice_teams_updated == 10
+
+
+def test_run_warmup_precompute_cycle_learns_completed_races_before_hashing(patcher):
+    """Next-race PRE warmup should use artifacts updated from completed races."""
+    fixed_now = datetime(2026, 6, 15, 9, 0, tzinfo=UTC)
+    patcher.setattr(warmup, "should_write_to_db", lambda: False)
+    patcher.setattr(warmup, "_refresh_anchor_practice_characteristics", lambda **kwargs: {})
+    patcher.setattr(
+        warmup,
+        "get_prediction_precompute_config",
+        lambda: {
+            "enabled": True,
+            "horizon_races": 1,
+            "weather_scenarios": ["dry"],
+            "max_file_entries": 2048,
+            "learn_completed_races_before_warmup": True,
+        },
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_warmup_targets",
+        lambda year, now_utc, horizon_races: warmup.WarmupTargets(
+            anchor_race_name="Austrian Grand Prix",
+            anchor_is_sprint=False,
+            target_races=("Austrian Grand Prix",),
+        ),
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_checkpoint_context",
+        lambda year, race_name, is_sprint, now_utc, session_detector: warmup.CheckpointContext(
+            checkpoint="PRE",
+            expected_checkpoint="PRE",
+            latest_ready_checkpoint="PRE",
+            checkpoint_ready=True,
+            reason="ready",
+            boundary_signature="sig_pre",
+        ),
+    )
+    patcher.setattr(warmup, "is_sprint_weekend", lambda year, race_name: False)
+
+    call_order: list[str] = []
+    artifact_versions = {"car_characteristics::2026::car_characteristics": (7, "before")}
+
+    def _auto_update_from_races(races_to_update=None, year=2026, progress_callback=None):
+        del progress_callback, year
+        call_order.append(f"learn:{','.join(races_to_update or [])}")
+        artifact_versions["car_characteristics::2026::car_characteristics"] = (8, "after")
+        return 1
+
+    patcher.setattr("src.utils.auto_updater.needs_update", lambda year=2026: (True, ["Barcelona Grand Prix"]))
+    patcher.setattr("src.utils.auto_updater.auto_update_from_races", _auto_update_from_races)
+    patcher.setattr(
+        warmup,
+        "get_artifact_versions",
+        lambda year=2026: (call_order.append("artifact_versions"), dict(artifact_versions))[1],
+    )
+    patcher.setattr(
+        warmup,
+        "compute_artifact_hash",
+        lambda versions: (
+            f"artifact_hash_v{versions['car_characteristics::2026::car_characteristics'][0]}"
+        ),
+    )
+    patcher.setattr(warmup, "_load_predictor", lambda artifact_versions, year: object())
+    patcher.setattr(warmup, "load_precomputed_base_features", lambda **kwargs: None)
+    patcher.setattr(warmup, "load_precomputed_prediction", lambda **kwargs: None)
+    patcher.setattr(
+        warmup,
+        "compute_base_features",
+        lambda *args, **kwargs: {
+            "is_sprint": False,
+            "qualifying": {"grid": [], "grid_source": "PREDICTED"},
+            "qualifying_grid_for_race": [],
+            "race_input_confidence": 0.7,
+            "timing": {"qualifying": 0.1},
+        },
+    )
+    saved_prediction_hashes: list[str] = []
+    patcher.setattr(
+        warmup,
+        "compute_weather_predictions",
+        lambda base_features, weather, predictor, year, target_race: {
+            "qualifying": {"grid": []},
+            "race": {"finish_order": []},
+        },
+    )
+    patcher.setattr(warmup, "save_precomputed_base_features", lambda **kwargs: None)
+    patcher.setattr(
+        warmup,
+        "save_precomputed_prediction",
+        lambda **kwargs: saved_prediction_hashes.append(str(kwargs["artifact_hash"])),
+    )
+    patcher.setattr(warmup, "save_precompute_horizon_index", lambda **kwargs: None)
+
+    result = warmup.run_warmup_precompute_cycle(2026, now_utc=fixed_now)
+
+    assert result.status == "success"
+    assert result.race_learning_updated == 1
+    assert call_order[:2] == ["learn:Barcelona Grand Prix", "artifact_versions"]
+    assert saved_prediction_hashes == ["artifact_hash_v8"]
+
+
+def test_run_warmup_precompute_cycle_waits_when_race_learning_is_pending(patcher):
+    """Warmup should not publish next-race PRE if completed-race learning failed."""
+    fixed_now = datetime(2026, 6, 15, 9, 0, tzinfo=UTC)
+    patcher.setattr(warmup, "should_write_to_db", lambda: False)
+    patcher.setattr(
+        warmup,
+        "get_prediction_precompute_config",
+        lambda: {
+            "enabled": True,
+            "horizon_races": 1,
+            "weather_scenarios": ["dry"],
+            "max_file_entries": 2048,
+            "learn_completed_races_before_warmup": True,
+        },
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_warmup_targets",
+        lambda year, now_utc, horizon_races: warmup.WarmupTargets(
+            anchor_race_name="Austrian Grand Prix",
+            anchor_is_sprint=False,
+            target_races=("Austrian Grand Prix",),
+        ),
+    )
+    patcher.setattr(
+        warmup,
+        "_resolve_checkpoint_context",
+        lambda year, race_name, is_sprint, now_utc, session_detector: warmup.CheckpointContext(
+            checkpoint="PRE",
+            expected_checkpoint="PRE",
+            latest_ready_checkpoint="PRE",
+            checkpoint_ready=True,
+            reason="ready",
+            boundary_signature="sig_pre",
+        ),
+    )
+    patcher.setattr("src.utils.auto_updater.needs_update", lambda year=2026: (True, ["Barcelona Grand Prix"]))
+    patcher.setattr(
+        "src.utils.auto_updater.auto_update_from_races",
+        lambda races_to_update=None, year=2026, progress_callback=None: 0,
+    )
+    patcher.setattr(
+        warmup,
+        "get_artifact_versions",
+        lambda year=2026: (_ for _ in ()).throw(AssertionError("Should not hash stale artifacts")),
+    )
+
+    result = warmup.run_warmup_precompute_cycle(2026, now_utc=fixed_now)
+
+    assert result.status == "not_ready"
+    assert result.reason == "race_learning_pending"
+    assert result.race_learning_updated == 0
+    assert result.race_learning_pending == ["Barcelona Grand Prix"]
 
 
 def test_run_warmup_precompute_cycle_reconciles_accuracy_when_enabled(patcher):
@@ -1036,8 +1245,8 @@ def test_run_warmup_precompute_cycle_returns_locked_when_another_worker_holds_lo
     assert result.reason == "another_worker_holds_lock"
 
 
-def test_compute_base_features_clamps_completed_q_to_fp3_prediction(patcher):
-    """Warmup base features should ignore completed Q data and keep the FP3 boundary."""
+def test_compute_base_features_uses_completed_q_as_race_input(patcher):
+    """Warmup base features should close qualifying and use actual Q for the race."""
 
     class _Predictor:
         def __init__(self):
@@ -1066,7 +1275,7 @@ def test_compute_base_features_clamps_completed_q_to_fp3_prediction(patcher):
         warmup,
         "fetch_grid_if_available",
         lambda *args, **kwargs: (_ for _ in ()).throw(
-            AssertionError("fetch_grid_if_available should not run after FP3")
+            AssertionError("fetch_grid_if_available should not run when Q actuals are resolved")
         ),
     )
 
@@ -1080,11 +1289,12 @@ def test_compute_base_features_clamps_completed_q_to_fp3_prediction(patcher):
         is_sprint=False,
     )
 
-    assert predictor.qualifying_kwargs is not None
-    assert predictor.qualifying_kwargs["checkpoint_session_name"] == "FP3"
-    assert result["qualifying"]["grid_source"] == "PREDICTED"
-    assert result["qualifying"]["grid"][0]["driver"] == "NOR"
-    assert result["race_input_confidence"] == pytest.approx(0.9)
+    assert predictor.qualifying_kwargs is None
+    assert result["qualifying"]["grid_source"] == "ACTUAL"
+    assert result["qualifying"]["result_mode"] == "ACTUAL"
+    assert result["qualifying"]["grid"][0]["driver"] == "RUS"
+    assert result["qualifying_grid_for_race"][0]["driver"] == "RUS"
+    assert result["race_input_confidence"] == pytest.approx(1.0)
 
 
 def test_compute_base_features_uses_stored_checkpoint_profiles_for_qualifying(patcher):
