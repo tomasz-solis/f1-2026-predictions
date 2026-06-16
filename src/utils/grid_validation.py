@@ -87,6 +87,21 @@ def validate_qualifying_grid(
                     "Grid percentile positions must satisfy p5 <= p95 "
                     f"(got p5={validated_entry['p5']}, p95={validated_entry['p95']})"
                 )
+            lower = int(validated_entry["p5"])
+            upper = int(validated_entry["p95"])
+            if "median_position" in validated_entry:
+                median_position = int(validated_entry["median_position"])
+                if not lower <= median_position <= upper:
+                    raise ValueError(
+                        "Grid median_position must lie inside p5-p95 interval "
+                        f"(got median_position={median_position}, p5={lower}, p95={upper})"
+                    )
+            final_position = int(validated_entry["position"])
+            if not lower <= final_position <= upper:
+                raise ValueError(
+                    "Grid position must lie inside p5-p95 interval "
+                    f"(got position={final_position}, p5={lower}, p95={upper})"
+                )
 
         if "confidence" in entry and entry["confidence"] is not None:
             try:

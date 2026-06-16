@@ -352,7 +352,9 @@ def test_run_warmup_precompute_cycle_learns_completed_races_before_hashing(patch
         artifact_versions["car_characteristics::2026::car_characteristics"] = (8, "after")
         return 1
 
-    patcher.setattr("src.utils.auto_updater.needs_update", lambda year=2026: (True, ["Barcelona Grand Prix"]))
+    patcher.setattr(
+        "src.utils.auto_updater.needs_update", lambda year=2026: (True, ["Barcelona Grand Prix"])
+    )
     patcher.setattr("src.utils.auto_updater.auto_update_from_races", _auto_update_from_races)
     patcher.setattr(
         warmup,
@@ -441,7 +443,9 @@ def test_run_warmup_precompute_cycle_waits_when_race_learning_is_pending(patcher
             boundary_signature="sig_pre",
         ),
     )
-    patcher.setattr("src.utils.auto_updater.needs_update", lambda year=2026: (True, ["Barcelona Grand Prix"]))
+    patcher.setattr(
+        "src.utils.auto_updater.needs_update", lambda year=2026: (True, ["Barcelona Grand Prix"])
+    )
     patcher.setattr(
         "src.utils.auto_updater.auto_update_from_races",
         lambda races_to_update=None, year=2026, progress_callback=None: 0,

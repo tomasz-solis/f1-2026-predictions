@@ -66,6 +66,17 @@ sessions are warmed quickly after the boundary flips:
 If you use multiple workers, keep the same cadence; warmup writes are idempotent.
 By default, each successful warmup also checks recently completed races and
 rebuilds prediction-accuracy snapshots when classified results are available.
+Warmup follows the same target-boundary policy as the live prediction flow:
+after qualifying completes, qualifying itself is no longer an open forecast, but
+the race forecast may use the actual qualifying classification as its grid input.
+
+Quality gates for release checks:
+
+```bash
+make evaluation-gate
+make candidate-audit
+make shadow-challenger-audit
+```
 
 ## Supabase/Render note
 

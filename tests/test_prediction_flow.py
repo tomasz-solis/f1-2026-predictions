@@ -280,7 +280,7 @@ def test_run_prediction_keeps_checkpoint_profile_confidence_penalty(patcher):
     assert mock_predictor.predict_race.call_args.kwargs["input_confidence"] == pytest.approx(0.8)
 
 
-def test_run_prediction_keeps_predicted_race_input_confidence_after_fp3(patcher):
+def test_run_prediction_keeps_predicted_race_input_confidence_when_q_incomplete(patcher):
     mock_predictor = MagicMock()
     mock_predictor.predict_qualifying.return_value = {
         "grid": [{"driver": "VER", "team": "Red Bull Racing", "position": 1}],
@@ -297,13 +297,14 @@ def test_run_prediction_keeps_predicted_race_input_confidence_after_fp3(patcher)
         "fetch_actual_competitive_results_if_completed",
         lambda year, race_name, session_name: (None, "INCOMPLETE"),
     )
-    patcher.setattr(
-        prediction_flow,
-        "fetch_grid_if_available",
-        lambda *args, **kwargs: (_ for _ in ()).throw(
-            AssertionError("fetch_grid_if_available should not run after FP3")
-        ),
-    )
+    grid_sessions: list[str] = []
+
+    def _fetch_grid(year: int, race_name: str, session_name: str, predicted_grid: list):
+        del year, race_name
+        grid_sessions.append(session_name)
+        return predicted_grid, "PREDICTED"
+
+    patcher.setattr(prediction_flow, "fetch_grid_if_available", _fetch_grid)
     patcher.setattr(
         prediction_flow,
         "_resolve_current_checkpoint_session",
@@ -313,6 +314,7 @@ def test_run_prediction_keeps_predicted_race_input_confidence_after_fp3(patcher)
     artifact_versions = {"car_characteristics::2026::car_characteristics": (1, "ts")}
     prediction_flow.run_prediction("Bahrain Grand Prix", "dry", artifact_versions, is_sprint=False)
 
+    assert grid_sessions == ["Q"]
     called_kwargs = mock_predictor.predict_race.call_args.kwargs
     assert called_kwargs["input_confidence"] == pytest.approx(0.85)
 
@@ -551,8 +553,8 @@ def test_run_prediction_accepts_real_baseline_predictor_signatures(patcher):
     assert calls["race"]["year"] == 2027
 
 
-def test_run_prediction_ignores_completed_q_results_and_stays_on_fp3(patcher):
-    """Completed Q results should not become inputs for fresh race predictions."""
+def test_run_prediction_uses_completed_q_results_for_post_q_race_input(patcher):
+    """After Q, the race target may use actual Q while the qualifying forecast is closed."""
     mock_predictor = MagicMock()
     mock_predictor.predict_qualifying.return_value = {
         "grid": [{"driver": "NOR", "team": "McLaren", "position": 1}],
@@ -599,18 +601,18 @@ def test_run_prediction_ignores_completed_q_results_and_stays_on_fp3(patcher):
         is_sprint=False,
     )
 
-    assert actual_calls == ["R"]
-    assert mock_predictor.predict_qualifying.call_count == 1
-    assert result["qualifying"]["grid_source"] == "PREDICTED"
-    assert result["qualifying"]["grid"][0]["driver"] == "NOR"
-    assert result["race"]["grid_source"] == "PREDICTED"
-    assert result["race"]["starting_grid"] == [{"driver": "NOR", "team": "McLaren", "position": 1}]
+    assert actual_calls == ["Q", "R"]
+    assert mock_predictor.predict_qualifying.call_count == 0
+    assert result["qualifying"]["grid_source"] == "ACTUAL"
+    assert result["qualifying"]["grid"][0]["driver"] == "RUS"
+    assert result["race"]["grid_source"] == "ACTUAL"
+    assert result["race"]["starting_grid"] == [{"driver": "RUS", "team": "Mercedes", "position": 1}]
     assert result["race"]["starting_session_name"] == "Q"
-    assert "starting_grid_note" not in result["race"]
+    assert "starting_grid_note" in result["race"]
     assert mock_predictor.predict_race.call_args.kwargs["qualifying_grid"] == [
-        {"driver": "NOR", "team": "McLaren", "position": 1}
+        {"driver": "RUS", "team": "Mercedes", "position": 1}
     ]
-    assert mock_predictor.predict_race.call_args.kwargs["input_confidence"] == pytest.approx(0.82)
+    assert mock_predictor.predict_race.call_args.kwargs["input_confidence"] == pytest.approx(1.0)
 
 
 def test_run_prediction_uses_actual_sprint_race_section_after_completion(patcher):

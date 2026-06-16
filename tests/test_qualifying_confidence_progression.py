@@ -145,6 +145,29 @@ def test_aggregate_grid_applies_learned_interval_radius_floor():
     assert by_driver["NOR"]["p95"] == 2
 
 
+def test_aggregate_grid_widens_intervals_to_include_final_tiebreak_rank():
+    predictor = _Predictor()
+    position_records = {
+        "VER": [1, 1, 1, 1],
+        "NOR": [1, 1, 1, 1],
+    }
+    all_drivers = [
+        {"driver": "VER", "team": "Red Bull Racing"},
+        {"driver": "NOR", "team": "McLaren"},
+    ]
+
+    grid = predictor._aggregate_grid_results(
+        position_records,
+        all_drivers,
+        data_confidence_score=0.9,
+    )
+
+    for row in grid:
+        assert row["p5"] <= row["median_position"] <= row["p95"]
+        assert row["p5"] <= row["position"] <= row["p95"]
+        assert row["order_confidence"] is not None
+
+
 def test_aggregate_grid_uses_team_uncertainty_to_widen_opening_weekends():
     predictor = _Predictor()
     position_records = {

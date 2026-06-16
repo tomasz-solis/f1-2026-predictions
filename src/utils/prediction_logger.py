@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from src.models.shadow_challenger import build_shadow_challengers_for_prediction
 from src.persistence.artifact_store import ArtifactStore
 from src.systems.systematic_learning import SystematicLearningSystem
 from src.types.prediction_types import QualifyingGridEntry
@@ -28,6 +29,13 @@ from src.utils.accuracy_targets import (
     synthesize_legacy_targets,
     target_session_name,
     weekend_format_name,
+)
+from src.utils.artifact_paths import (
+    ensure_path_under_root,
+    normalize_race_name,
+    normalize_session_name,
+    safe_race_slug,
+    safe_session_slug,
 )
 from src.utils.data_paths import resolve_repo_data_path
 from src.utils.model_version import stamp_model_metadata
@@ -157,6 +165,10 @@ class PredictionLogger:
                 "targets": {target_key: None for target_key in normalized_targets},
             },
         }
+        prediction_data["shadow_challengers"] = self._build_shadow_challengers(
+            prediction_data,
+            year=normalized_year,
+        )
 
         self._write_prediction_file(filepath, prediction_data)
         artifact_key = self._artifact_key_for_prediction(
@@ -183,6 +195,23 @@ class PredictionLogger:
 
         return filepath
 
+    def _build_shadow_challengers(
+        self,
+        prediction_data: dict[str, Any],
+        *,
+        year: int,
+    ) -> dict[str, Any]:
+        """Build background challenger forecasts without affecting champion output."""
+        try:
+            history = self.get_all_predictions(int(year))
+            return build_shadow_challengers_for_prediction(
+                prediction_data,
+                historical_predictions=history,
+            )
+        except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
+            logger.warning("Could not build shadow challenger payload: %s", exc)
+            return {}
+
     def _prediction_file_path(
         self,
         year: int,
@@ -191,11 +220,13 @@ class PredictionLogger:
     ) -> Path:
         """Build the normalized file path for one prediction payload."""
         safe_race_name = self._race_file_slug(race_name)
-        return (
+        safe_session_name = safe_session_slug(session_name)
+        return ensure_path_under_root(
+            self.predictions_dir,
             self.predictions_dir
             / str(year)
             / safe_race_name
-            / f"{safe_race_name}_{session_name.lower()}.json"
+            / f"{safe_race_name}_{safe_session_name}.json",
         )
 
     @staticmethod
@@ -612,7 +643,7 @@ class PredictionLogger:
     @staticmethod
     def _race_file_slug(race_name: str) -> str:
         """Return the directory/file slug used for prediction JSON files."""
-        return race_name.lower().replace(" ", "_").replace("'", "")
+        return safe_race_slug(race_name)
 
     @staticmethod
     def _listing_rows_are_file_backed(rows: list[dict[str, Any]]) -> bool:
@@ -785,12 +816,14 @@ class PredictionLogger:
     @staticmethod
     def _normalize_race_name(value: Any) -> str:
         """Normalize race names so whitespace drift cannot create a new storage key."""
-        return " ".join(str(value).split()).strip()
+        safe_race_slug(value)
+        return normalize_race_name(value)
 
     @staticmethod
     def _normalize_session_name(value: Any) -> str:
         """Normalize checkpoint session identifiers for storage and lookup."""
-        return str(value).strip().upper()
+        safe_session_slug(value)
+        return normalize_session_name(value)
 
     @classmethod
     def _prediction_identity(

@@ -10,6 +10,10 @@ import src.persistence.artifact_store as artifact_store_module
 from src.persistence.artifact_store import ArtifactStore
 
 
+def _assert_path_suffix(path, *parts: str) -> None:
+    assert path.parts[-len(parts) :] == parts
+
+
 def test_get_file_path_mappings(tmp_path):
     store = ArtifactStore(data_root=tmp_path)
 
@@ -23,21 +27,51 @@ def test_get_file_path_mappings(tmp_path):
     learning_state_path = store._get_file_path("learning_state", "2026::learning_state")
     legacy_learning_state_path = store._get_file_path("learning_state", "learning_state")
 
-    assert str(car_path).endswith("processed/car_characteristics/2026_car_characteristics.json")
-    assert str(driver_path).endswith(
-        "processed/driver_characteristics/2026_driver_characteristics.json"
+    _assert_path_suffix(
+        car_path, "processed", "car_characteristics", "2026_car_characteristics.json"
     )
-    assert str(legacy_driver_path).endswith("processed/driver_characteristics.json")
-    assert str(debuts_path).endswith("driver_debuts.json")
-    assert str(track_path).endswith(
-        "processed/track_characteristics/2026_track_characteristics.json"
+    _assert_path_suffix(
+        driver_path, "processed", "driver_characteristics", "2026_driver_characteristics.json"
     )
-    assert str(learning_state_path).endswith("learning_state/2026_learning_state.json")
-    assert str(legacy_learning_state_path).endswith("learning_state.json")
-    assert str(prediction_path).endswith(
-        "predictions/2026/bahrain_grand_prix/bahrain_grand_prix_qualifying.json"
+    _assert_path_suffix(legacy_driver_path, "processed", "driver_characteristics.json")
+    _assert_path_suffix(debuts_path, "driver_debuts.json")
+    _assert_path_suffix(
+        track_path, "processed", "track_characteristics", "2026_track_characteristics.json"
     )
-    assert str(default_path).endswith("custom/a/b.json")
+    _assert_path_suffix(learning_state_path, "learning_state", "2026_learning_state.json")
+    _assert_path_suffix(legacy_learning_state_path, "learning_state.json")
+    _assert_path_suffix(
+        prediction_path,
+        "predictions",
+        "2026",
+        "bahrain_grand_prix",
+        "bahrain_grand_prix_qualifying.json",
+    )
+    _assert_path_suffix(default_path, "custom", "a", "b.json")
+
+
+@pytest.mark.parametrize(
+    "artifact_type,artifact_key",
+    [
+        ("prediction", "2026::..::qualifying"),
+        ("prediction", "2026::Bahrain/Grand Prix::qualifying"),
+        ("prediction", "2026::Bahrain\nGrand Prix::qualifying"),
+        ("prediction", "2026::Bahrain Grand Prix::.."),
+        ("prediction", "2026::Bahrain Grand Prix::C:\\temp"),
+        ("custom", "..::secret"),
+        ("custom", "a/b"),
+        ("custom", "a\\b"),
+        ("custom", "a\tb"),
+        ("custom", "C:\\temp"),
+        ("custom", "a::"),
+        ("car_characteristics", "bad-year::car_characteristics"),
+    ],
+)
+def test_get_file_path_rejects_unsafe_artifact_keys(tmp_path, artifact_type, artifact_key):
+    store = ArtifactStore(data_root=tmp_path)
+
+    with pytest.raises(ValueError):
+        store._get_file_path(artifact_type, artifact_key)
 
 
 def test_write_and_read_file_roundtrip(tmp_path):

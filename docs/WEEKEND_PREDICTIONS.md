@@ -10,6 +10,9 @@ The app produces a cascade of predictions based on weekend format.
 - Sprint weekend: 4 outputs
 
 The race model can use ACTUAL grids from completed competitive sessions when available.
+That is deliberate: after `Q`, the main qualifying target is closed, but the
+Grand Prix race target may use the actual qualifying classification as its
+starting-grid input.
 
 ```mermaid
 flowchart TD
@@ -137,6 +140,10 @@ Current sprint adjustments in baseline predictor:
 - extra grid weight influence.
 - race still uses track-aware overtaking and strategy timing bias inputs.
 
+Grand Prix race and sprint race should be evaluated separately. They share much
+of the simulation stack, but grid anchoring, overtaking difficulty, pit strategy,
+and race length create different error profiles.
+
 ## Prediction Tracking Integration
 
 When tracking is enabled in the Settings expander:
@@ -150,6 +157,10 @@ When tracking is enabled in the Settings expander:
 Storage backend depends on `USE_DB_STORAGE` (`file_only`, `db_only`, `fallback`, `dual_write`).
 
 See `docs/PREDICTION_TRACKING.md` for file structure and update workflow.
+
+Saved artifacts may also include `shadow_challengers` for target-specific
+background candidates. These are audit outputs only and do not replace the
+champion prediction shown by the dashboard.
 
 ## Accuracy Outputs
 

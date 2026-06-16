@@ -870,7 +870,12 @@ class BaselineQualifyingMixin:
         )
 
         for i, item in enumerate(grid):
-            item["position"] = i + 1
+            final_position = i + 1
+            item["position"] = final_position
+            interval_low = min(int(item["p5"]), int(item["median_position"]), final_position)
+            interval_high = max(int(item["p95"]), int(item["median_position"]), final_position)
+            item["p5"] = interval_low
+            item["p95"] = interval_high
 
         oc_tolerance = float(
             cfg.get("baseline_predictor.qualifying.order_confidence.tolerance", 1.0)

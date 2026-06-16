@@ -2,7 +2,7 @@
 
 Events are best-effort and never raise into the UI. Session IDs are short
 hashed UUIDs scoped to the Streamlit session_state; they reset when the
-browser tab closes. No IP, no email, no other PII is stored.
+browser tab closes. No IP, no email, and no raw user-agent is stored.
 
 UTM parameters (utm_source, utm_medium, utm_campaign, utm_content,
 utm_term) are captured once on the first event of a session and pinned
@@ -23,11 +23,15 @@ logger = logging.getLogger(__name__)
 
 _SESSION_KEY = "_analytics_session_id"
 _LAST_PAGE_KEY = "_analytics_last_page"
-_USER_AGENT_KEY = "_analytics_user_agent"
+_CLIENT_CHANNEL_KEY = "_analytics_client_channel"
 _UTM_KEY = "_analytics_utm"
 _TABLE = "app_events"
 
 _UTM_FIELDS = ("utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term")
+_MAX_PAYLOAD_KEYS = 32
+_MAX_PAYLOAD_KEY_LENGTH = 64
+_MAX_PAYLOAD_STRING_LENGTH = 512
+_MAX_PAYLOAD_LIST_ITEMS = 20
 
 
 def _session_id() -> str:
@@ -39,14 +43,28 @@ def _session_id() -> str:
     return sid
 
 
-def _user_agent() -> str | None:
-    """Best-effort user-agent capture from Streamlit's request context.
+def _classify_user_agent(user_agent: str | None) -> str | None:
+    """Classify a raw user-agent into a coarse non-identifying channel."""
+    if not user_agent:
+        return None
+    lowered = user_agent.lower()
+    if "instagram" in lowered:
+        return "instagram_in_app"
+    if "threads" in lowered:
+        return "threads_in_app"
+    if "fbav" in lowered or "fban" in lowered or "facebook" in lowered:
+        return "facebook_in_app"
+    return "browser"
+
+
+def _client_channel() -> str | None:
+    """Best-effort coarse client-channel capture from Streamlit's request context.
 
     Cached per session because st.context is read-only and cheap, but no
-    point hitting it on every event. Returns None on older Streamlit
-    versions where st.context is unavailable.
+    point hitting it on every event. The raw user-agent never leaves this
+    function.
     """
-    cached = st.session_state.get(_USER_AGENT_KEY)
+    cached = st.session_state.get(_CLIENT_CHANNEL_KEY)
     if cached is not None:
         return cached or None
 
@@ -58,8 +76,41 @@ def _user_agent() -> str | None:
     except Exception:  # st.context not available or behaves unexpectedly
         ua = None
 
-    st.session_state[_USER_AGENT_KEY] = ua or ""
-    return ua
+    channel = _classify_user_agent(ua)
+    st.session_state[_CLIENT_CHANNEL_KEY] = channel or ""
+    return channel
+
+
+def _sanitize_payload_value(value: Any, *, depth: int = 0) -> Any:
+    """Bound telemetry payload values to simple JSON-compatible shapes."""
+    if value is None or isinstance(value, bool | int | float):
+        return value
+    if isinstance(value, str):
+        return value[:_MAX_PAYLOAD_STRING_LENGTH]
+    if depth >= 2:
+        return str(value)[:_MAX_PAYLOAD_STRING_LENGTH]
+    if isinstance(value, dict):
+        return {
+            str(key)[:_MAX_PAYLOAD_KEY_LENGTH]: _sanitize_payload_value(
+                nested_value,
+                depth=depth + 1,
+            )
+            for key, nested_value in list(value.items())[:_MAX_PAYLOAD_KEYS]
+        }
+    if isinstance(value, list | tuple):
+        return [
+            _sanitize_payload_value(item, depth=depth + 1)
+            for item in list(value)[:_MAX_PAYLOAD_LIST_ITEMS]
+        ]
+    return str(value)[:_MAX_PAYLOAD_STRING_LENGTH]
+
+
+def _sanitize_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return a bounded payload suitable for analytics storage."""
+    return {
+        str(key)[:_MAX_PAYLOAD_KEY_LENGTH]: _sanitize_payload_value(value)
+        for key, value in list(payload.items())[:_MAX_PAYLOAD_KEYS]
+    }
 
 
 def _capture_utm() -> dict[str, str]:
@@ -103,7 +154,7 @@ def track_event(event_type: str, **payload: Any) -> None:
 
     page = payload.pop("page", None)
     utm = _capture_utm()
-    merged_payload: dict[str, Any] = {**utm, **payload}
+    merged_payload = _sanitize_payload({**utm, **payload})
 
     record = {
         "session_id": _session_id(),
@@ -111,7 +162,7 @@ def track_event(event_type: str, **payload: Any) -> None:
         "page": page,
         "payload": merged_payload,
         "model_version": format_model_version_label(),
-        "user_agent": _user_agent(),
+        "user_agent": _client_channel(),
     }
 
     try:

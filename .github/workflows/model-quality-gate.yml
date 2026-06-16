@@ -1,0 +1,41 @@
+name: Model Quality Gate
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+jobs:
+  production-readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      USE_DB_STORAGE: ${{ secrets.SUPABASE_URL != '' && secrets.SUPABASE_KEY != '' && 'db_only' || 'file_only' }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Evaluate production readiness gate
+        run: |
+          python scripts/generate_evaluation_report.py --year 2026 --fail-on-gate
+
+      - name: Audit candidate models
+        run: |
+          python scripts/audit_model_candidates.py --year 2026
+
+      - name: Audit shadow challengers
+        run: |
+          python scripts/audit_shadow_challengers.py --year 2026

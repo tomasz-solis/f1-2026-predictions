@@ -80,6 +80,7 @@ Each file contains:
 - `qualifying.predicted_grid`
 - `race.predicted_results`
 - `targets.<target_key>`
+- `shadow_challengers.<target_key>` when a background challenger can be scored
 - `actuals.qualifying`
 - `actuals.race`
 - `actuals.targets.<target_key>`
@@ -95,6 +96,19 @@ Each target payload stores:
 - `eligible_at_save`
 
 The top-level `qualifying` and `race` fields remain for backward compatibility. New accuracy code reads `targets` first and falls back to the legacy shape only when needed.
+
+Shadow challenger payloads are diagnostic only. They store an alternate
+predicted order for a target using only champion rows and prior completed
+actuals. The dashboard-facing prediction remains the champion output until a
+promotion decision is made.
+
+Local prediction file paths are built from safe slugs:
+
+- race slugs are lowercase ASCII with spaces converted to underscores
+- session slugs are lowercase filename tokens, while metadata keeps uppercase
+  semantic session names
+- path traversal, drive prefixes, path separators, colons, empty tokens, and
+  control characters are rejected before any read/write path is resolved
 
 ## Add Actual Results Later
 

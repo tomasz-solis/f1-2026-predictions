@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -51,10 +51,116 @@ _TARGET_SECTION_BINDINGS = {
     },
 }
 
+_QUALIFYING_DIAGNOSTIC_KEYS = (
+    "data_source",
+    "data_regime",
+    "blend_used",
+    "testing_fallback_used",
+    "data_confidence_score",
+    "fp_blend_weight_used",
+    "qualifying_stage",
+    "weather",
+    "practice_signal_mode_used",
+    "practice_signal_checkpoint",
+    "characteristics_profile_used",
+    "teams_with_characteristics_profile",
+    "qualifying_residual_model_used",
+    "qualifying_residual_mean_abs_adjustment",
+)
+_RACE_DIAGNOSTIC_KEYS = (
+    "data_regime",
+    "grid_source",
+    "input_confidence",
+    "characteristics_profile_used",
+    "teams_with_characteristics_profile",
+    "race_residual_model_used",
+    "race_residual_mean_abs_adjustment",
+)
+_NESTED_RACE_DIAGNOSTIC_KEYS = (
+    "track_temperature_context",
+    "weather_feature_context",
+)
+
 
 def allowed_prediction_checkpoints(*, is_sprint: bool) -> tuple[str, ...]:
     """Return checkpoints that are allowed to inform a fresh prediction."""
     return _NON_COMPETITIVE_PREDICTION_CHECKPOINTS[bool(is_sprint)]
+
+
+def _json_safe_diagnostic_value(value: Any, *, max_items: int = 12, depth: int = 2) -> Any:
+    """Return a bounded JSON-safe diagnostic value."""
+    if value is None or isinstance(value, bool | int | float | str):
+        return value
+
+    if isinstance(value, Mapping) and depth > 0:
+        bounded: dict[str, Any] = {}
+        for index, (raw_key, raw_value) in enumerate(value.items()):
+            if index >= max_items:
+                bounded["_truncated"] = True
+                break
+            key = str(raw_key).strip()[:80]
+            if not key:
+                continue
+            bounded[key] = _json_safe_diagnostic_value(
+                raw_value,
+                max_items=max_items,
+                depth=depth - 1,
+            )
+        return bounded
+
+    if isinstance(value, list | tuple) and depth > 0:
+        return [
+            _json_safe_diagnostic_value(item, max_items=max_items, depth=depth - 1)
+            for item in list(value)[:max_items]
+        ]
+
+    return str(value)[:200]
+
+
+def _section_model_diagnostics(
+    section: Mapping[str, Any],
+    *,
+    keys: tuple[str, ...],
+    nested_keys: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    """Extract bounded model diagnostics from one prediction section."""
+    diagnostics: dict[str, Any] = {}
+    for key in keys:
+        if key in section:
+            diagnostics[key] = _json_safe_diagnostic_value(section.get(key))
+    for key in nested_keys:
+        value = section.get(key)
+        if isinstance(value, Mapping):
+            diagnostics[key] = _json_safe_diagnostic_value(value)
+
+    compound_strategies = section.get("compound_strategies")
+    if isinstance(compound_strategies, Mapping):
+        diagnostics["compound_strategy_count"] = len(compound_strategies)
+    pit_lap_distribution = section.get("pit_lap_distribution")
+    if isinstance(pit_lap_distribution, Mapping):
+        diagnostics["pit_lap_distribution_count"] = len(pit_lap_distribution)
+
+    return diagnostics
+
+
+def prediction_model_diagnostics_for_sections(
+    *,
+    qualifying_section: Mapping[str, Any],
+    race_section: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return compact model diagnostics suitable for saved prediction metadata."""
+    return {
+        "model_diagnostics_schema_version": 1,
+        "qualifying_model_diagnostics": _section_model_diagnostics(
+            qualifying_section,
+            keys=_QUALIFYING_DIAGNOSTIC_KEYS,
+        ),
+        "race_model_diagnostics": _section_model_diagnostics(
+            race_section,
+            keys=_RACE_DIAGNOSTIC_KEYS,
+            nested_keys=_NESTED_RACE_DIAGNOSTIC_KEYS,
+        ),
+    }
 
 
 def prediction_payload_for_session(
@@ -384,6 +490,10 @@ def save_prediction_if_enabled_core(
                     "PREDICTED",
                 ),
                 "top_level_race_grid_source": race_section.get("grid_source", "PREDICTED"),
+                **prediction_model_diagnostics_for_sections(
+                    qualifying_section=qualifying_section,
+                    race_section=race_section,
+                ),
             },
         )
         persist_prediction_checkpoint_summary(

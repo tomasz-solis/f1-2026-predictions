@@ -12,6 +12,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
+        chunk: ["a", "b", "c", "q", "r", "s", "e"]
 
     steps:
     - uses: actions/checkout@v3
@@ -35,17 +36,9 @@ jobs:
         pip install -r requirements.txt
         pip install pytest pytest-cov pytest-mock PyYAML
 
-    - name: Run tests
+    - name: Run test chunk ${{ matrix.chunk }}
       run: |
-        make test-github-full PYTEST=pytest
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
+        make test-github-chunk-${{ matrix.chunk }} PYTHON=python PYTEST=pytest
 
   evaluation-smoke:
     runs-on: ubuntu-latest

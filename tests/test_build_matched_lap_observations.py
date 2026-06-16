@@ -37,8 +37,13 @@ def test_build_parser_defaults_to_phase5_window() -> None:
     """The bulk runner defaults to the agreed 2022-2025 extraction window."""
     args = build_parser().parse_args([])
     assert args.years == [2022, 2023, 2024, 2025]
-    assert str(args.cache_dir) == "data/raw/.fastf1_cache"
-    assert str(args.output_dir) == "data/processed/teammate_network_observations/latest"
+    assert args.cache_dir.parts == ("data", "raw", ".fastf1_cache")
+    assert args.output_dir.parts == (
+        "data",
+        "processed",
+        "teammate_network_observations",
+        "latest",
+    )
     assert args.online is False
 
 

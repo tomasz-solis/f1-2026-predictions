@@ -11,29 +11,69 @@ from scipy.stats import spearmanr
 from src.predictors.baseline_2026 import Baseline2026Predictor
 
 
+@pytest.fixture(scope="module")
+def australian_quali_race():
+    predictor = Baseline2026Predictor(seed=42)
+    quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=80)
+    race = predictor.predict_race(
+        quali["grid"],
+        weather="dry",
+        race_name="Australian Grand Prix",
+        n_simulations=80,
+    )
+    return quali, race
+
+
+@pytest.fixture(scope="module")
+def miami_sprint_and_race():
+    predictor = Baseline2026Predictor(seed=42)
+    quali = predictor.predict_qualifying(2026, "Miami Grand Prix", n_simulations=80)
+    sprint = predictor.predict_sprint_race(
+        sprint_quali_grid=quali["grid"],
+        weather="dry",
+        race_name="Miami Grand Prix",
+        n_simulations=80,
+    )
+    race = predictor.predict_race(
+        quali["grid"],
+        weather="dry",
+        race_name="Miami Grand Prix",
+        n_simulations=80,
+        is_sprint=False,
+    )
+    return quali, sprint, race
+
+
+@pytest.fixture(scope="module")
+def australian_dry_wet_races():
+    predictor = Baseline2026Predictor(seed=42)
+    quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=80)
+    dry_race = predictor.predict_race(
+        quali["grid"],
+        weather="dry",
+        race_name="Australian Grand Prix",
+        n_simulations=80,
+    )
+    wet_race = predictor.predict_race(
+        quali["grid"],
+        weather="rain",
+        race_name="Australian Grand Prix",
+        n_simulations=80,
+    )
+    return dry_race, wet_race
+
+
 class TestRaceRealismRegression:
     """Regression tests to enforce race prediction realism."""
 
-    @pytest.fixture
-    def predictor(self):
-        """Create predictor instance."""
-        return Baseline2026Predictor(seed=42)
-
-    def test_grid_to_race_correlation_minimum(self, predictor):
+    def test_grid_to_race_correlation_minimum(self, australian_quali_race):
         """Grid-to-race correlation must be >= 0.75 in dry conditions.
 
         Qualifying order should have meaningful impact on race result.
         Target inspired by real F1 data where grid order correlates strongly
         with finishing order in clean races.
         """
-        # Use moderate simulation count for stable, repeatable results
-        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=300)
-        race = predictor.predict_race(
-            quali["grid"],
-            weather="dry",
-            race_name="Australian Grand Prix",
-            n_simulations=300,
-        )
+        quali, race = australian_quali_race
 
         # Extract positions
         grid_positions = {entry["driver"]: entry["median_position"] for entry in quali["grid"]}
@@ -53,19 +93,13 @@ class TestRaceRealismRegression:
             f"Expected >= 0.75 for realistic race behavior."
         )
 
-    def test_mean_position_change_maximum(self, predictor):
+    def test_mean_position_change_maximum(self, australian_quali_race):
         """Mean absolute position change must be <= 3.0 in dry conditions.
 
         This prevents excessive position shuffling that would make races
         feel like a lottery rather than a competition.
         """
-        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=300)
-        race = predictor.predict_race(
-            quali["grid"],
-            weather="dry",
-            race_name="Australian Grand Prix",
-            n_simulations=300,
-        )
+        quali, race = australian_quali_race
 
         grid_positions = {entry["driver"]: entry["median_position"] for entry in quali["grid"]}
         race_positions = {
@@ -83,19 +117,13 @@ class TestRaceRealismRegression:
             f"Expected <= 3.0 for realistic position stability."
         )
 
-    def test_pole_sitter_top3_probability(self, predictor):
+    def test_pole_sitter_top3_probability(self, australian_quali_race):
         """Pole sitter must have >= 45% chance of finishing in top 3.
 
         In real F1, pole position confers a significant advantage.
         This test ensures the model respects that reality.
         """
-        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=300)
-        race = predictor.predict_race(
-            quali["grid"],
-            weather="dry",
-            race_name="Australian Grand Prix",
-            n_simulations=300,
-        )
+        quali, race = australian_quali_race
 
         pole_driver = quali["grid"][0]["driver"]
         pole_finish = next(e for e in race["finish_order"] if e["driver"] == pole_driver)
@@ -107,19 +135,13 @@ class TestRaceRealismRegression:
             f"Expected >= 45% to reflect real qualifying advantage."
         )
 
-    def test_top5_starters_dominate_podium(self, predictor):
+    def test_top5_starters_dominate_podium(self, australian_quali_race):
         """Top-5 starters must account for >= 50% of total podium probability.
 
         Front-runners should not get swamped by midfield
         in unrealistic ways.
         """
-        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=300)
-        race = predictor.predict_race(
-            quali["grid"],
-            weather="dry",
-            race_name="Australian Grand Prix",
-            n_simulations=300,
-        )
+        quali, race = australian_quali_race
 
         top5_drivers = {entry["driver"] for entry in quali["grid"][:5]}
 
@@ -139,7 +161,7 @@ class TestRaceRealismRegression:
             f"Expected >= 50% for realistic front-runner advantage."
         )
 
-    def test_front_runners_no_excessive_falloffs(self, predictor):
+    def test_front_runners_no_excessive_falloffs(self, australian_quali_race):
         """Top-3 starters should have reasonable worst-case scenarios.
 
         This is measured via P95 (95th percentile worst finish).
@@ -149,13 +171,7 @@ class TestRaceRealismRegression:
         Some variance is acceptable, but all three having
         unrealistic tail outcomes.
         """
-        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=300)
-        race = predictor.predict_race(
-            quali["grid"],
-            weather="dry",
-            race_name="Australian Grand Prix",
-            n_simulations=300,
-        )
+        quali, race = australian_quali_race
 
         top3_drivers = [entry["driver"] for entry in quali["grid"][:3]]
 
@@ -183,20 +199,14 @@ class TestRaceRealismRegression:
             f"P95 values: {p95_values}. Expected mean <= 12.0 for stability."
         )
 
-    def test_podium_probabilities_mostly_monotonic(self, predictor):
+    def test_podium_probabilities_mostly_monotonic(self, australian_quali_race):
         """Podium probabilities should generally decrease with finishing position.
 
         For top-8 finishers, there should be at most 2 inversions where
         a lower-placed finisher has higher podium probability than someone
         finishing ahead of them.
         """
-        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=300)
-        race = predictor.predict_race(
-            quali["grid"],
-            weather="dry",
-            race_name="Australian Grand Prix",
-            n_simulations=300,
-        )
+        _, race = australian_quali_race
 
         top8 = sorted(race["finish_order"], key=lambda x: x["position"])[:8]
 
@@ -213,30 +223,13 @@ class TestRaceRealismRegression:
             f"Expected <= 2 for coherent probability ordering."
         )
 
-    def test_sprint_race_has_higher_grid_influence(self, predictor):
+    def test_sprint_race_has_higher_grid_influence(self, miami_sprint_and_race):
         """Sprint races should preserve qualifying order more than full races.
 
         This reflects the reality that shorter races with no pit stops
         have fewer opportunities for position changes.
         """
-        quali = predictor.predict_qualifying(2026, "Miami Grand Prix", n_simulations=200)
-
-        # Sprint race (no pit stops, shorter distance)
-        sprint = predictor.predict_sprint_race(
-            sprint_quali_grid=quali["grid"],
-            weather="dry",
-            race_name="Miami Grand Prix",
-            n_simulations=200,
-        )
-
-        # Full race (with pit stops, full distance)
-        race = predictor.predict_race(
-            quali["grid"],
-            weather="dry",
-            race_name="Miami Grand Prix",
-            n_simulations=200,
-            is_sprint=False,
-        )
+        quali, sprint, race = miami_sprint_and_race
 
         # Calculate position changes
         grid_positions = {entry["driver"]: entry["median_position"] for entry in quali["grid"]}
@@ -259,26 +252,12 @@ class TestRaceRealismRegression:
             f"Sprint: {sprint_mean:.2f}, Race: {race_mean:.2f}"
         )
 
-    def test_wet_weather_increases_variance(self, predictor):
+    def test_wet_weather_increases_variance(self, australian_dry_wet_races):
         """Wet weather should increase position variance compared to dry.
 
         This reflects the reality that rain races are more unpredictable.
         """
-        quali = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=200)
-
-        dry_race = predictor.predict_race(
-            quali["grid"],
-            weather="dry",
-            race_name="Australian Grand Prix",
-            n_simulations=200,
-        )
-
-        wet_race = predictor.predict_race(
-            quali["grid"],
-            weather="rain",
-            race_name="Australian Grand Prix",
-            n_simulations=200,
-        )
+        dry_race, wet_race = australian_dry_wet_races
 
         # Compare average confidence (lower = more variance)
         dry_conf = np.mean([e["confidence"] for e in dry_race["finish_order"]])

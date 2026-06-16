@@ -14,6 +14,12 @@ from typing import Any, cast
 
 from postgrest.exceptions import APIError
 
+from src.utils.artifact_paths import (
+    ensure_path_under_root,
+    safe_artifact_key_parts,
+    safe_race_slug,
+    safe_session_slug,
+)
 from src.utils.data_paths import resolve_data_root
 
 from .config import (
@@ -225,61 +231,80 @@ class ArtifactStore:
         year_token = artifact_key.split("::", 1)[0].strip()
         return year_token if year_token.isdigit() else None
 
+    @staticmethod
+    def _year_token_from_artifact_key(artifact_key: str, *, default: str = "2026") -> str:
+        """Return a validated season year token for season-scoped artifacts."""
+        year_token = artifact_key.split("::", 1)[0].strip() if "::" in artifact_key else default
+        if not year_token.isdigit():
+            raise ValueError(f"artifact_key must start with a numeric season year: {artifact_key}")
+        return year_token
+
+    def _contained_path(self, *parts: str) -> Path:
+        """Build an artifact path and verify it remains below the data root."""
+        return ensure_path_under_root(self.data_root, self.data_root.joinpath(*parts))
+
     def _get_file_path(self, artifact_type: str, artifact_key: str) -> Path:
         """Map artifact type/key to file path."""
         # Map to existing file paths
         if artifact_type == "car_characteristics":
-            year = artifact_key.split("::")[0] if "::" in artifact_key else "2026"
-            return (
-                self.data_root
-                / "processed"
-                / "car_characteristics"
-                / f"{year}_car_characteristics.json"
+            year = self._year_token_from_artifact_key(artifact_key)
+            return self._contained_path(
+                "processed",
+                "car_characteristics",
+                f"{year}_car_characteristics.json",
             )
         elif artifact_type == "driver_characteristics":
             season_year = self._extract_year_from_artifact_key(artifact_key)
             if season_year:
-                return (
-                    self.data_root
-                    / "processed"
-                    / "driver_characteristics"
-                    / f"{season_year}_driver_characteristics.json"
+                return self._contained_path(
+                    "processed",
+                    "driver_characteristics",
+                    f"{season_year}_driver_characteristics.json",
                 )
-            return self.data_root / "processed" / "driver_characteristics.json"
+            return self._contained_path("processed", "driver_characteristics.json")
         elif artifact_type == "driver_debuts":
-            return self.data_root / "driver_debuts.json"
+            return self._contained_path("driver_debuts.json")
         elif artifact_type == "track_characteristics":
-            year = artifact_key.split("::")[0] if "::" in artifact_key else "2026"
-            return (
-                self.data_root
-                / "processed"
-                / "track_characteristics"
-                / f"{year}_track_characteristics.json"
+            year = self._year_token_from_artifact_key(artifact_key)
+            return self._contained_path(
+                "processed",
+                "track_characteristics",
+                f"{year}_track_characteristics.json",
             )
         elif artifact_type == "learning_state":
             learning_year = self._extract_year_from_artifact_key(artifact_key)
             if learning_year:
-                return self.data_root / "learning_state" / f"{learning_year}_learning_state.json"
-            return self.data_root / "learning_state.json"
+                return self._contained_path(
+                    "learning_state", f"{learning_year}_learning_state.json"
+                )
+            return self._contained_path("learning_state.json")
         elif artifact_type == "practice_state":
-            return self.data_root / "systems" / "practice_characteristics_state.json"
+            return self._contained_path("systems", "practice_characteristics_state.json")
         elif artifact_type == "prediction":
             # Parse key: '2026::Bahrain Grand Prix::qualifying'
             parts = artifact_key.split("::")
             if len(parts) == 3:
                 year, race_name, session_name = parts
-                safe_race = race_name.lower().replace(" ", "_").replace("'", "")
-                return (
-                    self.data_root
-                    / "predictions"
-                    / year
-                    / safe_race
-                    / f"{safe_race}_{session_name.lower()}.json"
+                year = year.strip()
+                if not year.isdigit():
+                    raise ValueError(
+                        f"prediction artifact_key must start with a year: {artifact_key}"
+                    )
+                safe_race = safe_race_slug(race_name)
+                safe_session = safe_session_slug(session_name)
+                return self._contained_path(
+                    "predictions",
+                    year,
+                    safe_race,
+                    f"{safe_race}_{safe_session}.json",
                 )
+            raise ValueError("prediction artifact_key must have shape 'YYYY::Race Name::SESSION'")
 
         # Default: use type/key structure
-        safe_key = artifact_key.replace("::", "/")
-        return self.data_root / artifact_type / f"{safe_key}.json"
+        safe_type = safe_artifact_key_parts(artifact_type)[0]
+        safe_key_parts = safe_artifact_key_parts(artifact_key)
+        safe_key_parts[-1] = f"{safe_key_parts[-1]}.json"
+        return self._contained_path(safe_type, *safe_key_parts)
 
     def _write_file(self, artifact_type: str, artifact_key: str, data: dict[str, Any]) -> None:
         """Write artifact to file."""

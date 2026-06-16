@@ -7,7 +7,7 @@ from typing import Any
 
 from src.utils import config_loader
 
-_DEFAULT_MODEL_VERSION = "2.2"
+_DEFAULT_MODEL_VERSION = "2.3"
 
 
 def get_model_version() -> str:

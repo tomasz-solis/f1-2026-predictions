@@ -72,3 +72,4 @@ notebooks/
 
 # Local Claude preview scaffolding (machine-specific)
 .claude/launch.json
+.claude/settings.local.json

@@ -39,7 +39,7 @@ class GridConfig(StrictConfigModel):
 class ModelConfig(StrictConfigModel):
     """Model release metadata shared across generated artifacts."""
 
-    version: str = Field(default="2.2", min_length=1)
+    version: str = Field(default="2.3", min_length=1)
 
 
 class BayesianConfig(StrictConfigModel):

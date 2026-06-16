@@ -1,0 +1,346 @@
+{
+  "artifact_type": "shadow_challenger_audit",
+  "schema_version": 1,
+  "year": 2026,
+  "shadow_challenger_version": "target_form_blend_v1",
+  "target_rules": {
+    "main_qualifying": {
+      "target_key": "main_qualifying",
+      "challenger_name": "main_qualifying_form_blend_v1",
+      "model_weight": 0.4,
+      "history_window": 2,
+      "min_history_events": 1,
+      "rationale": "Qualifying challenger follows the audit signal that recent actual form is material, while retaining a model anchor."
+    },
+    "sprint_qualifying": {
+      "target_key": "sprint_qualifying",
+      "challenger_name": "sprint_qualifying_form_blend_v1",
+      "model_weight": 0.55,
+      "history_window": 2,
+      "min_history_events": 1,
+      "rationale": "Sprint qualifying has fewer samples and less practice data, so the challenger keeps a stronger model anchor than main qualifying."
+    },
+    "grand_prix_race": {
+      "target_key": "grand_prix_race",
+      "challenger_name": "grand_prix_race_form_blend_v1",
+      "model_weight": 0.8,
+      "history_window": 1,
+      "min_history_events": 1,
+      "rationale": "Grand Prix race audit favours a light model-aware previous-race correction."
+    },
+    "sprint_race": {
+      "target_key": "sprint_race",
+      "challenger_name": "sprint_race_form_blend_v1",
+      "model_weight": 0.75,
+      "history_window": 2,
+      "min_history_events": 1,
+      "rationale": "Sprint race stays model-led but monitors a short recent-form correction."
+    }
+  },
+  "prediction_artifacts_loaded": 28,
+  "target_shadow_scores": {
+    "grand_prix_race": {
+      "events": 7,
+      "challenger_scored_events": 6,
+      "champion_mean_mae": 4.987012987012988,
+      "champion_median_mae": 5.090909090909091,
+      "comparable_champion_mean_mae": 5.121212121212122,
+      "challenger_mean_mae": 5.075757575757575,
+      "challenger_median_mae": 5.363636363636363,
+      "mae_improvement_vs_comparable_champion": 0.045454545454546746,
+      "rows": [
+        {
+          "race_name": "Australian Grand Prix",
+          "target_key": "grand_prix_race",
+          "checkpoint": "FP3",
+          "champion_mae": 4.181818181818182,
+          "challenger_mae": null
+        },
+        {
+          "race_name": "Chinese Grand Prix",
+          "target_key": "grand_prix_race",
+          "checkpoint": "SQ",
+          "champion_mae": 5.7272727272727275,
+          "challenger_mae": 5.7272727272727275
+        },
+        {
+          "race_name": "Japanese Grand Prix",
+          "target_key": "grand_prix_race",
+          "checkpoint": "FP2",
+          "champion_mae": 3.090909090909091,
+          "challenger_mae": 3.0
+        },
+        {
+          "race_name": "Miami Grand Prix",
+          "target_key": "grand_prix_race",
+          "checkpoint": "SQ",
+          "champion_mae": 5.090909090909091,
+          "challenger_mae": 5.181818181818182
+        },
+        {
+          "race_name": "Canadian Grand Prix",
+          "target_key": "grand_prix_race",
+          "checkpoint": "SQ",
+          "champion_mae": 5.181818181818182,
+          "challenger_mae": 5.545454545454546
+        },
+        {
+          "race_name": "Monaco Grand Prix",
+          "target_key": "grand_prix_race",
+          "checkpoint": "FP3",
+          "champion_mae": 6.909090909090909,
+          "challenger_mae": 6.909090909090909
+        },
+        {
+          "race_name": "Barcelona Grand Prix",
+          "target_key": "grand_prix_race",
+          "checkpoint": "FP3",
+          "champion_mae": 4.7272727272727275,
+          "challenger_mae": 4.090909090909091
+        }
+      ]
+    },
+    "main_qualifying": {
+      "events": 7,
+      "challenger_scored_events": 6,
+      "champion_mean_mae": 3.064935064935065,
+      "champion_median_mae": 2.8181818181818183,
+      "comparable_champion_mean_mae": 3.106060606060606,
+      "challenger_mean_mae": 2.5000000000000004,
+      "challenger_median_mae": 2.5,
+      "mae_improvement_vs_comparable_champion": 0.6060606060606055,
+      "rows": [
+        {
+          "race_name": "Australian Grand Prix",
+          "target_key": "main_qualifying",
+          "checkpoint": "FP3",
+          "champion_mae": 2.8181818181818183,
+          "challenger_mae": null
+        },
+        {
+          "race_name": "Chinese Grand Prix",
+          "target_key": "main_qualifying",
+          "checkpoint": "SQ",
+          "champion_mae": 2.3636363636363638,
+          "challenger_mae": 2.8181818181818183
+        },
+        {
+          "race_name": "Japanese Grand Prix",
+          "target_key": "main_qualifying",
+          "checkpoint": "FP2",
+          "champion_mae": 2.272727272727273,
+          "challenger_mae": 1.9090909090909092
+        },
+        {
+          "race_name": "Miami Grand Prix",
+          "target_key": "main_qualifying",
+          "checkpoint": "SQ",
+          "champion_mae": 3.5454545454545454,
+          "challenger_mae": 3.1818181818181817
+        },
+        {
+          "race_name": "Canadian Grand Prix",
+          "target_key": "main_qualifying",
+          "checkpoint": "SQ",
+          "champion_mae": 2.4545454545454546,
+          "challenger_mae": 2.0
+        },
+        {
+          "race_name": "Monaco Grand Prix",
+          "target_key": "main_qualifying",
+          "checkpoint": "FP3",
+          "champion_mae": 4.363636363636363,
+          "challenger_mae": 2.909090909090909
+        },
+        {
+          "race_name": "Barcelona Grand Prix",
+          "target_key": "main_qualifying",
+          "checkpoint": "FP3",
+          "champion_mae": 3.6363636363636362,
+          "challenger_mae": 2.1818181818181817
+        }
+      ]
+    },
+    "sprint_qualifying": {
+      "events": 3,
+      "challenger_scored_events": 2,
+      "champion_mean_mae": 3.121212121212121,
+      "champion_median_mae": 3.272727272727273,
+      "comparable_champion_mean_mae": 3.409090909090909,
+      "challenger_mean_mae": 3.3636363636363638,
+      "challenger_median_mae": 3.3636363636363638,
+      "mae_improvement_vs_comparable_champion": 0.045454545454545414,
+      "rows": [
+        {
+          "race_name": "Chinese Grand Prix",
+          "target_key": "sprint_qualifying",
+          "checkpoint": "FP1",
+          "champion_mae": 2.5454545454545454,
+          "challenger_mae": null
+        },
+        {
+          "race_name": "Miami Grand Prix",
+          "target_key": "sprint_qualifying",
+          "checkpoint": "FP1",
+          "champion_mae": 3.272727272727273,
+          "challenger_mae": 2.909090909090909
+        },
+        {
+          "race_name": "Canadian Grand Prix",
+          "target_key": "sprint_qualifying",
+          "checkpoint": "FP1",
+          "champion_mae": 3.5454545454545454,
+          "challenger_mae": 3.8181818181818183
+        }
+      ]
+    },
+    "sprint_race": {
+      "events": 3,
+      "challenger_scored_events": 2,
+      "champion_mean_mae": 3.0606060606060606,
+      "champion_median_mae": 3.1818181818181817,
+      "comparable_champion_mean_mae": 3.0,
+      "challenger_mean_mae": 2.909090909090909,
+      "challenger_median_mae": 2.909090909090909,
+      "mae_improvement_vs_comparable_champion": 0.09090909090909083,
+      "rows": [
+        {
+          "race_name": "Chinese Grand Prix",
+          "target_key": "sprint_race",
+          "checkpoint": "SQ",
+          "champion_mae": 3.1818181818181817,
+          "challenger_mae": null
+        },
+        {
+          "race_name": "Miami Grand Prix",
+          "target_key": "sprint_race",
+          "checkpoint": "SQ",
+          "champion_mae": 3.1818181818181817,
+          "challenger_mae": 2.727272727272727
+        },
+        {
+          "race_name": "Canadian Grand Prix",
+          "target_key": "sprint_race",
+          "checkpoint": "SQ",
+          "champion_mae": 2.8181818181818183,
+          "challenger_mae": 3.090909090909091
+        }
+      ]
+    }
+  },
+  "checkpoint_decay": {
+    "grand_prix_race": [
+      {
+        "target_key": "grand_prix_race",
+        "checkpoint": "PRE",
+        "events": 7,
+        "mean_mae": 4.662337662337662,
+        "median_mae": 4.909090909090909
+      },
+      {
+        "target_key": "grand_prix_race",
+        "checkpoint": "FP1",
+        "events": 6,
+        "mean_mae": 5.060606060606061,
+        "median_mae": 5.045454545454545
+      },
+      {
+        "target_key": "grand_prix_race",
+        "checkpoint": "FP2",
+        "events": 4,
+        "mean_mae": 4.909090909090908,
+        "median_mae": 4.636363636363637
+      },
+      {
+        "target_key": "grand_prix_race",
+        "checkpoint": "FP3",
+        "events": 3,
+        "mean_mae": 5.2727272727272725,
+        "median_mae": 4.7272727272727275
+      },
+      {
+        "target_key": "grand_prix_race",
+        "checkpoint": "SQ",
+        "events": 3,
+        "mean_mae": 5.333333333333333,
+        "median_mae": 5.181818181818182
+      }
+    ],
+    "main_qualifying": [
+      {
+        "target_key": "main_qualifying",
+        "checkpoint": "PRE",
+        "events": 7,
+        "mean_mae": 2.87012987012987,
+        "median_mae": 2.909090909090909
+      },
+      {
+        "target_key": "main_qualifying",
+        "checkpoint": "FP1",
+        "events": 6,
+        "mean_mae": 3.46969696969697,
+        "median_mae": 3.4545454545454546
+      },
+      {
+        "target_key": "main_qualifying",
+        "checkpoint": "FP2",
+        "events": 4,
+        "mean_mae": 3.909090909090909,
+        "median_mae": 3.9545454545454546
+      },
+      {
+        "target_key": "main_qualifying",
+        "checkpoint": "FP3",
+        "events": 3,
+        "mean_mae": 3.606060606060606,
+        "median_mae": 3.6363636363636362
+      },
+      {
+        "target_key": "main_qualifying",
+        "checkpoint": "SQ",
+        "events": 3,
+        "mean_mae": 2.7878787878787876,
+        "median_mae": 2.4545454545454546
+      }
+    ],
+    "sprint_qualifying": [
+      {
+        "target_key": "sprint_qualifying",
+        "checkpoint": "PRE",
+        "events": 3,
+        "mean_mae": 2.7878787878787876,
+        "median_mae": 3.0
+      },
+      {
+        "target_key": "sprint_qualifying",
+        "checkpoint": "FP1",
+        "events": 3,
+        "mean_mae": 3.121212121212121,
+        "median_mae": 3.272727272727273
+      }
+    ],
+    "sprint_race": [
+      {
+        "target_key": "sprint_race",
+        "checkpoint": "PRE",
+        "events": 3,
+        "mean_mae": 3.515151515151515,
+        "median_mae": 3.6363636363636362
+      },
+      {
+        "target_key": "sprint_race",
+        "checkpoint": "FP1",
+        "events": 3,
+        "mean_mae": 3.818181818181818,
+        "median_mae": 3.909090909090909
+      },
+      {
+        "target_key": "sprint_race",
+        "checkpoint": "SQ",
+        "events": 3,
+        "mean_mae": 3.0606060606060606,
+        "median_mae": 3.1818181818181817
+      }
+    ]
+  }
+}

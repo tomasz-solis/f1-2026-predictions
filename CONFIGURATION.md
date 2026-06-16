@@ -12,6 +12,7 @@ This project uses two main config files for different purposes:
 `Baseline2026Predictor` reads values through `src/utils/config_loader.py`.
 The most relevant active section is:
 
+- `model.version`
 - `baseline_predictor.qualifying.*`
 - `baseline_predictor.race.*`
 
@@ -23,6 +24,7 @@ Examples:
 - `baseline_predictor.compound_selection.*` (tire compound selection thresholds)
 - `baseline_predictor.race.base_chaos.dry`
 - `baseline_predictor.race.grid_weight_min`
+- `baseline_predictor.race.overtake_model.*`
 - `baseline_predictor.race.pace_weight_base`
 - `baseline_predictor.race.dnf_rate_final_cap`
 - `baseline_predictor.race.testing_long_run_modifier_scale`
@@ -37,6 +39,14 @@ baseline predictor race/qualifying simulation path.
 The top-level `learning` section is active. It controls adaptive calibration
 sample gates, adjustment scales, and interval widening thresholds used by
 `src/systems/systematic_learning.py`.
+
+Current release posture:
+
+- Active champion metadata is `model.version: "2.3"`.
+- Version `2.3` keeps the calibrated baseline champion conservative while
+  recording target-specific shadow challengers in the background.
+- Candidate/challenger promotion is evidence-gated after races 8, 9, and 10;
+  do not promote a new blend solely because it wins a seven-race slice.
 
 ## 2. `config/production_config.json`
 
@@ -71,6 +81,8 @@ Related docs/scripts:
 - `migrations/002_create_runtime_state_and_operational_tables.sql`
 - `migrations/003_harden_rls_policies.sql`
 - `migrations/004_normalize_prediction_artifact_keys.sql`
+- `migrations/005_create_app_events_table.sql`
+- `migrations/006_harden_app_events.sql`
 - `scripts/test_supabase_connection.py`
 - `scripts/normalize_dashboard_artifacts_in_db.py`
 - `scripts/backfill_to_db.py`
@@ -81,6 +93,7 @@ In DB-backed modes, the same Supabase credentials are used for:
 - runtime state persistence (`runtime_state`),
 - practice backlog lock leases (`runtime_processing_locks`),
 - operational counters/alerts stream (`operational_events`).
+- dashboard telemetry (`app_events`, service-role only).
 
 ## Common Changes
 
@@ -110,6 +123,23 @@ Edit:
 - `baseline_predictor.race.lap1_chaos.*`
 - `baseline_predictor.race.teammate_variance_std`
 - `baseline_predictor.race.track_chaos_multiplier`
+
+Track overtaking difficulty is an input to race scoring, not just display
+metadata. Higher `overtaking_difficulty` means a harder-to-pass circuit and
+affects grid anchoring, chaos, safety-car likelihood, strategy mix, and final
+race movement caps/floors.
+
+Related knobs/data:
+
+- `data/processed/track_characteristics/2026_track_characteristics.json`
+- `baseline_predictor.race.track_chaos_multiplier`
+- `baseline_predictor.race.grid_weight_min`
+- `baseline_predictor.race.grid_weight_multiplier`
+- `baseline_predictor.race.overtaking_skill_multiplier`
+- `baseline_predictor.race.overtaking_track_threshold`
+- `baseline_predictor.race.overtake_model.*`
+- `baseline_predictor.race.final_blend.*`
+- `baseline_predictor.race.overtaking_transition.*`
 
 ### Change DNF behavior
 
@@ -213,6 +243,10 @@ pytest tests/test_fastf1_live_refresh.py -m live_fastf1
 
 If validation fails, startup will raise an explicit error.
 
+Release-quality validation also includes the machine-readable production gate
+emitted by `scripts/generate_evaluation_report.py`. The gate must pass before
+the repository should claim production-quality model readiness.
+
 ## Example: Read Config in Code
 
 ```python
@@ -228,12 +262,27 @@ pace_weight = config_loader.get("baseline_predictor.race.pace_weight_base", 0.40
 2. If persistence mode is DB-backed, verify connectivity first:
    - `python scripts/test_supabase_connection.py`
 3. Run targeted tests:
-   - `pytest tests/test_baseline_2026_integration.py`
-   - `pytest tests/test_dashboard_smoke.py`
-4. Run a dry prediction in the app/CLI and confirm behavior.
+   - `uv run pre-commit run --all-files`
+   - `make test-focused`
+   - `make evaluation-gate`
+4. Refresh the model diagnostics when model behavior changes:
+   - `make candidate-audit`
+   - `make shadow-challenger-audit`
+5. For full GitHub parity, run the split suite:
+   - `make test-github-chunk-a PYTEST=pytest PYTHON=python`
+   - `make test-github-chunk-b PYTEST=pytest PYTHON=python`
+   - `make test-github-chunk-c PYTEST=pytest PYTHON=python`
+   - `make test-github-chunk-q PYTEST=pytest PYTHON=python`
+   - `make test-github-chunk-r PYTEST=pytest PYTHON=python`
+   - `make test-github-chunk-s PYTEST=pytest PYTHON=python`
+   - `make test-github-chunk-e PYTEST=pytest PYTHON=python`
+6. Run a dry prediction in the app/CLI and confirm behavior.
 
 ## Notes
 
 - Qualifying FP blending is configuration-driven and confidence-adjusted (`baseline_predictor.qualifying.fp_blend_weight*` and `data_confidence.*`), not fixed 70/30.
+- GP qualifying, GP race, sprint qualifying, and sprint race are evaluated as
+  separate targets; use `shadow_challengers` diagnostics to compare target
+  behavior without contaminating the champion output.
 - `src/predictors/qualifying.py` and `src/predictors/race.py` preserve legacy method signatures and delegate to baseline logic.
 - For Supabase rollouts, start with `dual_write`, then move to `fallback` or `db_only` after validating migrations and runtime-state writes.

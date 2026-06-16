@@ -708,16 +708,22 @@ def test_resolve_testing_backends():
 
 
 def test_resolve_testing_cache_dir():
-    assert str(_resolve_testing_cache_dir(None)) == "data/raw/.fastf1_cache_testing"
-    assert (
-        str(_resolve_testing_cache_dir("_tmp_fastf1_cache_testing_2026"))
-        == "data/raw/_tmp_fastf1_cache_testing_2026"
+    assert _resolve_testing_cache_dir(None).parts == ("data", "raw", ".fastf1_cache_testing")
+    assert _resolve_testing_cache_dir("_tmp_fastf1_cache_testing_2026").parts == (
+        "data",
+        "raw",
+        "_tmp_fastf1_cache_testing_2026",
     )
-    assert (
-        str(_resolve_testing_cache_dir("./_tmp_fastf1_cache_testing_2026"))
-        == "data/raw/_tmp_fastf1_cache_testing_2026"
+    assert _resolve_testing_cache_dir("./_tmp_fastf1_cache_testing_2026").parts == (
+        "data",
+        "raw",
+        "_tmp_fastf1_cache_testing_2026",
     )
-    assert str(_resolve_testing_cache_dir("data/raw/.fastf1_cache")) == "data/raw/.fastf1_cache"
+    assert _resolve_testing_cache_dir("data/raw/.fastf1_cache").parts == (
+        "data",
+        "raw",
+        ".fastf1_cache",
+    )
 
 
 def test_coerce_utc_datetime_and_started_window():

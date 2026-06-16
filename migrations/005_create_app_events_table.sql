@@ -1,5 +1,6 @@
 -- App usage telemetry. No PII; session_id is a short hashed UUID generated
--- per Streamlit session_state, scoped to the browser tab.
+-- per Streamlit session_state, scoped to the browser tab. user_agent stores a
+-- coarse client-channel label only, not the raw browser user-agent string.
 create table if not exists public.app_events (
     id            bigserial primary key,
     occurred_at   timestamptz not null default now(),

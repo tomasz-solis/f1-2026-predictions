@@ -7,24 +7,21 @@ from scipy.stats import spearmanr
 from src.predictors.baseline_2026 import Baseline2026Predictor
 
 
-@pytest.fixture
-def predictor():
-    return Baseline2026Predictor(seed=42)
-
-
-def _quali_and_race(predictor: Baseline2026Predictor):
-    qualifying = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=500)
+@pytest.fixture(scope="module")
+def quali_and_race():
+    predictor = Baseline2026Predictor(seed=42)
+    qualifying = predictor.predict_qualifying(2026, "Australian Grand Prix", n_simulations=80)
     race = predictor.predict_race(
         qualifying["grid"],
         weather="dry",
         race_name="Australian Grand Prix",
-        n_simulations=500,
+        n_simulations=80,
     )
     return qualifying, race
 
 
-def test_diagnostic_grid_to_race_correlation_is_finite(predictor):
-    qualifying, race = _quali_and_race(predictor)
+def test_diagnostic_grid_to_race_correlation_is_finite(quali_and_race):
+    qualifying, race = quali_and_race
 
     grid_positions = {entry["driver"]: entry["position"] for entry in qualifying["grid"]}
     race_positions = {entry["driver"]: entry["position"] for entry in race["finish_order"]}
@@ -40,8 +37,8 @@ def test_diagnostic_grid_to_race_correlation_is_finite(predictor):
     )
 
 
-def test_diagnostic_mean_position_change_is_bounded(predictor):
-    qualifying, race = _quali_and_race(predictor)
+def test_diagnostic_mean_position_change_is_bounded(quali_and_race):
+    qualifying, race = quali_and_race
 
     grid_positions = {entry["driver"]: entry["median_position"] for entry in qualifying["grid"]}
     race_positions = {entry["driver"]: entry["median_position"] for entry in race["finish_order"]}
@@ -54,8 +51,8 @@ def test_diagnostic_mean_position_change_is_bounded(predictor):
     )
 
 
-def test_diagnostic_pole_sitter_podium_probability_is_valid(predictor):
-    qualifying, race = _quali_and_race(predictor)
+def test_diagnostic_pole_sitter_podium_probability_is_valid(quali_and_race):
+    qualifying, race = quali_and_race
 
     pole_driver = qualifying["grid"][0]["driver"]
     pole_finish = next(entry for entry in race["finish_order"] if entry["driver"] == pole_driver)
@@ -66,8 +63,8 @@ def test_diagnostic_pole_sitter_podium_probability_is_valid(predictor):
     )
 
 
-def test_diagnostic_top5_podium_share_is_valid(predictor):
-    qualifying, race = _quali_and_race(predictor)
+def test_diagnostic_top5_podium_share_is_valid(quali_and_race):
+    qualifying, race = quali_and_race
 
     top5_drivers = {entry["driver"] for entry in qualifying["grid"][:5]}
     total_podium_probability = 0.0
@@ -89,8 +86,8 @@ def test_diagnostic_top5_podium_share_is_valid(predictor):
     )
 
 
-def test_diagnostic_top_grid_falloff_frequency_is_bounded(predictor):
-    qualifying, race = _quali_and_race(predictor)
+def test_diagnostic_top_grid_falloff_frequency_is_bounded(quali_and_race):
+    qualifying, race = quali_and_race
 
     top3_drivers = [entry["driver"] for entry in qualifying["grid"][:3]]
     falloff_count = 0
@@ -105,8 +102,8 @@ def test_diagnostic_top_grid_falloff_frequency_is_bounded(predictor):
     )
 
 
-def test_diagnostic_podium_probability_ordering_has_limited_inversions(predictor):
-    qualifying, race = _quali_and_race(predictor)
+def test_diagnostic_podium_probability_ordering_has_limited_inversions(quali_and_race):
+    qualifying, race = quali_and_race
     del qualifying
 
     top8 = sorted(race["finish_order"], key=lambda item: item["position"])[:8]

@@ -66,10 +66,48 @@ def test_prediction_targets_for_checkpoint_excludes_actual_targets():
     assert set(targets) == {"grand_prix_race"}
 
 
+def test_prediction_model_diagnostics_for_sections_keeps_bounded_signal_metadata():
+    diagnostics = prediction_checkpointing.prediction_model_diagnostics_for_sections(
+        qualifying_section={
+            "data_source": "FP2",
+            "data_regime": "practice",
+            "fp_blend_weight_used": 0.72,
+            "characteristics_profile_used": "short_run",
+            "teams_with_characteristics_profile": 11,
+            "qualifying_residual_model_used": False,
+            "teammate_head_to_head": [{"large": "payload"}],
+        },
+        race_section={
+            "data_regime": "predicted_grid",
+            "input_confidence": 0.66,
+            "characteristics_profile_used": "long_run",
+            "teams_with_characteristics_profile": 10,
+            "race_residual_model_used": False,
+            "track_temperature_context": {"source": "session_blend", "track_c": 38.0},
+            "compound_strategies": {"VER": {"one_stop": 0.6}},
+        },
+    )
+
+    assert diagnostics["model_diagnostics_schema_version"] == 1
+    assert diagnostics["qualifying_model_diagnostics"] == {
+        "data_source": "FP2",
+        "data_regime": "practice",
+        "fp_blend_weight_used": 0.72,
+        "characteristics_profile_used": "short_run",
+        "teams_with_characteristics_profile": 11,
+        "qualifying_residual_model_used": False,
+    }
+    race_diagnostics = diagnostics["race_model_diagnostics"]
+    assert race_diagnostics["characteristics_profile_used"] == "long_run"
+    assert race_diagnostics["track_temperature_context"]["source"] == "session_blend"
+    assert race_diagnostics["compound_strategy_count"] == 1
+
+
 def test_save_prediction_if_enabled_core_prefers_post_quali_boundary_over_override():
     class _Logger:
         def __init__(self) -> None:
             self.saved_session_name: str | None = None
+            self.saved_kwargs: dict | None = None
             self.artifact_store = None
 
         def has_prediction_for_session(self, year: int, race_name: str, session_name: str) -> bool:
@@ -77,6 +115,7 @@ def test_save_prediction_if_enabled_core_prefers_post_quali_boundary_over_overri
 
         def save_prediction(self, **kwargs):
             self.saved_session_name = str(kwargs["session_name"])
+            self.saved_kwargs = dict(kwargs)
 
     class _Streamlit:
         @staticmethod
@@ -124,3 +163,8 @@ def test_save_prediction_if_enabled_core_prefers_post_quali_boundary_over_overri
     )
 
     assert logger_instance.saved_session_name == "Q"
+    assert logger_instance.saved_kwargs is not None
+    metadata = logger_instance.saved_kwargs["metadata"]
+    assert metadata["model_diagnostics_schema_version"] == 1
+    assert "qualifying_model_diagnostics" in metadata
+    assert "race_model_diagnostics" in metadata

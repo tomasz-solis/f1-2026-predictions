@@ -24,6 +24,7 @@ from src.dashboard.precomputed_predictions import (
     save_precomputed_prediction,
 )
 from src.dashboard.prediction_checkpointing import (
+    prediction_model_diagnostics_for_sections,
     prediction_payload_for_session,
     prediction_sections_for_session,
     prediction_targets_for_checkpoint,
@@ -545,6 +546,10 @@ def _save_warmup_prediction_to_logger(
             "top_level_race_result_mode": race_section.get("result_mode", "PREDICTED"),
             "top_level_qualifying_grid_source": qualifying_section.get("grid_source", "PREDICTED"),
             "top_level_race_grid_source": race_section.get("grid_source", "PREDICTED"),
+            **prediction_model_diagnostics_for_sections(
+                qualifying_section=qualifying_section,
+                race_section=race_section,
+            ),
         },
     )
 

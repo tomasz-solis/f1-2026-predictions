@@ -26,8 +26,12 @@ Automatic vs manual updates during dashboard use and cache behavior.
 Session-based prediction storage, attaching actual results, and accuracy metrics.
 
 ### `MODEL_PROMOTION.md`
-Promotion gates, movement diagnostics, and adaptive-learning safety checks for
-research components.
+Production readiness gates, shadow challenger audits, movement diagnostics, and
+adaptive-learning safety checks for research components.
+
+### `MODEL_CALIBRATION.md`
+Generated 2026 calibration report, including the machine-readable production
+gate status and baseline-vs-model metrics.
 
 ### `../reports/backtest_2025/REVIEW_PACKET.md`
 Canonical historical backtest summary with adaptive-vs-static comparison,
@@ -44,6 +48,10 @@ ArtifactStore modes, Supabase migration workflow, and active artifact keys.
 
 ### `WARMUP_PRECOMPUTE.md`
 Background warmup worker for checkpoint-aware precompute and ready-race horizon indexing.
+
+### `../data/model_diagnostics/2026/`
+Generated challenger and candidate audit artifacts used to decide whether a
+target-specific model should remain in shadow mode or be promoted.
 
 ## Validation Notebooks
 

@@ -12,30 +12,33 @@ is built around that tradeoff.
 
 ## Current Model Work
 
-The next planned model change is the driver-rating de-carring work described in
-`docs/fixes/`. It separates team strength from driver residuals so driver skill
-is not accidentally estimated through car performance.
+Active model version: `2.3`.
 
-Planned direction:
+Version `2.3` is a calibrated update to the existing champion model, not a
+promotion of a new model family. It keeps the dashboard-facing predictor
+conservative while adding target-split challenger monitoring in the background.
 
-- keep active-season learning centred on `team_strength`
-- split driver residuals into `race_rating_mu_s` and `quali_rating_mu_s`
-- store driver residuals directly in seconds
-- make driver ratings slower-moving than team strength during the season
-- use separate mappings from team strength to qualifying and race pace
-- migrate local JSON artifacts and Supabase rows together
-- add dashboard diagnostics for scale drift, residuals, slope, and R-squared
+Current release posture:
 
-This work is staged because it touches extraction, validation, local artifacts,
-Supabase persistence, dashboard diagnostics, and live prediction readers. The
-matched-lap extractor comes first; live updater changes come last.
+- keep the champion model active for production predictions
+- reduce FP/checkpoint overreaction after the first 7 completed race weekends
+- score separate targets for main qualifying, Grand Prix race, sprint qualifying,
+  and sprint race
+- record shadow challengers in saved prediction artifacts for offline review
+- require production readiness and challenger audits before any promotion
+- revisit challenger promotion only after races 8, 9, and 10 add enough evidence
+
+The main modeling risk being tracked is that recent 2026 data shows PRE forecasts
+often outperform later FP-backed checkpoints. The `2.3` tuning keeps practice
+evidence useful but bounded, while the challenger audit tests whether recent
+actual form should earn target-specific weight.
 
 ## Prediction Problem
 
 At race 1, the model has three days of pre-season testing and no 2026 race
-results. By race 5, it has testing, four race weekends, and several sessions of
-practice and qualifying evidence. The model has to behave sensibly at both ends
-of that range.
+results. After seven completed weekends, it has testing, race outcomes,
+practice, qualifying, sprint, and replay evidence, but still only a small live
+sample. The model has to behave sensibly at both ends of that range.
 
 Main modelling constraints:
 
@@ -96,6 +99,7 @@ simulation:
 
 ```text
 grid position
+historical overtaking difficulty for the circuit
 compound strengths from session history
 pit strategy sampling
 lap-by-lap tire degradation and fuel effect
@@ -141,8 +145,8 @@ Artifacts are read and written through `ArtifactStore`.
 The system stores predictions at each checkpoint and compares them with actuals
 after sessions complete. Accuracy is tracked by target and checkpoint:
 
-- qualifying
-- race
+- main qualifying
+- Grand Prix race
 - sprint qualifying
 - sprint race
 
@@ -153,11 +157,15 @@ The evaluation bundle is written to:
 
 It covers interval calibration, segment breakdowns, systematic bias, baseline
 comparison, error analysis, and promotion gates for experimental components.
+Machine-readable readiness is emitted in `production_gate` with status, score,
+blocking reasons, and metrics.
 
 Regenerate the report after new races complete:
 
 ```bash
-make evaluation-report
+make evaluation-gate
+make candidate-audit
+make shadow-challenger-audit
 ```
 
 ## Quick Start
@@ -188,8 +196,29 @@ Update from the most recent race:
 python scripts/update_from_race.py "Bahrain Grand Prix" --year 2026
 ```
 
-Run lint, type checks, and tests:
+Run the local pre-commit parity gate:
 
 ```bash
-make check
+uv run pre-commit run --all-files
+```
+
+Run the focused product-quality suite:
+
+```bash
+make lint
+make typecheck
+make test-focused
+make evaluation-gate
+```
+
+The full local pytest collection is split for predictable runtime:
+
+```bash
+make test-github-chunk-a
+make test-github-chunk-b
+make test-github-chunk-c
+make test-github-chunk-q
+make test-github-chunk-r
+make test-github-chunk-s
+make test-github-chunk-e
 ```

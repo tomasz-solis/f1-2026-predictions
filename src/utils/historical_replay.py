@@ -15,6 +15,7 @@ from typing import Any, cast
 from src.dashboard.checkpoint_predictor import build_checkpoint_overlay_predictor
 from src.dashboard.precomputed_predictions import get_prediction_precompute_config
 from src.dashboard.prediction_checkpointing import (
+    prediction_model_diagnostics_for_sections,
     prediction_payload_for_session,
     prediction_sections_for_session,
     prediction_targets_for_checkpoint,
@@ -791,6 +792,10 @@ def _build_race_checkpoint_record(
             .upper(),
             "information_cutoff_at": information_cutoff_at,
             "excluded_scoring_targets": sorted(excluded_scoring_targets),
+            **prediction_model_diagnostics_for_sections(
+                qualifying_section=qualifying_section,
+                race_section=race_section,
+            ),
         },
     )
     logger_instance.update_actuals(

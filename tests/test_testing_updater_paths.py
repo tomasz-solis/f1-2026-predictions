@@ -516,7 +516,7 @@ def test_update_from_testing_sessions_writes_file_when_not_dry_run(tmp_path, pat
     assert summary["snapshots_written"] == 1
 
     snapshot_path = (
-        tmp_path / "car_characteristics_snapshot" / "2026" / "Bahrain Grand Prix" / "FP1.json"
+        tmp_path / "car_characteristics_snapshot" / "2026" / "bahrain_grand_prix" / "fp1.json"
     )
     snapshot_payload = json.loads(snapshot_path.read_text())
     assert snapshot_payload["event_name"] == "Bahrain Grand Prix"
@@ -644,7 +644,7 @@ def test_backfill_session_snapshot_history_writes_only_snapshots(tmp_path, patch
     assert reloaded_payload == original_payload
 
     snapshot_path = (
-        tmp_path / "car_characteristics_snapshot" / "2026" / "Bahrain Grand Prix" / "FP1.json"
+        tmp_path / "car_characteristics_snapshot" / "2026" / "bahrain_grand_prix" / "fp1.json"
     )
     assert snapshot_path.exists()
 

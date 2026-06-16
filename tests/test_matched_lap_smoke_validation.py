@@ -14,8 +14,8 @@ from scripts.validate_matched_lap_smoke_sessions import (
 def test_build_parser_defaults_to_offline_cache_run() -> None:
     """The smoke validator defaults to local-cache evidence output."""
     args = build_parser().parse_args([])
-    assert str(args.cache_dir) == "data/raw/.fastf1_cache"
-    assert str(args.output_dir) == "data/diagnostics/matched_lap_extractor_smoke"
+    assert args.cache_dir.parts == ("data", "raw", ".fastf1_cache")
+    assert args.output_dir.parts == ("data", "diagnostics", "matched_lap_extractor_smoke")
     assert args.online is False
 
 

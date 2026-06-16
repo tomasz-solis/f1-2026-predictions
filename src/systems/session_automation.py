@@ -17,6 +17,10 @@ from src.dashboard.live_prediction_flow import (
     prediction_payload_for_session,
     prediction_targets_for_checkpoint,
 )
+from src.dashboard.prediction_checkpointing import (
+    prediction_model_diagnostics_for_sections,
+    prediction_sections_for_session,
+)
 from src.dashboard.prediction_flow import run_prediction
 from src.dashboard.update_flow import (
     auto_update_practice_characteristics_if_needed,
@@ -299,6 +303,11 @@ def _generate_prediction_for_latest_session(
         is_sprint=is_sprint,
         session_name=latest_session,
     )
+    qualifying_section, race_section = prediction_sections_for_session(
+        prediction_results=prediction_results,
+        is_sprint=is_sprint,
+        session_name=latest_session,
+    )
     target_predictions = prediction_targets_for_checkpoint(
         prediction_results=prediction_results,
         is_sprint=is_sprint,
@@ -327,6 +336,20 @@ def _generate_prediction_for_latest_session(
             "top_level_race_target": race_target,
             "top_level_qualifying_eligible_at_save": qualifying_target in target_predictions,
             "top_level_race_eligible_at_save": race_target in target_predictions,
+            "top_level_qualifying_result_mode": qualifying_section.get(
+                "result_mode",
+                "PREDICTED",
+            ),
+            "top_level_race_result_mode": race_section.get("result_mode", "PREDICTED"),
+            "top_level_qualifying_grid_source": qualifying_section.get(
+                "grid_source",
+                "PREDICTED",
+            ),
+            "top_level_race_grid_source": race_section.get("grid_source", "PREDICTED"),
+            **prediction_model_diagnostics_for_sections(
+                qualifying_section=qualifying_section,
+                race_section=race_section,
+            ),
         },
     )
     return True

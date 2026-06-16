@@ -70,7 +70,7 @@ def test_validate_config_accepts_default_yaml():
 
     assert validated.grid.size == 22
     assert validated.learning.min_samples == 3
-    assert validated.baseline_predictor.qualifying.fp_blend_weight == pytest.approx(0.70)
+    assert validated.baseline_predictor.qualifying.fp_blend_weight == pytest.approx(0.62)
     assert (
         validated.baseline_predictor.race.overtake_model.zone_front_probability_scale
         == pytest.approx(0.55)

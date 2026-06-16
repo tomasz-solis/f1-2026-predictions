@@ -63,6 +63,28 @@ def test_validate_qualifying_grid_preserves_uncertainty_fields():
     assert validated[0]["confidence"] == pytest.approx(48.5)
 
 
+def test_validate_qualifying_grid_requires_positions_inside_interval():
+    grid = [
+        {
+            "driver": "NOR",
+            "team": "McLaren",
+            "position": 1,
+            "median_position": 3,
+            "p5": 1,
+            "p95": 2,
+        },
+        {"driver": "RUS", "team": "Mercedes", "position": 2},
+    ]
+
+    with pytest.raises(ValueError, match="median_position"):
+        validate_qualifying_grid(grid, min_entries=2)
+
+    grid[0]["median_position"] = 1
+    grid[0]["position"] = 3
+    with pytest.raises(ValueError, match="position"):
+        validate_qualifying_grid(grid, min_entries=2)
+
+
 def test_validate_qualifying_grid_respects_custom_max_position():
     grid = [{"driver": "VER", "team": "Red Bull Racing", "position": 23}]
 

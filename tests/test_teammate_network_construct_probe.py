@@ -18,11 +18,19 @@ from src.extractors.matched_laps import MatchedLapConfig
 def test_build_parser_defaults_to_offline_construct_probe() -> None:
     """The probe defaults to stored observations and offline cache reads."""
     args = build_parser().parse_args([])
-    assert str(args.observations) == (
-        "data/processed/teammate_network_observations/latest/aggregated_observations.csv"
+    assert args.observations.parts == (
+        "data",
+        "processed",
+        "teammate_network_observations",
+        "latest",
+        "aggregated_observations.csv",
     )
-    assert str(args.cache_dir) == "data/raw/.fastf1_cache"
-    assert str(args.output_dir) == "data/diagnostics/teammate_network_construct_probe"
+    assert args.cache_dir.parts == ("data", "raw", ".fastf1_cache")
+    assert args.output_dir.parts == (
+        "data",
+        "diagnostics",
+        "teammate_network_construct_probe",
+    )
     assert args.online is False
 
 

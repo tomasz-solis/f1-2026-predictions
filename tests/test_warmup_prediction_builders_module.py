@@ -5,8 +5,8 @@ import pytest
 from src.dashboard import warmup_prediction_builders
 
 
-def test_compute_base_features_clamps_completed_q_to_fp3_inputs():
-    """Base features should ignore completed Q data and stay on the FP3 prediction boundary."""
+def test_compute_base_features_uses_completed_q_for_post_q_race_input():
+    """Base features may use completed Q data for the downstream race target."""
 
     class _Predictor:
         """Capture the checkpoint passed to qualifying prediction."""
@@ -37,6 +37,7 @@ def test_compute_base_features_clamps_completed_q_to_fp3_inputs():
         build_actual_qualifying_section_fn=lambda grid, session_name: {
             "result_mode": "ACTUAL",
             "session_name": session_name,
+            "grid_source": "ACTUAL",
             "grid": grid,
         },
         fetch_grid_if_available_fn=lambda *args, **kwargs: (_ for _ in ()).throw(
@@ -48,10 +49,10 @@ def test_compute_base_features_clamps_completed_q_to_fp3_inputs():
         cap_predicted_main_race_input_confidence_fn=lambda *args, **kwargs: 0.0,
     )
 
-    assert predictor.qualifying_calls[0]["checkpoint_session_name"] == "FP3"
-    assert result["qualifying"]["grid_source"] == "PREDICTED"
-    assert result["qualifying"]["grid"][0]["driver"] == "NOR"
-    assert result["race_input_confidence"] == 0.45
+    assert predictor.qualifying_calls == []
+    assert result["qualifying"]["grid_source"] == "ACTUAL"
+    assert result["qualifying"]["grid"][0]["driver"] == "RUS"
+    assert result["race_input_confidence"] == 1.0
 
 
 def test_compute_base_features_keeps_sprint_checkpoint_profile_calls():
@@ -103,8 +104,8 @@ def test_compute_base_features_keeps_sprint_checkpoint_profile_calls():
     assert result["main_race_input_confidence"] == pytest.approx(0.75)
 
 
-def test_compute_base_features_uses_actual_sq_but_not_actual_q():
-    """Sprint base features may use SQ results but must keep main qualifying on the SQ boundary."""
+def test_compute_base_features_uses_actual_sq_and_actual_q_at_q_boundary():
+    """Sprint base features may use completed SQ and Q for downstream race targets."""
 
     class _Predictor:
         """Capture whether main qualifying still runs from the SQ checkpoint."""
@@ -139,6 +140,7 @@ def test_compute_base_features_uses_actual_sq_but_not_actual_q():
         build_actual_qualifying_section_fn=lambda grid, session_name: {
             "result_mode": "ACTUAL",
             "session_name": session_name,
+            "grid_source": "ACTUAL",
             "grid": grid,
         },
         fetch_grid_if_available_fn=lambda *args, **kwargs: (_ for _ in ()).throw(
@@ -152,12 +154,11 @@ def test_compute_base_features_uses_actual_sq_but_not_actual_q():
 
     assert result["sprint_quali"]["result_mode"] == "ACTUAL"
     assert result["sprint_quali"]["grid"][0]["driver"] == "NOR"
-    assert [call["qualifying_stage"] for call in predictor.qualifying_calls] == ["main"]
-    assert predictor.qualifying_calls[0]["checkpoint_session_name"] == "SQ"
-    assert result["main_quali"]["grid_source"] == "PREDICTED"
-    assert result["main_quali"]["grid"][0]["driver"] == "PIA"
+    assert predictor.qualifying_calls == []
+    assert result["main_quali"]["grid_source"] == "ACTUAL"
+    assert result["main_quali"]["grid"][0]["driver"] == "RUS"
     assert result["sprint_race_input_confidence"] == 1.0
-    assert result["main_race_input_confidence"] == 0.0
+    assert result["main_race_input_confidence"] == 1.0
 
 
 def test_compute_base_features_does_not_refresh_q_grid_after_fp3():

@@ -6,7 +6,10 @@ import json
 from pathlib import Path
 
 from scripts.generate_evaluation_report import (
+    _apply_qualifying_production_adjustments,
+    _sort_selected_predictions,
     build_report,
+    evaluate_production_gate,
     render_error_analysis_markdown,
     render_markdown,
 )
@@ -82,6 +85,140 @@ def _write_prediction(
     (race_dir / f"{race_slug}_{session_name.lower()}.json").write_text(json.dumps(payload))
 
 
+def _legacy_prediction(
+    race_name: str,
+    predicted_rows: list[dict],
+    actual_rows: list[dict],
+) -> dict:
+    """Return a minimal legacy-shaped prediction payload for helper tests."""
+    return {
+        "metadata": {
+            "year": 2026,
+            "race_name": race_name,
+            "session_name": "FP3",
+            "predicted_at": "2026-01-01T00:00:00+00:00",
+        },
+        "qualifying": {"predicted_grid": predicted_rows},
+        "actuals": {"qualifying": actual_rows},
+    }
+
+
+def test_selected_predictions_are_sorted_by_calendar_order():
+    predictions = [
+        _legacy_prediction("Canadian Grand Prix", [], []),
+        _legacy_prediction("Australian Grand Prix", [], []),
+        _legacy_prediction("Chinese Grand Prix", [], []),
+    ]
+
+    ordered = _sort_selected_predictions(
+        predictions,
+        year=2026,
+        calendar_order={
+            "australian grand prix": 0,
+            "chinese grand prix": 1,
+            "canadian grand prix": 2,
+        },
+    )
+
+    assert [row["metadata"]["race_name"] for row in ordered] == [
+        "Australian Grand Prix",
+        "Chinese Grand Prix",
+        "Canadian Grand Prix",
+    ]
+
+
+def test_qualifying_production_adjustment_uses_previous_actuals_only():
+    first_actual = [
+        {"driver": "AAA", "team": "A", "position": 1},
+        {"driver": "BBB", "team": "B", "position": 2},
+    ]
+    second_actual = [
+        {"driver": "AAA", "team": "A", "position": 1},
+        {"driver": "BBB", "team": "B", "position": 2},
+    ]
+    first_prediction = _legacy_prediction(
+        "Australian Grand Prix",
+        [
+            {"driver": "AAA", "team": "A", "position": 1, "p5": 1, "p95": 1},
+            {"driver": "BBB", "team": "B", "position": 2, "p5": 2, "p95": 2},
+        ],
+        first_actual,
+    )
+    second_prediction = _legacy_prediction(
+        "Chinese Grand Prix",
+        [
+            {"driver": "BBB", "team": "B", "position": 1, "p5": 1, "p95": 1},
+            {"driver": "AAA", "team": "A", "position": 2, "p5": 2, "p95": 2},
+        ],
+        second_actual,
+    )
+
+    adjusted, metadata = _apply_qualifying_production_adjustments(
+        [first_prediction, second_prediction]
+    )
+
+    second_rows = adjusted[1]["qualifying"]["predicted_grid"]
+    assert [row["driver"] for row in second_rows] == ["AAA", "BBB"]
+    assert second_rows[0]["raw_model_position"] == 2
+    assert second_rows[0]["previous_race_position"] == 1
+    assert second_rows[0]["conformal_interval_margin"] == 1.0
+    assert metadata["qualifying_rank_stabilizer"]["uses_current_event_actuals"] is False
+    assert (
+        metadata["qualifying_interval_stabilizer"]["uses_current_event_actuals_for_current_margin"]
+        is False
+    )
+
+
+def test_production_gate_passes_when_model_is_fresh_calibrated_and_beats_naive():
+    report = {
+        "generated_at": "2026-06-15T12:00:00+00:00",
+        "qualifying_accuracy": {"events_evaluated": 5},
+        "race_accuracy": {"events_evaluated": 5},
+        "qualifying_vs_baseline": {"improvement": {"mae_improvement": 0.12}},
+        "race_vs_baseline": {"improvement": {"mae_improvement": 0.08}},
+        "calibration": {"empirical_coverage": 0.90},
+        "qualifying_bias": {
+            "most_overestimated_drivers": [{"entity": "AAA", "mean_abs_error": 2.0}]
+        },
+        "race_bias": {"most_underestimated_drivers": [{"entity": "BBB", "mean_abs_error": 3.0}]},
+    }
+
+    gate = evaluate_production_gate(
+        report,
+        latest_completed_race_at="2026-06-14T18:00:00+00:00",
+    )
+
+    assert gate["status"] == "pass"
+    assert gate["score_estimate"] == 95
+    assert gate["reasons"] == []
+
+
+def test_production_gate_fails_stale_underperforming_report():
+    report = {
+        "generated_at": "2026-04-20T12:00:00+00:00",
+        "qualifying_accuracy": {"events_evaluated": 3},
+        "race_accuracy": {"events_evaluated": 3},
+        "qualifying_vs_baseline": {"improvement": {"mae_improvement": -0.23}},
+        "race_vs_baseline": {"improvement": {"mae_improvement": -0.18}},
+        "calibration": {"empirical_coverage": 0.803},
+        "qualifying_bias": {
+            "most_overestimated_drivers": [{"entity": "VER", "mean_abs_error": 11.0}]
+        },
+        "race_bias": {},
+    }
+
+    gate = evaluate_production_gate(
+        report,
+        latest_completed_race_at="2026-06-01T18:00:00+00:00",
+    )
+
+    assert gate["status"] == "fail"
+    assert gate["score_estimate"] < 95
+    assert "older than the latest completed race" in " ".join(gate["reasons"])
+    assert "qualifying MAE does not beat" in " ".join(gate["reasons"])
+    assert "race MAE does not beat" in " ".join(gate["reasons"])
+
+
 def test_build_report_includes_accuracy_and_format_breakdown(tmp_path):
     """Report payload should include standardized accuracy and coverage sections."""
     predictions_dir = tmp_path / "predictions"
@@ -138,6 +275,7 @@ def test_build_report_includes_accuracy_and_format_breakdown(tmp_path):
     assert report["segment_breakdown"]["race"]["weather"]["mixed"]["events"] == 1
     assert report["segment_breakdown"]["race"]["track_type"]["street"]["events"] == 1
     assert report["error_analysis"]["race"]["worst_events"][0]["race_name"] == "Monaco Grand Prix"
+    assert report["production_gate"]["status"] == "fail"
     assert "mae" in report["qualifying_accuracy"]
     assert "mae" in report["race_accuracy"]
 
@@ -167,6 +305,7 @@ def test_render_markdown_mentions_accuracy_overview_and_format_breakdown(tmp_pat
     markdown = render_markdown(build_report(2026, predictions_dir))
 
     assert "## 0. Accuracy Overview" in markdown
+    assert "## Production Readiness Gate" in markdown
     assert "### Weekend Format Coverage" in markdown
     assert "## Selection Policy" in markdown
     assert "## 1. Segmented Performance" in markdown

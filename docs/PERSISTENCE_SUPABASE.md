@@ -44,6 +44,8 @@ like `ttps://...` now fail fast with an explicit error.
 - SQL migration: `migrations/002_create_runtime_state_and_operational_tables.sql`
 - SQL migration: `migrations/003_harden_rls_policies.sql`
 - SQL migration: `migrations/004_normalize_prediction_artifact_keys.sql`
+- SQL migration: `migrations/005_create_app_events_table.sql`
+- SQL migration: `migrations/006_harden_app_events.sql`
 - Connection test: `scripts/test_supabase_connection.py`
 - Cleanup utility: `scripts/normalize_dashboard_artifacts_in_db.py`
 - Backfill utility: `scripts/backfill_to_db.py` (migrates `driver_debuts.csv` too)
@@ -53,6 +55,13 @@ like `ttps://...` now fail fast with an explicit error.
 - Predictor + storage smoke test: `scripts/test_predictor_with_db.py`
 
 No new Supabase tables or migrations are required for prediction accuracy. The existing generic `artifacts` table stores both raw prediction artifacts and derived accuracy snapshots.
+
+Dashboard telemetry uses `app_events`. Treat it as backend-only telemetry:
+
+- RLS is forced.
+- `PUBLIC`, `anon`, and `authenticated` privileges are revoked.
+- only `service_role` receives table access.
+- telemetry payloads must not include raw IP addresses, emails, or raw user-agent strings.
 
 ## Targeted Dashboard Datapoint Sync
 
@@ -191,6 +200,8 @@ These keys are relevant for the baseline predictor stack:
    - `migrations/002_create_runtime_state_and_operational_tables.sql`
    - `migrations/003_harden_rls_policies.sql`
    - `migrations/004_normalize_prediction_artifact_keys.sql`
+   - `migrations/005_create_app_events_table.sql`
+   - `migrations/006_harden_app_events.sql`
 2. Validate credentials and table access:
    - `uv run --active python scripts/test_supabase_connection.py`
 3. Inspect or repair normalized dashboard artifact keys:

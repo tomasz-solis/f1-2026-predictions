@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.persistence.artifact_store import ArtifactStore
 from src.utils.model_version import get_model_version
 from src.utils.prediction_logger import PredictionLogger
 
@@ -180,6 +181,52 @@ def test_prediction_identity_is_normalized_for_storage_and_lookup(
     assert logger.has_prediction_for_session(2026, "Chinese Grand Prix", " fp1 ") is True
 
 
+def test_prediction_logger_and_artifact_store_use_same_prediction_path(temp_predictions_dir):
+    """Canonical prediction paths should not drift between persistence layers."""
+    logger = PredictionLogger(predictions_dir=temp_predictions_dir)
+    store = ArtifactStore(data_root=Path(temp_predictions_dir).parent)
+
+    logger_path = logger._prediction_file_path(2026, "Bahrain Grand Prix", "FP1")
+    store_path = store._get_file_path("prediction", "2026::Bahrain Grand Prix::FP1")
+
+    assert logger_path == store_path
+
+
+@pytest.mark.parametrize(
+    "race_name,session_name",
+    [
+        ("..", "FP1"),
+        ("Bahrain/Grand Prix", "FP1"),
+        ("Bahrain\\Grand Prix", "FP1"),
+        ("Bahrain\nGrand Prix", "FP1"),
+        ("C:\\temp", "FP1"),
+        ("Bahrain Grand Prix", ".."),
+        ("Bahrain Grand Prix", "FP/1"),
+        ("Bahrain Grand Prix", "FP\t1"),
+        ("Bahrain Grand Prix", "C:\\temp"),
+        ("Bahrain Grand Prix", ""),
+    ],
+)
+def test_prediction_logger_rejects_unsafe_storage_identity(
+    temp_predictions_dir,
+    sample_quali_prediction,
+    sample_race_prediction,
+    race_name,
+    session_name,
+):
+    logger = PredictionLogger(predictions_dir=temp_predictions_dir)
+
+    with pytest.raises(ValueError):
+        logger.save_prediction(
+            year=2026,
+            race_name=race_name,
+            session_name=session_name,
+            qualifying_prediction=sample_quali_prediction,
+            race_prediction=sample_race_prediction,
+            weather="dry",
+        )
+
+
 def test_load_nonexistent_prediction(temp_predictions_dir):
     """Test loading a prediction that doesn't exist."""
     logger = PredictionLogger(predictions_dir=temp_predictions_dir)
@@ -284,6 +331,62 @@ def test_save_prediction_and_update_actuals_with_targets(
     assert set(prediction["targets"]) == {"sprint_qualifying", "grand_prix_race"}
     assert prediction["actuals"]["targets"]["sprint_qualifying"][0]["driver"] == "VER"
     assert prediction["actuals"]["targets"]["grand_prix_race"][0]["driver"] == "VER"
+
+
+def test_save_prediction_attaches_background_shadow_challenger(
+    temp_predictions_dir,
+    sample_quali_prediction,
+    sample_race_prediction,
+):
+    """Future saves should carry target-specific challenger rows for offline scoring."""
+    logger = PredictionLogger(predictions_dir=temp_predictions_dir)
+    target_payload = {
+        "main_qualifying": {
+            "target_session": "Q",
+            "predicted_order": [
+                {"position": 1, "driver": "BBB", "team": "B"},
+                {"position": 2, "driver": "AAA", "team": "A"},
+            ],
+            "eligible_at_save": True,
+        }
+    }
+
+    logger.save_prediction(
+        year=2026,
+        race_name="Australian Grand Prix",
+        session_name="FP1",
+        qualifying_prediction=sample_quali_prediction,
+        race_prediction=sample_race_prediction,
+        weather="dry",
+        target_predictions=target_payload,
+    )
+    logger.update_actuals(
+        year=2026,
+        race_name="Australian Grand Prix",
+        session_name="FP1",
+        target_actual_results={
+            "main_qualifying": [
+                {"position": 1, "driver": "AAA", "team": "A"},
+                {"position": 2, "driver": "BBB", "team": "B"},
+            ]
+        },
+    )
+    logger.save_prediction(
+        year=2026,
+        race_name="Chinese Grand Prix",
+        session_name="FP1",
+        qualifying_prediction=sample_quali_prediction,
+        race_prediction=sample_race_prediction,
+        weather="dry",
+        target_predictions=target_payload,
+    )
+
+    prediction = logger.load_prediction(2026, "Chinese Grand Prix", "FP1")
+    challenger = prediction["shadow_challengers"]["main_qualifying"]
+
+    assert challenger["status"] == "active"
+    assert challenger["challenger_name"] == "main_qualifying_form_blend_v1"
+    assert [row["driver"] for row in challenger["predicted_order"]] == ["AAA", "BBB"]
 
 
 def test_update_actuals_triggers_systematic_learning(

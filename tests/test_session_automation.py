@@ -393,9 +393,9 @@ def test_run_cycle_reconciles_sprint_actuals_and_writes_accuracy_snapshots(patch
     assert summary.checked_events == 1
     assert summary.generated_predictions == []
     assert summary.reconciled_actuals == ["Chinese Grand Prix::6"]
-    assert summary.accuracy_snapshots == 11
+    assert summary.accuracy_snapshots == 12
+    assert len(accuracy_saves) == 12
     assert sorted(set(fetch_calls)) == ["Q", "R", "SQ", "Sprint"]
-    assert len(accuracy_saves) == 11
     logger_inst = logger_instances[0]
     pre_actuals = logger_inst._records["PRE"]["actuals"]
     assert pre_actuals["qualifying"][0]["driver"] == "SQ"

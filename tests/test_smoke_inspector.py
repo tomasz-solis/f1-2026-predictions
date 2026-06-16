@@ -394,7 +394,7 @@ def test_cli_default_cache_path_uses_repo_fastf1_convention() -> None:
     parser = build_parser()
     args = parser.parse_args([])
 
-    assert str(args.cache_dir) == "data/raw/.fastf1_cache"
+    assert args.cache_dir.parts == ("data", "raw", ".fastf1_cache")
 
 
 def test_inspection_output_has_no_extractor_shaped_fields() -> None:

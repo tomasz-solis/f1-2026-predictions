@@ -247,9 +247,7 @@ def resolve_dashboard_race_horizon(
 
     return [
         race_name
-        for race_name, _event_cutoff in competitive_rows[
-            anchor_index : anchor_index + horizon_size
-        ]
+        for race_name, _event_cutoff in competitive_rows[anchor_index : anchor_index + horizon_size]
     ]
 
 
