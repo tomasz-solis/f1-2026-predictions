@@ -5,13 +5,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def validate_range(value: float, name: str, min_val: float, max_val: float) -> None:
-    """Validate value is within range [min_val, max_val]. Raises ValueError if outside."""
-    if not (min_val <= value <= max_val):
-        raise ValueError(f"{name} must be between {min_val} and {max_val}, got {value}")
-    logger.debug("Validated %s=%s is in range [%s, %s]", name, value, min_val, max_val)
-
-
 def validate_positive_int(value: int, name: str, min_val: int = 1) -> None:
     """Validate value is positive integer >= min_val. Raises ValueError if not."""
     if not isinstance(value, int) or value < min_val:
