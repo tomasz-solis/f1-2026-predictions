@@ -230,11 +230,11 @@ class TestBayesianDriverRanking:
         # Rating should drop significantly
         assert final_mu < initial_mu - 3.0
 
-    def test_update_from_session_alias_works(self, sample_priors):
-        """Backward compatibility alias should work."""
+    def test_canonical_update_method(self, sample_priors):
+        """Test the canonical update method."""
         ranker = BayesianDriverRanking(sample_priors)
 
-        ranker.update_from_session({"1": 1}, "race", confidence=1.0)
+        ranker.update({"1": 1}, "race", confidence=1.0)
 
         assert len(ranker.history) == 1
 

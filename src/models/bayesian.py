@@ -207,8 +207,6 @@ class BayesianDriverRanking:
             observed_positions=adjusted_positions,
         )
 
-    update_from_session = update
-    update_from_session_teammate_relative = update_teammate_relative
 
     def get_history_df(self) -> pd.DataFrame:
         """Export update history for visualization."""
