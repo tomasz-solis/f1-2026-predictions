@@ -9,10 +9,7 @@ from typing import Any
 import numpy as np
 from scipy.stats import kendalltau, spearmanr
 
-try:
-    from src.utils.team_mapping import canonicalize_team
-except ImportError:
-    from src.utils.team_mapping import canonicalize_team
+from src.utils.team_mapping import canonicalize_team
 
 
 def compare_rankings(predicted: list[str], actual: list[str]) -> dict[str, float]:
