@@ -1,0 +1,147 @@
+{
+  "metadata": {
+    "run_id": "43e377c3-9e38-48e1-84a6-85135aa9d416",
+    "year": 2026,
+    "race_name": "Japanese Grand Prix",
+    "session_name": "Q",
+    "predicted_at": "2026-06-26T07:12:25.027139+00:00",
+    "weather": "dry",
+    "fp_blend_info": {},
+    "source": "warmup_precompute",
+    "weekend_format": "normal",
+    "top_level_qualifying_target": "main_qualifying",
+    "top_level_race_target": "grand_prix_race",
+    "top_level_qualifying_eligible_at_save": false,
+    "top_level_race_eligible_at_save": true,
+    "top_level_qualifying_result_mode": "ACTUAL",
+    "top_level_race_result_mode": "PREDICTED",
+    "top_level_qualifying_grid_source": "ACTUAL",
+    "top_level_race_grid_source": "ACTUAL",
+    "model_diagnostics_schema_version": 1,
+    "qualifying_model_diagnostics": {
+      "data_source": "Actual Qualifying classification"
+    },
+    "race_model_diagnostics": {
+      "grid_source": "ACTUAL",
+      "input_confidence": 1.0
+    },
+    "model_version": "2.3"
+  },
+  "qualifying": {
+    "predicted_grid": [
+      {
+        "position": 1,
+        "driver": "RUS",
+        "team": "Mercedes",
+        "expected_time": null,
+        "confidence": null,
+        "order_confidence": null,
+        "p5": null,
+        "p95": null
+      },
+      {
+        "position": 2,
+        "driver": "LEC",
+        "team": "Ferrari",
+        "expected_time": null,
+        "confidence": null,
+        "order_confidence": null,
+        "p5": null,
+        "p95": null
+      }
+    ]
+  },
+  "race": {
+    "predicted_results": [
+      {
+        "position": 1,
+        "driver": "RUS",
+        "team": "Mercedes",
+        "confidence": 78.4,
+        "order_confidence": null,
+        "dnf_probability": null,
+        "dnf_risk": null
+      },
+      {
+        "position": 2,
+        "driver": "LEC",
+        "team": "Ferrari",
+        "confidence": 71.2,
+        "order_confidence": null,
+        "dnf_probability": null,
+        "dnf_risk": null
+      }
+    ]
+  },
+  "targets": {
+    "grand_prix_race": {
+      "target_session": "R",
+      "predicted_order": [
+        {
+          "position": 1,
+          "driver": "RUS",
+          "team": "Mercedes",
+          "confidence": 78.4
+        },
+        {
+          "position": 2,
+          "driver": "LEC",
+          "team": "Ferrari",
+          "confidence": 71.2
+        }
+      ],
+      "result_mode": "PREDICTED",
+      "grid_source": "ACTUAL",
+      "fp_blend_info": {},
+      "mean_confidence": 74.80000000000001,
+      "eligible_at_save": true
+    }
+  },
+  "actuals": {
+    "qualifying": null,
+    "race": null,
+    "targets": {
+      "grand_prix_race": null
+    }
+  },
+  "shadow_challengers": {
+    "grand_prix_race": {
+      "schema_version": 1,
+      "challenger_version": "target_form_blend_v1",
+      "challenger_name": "grand_prix_race_form_blend_v1",
+      "target_key": "grand_prix_race",
+      "target_session": "R",
+      "rule": {
+        "target_key": "grand_prix_race",
+        "challenger_name": "grand_prix_race_form_blend_v1",
+        "model_weight": 0.8,
+        "history_window": 1,
+        "min_history_events": 1,
+        "rationale": "Grand Prix race audit favours a light model-aware previous-race correction."
+      },
+      "history_events": 1,
+      "uses_current_event_actuals": false,
+      "status": "active",
+      "predicted_order": [
+        {
+          "position": 1,
+          "driver": "RUS",
+          "team": "Mercedes",
+          "confidence": 78.4,
+          "champion_position": 1,
+          "shadow_score": 1.2,
+          "shadow_adjustment_positions": 0
+        },
+        {
+          "position": 2,
+          "driver": "LEC",
+          "team": "Ferrari",
+          "confidence": 71.2,
+          "champion_position": 2,
+          "shadow_score": 2.4,
+          "shadow_adjustment_positions": 0
+        }
+      ]
+    }
+  }
+}
