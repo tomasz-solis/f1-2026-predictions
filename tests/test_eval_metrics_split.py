@@ -114,6 +114,25 @@ def test_dnf_calibration_handles_missing_probabilities():
     assert math.isnan(cal["brier_score"])
 
 
+def test_dnf_calibration_zero_dnf_event_scores_brier_but_not_skill():
+    # An event where nobody retires has baseline_brier 0 (base rate 0), so the
+    # skill score is undefined (NaN) while the Brier score itself stays finite.
+    predicted = [
+        {"driver": "A", "position": 1, "dnf_probability": 0.05},
+        {"driver": "B", "position": 2, "dnf_probability": 0.10},
+    ]
+    actual = [
+        {"driver": "A", "position": 1, "status": "Finished"},
+        {"driver": "B", "position": 2, "status": "Finished"},
+    ]
+    cal = compute_dnf_calibration(predicted, actual)
+    assert cal["scored_drivers"] == 2.0
+    assert cal["actual_dnf_count"] == 0.0
+    assert cal["brier_score"] == pytest.approx((0.05**2 + 0.10**2) / 2)
+    assert cal["baseline_brier"] == 0.0
+    assert math.isnan(cal["brier_skill_score"])
+
+
 def test_dnf_calibration_reads_dnf_risk_alias_and_normalises_percent():
     # Persisted artifacts use the "dnf_risk" alias; some store it as a 0-100 percentage.
     predicted = [

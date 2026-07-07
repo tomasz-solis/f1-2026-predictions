@@ -737,13 +737,21 @@ def _build_dnf_calibration_section(
             sum(float(row[key]) * float(row["scored_drivers"]) for row in labelled) / total_drivers
         )
 
+    weighted_brier = _weighted("brier_score")
+    weighted_baseline = _weighted("baseline_brier")
+    # Derive the aggregate skill from the pooled components instead of averaging
+    # per-event skills: an event with zero DNFs has baseline_brier 0 and an
+    # undefined (NaN) per-event skill, which would poison the mean.
+    brier_skill_score: float | None = None
+    if weighted_baseline > 0:
+        brier_skill_score = 1.0 - weighted_brier / weighted_baseline
     return {
         "events_scored": len(labelled),
         "scored_drivers": sum(int(row["scored_drivers"]) for row in labelled),
         "actual_dnf_count": sum(int(row["actual_dnf_count"]) for row in labelled),
-        "brier_score": _weighted("brier_score"),
-        "baseline_brier": _weighted("baseline_brier"),
-        "brier_skill_score": _weighted("brier_skill_score"),
+        "brier_score": weighted_brier,
+        "baseline_brier": weighted_baseline,
+        "brier_skill_score": brier_skill_score,
     }
 
 
@@ -1862,6 +1870,21 @@ def render_markdown(report: dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _sanitize_non_finite(value: Any) -> Any:
+    """Replace NaN/inf floats with None so the report stays strict-JSON valid.
+
+    ``json.dump`` defaults to ``allow_nan=True`` and would emit a bare ``NaN``
+    literal that strict parsers reject.
+    """
+    if isinstance(value, dict):
+        return {key: _sanitize_non_finite(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_non_finite(item) for item in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Generate calibration and bias evaluation report from saved predictions."
@@ -1960,8 +1983,9 @@ def main() -> int:
 
     json_out = Path(args.json_out or f"data/evaluation/{args.year}_evaluation_report.json")
     json_out.parent.mkdir(parents=True, exist_ok=True)
+    report = _sanitize_non_finite(report)
     with open(json_out, "w") as fh:
-        json.dump(report, fh, indent=2)
+        json.dump(report, fh, indent=2, allow_nan=False)
     logger.info("Wrote JSON report: %s", json_out)
 
     md = render_markdown(report)

@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from scripts.generate_evaluation_report import (
     _apply_qualifying_production_adjustments,
+    _build_dnf_calibration_section,
+    _sanitize_non_finite,
     _sort_selected_predictions,
     build_report,
     evaluate_production_gate,
@@ -101,6 +104,78 @@ def _legacy_prediction(
         "qualifying": {"predicted_grid": predicted_rows},
         "actuals": {"qualifying": actual_rows},
     }
+
+
+def test_dnf_calibration_aggregate_skill_survives_zero_dnf_event():
+    # Regression: a zero-DNF event has an undefined (NaN) per-event skill score;
+    # the aggregate must be derived from pooled brier/baseline components instead
+    # of averaging per-event skills, or the NaN poisons the whole season number.
+    with_dnf_predicted = [
+        {"driver": "A", "position": 1, "dnf_probability": 0.05},
+        {"driver": "B", "position": 2, "dnf_probability": 0.80},
+    ]
+    with_dnf_actual = [
+        {"driver": "A", "position": 1, "status": "Finished"},
+        {"driver": "B", "position": 20, "status": "Retired"},
+    ]
+    zero_dnf_predicted = [
+        {"driver": "A", "position": 1, "dnf_probability": 0.05},
+        {"driver": "B", "position": 2, "dnf_probability": 0.10},
+    ]
+    zero_dnf_actual = [
+        {"driver": "A", "position": 1, "status": "Finished"},
+        {"driver": "B", "position": 2, "status": "Finished"},
+    ]
+
+    section = _build_dnf_calibration_section(
+        [with_dnf_predicted, zero_dnf_predicted],
+        [with_dnf_actual, zero_dnf_actual],
+    )
+
+    assert section["events_scored"] == 2
+    assert section["scored_drivers"] == 4
+    assert section["actual_dnf_count"] == 1
+    # Pooled components: brier = mean over both events weighted by drivers,
+    # baseline pools the per-event base-rate scores (0.25 and 0.0).
+    expected_brier = ((0.0025 + 0.04) / 2 + (0.0025 + 0.01) / 2) / 2
+    assert section["brier_score"] == pytest.approx(expected_brier)
+    assert section["baseline_brier"] == pytest.approx(0.125)
+    assert section["brier_skill_score"] == pytest.approx(1.0 - expected_brier / 0.125)
+
+
+def test_dnf_calibration_aggregate_skill_is_none_when_no_dnfs_at_all():
+    predicted = [
+        {"driver": "A", "position": 1, "dnf_probability": 0.05},
+        {"driver": "B", "position": 2, "dnf_probability": 0.10},
+    ]
+    actual = [
+        {"driver": "A", "position": 1, "status": "Finished"},
+        {"driver": "B", "position": 2, "status": "Finished"},
+    ]
+
+    section = _build_dnf_calibration_section([predicted], [actual])
+
+    assert section["events_scored"] == 1
+    assert section["baseline_brier"] == 0.0
+    assert section["brier_skill_score"] is None
+
+
+def test_sanitize_non_finite_makes_report_strict_json_safe():
+    report = {
+        "ok": 1.5,
+        "bad": float("nan"),
+        "nested": {"inf": float("inf"), "list": [1, float("-inf"), "text"]},
+    }
+
+    sanitized = _sanitize_non_finite(report)
+
+    assert sanitized == {
+        "ok": 1.5,
+        "bad": None,
+        "nested": {"inf": None, "list": [1, None, "text"]},
+    }
+    # Must not raise: the report file is written with allow_nan=False.
+    json.dumps(sanitized, allow_nan=False)
 
 
 def test_selected_predictions_are_sorted_by_calendar_order():
