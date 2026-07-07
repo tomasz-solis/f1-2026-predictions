@@ -965,6 +965,8 @@ class BaselineRaceConfig(StrictConfigModel):
     dnf_rate_historical_cap: float = Field(default=0.20, ge=0.0, le=1.0)
     dnf_rate_final_cap: float = Field(default=0.35, ge=0.0, le=1.0)
     dnf_rate_floor: float = Field(default=0.02, ge=0.0, le=1.0)
+    dnf_probability_shrinkage_lambda: float = Field(default=1.0, ge=0.0, le=1.0)
+    dnf_probability_base_rate: float = Field(default=0.04, ge=0.0, le=1.0)
     testing_long_run_modifier_scale: float = Field(default=0.05, ge=0.0)
     main_race_predicted_grid_sprint_confidence_cap: float = Field(
         default=0.55,

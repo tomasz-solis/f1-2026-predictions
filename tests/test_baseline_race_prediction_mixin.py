@@ -10,6 +10,7 @@ from src.predictors.baseline.race.grid_uncertainty import prepare_grid_uncertain
 from src.predictors.baseline.race.prediction_mixin import BaselineRacePredictionMixin
 from src.predictors.baseline.race.result_processing import (
     apply_early_season_team_uncertainty_adjustments,
+    calibrated_dnf_probability,
     estimate_predicted_grid_uncertainty_share,
 )
 
@@ -1238,3 +1239,35 @@ def test_enforce_non_increasing_podium_probabilities(input_values, expected_firs
     assert smoothed[0] == expected_first
     assert smoothed[-1] == expected_last
     assert all(smoothed[idx] >= smoothed[idx + 1] for idx in range(len(smoothed) - 1))
+
+
+def test_calibrated_dnf_probability_default_lambda_reports_capped_rate_unchanged():
+    assert calibrated_dnf_probability(
+        0.50,
+        output_cap=0.35,
+        shrinkage_lambda=1.0,
+        base_rate=0.04,
+    ) == pytest.approx(0.35)
+    assert calibrated_dnf_probability(
+        0.12,
+        output_cap=0.35,
+        shrinkage_lambda=1.0,
+        base_rate=0.04,
+    ) == pytest.approx(0.12)
+
+
+def test_calibrated_dnf_probability_shrinks_toward_base_rate():
+    # lambda 0.25 keeps a quarter of the (capped) simulated rate.
+    assert calibrated_dnf_probability(
+        0.20,
+        output_cap=0.35,
+        shrinkage_lambda=0.25,
+        base_rate=0.04,
+    ) == pytest.approx(0.25 * 0.20 + 0.75 * 0.04)
+    # lambda 0 collapses to the configured base rate regardless of input.
+    assert calibrated_dnf_probability(
+        0.90,
+        output_cap=0.35,
+        shrinkage_lambda=0.0,
+        base_rate=0.04,
+    ) == pytest.approx(0.04)

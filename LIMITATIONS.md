@@ -208,3 +208,32 @@ What would fix it: rerun guarded ablations after each component change and
 promote only components that pass the gate across holdouts and live slices.
 Qualifying residuals need direction diagnostics before clip tuning; if they
 often move drivers the wrong way, smaller clips only hide a bad signal.
+
+---
+
+## 10. DNF probability is honest about existence, not yet about magnitude
+
+What the model does: every race prediction carries a per-driver
+`dnf_probability` built from historical retirement rates, driver experience,
+and team uncertainty, then realised through Monte Carlo DNF sampling. The
+dashboard shows it as a "DNF Risk %" column and the evaluation report scores
+it with a Brier score against actual retirements.
+
+The gap: against the low observed 2026 retirement rate, the raw output
+overforecasts risk. The 2026 probe
+(`data/model_diagnostics/2026/dnf_calibration_probe.md`, 13 race events,
+286 driver observations, 11 DNFs) scores the emitted probabilities at
+Brier 0.046 while shrinking them three-quarters of the way toward the season
+base rate scores 0.037. The sample is small, so per-driver risk ranking may
+still be informative even though the absolute magnitudes run high.
+
+What partially mitigates it: an output-layer shrinkage knob
+(`baseline_predictor.race.dnf_probability_shrinkage_lambda` with
+`dnf_probability_base_rate`) can recalibrate the *reported* probability
+without touching the simulation inputs. It defaults to 1.0 (no change) until
+the probe evidence is confirmed on a larger sample.
+
+What would fix it: keep scoring races, and if the overforecast persists,
+recalibrate the simulation-input DNF rates themselves (historical caps,
+floors, and experience modifiers) through the promotion-gate workflow, since
+that changes finish-order predictions.

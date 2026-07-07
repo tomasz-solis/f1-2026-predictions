@@ -282,6 +282,22 @@ def apply_hypothetical_points_floor(
     return min(position_blend_score, capped_position), capped_samples
 
 
+def calibrated_dnf_probability(
+    simulated_rate: float,
+    *,
+    output_cap: float,
+    shrinkage_lambda: float,
+    base_rate: float,
+) -> float:
+    """Return the reported DNF probability after capping and base-rate shrinkage.
+
+    The shrinkage only recalibrates the *reported* number; the simulation has
+    already sampled DNFs from the uncalibrated per-driver inputs.
+    """
+    capped = float(np.clip(float(simulated_rate), 0.0, output_cap))
+    return round(shrinkage_lambda * capped + (1.0 - shrinkage_lambda) * base_rate, 3)
+
+
 @dataclass(frozen=True)
 class _FinishOrderConfig:
     """Resolved config for the build_finish_order scoring loop."""
@@ -312,6 +328,8 @@ class _FinishOrderConfig:
     predicted_grid_racecraft_scale: float
     predicted_grid_max_gain_scale: float
     dnf_probability_output_cap: float
+    dnf_probability_shrinkage_lambda: float
+    dnf_probability_base_rate: float
     learning_position_scale: float
     track_overtaking: float
 
@@ -479,6 +497,24 @@ def _load_finish_order_config(
         )
     )
     dnf_probability_output_cap = float(cfg.get("baseline_predictor.race.dnf_rate_final_cap", 0.35))
+    # Output-layer calibration of the reported DNF probability: shrink toward a
+    # season base rate without touching the Monte Carlo DNF sampling inputs.
+    # lambda 1.0 reports the simulated rate unchanged; the 2026 probe
+    # (data/model_diagnostics/2026/dnf_calibration_probe.md) supports 0.25.
+    dnf_probability_shrinkage_lambda = float(
+        np.clip(
+            float(cfg.get("baseline_predictor.race.dnf_probability_shrinkage_lambda", 1.0)),
+            0.0,
+            1.0,
+        )
+    )
+    dnf_probability_base_rate = float(
+        np.clip(
+            float(cfg.get("baseline_predictor.race.dnf_probability_base_rate", 0.04)),
+            0.0,
+            1.0,
+        )
+    )
     learning_position_scale = float(
         cfg.get("baseline_predictor.race.learning.position_adjustment_scale", 0.70)
     )
@@ -510,6 +546,8 @@ def _load_finish_order_config(
         predicted_grid_racecraft_scale=predicted_grid_racecraft_scale,
         predicted_grid_max_gain_scale=predicted_grid_max_gain_scale,
         dnf_probability_output_cap=dnf_probability_output_cap,
+        dnf_probability_shrinkage_lambda=dnf_probability_shrinkage_lambda,
+        dnf_probability_base_rate=dnf_probability_base_rate,
         learning_position_scale=learning_position_scale,
         track_overtaking=track_overtaking,
     )
@@ -686,15 +724,11 @@ def build_finish_order(
                 "confidence": round(confidence, 1),
                 "order_confidence": None,
                 "podium_probability": 0.0,
-                "dnf_probability": round(
-                    float(
-                        np.clip(
-                            aggregated["dnf_rates"].get(driver_code, 0.0),
-                            0.0,
-                            fo_cfg.dnf_probability_output_cap,
-                        )
-                    ),
-                    3,
+                "dnf_probability": calibrated_dnf_probability(
+                    aggregated["dnf_rates"].get(driver_code, 0.0),
+                    output_cap=fo_cfg.dnf_probability_output_cap,
+                    shrinkage_lambda=fo_cfg.dnf_probability_shrinkage_lambda,
+                    base_rate=fo_cfg.dnf_probability_base_rate,
                 ),
             }
         )

@@ -539,6 +539,14 @@ baseline_predictor:
     dnf_rate_final_cap: 0.35       # Final maximum DNF probability per driver
     dnf_rate_floor: 0.02           # Minimum per-race DNF probability to avoid zero-risk overconfidence
 
+    # Output-layer DNF probability calibration (reported number only; the Monte
+    # Carlo DNF sampling inputs are untouched). lambda 1.0 = report the simulated
+    # rate unchanged. The 2026 probe (data/model_diagnostics/2026/
+    # dnf_calibration_probe.md) supports 0.25: the raw output overforecasts
+    # retirement risk (Brier 0.046 vs 0.037 shrunk toward the season base rate).
+    dnf_probability_shrinkage_lambda: 1.0
+    dnf_probability_base_rate: 0.04
+
     # Program-aware testing/practice modifier
     # Uses long-run profile characteristics to make a small team-strength adjustment.
     testing_long_run_modifier_scale: 0.05
