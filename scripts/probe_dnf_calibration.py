@@ -176,7 +176,8 @@ def render_markdown(probe: dict[str, Any]) -> str:
         "## Per-event Brier",
         "",
         "| Race | Target | Checkpoint | Drivers | DNFs | Prior rate | "
-        + " | ".join(f"λ={lam}" for lam in probe["pooled_brier_by_lambda"]) + " |",
+        + " | ".join(f"λ={lam}" for lam in probe["pooled_brier_by_lambda"])
+        + " |",
         "|---|---|---|---:|---:|---:|" + "---:|" * len(probe["pooled_brier_by_lambda"]),
     ]
     for event in probe["events"]:
