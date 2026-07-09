@@ -45,9 +45,13 @@ logger = logging.getLogger(__name__)
 _SPRINT_SECONDS_EVIDENCE_SCALE = 0.5
 
 
-def _driver_characteristics_fallback_paths(year: int) -> tuple[Path, ...]:
-    """Return the season-scoped driver file first, then the legacy fallback path."""
-    processed_root = Path("data/processed")
+def _driver_characteristics_fallback_paths(processed_root: Path, year: int) -> tuple[Path, ...]:
+    """Return the season-scoped driver file first, then the legacy fallback path.
+
+    ``processed_root`` is the active store's ``processed`` directory, so sidecar
+    tools (historical replay, ablation runs) read and write inside their own
+    data root instead of the repo's live ``data/processed`` tree.
+    """
     return (
         processed_root / "driver_characteristics" / f"{year}_driver_characteristics.json",
         processed_root / "driver_characteristics.json",
@@ -78,7 +82,8 @@ def _load_driver_characteristics_payload(
     if payload:
         return payload
 
-    for fallback_file in _driver_characteristics_fallback_paths(year):
+    processed_root = Path(store.data_root) / "processed"
+    for fallback_file in _driver_characteristics_fallback_paths(processed_root, year):
         if not fallback_file.exists():
             continue
         try:
@@ -107,7 +112,8 @@ def _persist_driver_characteristics_payload(
 ) -> None:
     """Save driver characteristics to the store and JSON file."""
     artifact_key = f"{year}::driver_characteristics"
-    fallback_file = _driver_characteristics_fallback_paths(year)[0]
+    processed_root = Path(store.data_root) / "processed"
+    fallback_file = _driver_characteristics_fallback_paths(processed_root, year)[0]
     fallback_file.parent.mkdir(parents=True, exist_ok=True)
 
     current_version_raw = payload.get("version", 0)

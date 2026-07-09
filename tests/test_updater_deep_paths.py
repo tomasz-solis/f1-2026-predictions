@@ -337,6 +337,7 @@ def test_update_bayesian_driver_ratings_prefers_teammate_relative_updates(patche
 
     class _Store:
         def __init__(self, data_root):
+            self.data_root = data_root
             self.saved = []
 
         def load_artifact(self, artifact_type, artifact_key):
@@ -406,6 +407,7 @@ def test_update_bayesian_driver_ratings_persists_driver_characteristics_updates(
 
     class _Store:
         def __init__(self, data_root):
+            self.data_root = data_root
             self.saved = []
 
         def load_artifact(self, artifact_type, artifact_key):
@@ -509,6 +511,7 @@ def test_update_bayesian_driver_ratings_reuses_saved_posteriors_and_cleans_stale
 
     class _Store:
         def __init__(self, data_root):
+            self.data_root = data_root
             self.saved = []
 
         def load_artifact(self, artifact_type, artifact_key):
@@ -607,6 +610,7 @@ def test_update_bayesian_driver_ratings_also_writes_year_scoped_fallback_on_stor
 
     class _Store:
         def __init__(self, data_root):
+            self.data_root = data_root
             self.saved = []
 
         def load_artifact(self, artifact_type, artifact_key):
@@ -683,6 +687,7 @@ def test_update_bayesian_driver_ratings_refreshes_quali_pace_from_qualifying_res
 
     class _Store:
         def __init__(self, data_root):
+            self.data_root = data_root
             self.saved = []
 
         def load_artifact(self, artifact_type, artifact_key):
@@ -774,6 +779,7 @@ def test_update_bayesian_driver_ratings_persists_post_qualifying_session_state(p
 
     class _Store:
         def __init__(self, data_root):
+            self.data_root = data_root
             self.saved = []
 
         def load_artifact(self, artifact_type, artifact_key):
@@ -865,6 +871,7 @@ def test_update_bayesian_driver_ratings_updates_dnf_rate_from_statuses(patcher, 
 
     class _Store:
         def __init__(self, data_root):
+            self.data_root = data_root
             self.saved = []
 
         def load_artifact(self, artifact_type, artifact_key):
@@ -925,12 +932,44 @@ def test_load_driver_characteristics_payload_prefers_year_scoped_fallback(tmp_pa
     year_path.write_text(json.dumps({"source": "year_scoped"}))
 
     class _Store:
+        data_root = Path("data")
+
         def load_artifact(self, artifact_type, artifact_key):
             return None
 
     payload = updater._load_driver_characteristics_payload(_Store(), year=2027)
 
     assert payload == {"source": "year_scoped"}
+
+
+def test_persist_driver_characteristics_writes_under_store_root_not_repo(tmp_path, patcher):
+    # Regression: the fallback file must land under the store's own data root so
+    # sidecar tools (historical replay) cannot overwrite the repo's live
+    # data/processed driver characteristics. chdir to tmp_path so a regression to
+    # the old hardcoded "data/processed" would surface as a distinct leaked path.
+    patcher.chdir(tmp_path)
+    sidecar_root = tmp_path / "sidecar"
+
+    class _Store:
+        def __init__(self, data_root):
+            self.data_root = data_root
+
+        def get_latest_version(self, artifact_type, artifact_key):
+            return 0
+
+        def save_artifact(self, artifact_type, artifact_key, data, version):
+            return None
+
+    updater._persist_driver_characteristics_payload(
+        _Store(sidecar_root), {"drivers": {"VER": {}}}, 2026
+    )
+
+    written = (
+        sidecar_root / "processed" / "driver_characteristics" / "2026_driver_characteristics.json"
+    )
+    leaked = tmp_path / "data" / "processed" / "driver_characteristics" / "2026_driver_characteristics.json"
+    assert written.exists(), "fallback must be written under the store's data root"
+    assert not leaked.exists(), "fallback must not leak into the repo-relative data/processed tree"
 
 
 def test_update_bayesian_driver_ratings_writes_year_scoped_fallback_on_store_save_failure(
@@ -1092,6 +1131,7 @@ def test_sprint_race_updates_race_pace_ema(patcher, tmp_path):
 
     class _Store:
         def __init__(self, data_root):
+            self.data_root = data_root
             self.saved = []
 
         def load_artifact(self, artifact_type, artifact_key):
@@ -1125,9 +1165,10 @@ def test_sprint_race_updates_race_pace_ema(patcher, tmp_path):
 
     patcher.setattr(updater.config_loader, "get", _config_get)
 
-    updater.update_from_sprint_race(2026, "China Grand Prix", data_root=str(tmp_path))
+    updater.update_from_sprint_race(2026, "China Grand Prix", data_root=str(tmp_path / "data"))
 
-    # Read the year-scoped fallback file that _persist_driver_characteristics_payload writes.
+    # Read the year-scoped fallback file that _persist_driver_characteristics_payload writes
+    # under <data_root>/processed, mirroring production's data_root="data".
     fallback = (
         tmp_path
         / "data"
