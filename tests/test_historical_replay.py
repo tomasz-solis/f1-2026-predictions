@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from src.utils.accuracy_targets import TARGET_GRAND_PRIX_RACE, TARGET_SPRINT_QUALIFYING
 from src.utils.historical_replay import (
     HistoricalReplaySummary,
     ReplayConfigOverride,
+    _reset_replay_artifacts,
     apply_target_scoring_policy,
     checkpoint_sequence_for_weekend,
     session_is_available_at_checkpoint,
@@ -78,3 +83,14 @@ def test_historical_replay_summary_tracks_driver_update_trace_report() -> None:
     )
 
     assert summary.to_dict()["driver_update_trace_path"].endswith("driver_update_trace.json")
+
+
+def test_reset_replay_artifacts_reports_missing_preseason_baseline(tmp_path: Path) -> None:
+    """A missing flat pre-season baseline should raise an actionable error."""
+    processed_dir = tmp_path / "processed"
+    (processed_dir / "car_characteristics").mkdir(parents=True)
+    (processed_dir / "car_characteristics" / "2026_car_characteristics.json").write_text("{}")
+    # No flat driver_characteristics.json is present.
+
+    with pytest.raises(FileNotFoundError, match="pre-season driver baseline"):
+        _reset_replay_artifacts(processed_dir, year=2026)

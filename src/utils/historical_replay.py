@@ -226,7 +226,23 @@ def _reset_replay_artifacts(processed_dir: Path, year: int) -> None:
     driver_file = (
         processed_dir / "driver_characteristics" / f"{int(year)}_driver_characteristics.json"
     )
+    # The flat driver_characteristics.json is the committed pre-season snapshot
+    # (sessions_observed=0). It is what makes the replay leakage-safe: resetting
+    # from the in-season season-scoped file instead would seed race-1 forecasts
+    # with end-of-season ratings.
     baseline_driver_file = processed_dir / "driver_characteristics.json"
+    if not baseline_driver_file.exists():
+        raise FileNotFoundError(
+            f"Replay pre-season driver baseline not found: {baseline_driver_file}. "
+            "This flat driver_characteristics.json is a generated, git-ignored "
+            "pre-season snapshot (sessions_observed=0) that the source processed dir "
+            "is copied from. Regenerate it with "
+            "`uv run python scripts/extract_driver_characteristics.py "
+            "--output data/processed/driver_characteristics.json`, or for the exact "
+            "last-committed snapshot run "
+            "`git show ff9197a0^:data/processed/driver_characteristics.json "
+            "> data/processed/driver_characteristics.json`, then re-run."
+        )
 
     _reset_car_artifact(car_file, year=int(year))
     _reset_driver_artifact(
