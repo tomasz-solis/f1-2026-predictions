@@ -278,7 +278,12 @@ baseline_predictor:
     testing_fallback_checkpoint_clip_scale: 0.040
     testing_fallback_checkpoint_clip_cap: 0.035
     stored_checkpoint_blend_weight_multiplier: 1.00
-    stored_checkpoint_blend_weight_cap: 0.72
+    # Cut from 0.72 per the 2026 practice-signal blend probe
+    # (data/model_diagnostics/2026/practice_signal_blend_probe.md): over the full
+    # season, blending only ~25% of the FP-informed reordering with the
+    # pre-weekend forecast beat full-trust at every FP checkpoint. Qualifying
+    # target only; the race target keeps its own FP evidence.
+    stored_checkpoint_blend_weight_cap: 0.25
     checkpoint_driver_profile_smoothing_seconds: 0.35
     checkpoint_driver_profile_quali_scale: 0.07
     checkpoint_driver_profile_skill_scale: 0.015
@@ -294,7 +299,9 @@ baseline_predictor:
     snapshot_sufficiency_floor: 0.6
     # Hard cap on how far one stored checkpoint may move a team's blended strength from its
     # season-learned prior (0-1 strength scale). Bounds catastrophic single-session swings.
-    stored_checkpoint_max_strength_move: 0.28
+    # Aligned to the live FP path's fp_max_strength_move (0.18): the stored path
+    # previously allowed larger single-session swings than the live blend.
+    stored_checkpoint_max_strength_move: 0.18
     # Same hard cap for the live FP-session blend path. A single compromised practice run (a
     # DNF/red-flag/limited run that leaves a strong car looking slow) can no longer drag a team
     # more than this far from its season-learned prior on the 0-1 strength scale.
@@ -541,10 +548,13 @@ baseline_predictor:
 
     # Output-layer DNF probability calibration (reported number only; the Monte
     # Carlo DNF sampling inputs are untouched). lambda 1.0 = report the simulated
-    # rate unchanged. The 2026 probe (data/model_diagnostics/2026/
-    # dnf_calibration_probe.md) supports 0.25: the raw output overforecasts
-    # retirement risk (Brier 0.046 vs 0.037 shrunk toward the season base rate).
-    dnf_probability_shrinkage_lambda: 1.0
+    # rate unchanged; 0.0 = report the base rate. Set to 0.25 per the 2026 probe
+    # (data/model_diagnostics/2026/dnf_calibration_probe.md): the raw output
+    # overforecasts retirement risk (Brier 0.046 -> 0.037 shrunk toward the
+    # season base rate). Trade-off: this compresses the reported range to about
+    # [0.03, 0.12], so the "DNF Risk %" surface reads relative risk, not absolute
+    # crash odds. Raise toward 0.5 (Brier 0.038) to keep more spread.
+    dnf_probability_shrinkage_lambda: 0.25
     dnf_probability_base_rate: 0.04
 
     # Program-aware testing/practice modifier

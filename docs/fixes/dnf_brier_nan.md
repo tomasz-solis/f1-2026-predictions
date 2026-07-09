@@ -63,9 +63,15 @@ only the *reported* probability (dashboard "DNF Risk %" and the Brier
 diagnostic); the Monte Carlo DNF sampling inputs are untouched, so finish
 orders and intervals do not move.
 
-Recommended setting per the probe: `dnf_probability_shrinkage_lambda: 0.25`.
-Flipping the default is a product decision; confirm on a larger sample and
-apply through the normal config-change review.
+Applied: `default.yaml` now ships `dnf_probability_shrinkage_lambda: 0.25`
+(the schema Field default stays 1.0 as the conservative fallback for configs
+that omit the key). This changes only the *reported* probability; because CI
+runs on Ubuntu, the golden regression's exact match (macOS+3.11 only) is not
+exercised there and the cross-environment check does not compare
+`dnf_probability`, so the flip is CI-safe. Trade-off: the reported range
+compresses to ~[0.03, 0.12] (relative, not absolute, risk); 0.5 keeps more
+spread at nearly the same Brier and is the conservative alternative. The
+sample is still small (11 DNFs), so revisit as races accumulate.
 
 Out of scope / follow-up: recalibrating the simulation-input DNF rates
 (`_compute_driver_dnf_probability` in

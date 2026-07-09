@@ -229,9 +229,13 @@ still be informative even though the absolute magnitudes run high.
 
 What partially mitigates it: an output-layer shrinkage knob
 (`baseline_predictor.race.dnf_probability_shrinkage_lambda` with
-`dnf_probability_base_rate`) can recalibrate the *reported* probability
-without touching the simulation inputs. It defaults to 1.0 (no change) until
-the probe evidence is confirmed on a larger sample.
+`dnf_probability_base_rate`) recalibrates the *reported* probability without
+touching the simulation inputs. It now ships at 0.25 per the probe, shrinking
+the raw output three-quarters of the way toward the season base rate.
+Trade-off: the reported range compresses to roughly [0.03, 0.12], so the
+"DNF Risk %" surface reads as *relative* risk rather than absolute crash odds;
+the sample is still small (11 DNFs), so the value may be revised (0.5 keeps
+more spread at nearly the same Brier).
 
 What would fix it: keep scoring races, and if the overforecast persists,
 recalibrate the simulation-input DNF rates themselves (historical caps,
