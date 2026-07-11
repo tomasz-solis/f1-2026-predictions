@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import fastf1
 import numpy as np
@@ -512,9 +513,11 @@ def _normalize_lower_better(metric_values: dict[str, float]) -> dict[str, float]
 
 def _attach_raw_snapshot_metrics(
     performance_by_team: dict[str, dict[str, float]],
-    per_team_payload: dict[str, dict[str, float]],
+    per_team_payload: dict[str, dict[str, Any]],
     lap_pace_seconds: dict[str, float],
     raw_top_speed_by_team: dict[str, float],
+    *,
+    session_key: str,
 ) -> dict[str, dict[str, float]]:
     """Attach raw session metrics to per-team payloads for snapshot consumers."""
     if not raw_top_speed_by_team and not lap_pace_seconds and not per_team_payload:
@@ -526,8 +529,12 @@ def _attach_raw_snapshot_metrics(
         if isinstance(metrics, dict)
     }
 
-    for team_name, session_payload in per_team_payload.items():
-        if not isinstance(session_payload, dict) or not session_payload:
+    for team_name, sessions_payload in per_team_payload.items():
+        if not isinstance(sessions_payload, dict) or not sessions_payload:
+            continue
+
+        session_payload = sessions_payload.get(session_key)
+        if not isinstance(session_payload, dict):
             continue
 
         team_payload = merged.setdefault(str(team_name), {})
@@ -815,6 +822,7 @@ def _collect_session_metrics(
         per_team_payload,
         lap_pace_seconds,
         raw_top_speed_by_team,
+        session_key=session_key,
     )
     normalized_pace = normalize_lower_better_fn(lap_pace_seconds)
     for team, pace_score in normalized_pace.items():

@@ -653,6 +653,60 @@ def test_collect_session_metrics_attaches_raw_top_speed_from_all_valid_laps(monk
     assert perf["Ferrari"]["overall_pace_seconds"] == 91.0
 
 
+def test_collect_session_metrics_attaches_nested_raw_characteristics(monkeypatch):
+    from src.systems import testing_updater as testing_updater
+
+    class DummySession:
+        def __init__(self, laps):
+            self.laps = laps
+
+    laps = pd.DataFrame(
+        {
+            "Team": ["Mercedes"] * 8,
+            "Driver": ["RUS"] * 8,
+            "Stint": [1] * 8,
+            "Compound": ["MEDIUM"] * 8,
+            "LapNumber": list(range(1, 9)),
+            "LapTime": [pd.to_timedelta(f"0:01:{30 + index:02d}") for index in range(8)],
+            "PitOutTime": [pd.NaT] * 8,
+            "PitInTime": [pd.NaT] * 8,
+        }
+    )
+
+    monkeypatch.setattr(
+        testing_updater,
+        "_extract_team_payload",
+        lambda _laps: {
+            "sector_times": {"s1": 30.1, "s2": 34.2, "s3": 26.3},
+            "braking_profile": {"braking_pct": 12.4},
+        },
+    )
+    monkeypatch.setattr(
+        testing_updater,
+        "extract_all_teams_performance",
+        lambda _payload, session_name: {
+            "Mercedes": {
+                "slow_corner_performance": 0.7,
+                "medium_corner_performance": 1.0,
+                "fast_corner_performance": 0.4,
+                "braking_performance": 0.0,
+            }
+        },
+    )
+
+    perf, _tire = testing_updater._collect_session_metrics(
+        session=DummySession(laps),
+        session_key="FP1",
+        known_teams={"Mercedes"},
+        run_profile="balanced",
+    )
+
+    assert perf["Mercedes"]["slow_corner_seconds"] == pytest.approx(30.1)
+    assert perf["Mercedes"]["medium_corner_seconds"] == pytest.approx(34.2)
+    assert perf["Mercedes"]["fast_corner_seconds"] == pytest.approx(26.3)
+    assert perf["Mercedes"]["braking_pct"] == pytest.approx(12.4)
+
+
 def test_count_team_selected_laps_avoids_short_stint_cooldown_laps():
     class DummySession:
         def __init__(self, laps):
