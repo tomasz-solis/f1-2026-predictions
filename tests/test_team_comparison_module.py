@@ -2673,3 +2673,31 @@ def test_render_team_comparison_section_keeps_weekend_fallback_team_visible(patc
     mclaren_trace = next(trace for trace in development_figure.data if trace.name == "McLaren")
     assert list(mclaren_trace.x) == ["Chinese Grand Prix Q", "Chinese Grand Prix R"]
     assert math.isnan(mclaren_trace.y[1])
+
+
+def test_development_race_ticks_labels_one_tick_per_race():
+    rows = []
+    order = 0
+    for event in ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"]:
+        for session in ["FP1", "FP2", "Q"]:
+            rows.append(
+                {
+                    "Snapshot": f"{event} {session}",
+                    "Snapshot Order": order,
+                    "Event": event,
+                    "Session": session,
+                }
+            )
+            order += 1
+    history_df = pd.DataFrame(rows)
+    category_order = list(history_df.sort_values("Snapshot Order")["Snapshot"])
+
+    tickvals, ticktext = team_comparison._development_race_ticks(history_df, category_order)
+
+    # One tick per race (at its first session), short race names, not one per session.
+    assert ticktext == ["Bahrain", "Saudi Arabian"]
+    assert tickvals == ["Bahrain Grand Prix FP1", "Saudi Arabian Grand Prix FP1"]
+
+
+def test_development_race_ticks_empty_frame_is_safe():
+    assert team_comparison._development_race_ticks(pd.DataFrame(), []) == ([], [])

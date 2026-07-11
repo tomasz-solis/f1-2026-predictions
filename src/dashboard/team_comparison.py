@@ -233,6 +233,46 @@ def _load_team_snapshot_history(year: int, cache_token: str = "") -> list[dict[s
     return sort_snapshot_payloads(list(deduped.values()))
 
 
+def _short_event_label(event_name: str) -> str:
+    """Trim a race name for a compact axis tick (e.g. 'Bahrain Grand Prix' -> 'Bahrain')."""
+    name = str(event_name).strip()
+    for suffix in (" Grand Prix", " GP"):
+        if name.endswith(suffix):
+            return name[: -len(suffix)].strip()
+    return name
+
+
+def _development_race_ticks(
+    history_df: Any, category_order: list[str]
+) -> tuple[list[str], list[str]]:
+    """Return one x tick per race (at its first session) instead of one per session.
+
+    The development axis has a point for every session snapshot across the season, so
+    labelling each one makes it unreadable. We keep every data point but label only the
+    first session of each race with the short race name; the full "race + session" label
+    stays in the unified hover. (impeccable: declutter a dense time axis)
+    """
+    if history_df.empty or "Event" not in history_df.columns:
+        return [], []
+    event_by_label = dict(
+        zip(
+            history_df["Snapshot"],
+            history_df["Event"],
+            strict=False,
+        )
+    )
+    tickvals: list[str] = []
+    ticktext: list[str] = []
+    seen: set[str] = set()
+    for label in category_order:
+        event = str(event_by_label.get(label, "")).strip()
+        if event and event not in seen:
+            seen.add(event)
+            tickvals.append(label)  # categorical axis: tick at this session's position
+            ticktext.append(_short_event_label(event))
+    return tickvals, ticktext
+
+
 def _render_development_history_section(
     year: int,
     selected_teams: list[str],
@@ -315,6 +355,7 @@ def _render_development_history_section(
         st.info(f"No stored `{metric_label}` values are available for this selection yet.")
         return
     category_order = _ordered_snapshot_labels(history_df)
+    race_tickvals, race_ticktext = _development_race_ticks(history_df, category_order)
     missing_history_points = bool(metric_frame[metric_label].isna().any())
 
     try:
@@ -360,6 +401,14 @@ def _render_development_history_section(
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
             font=dict(color="#E8EDF2", size=14),
+            # Unified hover turns each session into one card listing every selected
+            # team and its value, so the order of teams at that point reads at a glance.
+            hovermode="x unified",
+            hoverlabel=dict(
+                bgcolor="rgba(17,24,38,0.94)",
+                bordercolor="rgba(232,237,242,0.20)",
+                font=dict(color="#E8EDF2", size=13),
+            ),
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
@@ -371,7 +420,14 @@ def _render_development_history_section(
                 borderwidth=1,
             ),
             xaxis=dict(
-                tickangle=-30,
+                # One label per race instead of one per session; sessions stay in the hover.
+                # Angle + automargin so back-to-back races (e.g. Barcelona/Austrian) that
+                # sit close on the axis don't overlap.
+                tickmode="array",
+                tickvals=race_tickvals,
+                ticktext=race_ticktext,
+                tickangle=-40,
+                automargin=True,
                 categoryorder="array",
                 categoryarray=category_order,
                 gridcolor="rgba(232,237,242,0.12)",
