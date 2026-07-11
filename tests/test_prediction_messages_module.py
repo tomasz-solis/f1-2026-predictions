@@ -18,8 +18,8 @@ def test_build_precompute_horizon_message_reports_boundary_fallback():
     )
 
     assert tone == "success"
-    assert "latest warmed persisted checkpoint" in message
-    assert "Australian Grand Prix checkpoint FP2" in message
+    assert "Forecasts are ready for 1 of the next 2 race weekends" in message
+    assert "still being prepared" in message
 
 
 def test_build_runtime_messages_collects_key_runtime_notices():
@@ -138,7 +138,7 @@ def test_render_collapsible_runtime_messages_deduplicates_details():
         st_module=_Streamlit(),
     )
 
-    assert banners == [("Latest checkpoint missing (+1 more)", "warning", "Run context")]
+    assert banners == [("Latest checkpoint missing (+1 more)", "warning", "Forecast details")]
     assert markdown_calls == [
         "- **Warning:** Latest checkpoint missing",
         "- **Info:** Cache reused",

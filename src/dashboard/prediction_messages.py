@@ -147,26 +147,23 @@ def build_precompute_horizon_message(
         ):
             return (
                 (
-                    f"Showing {ready_count}/{horizon_count} precomputed races from "
-                    f"{anchor_race} checkpoint {anchor_session}. "
-                    "A newer checkpoint exists, but it is not warmed yet. The selected race stays "
-                    "on the latest warmed persisted checkpoint while future-race options remain on "
-                    "the last warmed horizon."
+                    f"Forecasts are ready for {ready_count} of the next {horizon_count} race "
+                    "weekends. The newest session data is still being prepared, so this shows the "
+                    "most recent ready forecast."
                 ),
                 "success",
             )
         if anchor_race and anchor_session:
             return (
                 (
-                    f"Showing {ready_count}/{horizon_count} precomputed races from "
-                    f"{anchor_race} checkpoint {anchor_session}. "
-                    "Hidden races will appear after the horizon is warmed."
+                    f"Forecasts are ready for {ready_count} of the next {horizon_count} race "
+                    "weekends. More appear as upcoming weekends are prepared."
                 ),
                 "success",
             )
         return (
-            f"Showing {ready_count} precomputed races. "
-            "Hidden races will appear after the horizon is warmed.",
+            f"Forecasts are ready for the next {ready_count} race weekends. "
+            "More appear as upcoming weekends are prepared.",
             "success",
         )
 
@@ -176,8 +173,8 @@ def build_precompute_horizon_message(
         planned_count = len(planned_races) if isinstance(planned_races, list) else visible_count
         return (
             (
-                f"Showing the next {visible_count}/{planned_count} scheduled races only. "
-                "Warmup exists for an older artifact set, but not for the current one yet."
+                f"Showing forecasts for the next {visible_count} of {planned_count} scheduled "
+                "races. The rest are being refreshed for the latest model and will appear shortly."
             ),
             "info",
         )
@@ -189,24 +186,24 @@ def build_precompute_horizon_message(
         if selected_race_prediction_available:
             return (
                 (
-                    f"Showing the next {visible_count}/{planned_count} scheduled races only. "
-                    "The selected race is ready at the current checkpoint, while future-race "
-                    "horizon metadata is still catching up."
+                    f"Showing forecasts for the next {visible_count} of {planned_count} scheduled "
+                    "races. This weekend's forecast is ready; later weekends are still being "
+                    "prepared."
                 ),
                 "info",
             )
         return (
             (
-                f"Showing the next {visible_count}/{planned_count} scheduled races only. "
-                "Persisted horizon metadata is not ready for this boundary yet."
+                f"Showing forecasts for the next {visible_count} of {planned_count} scheduled "
+                "races. Later weekends are still being prepared."
             ),
             "info",
         )
 
     return (
         (
-            "No warmed precompute horizon yet. First run builds checkpoint snapshots for the "
-            "current race and nearby weekends."
+            "Forecasts are being prepared for the current race weekend and the ones just after it. "
+            "Check back shortly."
         ),
         "info",
     )
@@ -381,7 +378,7 @@ def render_collapsible_runtime_messages(
     render_notice_banner_fn(
         summary_text,
         tone=primary_level,
-        label="Run context",
+        label="Forecast details",
         st_module=st_module,
     )
 
@@ -389,9 +386,9 @@ def render_collapsible_runtime_messages(
         return
 
     try:
-        expander = st_module.expander("Run Context Details", expanded=False)
+        expander = st_module.expander("What's behind this forecast", expanded=False)
     except TypeError:
-        expander = st_module.expander("Run Context Details")
+        expander = st_module.expander("What's behind this forecast")
 
     with expander:
         for level, message in unique_messages:

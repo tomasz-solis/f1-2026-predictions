@@ -653,8 +653,8 @@ def prediction_action_state(
     """Resolve whether a persisted dashboard prediction is available."""
     if bool(precompute_filter_meta.get("fallback_boundary_active")):
         pending_message = (
-            "A newer checkpoint exists beyond the warmed horizon. The selected race will stay "
-            "on the latest warmed persisted checkpoint until the next warmup catches up."
+            "Newer session data has just come in and is still being prepared. For now, this shows "
+            "the most recent ready forecast — it'll update shortly."
         )
         return {
             "disabled": False,
@@ -671,24 +671,18 @@ def prediction_action_state(
     stale_reason = str(precompute_filter_meta.get("stale_reason", "")).strip()
     if stale_reason == "artifact_hash_mismatch":
         pending_message = (
-            "Stored predictions exist for an older artifact set, but the current artifact set "
-            "has not been warmed yet. Run warmup again after artifact or config changes."
+            "This forecast is being refreshed for the latest model version. "
+            "It'll be ready again shortly."
         )
     elif stale_reason == "boundary_mismatch":
         pending_message = (
-            "Current session boundary is ahead of the warmed horizon. Predictions will be available "
-            "after the next hourly warmup persists this checkpoint."
+            "The latest session just finished and the forecast is being updated. "
+            "Check back shortly."
         )
     elif bool(precompute_filter_meta.get("scope_applied")):
-        pending_message = (
-            "Persisted horizon metadata is still warming for the current checkpoint. "
-            "The dashboard will update after the next hourly warmup completes."
-        )
+        pending_message = "This weekend's forecast is being prepared and will be ready shortly."
     else:
-        pending_message = (
-            "Persisted-only mode is enabled and no warmed horizon is available yet. "
-            "Run warmup before using dashboard predictions."
-        )
+        pending_message = "Forecasts for this weekend are being prepared. Check back shortly."
 
     return {
         "disabled": True,

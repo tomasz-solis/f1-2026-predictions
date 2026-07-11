@@ -167,11 +167,11 @@ html, body {
     inset: 0;
     pointer-events: none;
     background:
-      radial-gradient(62% 70% at 12% 0%, rgba(255,77,45,0.10), rgba(11,15,20,0) 60%),
-      radial-gradient(58% 68% at 88% 6%, rgba(52,99,184,0.18), rgba(11,15,20,0) 62%),
-      linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.0) 28%),
+      radial-gradient(62% 70% at 12% 0%, rgba(255,77,45,0.06), rgba(11,15,20,0) 58%),
+      radial-gradient(58% 68% at 88% 6%, rgba(52,99,184,0.10), rgba(11,15,20,0) 60%),
+      linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.0) 24%),
       repeating-linear-gradient(90deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 132px);
-    opacity: 0.42;
+    opacity: 0.30;
     z-index: 0;
 }
 [data-testid="stHeader"] {

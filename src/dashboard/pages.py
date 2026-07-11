@@ -182,6 +182,23 @@ def _set_selected_season(year: int) -> None:
         return
 
 
+def _forecast_view_is_new(view_key: str) -> bool:
+    """Return True the first time a forecast selection is shown this session.
+
+    Guards analytics and the accuracy-save so passive Streamlit reruns (e.g.
+    toggling an unrelated control) don't re-fire them. Falls back to True when
+    session state is unavailable (headless/tests), where there are no reruns to
+    dedupe anyway.
+    """
+    try:
+        if st.session_state.get("_forecast_view_key") == view_key:
+            return False
+        st.session_state["_forecast_view_key"] = view_key
+    except Exception:
+        return True
+    return True
+
+
 def render_team_comparison_page() -> None:
     """Render the team-comparison page."""
     selected_season = _get_selected_season()
@@ -364,6 +381,69 @@ def _load_local_race_options(year: int = DEFAULT_SEASON) -> list[str]:
         else:
             options.append(race_name)
     return options
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _load_race_round_meta(year: int) -> dict[str, tuple[int, str]]:
+    """Map each race (base name) to ``(round_number, iso_event_date)`` from the schedule.
+
+    Sourced from FastF1 so the dropdown can be ordered by calendar round and default
+    to the next upcoming Grand Prix. Keyed by the plain event name (no "(Sprint)"
+    suffix) so sprint-labelling differences never break the lookup. Empty when the
+    schedule can't be loaded (offline) — the dropdown then keeps its raw order and
+    shows no numbers.
+    """
+    meta: dict[str, tuple[int, str]] = {}
+    try:
+        schedule = _fastf1_module().get_event_schedule(year)
+    except Exception as exc:
+        logger.info("Race round metadata unavailable for %s: %s", year, exc)
+        return meta
+    if not {"EventName", "RoundNumber"}.issubset(schedule.columns):
+        return meta
+    for _, event in schedule.iterrows():
+        name = str(event.get("EventName", "")).strip()
+        if not name or "testing" in name.lower():
+            continue
+        try:
+            round_number = int(event.get("RoundNumber", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        if round_number <= 0:  # round 0 is pre-season testing
+            continue
+        meta[name] = (round_number, str(event.get("EventDate", "") or "")[:10])
+    return meta
+
+
+def _order_races_by_round(
+    race_options: list[str],
+    round_meta: dict[str, tuple[int, str]],
+    *,
+    today_iso: str,
+) -> tuple[list[str], int]:
+    """Sort options by calendar round and pick the next upcoming race as the default.
+
+    Returns the reordered options and the index of the race to open on: the first
+    Grand Prix whose event date is today or later. Falls back to the most recent
+    race when the season is over, or index 0 when dates are unknown (offline).
+    """
+
+    def _base(label: str) -> str:
+        return label.replace(" (Sprint)", "")
+
+    ordered = sorted(race_options, key=lambda label: round_meta.get(_base(label), (10_000, ""))[0])
+
+    upcoming = [
+        i
+        for i, label in enumerate(ordered)
+        if round_meta.get(_base(label), (0, ""))[1] >= today_iso
+        and round_meta.get(_base(label), (0, ""))[1]
+    ]
+    if upcoming:
+        return ordered, upcoming[0]
+    if any(round_meta.get(_base(label), (0, ""))[1] for label in ordered):
+        return ordered, len(ordered) - 1  # season over — show the most recent race
+    return ordered, 0
 
 
 def _parse_refresh_timestamp(value: Any) -> datetime | None:
@@ -712,20 +792,6 @@ def _prediction_failure_hint(error: Exception) -> str | None:
     return _prediction_messages.prediction_failure_hint(error)
 
 
-def _build_precompute_horizon_message(
-    precompute_filter_meta: dict[str, Any],
-    *,
-    race_options: list[str],
-    selected_race_prediction_available: bool,
-) -> tuple[str, str]:
-    """Describe the warmed horizon state shown above the prediction action."""
-    return _prediction_messages.build_precompute_horizon_message(
-        precompute_filter_meta,
-        race_options=race_options,
-        selected_race_prediction_available=selected_race_prediction_available,
-    )
-
-
 def _build_runtime_messages(
     *,
     selected_season: int,
@@ -768,39 +834,66 @@ def _runtime_health_counters_caption(observability: dict[str, Any]) -> str | Non
     return _prediction_messages.runtime_health_counters_caption(observability)
 
 
+def _render_forecast_pending_state(
+    *,
+    race_name: str,
+    selected_season: int,
+    pending_message: str | None,
+    error: Exception | None = None,
+) -> None:
+    """Show a calm 'forecast is being prepared' state instead of a raw error.
+
+    Reached when no warmed prediction is available yet for the selected race
+    (warmup still running, or a schedule lookup failed). A fan sees plain
+    reassurance and a next step, not a stack trace.
+    """
+    if isinstance(pending_message, str) and pending_message.strip():
+        lead = pending_message.strip().rstrip(".") + "."
+    else:
+        lead = f"The {race_name} {selected_season} forecast isn't published yet."
+    body = (
+        f"{lead} Predictions appear here as each session's data comes in, starting with first "
+        "practice. To see a full forecast right now, pick a Grand Prix that's already run from "
+        "the list above."
+    )
+    render_notice_banner(body, tone="info", label="Forecast updating", st_module=st)
+    if error is not None:
+        logger.info("Forecast unavailable for %s %s: %s", race_name, selected_season, error)
+
+
 def render_live_prediction_page(enable_logging: bool) -> None:
     """Render the main live prediction page with qualifying and race tabs."""
     selected_season = _get_selected_season()
     render_prediction_hero_deck(
         title="Race Weekend Prediction",
         summary=(
-            "Qualifying and race forecasts served from warmed checkpoint artifacts. "
-            "Session context and freshness cues stay visible without implying live recompute on click."
+            "Qualifying and race-day forecasts for the weekend, updated as each session's data "
+            "comes in. The latest numbers load the moment you arrive."
         ),
         eyebrow="Weekend forecast",
         cards=[
             {
                 "label": "Model",
                 "value": BRAND_MODEL_VERSION,
-                "meta": "Current dashboard release.",
+                "meta": "The forecasting model these predictions run on.",
                 "tone": "accent",
             },
             {
                 "label": "Updated",
                 "value": _dashboard_refresh_label(selected_season),
-                "meta": "Latest warmed dashboard refresh stamp.",
+                "meta": "When these forecasts were last refreshed.",
                 "tone": "neutral",
             },
             {
-                "label": "Logging",
-                "value": "ON" if enable_logging else "OFF",
-                "meta": "One checkpoint saved per session boundary.",
+                "label": "On record",
+                "value": "Saved" if enable_logging else "Off",
+                "meta": "Every forecast is saved, so it can be scored against the real result.",
                 "tone": "success" if enable_logging else "warning",
             },
             {
-                "label": "Serving",
-                "value": "Persisted",
-                "meta": "Warmup and automation refresh predictions outside the request path.",
+                "label": "Forecasts",
+                "value": "Ready",
+                "meta": "Prepared ahead of each session, so they load instantly.",
                 "tone": "neutral",
             },
         ],
@@ -819,7 +912,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
                 options=season_options,
                 index=season_index,
                 key="selected_season",
-                help=("Controls schedule lookup, warmed artifacts, and prediction execution year."),
+                help="Choose which season to forecast.",
             )
         )
     _set_selected_season(selected_season)
@@ -830,151 +923,149 @@ def render_live_prediction_page(enable_logging: bool) -> None:
         race_options=race_options,
     )
 
+    # The raw option order (from the local track file) is not the calendar order, so
+    # order by round and open on the next upcoming Grand Prix — not whatever happened
+    # to be first. Numbers come from the schedule; the option value stays the clean
+    # race name so downstream matching is untouched.
+    round_meta = _load_race_round_meta(selected_season)
+    race_options, default_race_index = _order_races_by_round(
+        race_options,
+        round_meta,
+        today_iso=datetime.now(UTC).date().isoformat(),
+    )
+
+    def _format_race_option(label: str) -> str:
+        entry = round_meta.get(label.replace(" (Sprint)", ""))
+        return f"{entry[0]}. {label}" if entry else label
+
     with control_col2:
-        race_selection = st.selectbox("Grand Prix", race_options)
+        race_selection = st.selectbox(
+            "Grand Prix",
+            race_options,
+            index=default_race_index,
+            format_func=_format_race_option,
+            help="Pick a race weekend to see its forecast.",
+        )
         race_name = race_selection.replace(" (Sprint)", "")
 
     with control_col3:
-        weather = st.selectbox("Weather", ["dry", "rain", "mixed"])
+        weather = st.selectbox(
+            "Weather",
+            ["dry", "rain", "mixed"],
+            help="Assumed race-day conditions. Switch it to see how wet or mixed weather changes the forecast.",
+        )
     selected_race_prediction_available = False
 
-    selected_weekend_label = (
-        "Sprint weekend" if race_selection.endswith("(Sprint)") else "Race weekend"
-    )
-    render_notice_banner(
-        (
-            f"{selected_weekend_label} selected for {race_name} {selected_season}. "
-            "Predictions are served from warmed persisted artifacts; run warmup outside the "
-            "dashboard if a newer checkpoint is needed."
-        ),
-        tone="info",
-        label="Run setup",
-        st_module=st,
-    )
-
-    precompute_message, precompute_tone = _build_precompute_horizon_message(
-        precompute_filter_meta,
-        race_options=race_options,
-        selected_race_prediction_available=selected_race_prediction_available,
-    )
-    render_notice_banner(
-        precompute_message,
-        tone=precompute_tone,
-        label="Precompute horizon",
-        st_module=st,
-    )
-
+    # Horizon-coverage detail (which upcoming races are warmed yet) is operator
+    # plumbing, not a fan's answer — it no longer gets its own banner above the
+    # forecast. When a race has no forecast, the single pending state below says
+    # everything the fan needs, without doubling up. (impeccable: distill)
     prediction_action_state = _prediction_action_state(
         precompute_filter_meta,
         selected_race_prediction_available=selected_race_prediction_available,
     )
     pending_message = prediction_action_state.get("pending_message")
-    if isinstance(pending_message, str) and pending_message.strip():
-        render_notice_banner(
-            pending_message,
-            tone="warning",
-            label="Warmup pending",
-            st_module=st,
-        )
 
-    predict_clicked = st.button(
-        "Predict sprint weekend" if race_selection.endswith("(Sprint)") else "Predict weekend",
-        type="primary",
-        width="stretch",
-        disabled=bool(prediction_action_state.get("disabled")),
-        help=str(prediction_action_state.get("help") or ""),
+    # Answer first: the forecast is served from warmed, persisted artifacts and
+    # the dashboard request path is read-only (no recompute, no writes), so show
+    # it immediately on load instead of gating it behind a click. Changing the
+    # Grand Prix or weather selector above reruns this and refreshes the forecast
+    # in place. (impeccable: onboard — auto-show next race)
+    status_placeholder = st.empty()
+
+    def update_status(message: str) -> None:
+        status_placeholder.info(f"Loading: {message}")
+
+    with st.spinner("Loading the latest forecast…"):
+        try:
+            pipeline_output = execute_live_prediction_pipeline(
+                race_name=race_name,
+                weather=weather,
+                year=selected_season,
+                force_refresh=False,
+                progress_callback=update_status,
+            )
+        except Exception as e:  # noqa: BLE001 - surfaced as a calm pending state below
+            status_placeholder.empty()
+            _render_forecast_pending_state(
+                race_name=race_name,
+                selected_season=selected_season,
+                pending_message=pending_message,
+                error=e,
+            )
+            return
+
+    status_placeholder.empty()
+
+    prediction_results = pipeline_output["prediction_results"]
+    is_sprint = bool(pipeline_output["is_sprint"])
+    practice_update = pipeline_output["practice_update"]
+    boundary_refresh = pipeline_output.get("boundary_refresh", {})
+    boundary_fallback = pipeline_output.get("boundary_fallback", {})
+    precompute_summary = pipeline_output.get("precompute_summary", {})
+    prediction_cache_hit = bool(pipeline_output.get("prediction_cache_hit", False))
+    pipeline_timing = pipeline_output.get("pipeline_timing", {})
+    observability = pipeline_output.get("observability", {})
+    prediction_checkpoint = str(pipeline_output.get("boundary_session_name") or "").strip().upper()
+
+    runtime_messages = _build_runtime_messages(
+        selected_season=selected_season,
+        race_name=race_name,
+        is_sprint=is_sprint,
+        boundary_refresh=boundary_refresh,
+        practice_update=practice_update,
+        prediction_cache_hit=prediction_cache_hit,
+        boundary_fallback=boundary_fallback,
+        precompute_summary=precompute_summary,
+        completed_races_count=_load_completed_races_count(selected_season),
     )
+    # Consolidate operator diagnostics (runtime alerts, health counters, timing)
+    # into the single collapsible disclosure instead of stacking separate captions
+    # and banners above the forecast. A fan sees one "Forecast details" line with
+    # everything else one click deep. (impeccable: distill)
+    for severity, formatted in _iter_observability_alerts(observability):
+        runtime_messages.append(("warning" if severity == "error" else severity, formatted))
 
-    if predict_clicked:
+    counters_caption = _runtime_health_counters_caption(observability)
+    if counters_caption:
+        runtime_messages.append(("info", counters_caption))
+
+    timing_caption = _pipeline_timing_caption(
+        pipeline_timing if isinstance(pipeline_timing, dict) else None
+    )
+    if timing_caption:
+        runtime_messages.append(("info", timing_caption))
+
+    _render_collapsible_runtime_messages(runtime_messages)
+
+    # Capture the served forecast for accuracy tracking and log the view once per
+    # selection per browser session, so passive reruns don't re-fire writes,
+    # analytics, or the "already saved" notice on every interaction.
+    view_key = f"{selected_season}|{race_name}|{weather}|{prediction_checkpoint}"
+    if _forecast_view_is_new(view_key):
         track_event(
-            "predict_clicked",
+            "forecast_viewed",
             race=race_name,
-            is_sprint=race_selection.endswith("(Sprint)"),
+            is_sprint=is_sprint,
             weather=str(weather),
             season=int(selected_season),
         )
+        _save_prediction_if_enabled(
+            enable_logging=enable_logging,
+            prediction_results=prediction_results,
+            is_sprint=is_sprint,
+            race_name=race_name,
+            weather=weather,
+            year=selected_season,
+            checkpoint_session_override=prediction_checkpoint or None,
+        )
 
-        status_placeholder = st.empty()
-
-        with st.spinner("Loading prediction data..."):
-            try:
-
-                def update_status(message: str) -> None:
-                    status_placeholder.info(f"Loading: {message}")
-
-                pipeline_output = execute_live_prediction_pipeline(
-                    race_name=race_name,
-                    weather=weather,
-                    year=selected_season,
-                    force_refresh=False,
-                    progress_callback=update_status,
-                )
-                prediction_results = pipeline_output["prediction_results"]
-                is_sprint = bool(pipeline_output["is_sprint"])
-                practice_update = pipeline_output["practice_update"]
-                boundary_refresh = pipeline_output.get("boundary_refresh", {})
-                boundary_fallback = pipeline_output.get("boundary_fallback", {})
-                precompute_summary = pipeline_output.get("precompute_summary", {})
-                prediction_cache_hit = bool(pipeline_output.get("prediction_cache_hit", False))
-                pipeline_timing = pipeline_output.get("pipeline_timing", {})
-                observability = pipeline_output.get("observability", {})
-                prediction_checkpoint = (
-                    str(pipeline_output.get("boundary_session_name") or "").strip().upper()
-                )
-                status_placeholder.empty()
-
-                runtime_messages = _build_runtime_messages(
-                    selected_season=selected_season,
-                    race_name=race_name,
-                    is_sprint=is_sprint,
-                    boundary_refresh=boundary_refresh,
-                    practice_update=practice_update,
-                    prediction_cache_hit=prediction_cache_hit,
-                    boundary_fallback=boundary_fallback,
-                    precompute_summary=precompute_summary,
-                    completed_races_count=_load_completed_races_count(selected_season),
-                )
-
-                _render_collapsible_runtime_messages(runtime_messages)
-
-                timing_caption = _pipeline_timing_caption(
-                    pipeline_timing if isinstance(pipeline_timing, dict) else None
-                )
-                if timing_caption:
-                    st.caption(timing_caption)
-
-                for severity, formatted in _iter_observability_alerts(observability):
-                    if severity == "error":
-                        st.error(formatted)
-                    else:
-                        st.warning(formatted)
-
-                counters_caption = _runtime_health_counters_caption(observability)
-                if counters_caption:
-                    st.caption(counters_caption)
-
-                _save_prediction_if_enabled(
-                    enable_logging=enable_logging,
-                    prediction_results=prediction_results,
-                    is_sprint=is_sprint,
-                    race_name=race_name,
-                    weather=weather,
-                    year=selected_season,
-                    checkpoint_session_override=prediction_checkpoint or None,
-                )
-
-                _render_prediction_results(
-                    prediction_results,
-                    is_sprint,
-                    prediction_cache_hit=prediction_cache_hit,
-                    pipeline_timing=pipeline_timing if isinstance(pipeline_timing, dict) else None,
-                )
-
-            except Exception as e:
-                st.error(f"Prediction failed: {e}")
-                hint = _prediction_failure_hint(e)
-                if hint:
-                    st.info(hint)
+    _render_prediction_results(
+        prediction_results,
+        is_sprint,
+        prediction_cache_hit=prediction_cache_hit,
+        pipeline_timing=pipeline_timing if isinstance(pipeline_timing, dict) else None,
+    )
 
 
 def render_model_insights_page() -> None:

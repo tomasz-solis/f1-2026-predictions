@@ -308,7 +308,7 @@ def test_prediction_action_state_keeps_current_race_enabled_during_boundary_lag(
     )
 
     assert state["disabled"] is False
-    assert "latest warmed persisted checkpoint" in state["pending_message"]
+    assert "still being prepared" in state["pending_message"]
 
 
 def test_prediction_action_state_reports_rewarm_when_artifact_hash_changed():
@@ -321,7 +321,7 @@ def test_prediction_action_state_reports_rewarm_when_artifact_hash_changed():
     )
 
     assert state["disabled"] is True
-    assert "older artifact set" in state["pending_message"]
+    assert "refreshed for the latest model version" in state["pending_message"]
 
 
 def test_selected_race_persisted_prediction_available_uses_current_boundary_and_weather(patcher):
@@ -1394,6 +1394,65 @@ def test_render_live_prediction_page_uses_filtered_precompute_race_options(patch
     assert options_seen == [["Australian Grand Prix"]]
 
 
+def test_render_live_prediction_page_shows_calm_pending_state_when_unavailable(patcher):
+    _stub_page_streamlit(patcher)
+
+    error_messages: list[str] = []
+    notice_labels: list[str] = []
+    rendered: list[str] = []
+
+    def _selectbox(label, options, index=0, **_kwargs):
+        if label == "Season":
+            return 2027
+        if label == "Grand Prix":
+            return "Australian Grand Prix"
+        if label == "Weather":
+            return "dry"
+        return options[index] if options else None
+
+    patcher.setattr(pages.st, "selectbox", _selectbox)
+    patcher.setattr(pages.st, "button", lambda *_args, **_kwargs: True)
+    patcher.setattr(pages.st, "error", lambda message: error_messages.append(str(message)))
+    patcher.setattr(pages.st, "spinner", lambda *_args, **_kwargs: _Ctx())
+    patcher.setattr(
+        pages.st,
+        "empty",
+        lambda: type(
+            "_Status",
+            (),
+            {"info": lambda self, _msg: None, "empty": lambda self: None},
+        )(),
+    )
+    patcher.setattr(
+        pages, "_load_race_options", lambda year=pages.DEFAULT_SEASON: ["Australian Grand Prix"]
+    )
+    patcher.setattr(
+        pages,
+        "_filter_race_options_to_precomputed_horizon",
+        lambda year, race_options: (race_options, {"applied": False}),
+    )
+
+    def _raise_unavailable(*_args, **_kwargs):
+        raise RuntimeError("no warmed prediction persisted for this race yet")
+
+    patcher.setattr(pages, "execute_live_prediction_pipeline", _raise_unavailable)
+    patcher.setattr(
+        pages,
+        "render_notice_banner",
+        lambda _body, tone="info", label="", st_module=None: notice_labels.append(label),
+    )
+    patcher.setattr(
+        pages, "_render_prediction_results", lambda *_a, **_k: rendered.append("results")
+    )
+
+    pages.render_live_prediction_page(enable_logging=False)
+
+    # No raw exception leaked, results not rendered, and a calm pending notice shown.
+    assert error_messages == []
+    assert rendered == []
+    assert "Forecast updating" in notice_labels
+
+
 def test_build_team_comparison_dataframe_uses_profile_metrics():
     teams_payload = {
         "Team A": {
@@ -1444,3 +1503,43 @@ def test_default_team_selection_prefers_big4_order():
     selected = pages._default_team_selection(teams, max_teams=4)
 
     assert selected == ["McLaren", "Mercedes", "Ferrari", "Red Bull Racing"]
+
+
+def test_order_races_by_round_sorts_and_defaults_to_next_upcoming():
+    options = ["Belgian Grand Prix", "Australian Grand Prix", "British Grand Prix (Sprint)"]
+    meta = {
+        "Australian Grand Prix": (1, "2026-03-08"),
+        "British Grand Prix": (9, "2026-07-05"),
+        "Belgian Grand Prix": (10, "2026-07-19"),
+    }
+
+    ordered, default_index = pages._order_races_by_round(options, meta, today_iso="2026-07-11")
+
+    assert ordered == [
+        "Australian Grand Prix",
+        "British Grand Prix (Sprint)",
+        "Belgian Grand Prix",
+    ]
+    # Next race on/after 2026-07-11 is Belgium (British already ran).
+    assert ordered[default_index] == "Belgian Grand Prix"
+
+
+def test_order_races_by_round_season_over_shows_most_recent():
+    options = ["Australian Grand Prix", "Abu Dhabi Grand Prix"]
+    meta = {
+        "Australian Grand Prix": (1, "2026-03-08"),
+        "Abu Dhabi Grand Prix": (24, "2026-11-29"),
+    }
+
+    ordered, default_index = pages._order_races_by_round(options, meta, today_iso="2027-01-01")
+
+    assert ordered[default_index] == "Abu Dhabi Grand Prix"
+
+
+def test_order_races_by_round_unknown_dates_keeps_index_zero():
+    options = ["Some Grand Prix", "Another Grand Prix"]
+
+    ordered, default_index = pages._order_races_by_round(options, {}, today_iso="2026-07-11")
+
+    assert default_index == 0
+    assert set(ordered) == set(options)
