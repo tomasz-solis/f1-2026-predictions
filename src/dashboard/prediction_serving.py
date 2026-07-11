@@ -126,6 +126,7 @@ def load_served_prediction_bundle(
     store_cached_prediction_fn: Any,
     load_warmed_boundary_fallback_prediction_fn: Any,
     load_precompute_horizon_index_fn: Any,
+    load_latest_prediction_for_boundary_fn: Any = None,
     served_prediction_boundary_session_name_fn: Any,
     prediction_unavailable_error_type: type[Exception],
     notify_fn: Callable[[str], None],
@@ -208,11 +209,33 @@ def load_served_prediction_bundle(
         if fallback_result is not None:
             prediction_results, boundary_fallback = fallback_result
         else:
-            raise prediction_unavailable_error_type(
-                "Persisted prediction is not available for "
-                f"{race_name} {year} [{weather_normalized}] at checkpoint {boundary_session_name}. "
-                "Run warmup or trigger the scheduled job before using the dashboard."
-            )
+            # The exact (artifact_hash + boundary) key missed and no warmed-boundary
+            # fallback applied. The forecast may still exist under a different model
+            # artifact hash — routine artifact bumps re-key every stored record — so
+            # serve the newest forecast for this race/weather/checkpoint regardless of
+            # model version instead of failing to an empty page.
+            resilient_prediction = None
+            if load_latest_prediction_for_boundary_fn is not None:
+                resilient_prediction = load_latest_prediction_for_boundary_fn(
+                    year=year,
+                    race_name=race_name,
+                    weather=weather_normalized,
+                    boundary_signature=boundary_signature,
+                )
+            if resilient_prediction is not None:
+                prediction_results = resilient_prediction
+                store_cached_prediction_fn(prediction_cache_key, resilient_prediction)
+                notify_fn(
+                    "Serving the latest available forecast "
+                    "(saved under a different model version than this build)..."
+                )
+            else:
+                raise prediction_unavailable_error_type(
+                    "Persisted prediction is not available for "
+                    f"{race_name} {year} [{weather_normalized}] at checkpoint "
+                    f"{boundary_session_name}. "
+                    "Run warmup or trigger the scheduled job before using the dashboard."
+                )
 
     precompute_summary["ready_races"] = _ready_races_for_current_horizon(
         year=year,

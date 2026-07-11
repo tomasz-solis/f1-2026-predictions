@@ -266,6 +266,74 @@ def load_precomputed_prediction(
     return _extract_prediction_results(file_payload)
 
 
+def load_latest_prediction_for_boundary(
+    *,
+    year: int,
+    race_name: str,
+    weather: str,
+    boundary_signature: str,
+) -> dict[str, Any] | None:
+    """Return the newest warmed prediction for a race/weather/checkpoint, any model version.
+
+    Resilience fallback for the exact-key lookup. Predictions are keyed partly by an
+    artifact hash of the code+model snapshot that produced them, so a routine artifact
+    bump re-keys every record and orphans forecasts that still exist under an older
+    hash. When the exact key misses, serve the most recent forecast for the same race,
+    weather and boundary signature — just possibly from a slightly older model version —
+    rather than showing an empty page.
+
+    The boundary signature is kept exact so the served checkpoint stays correct; only
+    the artifact hash is relaxed.
+
+    ponytail: linear scan of the namespace; fine as a cache-miss fallback (hundreds of
+    records). Add a race-indexed query if the store ever grows to thousands.
+    """
+    weather_normalized = str(weather).strip().lower()
+    boundary = str(boundary_signature)
+    best_results: dict[str, Any] | None = None
+    best_updated = ""
+
+    def _consider(payload: Any) -> None:
+        nonlocal best_results, best_updated
+        if not isinstance(payload, dict):
+            return
+        try:
+            if int(payload.get("year", -1)) != int(year):
+                return
+        except (TypeError, ValueError):
+            return
+        if str(payload.get("race_name", "")).strip() != str(race_name).strip():
+            return
+        if str(payload.get("weather", "")).strip().lower() != weather_normalized:
+            return
+        if str(payload.get("boundary_signature", "")) != boundary:
+            return
+        results = _extract_prediction_results(payload)
+        if results is None:
+            return
+        updated = str(payload.get("updated_at", ""))
+        if best_results is None or updated > best_updated:
+            best_results, best_updated = results, updated
+
+    if should_read_db_first():
+        try:
+            namespace = RuntimeStateStore().load_namespace(
+                _STATE_NAMESPACE_PRECOMPUTED_PREDICTIONS
+            )
+            for payload in namespace.values():
+                _consider(payload)
+        except _STATE_ERRORS as exc:
+            logger.warning("Could not scan precomputed predictions from DB: %s", exc)
+
+    if best_results is None:
+        file_entries = _load_file_state().get("entries", {})
+        if isinstance(file_entries, dict):
+            for payload in file_entries.values():
+                _consider(payload)
+
+    return best_results
+
+
 def save_precomputed_prediction(
     *,
     year: int,

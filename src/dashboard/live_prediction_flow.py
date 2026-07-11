@@ -14,6 +14,7 @@ from typing import Any, Protocol
 from src.dashboard.precomputed_predictions import (
     compute_artifact_hash,
     get_prediction_precompute_config,
+    load_latest_prediction_for_boundary,
     load_precompute_horizon_index,
     load_precomputed_prediction,
 )
@@ -424,6 +425,7 @@ def _load_served_prediction_bundle(
         store_cached_prediction_fn=_store_cached_prediction,
         load_warmed_boundary_fallback_prediction_fn=_load_warmed_boundary_fallback_prediction,
         load_precompute_horizon_index_fn=load_precompute_horizon_index,
+        load_latest_prediction_for_boundary_fn=load_latest_prediction_for_boundary,
         served_prediction_boundary_session_name_fn=_served_prediction_boundary_session_name,
         prediction_unavailable_error_type=PrecomputedPredictionUnavailableError,
         notify_fn=notify_fn,
