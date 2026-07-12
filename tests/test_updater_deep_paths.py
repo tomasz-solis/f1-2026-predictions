@@ -967,7 +967,13 @@ def test_persist_driver_characteristics_writes_under_store_root_not_repo(tmp_pat
     written = (
         sidecar_root / "processed" / "driver_characteristics" / "2026_driver_characteristics.json"
     )
-    leaked = tmp_path / "data" / "processed" / "driver_characteristics" / "2026_driver_characteristics.json"
+    leaked = (
+        tmp_path
+        / "data"
+        / "processed"
+        / "driver_characteristics"
+        / "2026_driver_characteristics.json"
+    )
     assert written.exists(), "fallback must be written under the store's data root"
     assert not leaked.exists(), "fallback must not leak into the repo-relative data/processed tree"
 

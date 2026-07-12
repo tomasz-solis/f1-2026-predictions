@@ -317,9 +317,7 @@ def load_latest_prediction_for_boundary(
 
     if should_read_db_first():
         try:
-            namespace = RuntimeStateStore().load_namespace(
-                _STATE_NAMESPACE_PRECOMPUTED_PREDICTIONS
-            )
+            namespace = RuntimeStateStore().load_namespace(_STATE_NAMESPACE_PRECOMPUTED_PREDICTIONS)
             for payload in namespace.values():
                 _consider(payload)
         except _STATE_ERRORS as exc:
