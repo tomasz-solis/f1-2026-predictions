@@ -441,7 +441,15 @@ def _render_development_history_section(
                 linecolor="rgba(232,237,242,0.20)",
             ),
         )
-        st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+        # Keyed so the CSS can let this season-long time series use the full page
+        # width (the default chart cap is the narrower readable width, which crams
+        # the race axis). See `.st-key-ts-dev-over-time` in styles.py.
+        st.plotly_chart(
+            fig,
+            width="stretch",
+            key="ts-dev-over-time",
+            config={"displayModeBar": False},
+        )
     except Exception as exc:
         st.info(f"Development chart unavailable ({exc}).")
     st.caption(

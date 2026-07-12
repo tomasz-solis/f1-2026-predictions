@@ -655,6 +655,12 @@ button[kind="primary"]:focus-visible,
   padding: 0.35rem 0.35rem 0.15rem;
   box-shadow: 0 12px 30px rgba(0,0,0,0.3);
 }
+
+/* Development-over-time is a season-long time series: let it use the full page
+   rail instead of the narrower readable cap, so the race axis has room. */
+.st-key-ts-dev-over-time [data-testid="stPlotlyChart"] {
+  max-width: var(--ts-page-max);
+}
 [data-testid="stAlert"] {
   border: 1px solid rgba(232,237,242,0.16) !important;
   border-radius: 14px !important;
