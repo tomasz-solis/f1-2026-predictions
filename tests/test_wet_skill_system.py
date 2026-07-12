@@ -519,11 +519,7 @@ def _run_sprint_wet_skill_update(
     updater.update_from_sprint_race(2026, "China Grand Prix", data_root=str(tmp_path))
 
     fallback_file = (
-        tmp_path
-        / "data"
-        / "processed"
-        / "driver_characteristics"
-        / "2026_driver_characteristics.json"
+        tmp_path / "processed" / "driver_characteristics" / "2026_driver_characteristics.json"
     )
     saved_payload = json.loads(fallback_file.read_text())
     return saved_payload["drivers"]
