@@ -1,8 +1,12 @@
 """Tests for the Team Comparison snapshot migration CLI."""
 
+from argparse import Namespace
+
 from scripts.backfill_team_comparison_snapshots import (
+    SnapshotJob,
     _audit_latest_snapshots,
     _build_snapshot_jobs,
+    _worker_command,
 )
 
 
@@ -79,3 +83,20 @@ def test_audit_latest_snapshots_rejects_stale_or_normalized_only_payload() -> No
     assert audit.passed is False
     assert audit.stale_sources == ((artifact_key, "testing_practice_extraction"),)
     assert len(audit.missing_raw_metrics) == 2
+
+
+def test_worker_command_runs_exactly_one_session() -> None:
+    command = _worker_command(
+        Namespace(year=2026, apply=True, force_renew_cache=False),
+        job=SnapshotJob(
+            event_name="British Grand Prix",
+            sessions=("FP1",),
+            cache_dir="data/raw/.fastf1_cache",
+        ),
+        session="FP1",
+    )
+
+    assert "--worker-event" in command
+    assert command[command.index("--worker-event") + 1] == "British Grand Prix"
+    assert command[command.index("--worker-session") + 1] == "FP1"
+    assert "--apply" in command

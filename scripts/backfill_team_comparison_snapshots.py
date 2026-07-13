@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import subprocess
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -32,7 +33,6 @@ from src.persistence.config import (  # noqa: E402
     should_read_db_first,
     should_write_to_db,
 )
-from src.systems.testing_updater import backfill_session_snapshot_history  # noqa: E402
 
 logger = logging.getLogger("backfill_team_comparison_snapshots")
 
@@ -90,6 +90,9 @@ def _parse_args() -> argparse.Namespace:
         default=600,
         help="Maximum artifact rows to inspect when discovering production keys.",
     )
+    parser.add_argument("--worker-event", help=argparse.SUPPRESS)
+    parser.add_argument("--worker-session", help=argparse.SUPPRESS)
+    parser.add_argument("--worker-cache-dir", help=argparse.SUPPRESS)
     return parser.parse_args()
 
 
@@ -230,7 +233,76 @@ def _audit_latest_snapshots(
     )
 
 
+def _run_single_session_worker(args: argparse.Namespace) -> int:
+    """Rebuild one session in an isolated process to cap FastF1 memory usage."""
+    if not args.worker_event or not args.worker_session or not args.worker_cache_dir:
+        logger.error("Incomplete snapshot worker arguments")
+        return 2
+
+    # This is intentionally imported only inside the short-lived worker. The
+    # orchestrator remains lightweight while each FastF1 session is loaded, and
+    # all telemetry memory is returned to the OS when the worker exits.
+    from src.systems.testing_updater import backfill_session_snapshot_history
+
+    summary = backfill_session_snapshot_history(
+        year=args.year,
+        characteristics_year=args.year,
+        events=[args.worker_event],
+        sessions=[args.worker_session],
+        testing_backend="auto",
+        cache_dir=args.worker_cache_dir,
+        force_renew_cache=bool(args.force_renew_cache),
+        run_profile="balanced",
+        dry_run=not args.apply,
+    )
+    loaded_sessions = list(summary.get("loaded_sessions", []))
+    snapshots_written = int(summary.get("snapshots_written", 0))
+    logger.info(
+        "Worker %s %s: loaded=%s written=%s",
+        args.worker_event,
+        args.worker_session,
+        len(loaded_sessions),
+        snapshots_written,
+    )
+    if len(loaded_sessions) != 1:
+        logger.error("Worker did not load its requested session: %s", loaded_sessions)
+        return 1
+    if args.apply and snapshots_written != 1:
+        logger.error("Worker wrote %s snapshots; expected 1", snapshots_written)
+        return 1
+    return 0
+
+
+def _worker_command(
+    args: argparse.Namespace,
+    *,
+    job: SnapshotJob,
+    session: str,
+) -> list[str]:
+    """Build the isolated worker command for one event session."""
+    command = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--year",
+        str(args.year),
+        "--worker-event",
+        job.event_name,
+        "--worker-session",
+        session,
+        "--worker-cache-dir",
+        job.cache_dir,
+    ]
+    if args.apply:
+        command.append("--apply")
+    if args.force_renew_cache:
+        command.append("--force-renew-cache")
+    return command
+
+
 def _run_backfill(args: argparse.Namespace) -> int:
+    if args.worker_event or args.worker_session or args.worker_cache_dir:
+        return _run_single_session_worker(args)
+
     if not should_read_db_first() or not should_write_to_db():
         logger.error(
             "DB-backed storage is required (mode=%s, db_read=%s, db_write=%s)",
@@ -259,43 +331,23 @@ def _run_backfill(args: argparse.Namespace) -> int:
     total_written = 0
     for job in jobs:
         logger.info("Rebuilding %s: %s", job.event_name, ", ".join(job.sessions))
-        summary = backfill_session_snapshot_history(
-            year=args.year,
-            characteristics_year=args.year,
-            events=[job.event_name],
-            sessions=list(job.sessions),
-            testing_backend="auto",
-            cache_dir=job.cache_dir,
-            force_renew_cache=bool(args.force_renew_cache),
-            run_profile="balanced",
-            dry_run=not args.apply,
-        )
-        loaded_sessions = list(summary.get("loaded_sessions", []))
-        snapshots_written = int(summary.get("snapshots_written", 0))
-        logger.info(
-            "%s: loaded=%s/%s written=%s",
-            job.event_name,
-            len(loaded_sessions),
-            len(job.sessions),
-            snapshots_written,
-        )
-        if len(loaded_sessions) != len(job.sessions):
-            logger.error(
-                "%s did not load every requested session: %s",
-                job.event_name,
-                loaded_sessions,
+        for session in job.sessions:
+            logger.info("Starting isolated worker: %s %s", job.event_name, session)
+            completed = subprocess.run(
+                _worker_command(args, job=job, session=session),
+                check=False,
             )
-            return 1
-        if args.apply and snapshots_written != len(job.sessions):
-            logger.error(
-                "%s wrote %s snapshots; expected %s",
-                job.event_name,
-                snapshots_written,
-                len(job.sessions),
-            )
-            return 1
-        total_loaded += len(loaded_sessions)
-        total_written += snapshots_written
+            if completed.returncode != 0:
+                logger.error(
+                    "Worker failed for %s %s with exit code %s",
+                    job.event_name,
+                    session,
+                    completed.returncode,
+                )
+                return 1
+            total_loaded += 1
+            if args.apply:
+                total_written += 1
 
     logger.info("Sessions loaded=%s snapshots written=%s", total_loaded, total_written)
     if not args.apply:
