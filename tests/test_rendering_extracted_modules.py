@@ -113,7 +113,7 @@ def test_rendering_race_movement_ladder_reserves_hover_space() -> None:
     assert figure.layout.title.text is None
     assert figure.layout.height == 340
     assert "P%{customdata[2]} → P%{customdata[3]}" in figure.data[0].hovertemplate
-    assert figure.layout.annotations[1].text == "LEC P2 +3"
+    assert figure.layout.annotations[1].text == "LEC P2 (+3)"
 
 
 def test_rendering_race_movement_ladder_adds_height_for_field_span() -> None:

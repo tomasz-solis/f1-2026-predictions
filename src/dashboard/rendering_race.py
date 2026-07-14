@@ -274,7 +274,7 @@ def _position_change_ladder_figure(rows: pd.DataFrame) -> go.Figure:
         fig.add_annotation(
             x=1.06,
             y=int(row.finish_position),
-            text=f"{row.driver} P{int(row.finish_position)} {delta:+d}",
+            text=f"{row.driver} P{int(row.finish_position)} ({delta:+d})",
             showarrow=False,
             xanchor="left",
             font={"size": 11, "color": color},
