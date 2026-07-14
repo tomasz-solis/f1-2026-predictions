@@ -23,6 +23,7 @@ CUSTOM_CSS = """
   --ts-gap: 1rem;
   --ts-page-max: 1280px;
   --ts-readable-max: 980px;
+  --ts-movement-chart-max: 760px;
 }
 
 /* --- Sticky header (collapsible) --- */
@@ -648,6 +649,7 @@ button[kind="primary"]:focus-visible,
 [data-testid="stPlotlyChart"] {
   width: 100%;
   max-width: var(--ts-readable-max);
+  box-sizing: border-box;
   margin: 0.45rem auto 1.05rem;
   background: linear-gradient(180deg, rgba(16,25,40,0.68), rgba(11,19,30,0.7));
   border: 1px solid rgba(232,237,242,0.13);
@@ -660,6 +662,38 @@ button[kind="primary"]:focus-visible,
    rail instead of the narrower readable cap, so the race axis has room. */
 .st-key-ts-dev-over-time [data-testid="stPlotlyChart"] {
   max-width: var(--ts-page-max);
+}
+
+/* The movement ladder is a two-column slopegraph, so a shorter measure makes
+   one-place changes legible and leaves the Finish-side hover card on-canvas. */
+.st-key-ts-biggest-movers {
+  max-width: var(--ts-readable-max);
+  margin-inline: auto;
+}
+.st-key-ts-biggest-movers .ts-movement-chart-title {
+  max-width: var(--ts-movement-chart-max);
+  margin: 1.25rem auto 0;
+  padding-inline: 0.4rem;
+  color: rgba(232,237,242,0.94);
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+.st-key-ts-biggest-movers .ts-movement-chart-title span {
+  margin-left: 0.4rem;
+  color: rgba(139,148,158,0.96);
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+.st-key-ts-biggest-movers [data-testid="stCaptionContainer"] {
+  max-width: var(--ts-movement-chart-max);
+  margin: 0.4rem auto 0;
+  padding-inline: 0.4rem;
+}
+.st-key-ts-biggest-movers [data-testid="stPlotlyChart"] {
+  max-width: var(--ts-movement-chart-max);
+  margin: 0.65rem auto 1.25rem;
 }
 [data-testid="stAlert"] {
   border: 1px solid rgba(232,237,242,0.16) !important;
@@ -872,7 +906,7 @@ hr {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .ts-stat-grid--movement {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 .ts-stat-card {
   min-height: 112px;
@@ -1314,15 +1348,19 @@ footer, [data-testid="stFooter"] { display: none !important; }
   .ts-run-summary__value {
     text-align: left;
   }
-  .ts-stat-grid--movement {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 700px) {
   .ts-hero-deck__meta .ts-stat-grid,
   .ts-stat-grid--hero {
     grid-template-columns: 1fr;
+  }
+  .ts-stat-grid--movement {
+    grid-template-columns: 1fr;
+  }
+  .st-key-ts-biggest-movers .ts-movement-chart-title span {
+    display: block;
+    margin: 0.2rem 0 0;
   }
 }
 

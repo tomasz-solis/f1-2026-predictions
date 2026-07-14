@@ -209,3 +209,9 @@ def test_navigation_pages_match_dashboard_order():
 
 def test_custom_css_keeps_streamlit_spinner_visible():
     assert '[data-testid="stSpinner"] { display: none !important; }' not in layout._CUSTOM_CSS
+
+
+def test_custom_css_scopes_the_movement_ladder_width():
+    assert "--ts-movement-chart-max: 760px;" in layout._CUSTOM_CSS
+    assert '.st-key-ts-biggest-movers [data-testid="stPlotlyChart"]' in layout._CUSTOM_CSS
+    assert "box-sizing: border-box;" in layout._CUSTOM_CSS

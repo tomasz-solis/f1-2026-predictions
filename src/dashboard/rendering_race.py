@@ -235,7 +235,7 @@ def _movement_ladder_rows(comparison: pd.DataFrame, *, row_limit: int = 12) -> p
     return ladder_rows.sort_values(["start_position", "finish_position", "driver"])
 
 
-def _position_change_ladder_figure(rows: pd.DataFrame, *, title: str) -> go.Figure:
+def _position_change_ladder_figure(rows: pd.DataFrame) -> go.Figure:
     """Build a start-to-finish movement ladder for the top projected movers."""
     fig = go.Figure()
     for row in rows.itertuples(index=False):
@@ -255,10 +255,10 @@ def _position_change_ladder_figure(rows: pd.DataFrame, *, title: str) -> go.Figu
                 marker={"size": 9, "color": color, "line": {"width": 0}},
                 customdata=customdata,
                 hovertemplate=(
-                    "<b>%{customdata[0]}</b> (%{customdata[1]})"
-                    "<br>Grid: P%{customdata[2]}"
-                    "<br>Finish: P%{customdata[3]}"
-                    "<br>Net: %{customdata[4]:+d}<extra></extra>"
+                    "<b>%{customdata[0]}</b>"
+                    "<br>%{customdata[1]}"
+                    "<br>P%{customdata[2]} → P%{customdata[3]} · "
+                    "%{customdata[4]:+d}<extra></extra>"
                 ),
                 showlegend=False,
             )
@@ -274,25 +274,32 @@ def _position_change_ladder_figure(rows: pd.DataFrame, *, title: str) -> go.Figu
         fig.add_annotation(
             x=1.06,
             y=int(row.finish_position),
-            text=f"P{int(row.finish_position)} {delta:+d}",
+            text=f"{row.driver} P{int(row.finish_position)} {delta:+d}",
             showarrow=False,
             xanchor="left",
             font={"size": 11, "color": color},
         )
 
+    positions = pd.concat([rows["start_position"], rows["finish_position"]]).astype(int)
+    min_position = int(positions.min())
+    max_position = int(positions.max())
+    position_span = max_position - min_position
+
     fig.update_layout(
-        height=max(340, 28 * len(rows) + 180),
-        margin={"l": 90, "r": 90, "t": 56, "b": 36},
+        height=max(340, min(660, 30 * (position_span + 1) + 140)),
+        margin={"l": 16, "r": 16, "t": 20, "b": 40},
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        title={
-            "text": title,
-            "x": 0.02,
-            "xanchor": "left",
-            "font": {"size": 16, "color": "rgba(232,237,242,0.94)"},
+        hoverlabel={
+            "align": "left",
+            "bgcolor": "#111826",
+            "bordercolor": "rgba(232,237,242,0.22)",
+            "font": {"size": 12, "color": "rgba(232,237,242,0.96)"},
         },
         xaxis={
-            "range": [-0.22, 1.22],
+            # Bring the two columns closer together and reserve the remaining
+            # measure for endpoint labels and the Finish-side hover card.
+            "range": [-0.55, 1.90],
             "tickmode": "array",
             "tickvals": [0, 1],
             "ticktext": ["Grid", "Finish"],
@@ -306,7 +313,7 @@ def _position_change_ladder_figure(rows: pd.DataFrame, *, title: str) -> go.Figu
                 "text": "Position",
                 "font": {"size": 11, "color": "rgba(232,237,242,0.72)"},
             },
-            "autorange": "reversed",
+            "range": [max_position + 0.7, min_position - 0.7],
             "dtick": 1,
             "gridcolor": "rgba(232,237,242,0.08)",
             "fixedrange": True,
@@ -353,12 +360,11 @@ def _render_position_change_chart(
         _build_movement_story_cards(comparison),
         grid_class="ts-stat-grid ts-stat-grid--movement",
     )
-    st.caption(
-        "Movement ladder shows projected position changes only; unchanged drivers are omitted."
-    )
-    st.caption(summary)
-
     if not bool((comparison["positions_gained"] != 0).any()):
+        st.caption(
+            "Movement ladder shows projected position changes only; unchanged drivers are omitted."
+        )
+        st.caption(summary)
         render_notice_banner(
             "No projected position changes in this run.",
             tone="info",
@@ -366,14 +372,23 @@ def _render_position_change_chart(
         )
         return
 
-    st.plotly_chart(
-        _position_change_ladder_figure(
-            _movement_ladder_rows(comparison),
-            title="Grid to projected finish - movers only",
-        ),
-        width="stretch",
-        config={"displayModeBar": False},
-    )
+    with st.container(key="ts-biggest-movers"):
+        st.markdown(
+            '<h3 class="ts-movement-chart-title">'
+            "Grid to projected finish <span>Movers only</span>"
+            "</h3>",
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "Movement ladder shows projected position changes only; "
+            f"unchanged drivers are omitted. {summary}"
+        )
+        st.plotly_chart(
+            _position_change_ladder_figure(_movement_ladder_rows(comparison)),
+            width="stretch",
+            key="ts-position-change",
+            config={"displayModeBar": False},
+        )
 
 
 def _render_track_temperature_context(result: dict) -> None:

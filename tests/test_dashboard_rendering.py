@@ -35,6 +35,7 @@ def _stub_streamlit(patcher):
     patcher.setattr(rendering.st, "progress", lambda *_args, **_kwargs: None)
     patcher.setattr(rendering.st, "write", lambda msg: calls.append(("write", str(msg))))
     patcher.setattr(rendering.st, "dataframe", lambda *_args, **_kwargs: None)
+    patcher.setattr(rendering.st, "container", lambda **_kwargs: _Ctx())
     patcher.setattr(
         rendering.st,
         "plotly_chart",

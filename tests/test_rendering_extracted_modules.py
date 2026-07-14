@@ -85,6 +85,55 @@ def test_rendering_race_movement_ladder_rows_only_returns_movers() -> None:
     assert all(ladder_rows["positions_gained"] != 0)
 
 
+def test_rendering_race_movement_ladder_reserves_hover_space() -> None:
+    rows = pd.DataFrame(
+        [
+            {
+                "driver": "LEC",
+                "team": "Ferrari",
+                "start_position": 5,
+                "finish_position": 2,
+                "positions_gained": 3,
+            },
+            {
+                "driver": "VER",
+                "team": "Red Bull Racing",
+                "start_position": 2,
+                "finish_position": 4,
+                "positions_gained": -2,
+            },
+        ]
+    )
+
+    figure = rendering_race._position_change_ladder_figure(rows)
+
+    assert tuple(figure.layout.xaxis.range) == (-0.55, 1.90)
+    assert tuple(figure.layout.yaxis.range) == (5.7, 1.3)
+    assert figure.layout.margin.to_plotly_json() == {"l": 16, "r": 16, "t": 20, "b": 40}
+    assert figure.layout.title.text is None
+    assert figure.layout.height == 340
+    assert "P%{customdata[2]} → P%{customdata[3]}" in figure.data[0].hovertemplate
+    assert figure.layout.annotations[1].text == "LEC P2 +3"
+
+
+def test_rendering_race_movement_ladder_adds_height_for_field_span() -> None:
+    rows = pd.DataFrame(
+        [
+            {
+                "driver": "LEC",
+                "team": "Ferrari",
+                "start_position": 15,
+                "finish_position": 2,
+                "positions_gained": 13,
+            }
+        ]
+    )
+
+    figure = rendering_race._position_change_ladder_figure(rows)
+
+    assert figure.layout.height == 560
+
+
 def test_rendering_qualifying_orders_teammate_matchups_by_edge() -> None:
     """Teammate cards should read strongest simulated edge first."""
     rows = rendering_qualifying._normalize_teammate_matchups(
