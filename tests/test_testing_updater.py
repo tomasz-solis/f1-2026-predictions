@@ -580,6 +580,28 @@ def test_select_program_aware_laps_preserves_fastf1_laps_behaviour():
     assert len(selected) == 2
 
 
+def test_select_program_aware_laps_restores_fastf1_session_metadata():
+    """Pandas concat must not detach selected laps from loaded car telemetry."""
+    from fastf1.core import Laps
+
+    session = object()
+    laps = Laps(
+        {
+            "Driver": ["DRV"] * 12,
+            "Stint": ([1] * 4) + ([2] * 8),
+            "Compound": (["SOFT"] * 4) + (["MEDIUM"] * 8),
+            "LapTime": [pd.to_timedelta(f"0:01:{20 + index:02d}") for index in range(12)],
+        },
+        session=session,
+    )
+
+    selected = _select_program_aware_laps(laps, run_profile="balanced")
+
+    assert isinstance(selected, Laps)
+    assert selected.session is session
+    assert all(lap.session is session for _, lap in selected.iterlaps())
+
+
 def test_collect_session_metrics_attaches_raw_top_speed_from_all_valid_laps(monkeypatch):
     from src.systems import testing_updater as testing_updater
 

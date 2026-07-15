@@ -270,6 +270,28 @@ def _select_short_run_laps(team_laps: pd.DataFrame, top_n: int = _SHORT_RUN_TOP_
     return clean.loc[keep_index].copy()
 
 
+def _restore_laps_session(
+    source_laps: pd.DataFrame,
+    selected_laps: pd.DataFrame,
+) -> pd.DataFrame:
+    """Keep FastF1's session reference after pandas selection/concat operations.
+
+    FastF1 stores the telemetry owner on ``Laps.session``. Some pandas paths used
+    by balanced/long-run selection preserve the ``Laps`` subclass but drop that
+    metadata, which makes every selected ``Lap.get_telemetry()`` call fail. Restore
+    the reference from the original team slice before telemetry extraction.
+    """
+    source_session = getattr(source_laps, "session", None)
+    if source_session is None or getattr(selected_laps, "session", None) is not None:
+        return selected_laps
+
+    try:
+        selected_laps.session = source_session
+    except (AttributeError, TypeError, ValueError):
+        logger.debug("Could not restore FastF1 session metadata on selected laps")
+    return selected_laps
+
+
 def _select_program_aware_laps(team_laps: pd.DataFrame, run_profile: str) -> pd.DataFrame:
     """
     Select representative laps with program-aware run filtering.
@@ -292,7 +314,8 @@ def _select_program_aware_laps(team_laps: pd.DataFrame, run_profile: str) -> pd.
     # lap inside a long stint counts and an end-of-session cooldown stint does not.
     if run_profile == "short_run":
         short_run_laps = _select_short_run_laps(team_laps)
-        return short_run_laps if not short_run_laps.empty else team_laps
+        selected_short_run = short_run_laps if not short_run_laps.empty else team_laps
+        return _restore_laps_session(team_laps, selected_short_run)
 
     if run_profile == "all":
         selected = team_laps
@@ -315,7 +338,8 @@ def _select_program_aware_laps(team_laps: pd.DataFrame, run_profile: str) -> pd.
                 selected = team_laps
 
     representative = _select_stint_representative_laps(selected)
-    return representative if not representative.empty else selected
+    selected_representative = representative if not representative.empty else selected
+    return _restore_laps_session(team_laps, selected_representative)
 
 
 def _count_team_selected_laps(

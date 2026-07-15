@@ -85,6 +85,41 @@ def test_audit_latest_snapshots_rejects_stale_or_normalized_only_payload() -> No
     assert len(audit.missing_raw_metrics) == 2
 
 
+def test_audit_latest_snapshots_rejects_partial_braking_coverage() -> None:
+    artifact_key = "2026::British Grand Prix::FP1"
+    audit = _audit_latest_snapshots(
+        {
+            artifact_key: {
+                "source": "snapshot_history_backfill",
+                "teams": {
+                    "Red Bull Racing": {
+                        "profiles": {
+                            "balanced": {
+                                "slow_corner_seconds": 28.9,
+                                "braking_pct": 10.7182,
+                            }
+                        }
+                    },
+                    "Mercedes": {
+                        "profiles": {
+                            "balanced": {
+                                "slow_corner_seconds": 29.131,
+                                "overall_pace_seconds": 91.822,
+                            }
+                        }
+                    },
+                },
+            }
+        },
+        migrated_keys=(artifact_key,),
+    )
+
+    assert audit.passed is False
+    assert audit.missing_raw_metrics == (
+        (artifact_key, "Mercedes", "balanced", "braking_performance", "braking_pct"),
+    )
+
+
 def test_worker_command_runs_exactly_one_session() -> None:
     command = _worker_command(
         Namespace(year=2026, apply=True, force_renew_cache=False),

@@ -204,6 +204,17 @@ def _audit_latest_snapshots(
         teams_payload = payload.get("teams")
         if not isinstance(teams_payload, dict):
             continue
+
+        profiles_with_raw_braking = {
+            str(profile_name)
+            for team_payload in teams_payload.values()
+            if isinstance(team_payload, dict)
+            for profiles in (team_payload.get("profiles"),)
+            if isinstance(profiles, dict)
+            for profile_name, profile in profiles.items()
+            if isinstance(profile, dict)
+            and isinstance(profile.get("braking_pct"), int | float)
+        }
         for team_name, team_payload in teams_payload.items():
             if not isinstance(team_payload, dict):
                 continue
@@ -214,7 +225,14 @@ def _audit_latest_snapshots(
                 if not isinstance(profile, dict):
                     continue
                 for normalized_key, raw_key in _RAW_METRIC_PAIRS:
-                    if normalized_key in profile and raw_key not in profile:
+                    requires_raw_braking_coverage = (
+                        raw_key == "braking_pct"
+                        and str(profile_name) in profiles_with_raw_braking
+                        and bool(profile)
+                    )
+                    if raw_key not in profile and (
+                        normalized_key in profile or requires_raw_braking_coverage
+                    ):
                         missing_raw_metrics.append(
                             (
                                 artifact_key,
