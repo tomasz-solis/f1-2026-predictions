@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from src.systems import testing_updater as tu
+from src.systems import testing_updater_sessions as tus
 
 
 class _Event(dict):
@@ -19,6 +20,50 @@ class _Event(dict):
 
     def get_session(self, day_number: int):
         return self._session
+
+
+def test_load_car_data_only_retains_only_braking_columns(patcher):
+    class _Session:
+        api_path = "/static/2026/test/session/"
+        drivers = ["16"]
+
+        def __init__(self):
+            self._t0_date = None
+            self._laps = pd.DataFrame({"LapStartTime": [pd.Timedelta(seconds=10)]})
+
+        @property
+        def t0_date(self):
+            return self._t0_date
+
+        def _calculate_t0_date(self, _car_data):
+            self._t0_date = pd.Timestamp("2026-01-01T12:00:00Z")
+
+    raw_car_data = {
+        "16": pd.DataFrame(
+            {
+                "Time": [pd.Timedelta(seconds=10), pd.Timedelta(seconds=11)],
+                "Date": pd.to_datetime(
+                    ["2026-01-01T12:00:10Z", "2026-01-01T12:00:11Z"]
+                ),
+                "RPM": [10_000, 10_200],
+                "Speed": [250, 255],
+                "nGear": [6, 7],
+                "Throttle": [80, 90],
+                "Brake": [False, True],
+                "DRS": [0, 0],
+                "Source": ["car", "car"],
+            }
+        )
+    }
+    patcher.setattr(tus.fastf1.core.api, "car_data", lambda _path: raw_car_data)
+    session = _Session()
+
+    tus.load_car_data_only(session)
+
+    assert session._pos_data == {}
+    assert list(session._car_data["16"].columns) == ["SessionTime", "Brake"]
+    assert session._car_data["16"]["Brake"].tolist() == [False, True]
+    assert session._laps["LapStartDate"].notna().all()
 
 
 def test_resolve_testing_backends_invalid_value():
@@ -75,6 +120,8 @@ def test_load_testing_session_with_backends_handles_failed_backend(patcher):
         return _Event(good_session, Session1="Day 1")
 
     patcher.setattr(tu.fastf1, "get_testing_event", _mock_get_testing_event)
+    car_data_loads = []
+    patcher.setattr(tu, "_load_car_data_only", lambda session: car_data_loads.append(session))
 
     errors = []
     loaded = tu._load_testing_session_with_backends(
@@ -87,9 +134,10 @@ def test_load_testing_session_with_backends_handles_failed_backend(patcher):
 
     assert loaded is good_session
     assert errors and "backend=f1timing" in errors[0]
+    assert car_data_loads == [good_session]
     good_session.load.assert_called_once_with(
         laps=True,
-        telemetry=True,
+        telemetry=False,
         weather=False,
         messages=False,
     )
@@ -105,6 +153,8 @@ def test_load_sessions_for_non_testing_event_collects_errors(patcher):
         return session
 
     patcher.setattr(tu.fastf1, "get_session", _mock_get_session)
+    car_data_loads = []
+    patcher.setattr(tu, "_load_car_data_only", lambda loaded: car_data_loads.append(loaded))
 
     errors = []
     loaded = tu._load_sessions_for_event(
@@ -117,9 +167,10 @@ def test_load_sessions_for_non_testing_event_collects_errors(patcher):
     assert len(loaded) == 1
     assert loaded[0][0] == "FP2"
     assert errors and "Bahrain Grand Prix::FP1" in errors[0]
+    assert car_data_loads == [session]
     session.load.assert_called_once_with(
         laps=True,
-        telemetry=True,
+        telemetry=False,
         weather=False,
         messages=False,
     )
@@ -143,6 +194,8 @@ def test_load_sessions_for_non_testing_event_skips_incomplete_laps(patcher):
         return good_session
 
     patcher.setattr(tu.fastf1, "get_session", _mock_get_session)
+    car_data_loads = []
+    patcher.setattr(tu, "_load_car_data_only", lambda session: car_data_loads.append(session))
 
     errors = []
     loaded = tu._load_sessions_for_event(
@@ -155,6 +208,7 @@ def test_load_sessions_for_non_testing_event_skips_incomplete_laps(patcher):
     assert len(loaded) == 1
     assert loaded[0][0] == "FP2"
     assert errors and "Australian Grand Prix::FP1" in errors[0]
+    assert car_data_loads == [good_session]
 
 
 def test_load_sessions_for_testing_event_skips_future_sessions(patcher):

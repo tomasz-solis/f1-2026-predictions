@@ -173,6 +173,47 @@ def normalize_testing_event_sessions(event: fastf1.events.Event) -> None:
                 event[key] = f"Practice {day_number}"
 
 
+def load_car_data_only(session: fastf1.core.Session) -> None:
+    """Attach car telemetry without loading FastF1's unused position stream.
+
+    Braking extraction only needs the native ``Brake`` car channel.
+    ``Session.load(telemetry=True)`` also loads every driver's position data,
+    which creates a large avoidable allocation in the scheduled refresh job.
+    """
+    try:
+        raw_car_data = fastf1.core.api.car_data(session.api_path)
+    except fastf1.core.api.SessionNotAvailableError:
+        raw_car_data = {}
+
+    session._calculate_t0_date(raw_car_data)
+    session._car_data = {}
+    session._pos_data = {}
+    if session.t0_date is None:
+        return
+
+    for driver in session.drivers:
+        # Remove each full-width raw frame as soon as it is reduced to the two
+        # columns the updater needs. This keeps the retained car-data footprint
+        # small while the remaining drivers are processed.
+        driver_data = raw_car_data.pop(driver, None)
+        if driver_data is None:
+            continue
+
+        telemetry = fastf1.core.Telemetry(
+            {
+                "SessionTime": driver_data["Date"].dt.round("ms") - session.t0_date,
+                "Brake": driver_data["Brake"],
+            },
+            session=session,
+            driver=driver,
+            _cast_default_cols=True,
+        )
+        session._car_data[driver] = telemetry
+
+    if hasattr(session, "_laps"):
+        session._laps["LapStartDate"] = session._laps["LapStartTime"] + session.t0_date
+
+
 def load_testing_session_with_backends(
     year: int,
     test_number: int,
@@ -183,14 +224,15 @@ def load_testing_session_with_backends(
     normalize_testing_event_sessions_fn: Callable[[fastf1.events.Event], None] = (
         normalize_testing_event_sessions
     ),
+    load_car_data_only_fn: Callable[[fastf1.core.Session], None] = load_car_data_only,
     logger_obj: Any = logger,
 ) -> fastf1.core.Session | None:
     """
     Load a testing session and verify laps are actually accessible.
 
     This avoids reporting sessions as discovered when `session.laps` would still
-    raise DataNotLoadedError after `load()`. Telemetry is loaded because the
-    updater now derives braking capability from lap-level brake traces.
+    raise DataNotLoadedError after `load()`. Car telemetry is attached
+    separately because braking needs brake traces but not position telemetry.
     """
     for backend in testing_backends:
         kwargs = {"backend": backend} if backend is not None else {}
@@ -199,12 +241,13 @@ def load_testing_session_with_backends(
             event = fastf1_get_testing_event(year, test_number, **kwargs)
             normalize_testing_event_sessions_fn(event)
             session = event.get_session(day_number)
-            session.load(laps=True, telemetry=True, weather=False, messages=False)
+            session.load(laps=True, telemetry=False, weather=False, messages=False)
             laps = session.laps
             if laps is None:
                 raise ValueError("laps are None after session.load()")
             # Access row count to force DataNotLoadedError if load is incomplete.
             _ = len(laps)
+            load_car_data_only_fn(session)
             return session
         except (
             AttributeError,
@@ -248,6 +291,7 @@ def load_sessions_for_event(
     load_testing_session_with_backends_fn: Callable[..., fastf1.core.Session | None] = (
         load_testing_session_with_backends
     ),
+    load_car_data_only_fn: Callable[[fastf1.core.Session], None] = load_car_data_only,
     fastf1_get_session: Callable[..., fastf1.core.Session] = fastf1.get_session,
     logger_obj: Any = logger,
 ) -> list[tuple[str, fastf1.core.Session]]:
@@ -258,8 +302,8 @@ def load_sessions_for_event(
     1) For non-testing events: use regular `get_session(event_name, session_name)`.
     2) For testing events: use `get_testing_event` + `get_testing_session`.
 
-    Telemetry is enabled for both paths because braking extraction depends on
-    per-lap car data instead of a placeholder slow-corner copy.
+    Car telemetry is enabled for both paths because braking extraction depends
+    on per-lap brake data. Position telemetry stays unloaded to cap memory use.
     """
     loaded: list[tuple[str, fastf1.core.Session]] = []
 
@@ -267,12 +311,13 @@ def load_sessions_for_event(
         for session_name in session_candidates:
             try:
                 session = fastf1_get_session(year, event_name, session_name)
-                session.load(laps=True, telemetry=True, weather=False, messages=False)
+                session.load(laps=True, telemetry=False, weather=False, messages=False)
                 laps = session.laps
                 if laps is None:
                     raise ValueError("laps are None after session.load()")
                 # Access row count to force DataNotLoadedError if load is incomplete.
                 _ = len(laps)
+                load_car_data_only_fn(session)
                 loaded.append((session_name, session))
             except (
                 AttributeError,

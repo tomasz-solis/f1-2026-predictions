@@ -238,14 +238,18 @@ def _build_tire_deg_display_scale(
     """
     Build a session-relative tire-deg slope range when multiple raw samples exist.
 
-    A single slope sample is not enough to rank teams meaningfully, so in that
-    case the caller falls back to the stable absolute-slope mapping instead.
+    A single slope sample is not enough to rank teams meaningfully. Historical
+    fallbacks also cannot be ranked against current-session slopes as though
+    they came from the same conditions. In both cases, the caller uses the
+    stable absolute-slope mapping instead.
     """
     raw_slopes: list[float] = []
     for team_data in teams_payload.values():
         if not isinstance(team_data, dict):
             continue
         metrics_payload = _resolve_profile_metrics(team_data, profile)
+        if metrics_payload.get("_tire_deg_history_fallback") is True:
+            return None
         raw_slope = metrics_payload.get("tire_deg_slope")
         if not isinstance(raw_slope, int | float):
             continue

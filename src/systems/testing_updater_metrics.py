@@ -665,10 +665,13 @@ def _extract_braking_capability(valid_laps: pd.DataFrame) -> float | None:
     for lap in _iter_lap_objects(valid_laps):
         telemetry = None
 
-        get_telemetry = getattr(lap, "get_telemetry", None)
-        if callable(get_telemetry):
+        # Brake is a native car-data channel. Avoid get_telemetry() unless it is
+        # the only available path: that method merges car and position streams,
+        # resamples them, and creates a much larger temporary dataframe per lap.
+        get_car_data = getattr(lap, "get_car_data", None)
+        if callable(get_car_data):
             try:
-                telemetry = get_telemetry()
+                telemetry = get_car_data()
             except (
                 AttributeError,
                 DataNotLoadedError,
@@ -680,10 +683,10 @@ def _extract_braking_capability(valid_laps: pd.DataFrame) -> float | None:
                 telemetry = None
 
         if telemetry is None:
-            get_car_data = getattr(lap, "get_car_data", None)
-            if callable(get_car_data):
+            get_telemetry = getattr(lap, "get_telemetry", None)
+            if callable(get_telemetry):
                 try:
-                    telemetry = get_car_data()
+                    telemetry = get_telemetry()
                 except (
                     AttributeError,
                     DataNotLoadedError,

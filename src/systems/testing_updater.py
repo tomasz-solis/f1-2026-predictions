@@ -88,6 +88,9 @@ from src.systems.testing_updater_sessions import (
     is_testing_event as _is_testing_event_impl,
 )
 from src.systems.testing_updater_sessions import (
+    load_car_data_only as _load_car_data_only_impl,
+)
+from src.systems.testing_updater_sessions import (
     load_sessions_for_event as _load_sessions_for_event_impl,
 )
 from src.systems.testing_updater_sessions import (
@@ -833,8 +836,14 @@ def _load_testing_session_with_backends(
         error_messages=error_messages,
         fastf1_get_testing_event=fastf1.get_testing_event,
         normalize_testing_event_sessions_fn=_normalize_testing_event_sessions,
+        load_car_data_only_fn=_load_car_data_only,
         logger_obj=logger,
     )
+
+
+def _load_car_data_only(session: fastf1.core.Session) -> None:
+    """Attach only the telemetry stream used by braking extraction."""
+    _load_car_data_only_impl(session)
 
 
 def _load_sessions_for_event(
@@ -863,6 +872,7 @@ def _load_sessions_for_event(
         get_testing_event_with_backends_fn=_get_testing_event_with_backends,
         testing_session_has_started_fn=_testing_session_has_started,
         load_testing_session_with_backends_fn=_load_testing_session_with_backends,
+        load_car_data_only_fn=_load_car_data_only,
         fastf1_get_session=fastf1.get_session,
         logger_obj=logger,
     )

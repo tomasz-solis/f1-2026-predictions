@@ -684,9 +684,50 @@ def test_build_latest_snapshot_comparison_payload_carries_forward_latest_long_ru
     long_run = payload["Ferrari"]["testing_characteristics_profiles"]["long_run"]
     assert balanced["tire_deg_performance"] == 0.67
     assert balanced["tire_deg_slope"] == 0.19
+    assert balanced["_tire_deg_history_fallback"] is True
     assert long_run["tire_deg_performance"] == 0.67
     assert long_run["tire_deg_slope"] == 0.19
+    assert long_run["_tire_deg_history_fallback"] is True
     assert payload["Ferrari"]["testing_characteristics"]["tire_deg_performance"] == 0.67
+
+
+def test_historical_tire_deg_fallback_does_not_distort_current_session_scale():
+    payload = {
+        "Ferrari": {
+            "overall_performance": 0.8,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "tire_deg_performance": 0.1,
+                    "tire_deg_slope": 0.19,
+                    "_tire_deg_history_fallback": True,
+                }
+            },
+        },
+        "Mercedes": {
+            "overall_performance": 0.8,
+            "testing_characteristics_profiles": {
+                "balanced": {
+                    "tire_deg_performance": 0.9,
+                    "tire_deg_slope": 0.05,
+                }
+            },
+        },
+    }
+
+    frame, _neutral_fallbacks = team_comparison._build_team_comparison_dataframe(
+        teams_payload=payload,
+        selected_teams=["Ferrari", "Mercedes"],
+        profile="balanced",
+    )
+
+    tire_deg_by_team = frame.set_index("Team")["Tire Deg"].to_dict()
+    assert tire_deg_by_team["Ferrari"] == pytest.approx(
+        team_comparison._normalize_tire_deg_slope_for_display(0.19)
+    )
+    assert tire_deg_by_team["Mercedes"] == pytest.approx(
+        team_comparison._normalize_tire_deg_slope_for_display(0.05)
+    )
+    assert tire_deg_by_team["Ferrari"] > 0.1
 
 
 def test_build_latest_snapshot_comparison_payload_uses_same_event_average_for_missing_team():

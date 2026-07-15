@@ -425,7 +425,7 @@ def _apply_profile_tire_deg_fallbacks(
     profiles_payload: dict[str, Any],
     tire_deg_fallback: dict[str, float],
 ) -> None:
-    """Fill missing tire-deg fields in per-profile snapshot payloads."""
+    """Fill missing tire-deg fields and identify their historical basis."""
     if not tire_deg_fallback:
         return
 
@@ -435,14 +435,19 @@ def _apply_profile_tire_deg_fallbacks(
     for metrics_payload in profiles_payload.values():
         if not isinstance(metrics_payload, dict):
             continue
+        fallback_applied = False
         if (
             _coerce_unit_metric(metrics_payload.get("tire_deg_performance")) is None
             and fallback_tire_perf is not None
         ):
             metrics_payload["tire_deg_performance"] = fallback_tire_perf
+            fallback_applied = True
         raw_slope = metrics_payload.get("tire_deg_slope")
         if not isinstance(raw_slope, int | float) and fallback_tire_slope is not None:
             metrics_payload["tire_deg_slope"] = fallback_tire_slope
+            fallback_applied = True
+        if fallback_applied:
+            metrics_payload["_tire_deg_history_fallback"] = True
 
 
 def _apply_profile_braking_fallbacks(

@@ -506,6 +506,42 @@ def test_extract_team_payload_attaches_braking_proxy_from_telemetry():
     assert payload["braking_profile"]["braking_pct"] == pytest.approx(40.0)
 
 
+def test_extract_team_payload_prefers_lighter_car_data_for_braking():
+    class _CarDataLap:
+        def get_car_data(self):
+            return pd.DataFrame({"Brake": [0, 1, 1, 0]})
+
+        def get_telemetry(self):
+            raise AssertionError("merged telemetry should not be built when car data exists")
+
+    class _CarDataLaps(pd.DataFrame):
+        _metadata = ["_lap_objects"]
+
+        def __init__(self, *args, lap_objects=None, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._lap_objects = list(lap_objects or [])
+
+        @property
+        def _constructor(self):
+            return _CarDataLaps
+
+        def iterlaps(self, require=None):
+            del require
+            yield from enumerate(self._lap_objects)
+
+    laps = _CarDataLaps(
+        {
+            "LapTime": [pd.to_timedelta("0:01:20")],
+            "SpeedST": [310.0],
+        },
+        lap_objects=[_CarDataLap()],
+    )
+
+    payload = _extract_team_payload(laps)
+
+    assert payload["braking_profile"]["braking_pct"] == pytest.approx(50.0)
+
+
 def test_extract_team_payload_ignores_unloaded_braking_telemetry():
     """Missing FastF1 telemetry should not abort practice refresh."""
 
