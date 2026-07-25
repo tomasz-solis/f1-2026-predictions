@@ -42,9 +42,7 @@ def test_load_car_data_only_retains_only_braking_columns(patcher):
         "16": pd.DataFrame(
             {
                 "Time": [pd.Timedelta(seconds=10), pd.Timedelta(seconds=11)],
-                "Date": pd.to_datetime(
-                    ["2026-01-01T12:00:10Z", "2026-01-01T12:00:11Z"]
-                ),
+                "Date": pd.to_datetime(["2026-01-01T12:00:10Z", "2026-01-01T12:00:11Z"]),
                 "RPM": [10_000, 10_200],
                 "Speed": [250, 255],
                 "nGear": [6, 7],

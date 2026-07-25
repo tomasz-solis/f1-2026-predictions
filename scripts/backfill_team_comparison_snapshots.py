@@ -212,8 +212,7 @@ def _audit_latest_snapshots(
             for profiles in (team_payload.get("profiles"),)
             if isinstance(profiles, dict)
             for profile_name, profile in profiles.items()
-            if isinstance(profile, dict)
-            and isinstance(profile.get("braking_pct"), int | float)
+            if isinstance(profile, dict) and isinstance(profile.get("braking_pct"), int | float)
         }
         for team_name, team_payload in teams_payload.items():
             if not isinstance(team_payload, dict):
