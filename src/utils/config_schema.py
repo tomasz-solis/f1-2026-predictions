@@ -268,6 +268,16 @@ class QualifyingResidualModelConfig(StrictConfigModel):
     allow_with_testing_seed: bool = False
 
 
+class PracticeChallengerConfig(StrictConfigModel):
+    """Q1 practice-to-qualifying challenger launch settings.
+
+    An empty ``launch_envelope_path`` keeps the champion path active and makes
+    the challenger fail closed; only a research overlay supplies a real path.
+    """
+
+    launch_envelope_path: str | None = None
+
+
 class RaceResidualModelConfig(StrictConfigModel):
     """Artifact-backed race residual settings."""
 
@@ -498,6 +508,9 @@ class BaselineQualifyingConfig(StrictConfigModel):
     driver_fp_adjustment_smoothing: float = Field(default=0.5, ge=0.0)
     qualifying_residual_model: QualifyingResidualModelConfig = Field(
         default_factory=QualifyingResidualModelConfig
+    )
+    practice_challenger: PracticeChallengerConfig = Field(
+        default_factory=PracticeChallengerConfig
     )
 
 
@@ -824,6 +837,19 @@ class GridUncertaintyConfig(StrictConfigModel):
     position_delta_scale: float = Field(default=0.20, ge=0.0)
 
 
+class GridAnchorSourceCalibratedConfig(StrictConfigModel):
+    """Per-grid-source anchor weights fitted offline by challenger replay.
+
+    Keys mirror ``src.utils.grid_scenarios.GRID_SOURCE_DETAILS``. An unset
+    source falls back to the champion's resolved anchor weight.
+    """
+
+    predicted_joint: float | None = Field(default=None, ge=0.0)
+    predicted_marginal_fallback: float | None = Field(default=None, ge=0.0)
+    actual_qualifying: float | None = Field(default=None, ge=0.0)
+    actual_starting_grid: float | None = Field(default=None, ge=0.0)
+
+
 class GridAnchorConfig(StrictConfigModel):
     """Final blend between simulated race order and qualifying grid."""
 
@@ -833,6 +859,9 @@ class GridAnchorConfig(StrictConfigModel):
     main_max: float = Field(default=0.57, ge=0.0)
     sprint_min: float = Field(default=0.78, ge=0.0)
     low_confidence_scale: float = Field(default=0.30, ge=0.0)
+    source_calibrated: GridAnchorSourceCalibratedConfig = Field(
+        default_factory=GridAnchorSourceCalibratedConfig
+    )
 
 
 class PredictedGridUncertaintyConfig(StrictConfigModel):
@@ -1046,6 +1075,12 @@ class CompoundBlendWeightsConfig(StrictConfigModel):
 class BaselinePredictorSectionConfig(StrictConfigModel):
     """Baseline predictor configuration block."""
 
+    # `model_variant` collides with pydantic's reserved `model_` namespace.
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    # Production stays on the immutable champion unless a replay or shadow run
+    # opts into a registered challenger variant explicitly.
+    model_variant: str = Field(default="champion")
     team_strength_schedule: str = Field(default="rapid_adaptive")
     baseline_learning_rate: float = Field(default=0.3, ge=0.0, le=1.0)
     mixed_wet_blend: float = Field(default=0.50, ge=0.0, le=1.0)

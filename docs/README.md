@@ -29,6 +29,9 @@ Session-based prediction storage, attaching actual results, and accuracy metrics
 Production readiness gates, shadow challenger audits, movement diagnostics, and
 adaptive-learning safety checks for research components.
 
+### `QUALIFYING_RACE_CHALLENGER.md`
+Q0/Q1/R0/R1/R2 evidence, replay, governance, and champion-safe release workflow.
+
 ### `MODEL_CALIBRATION.md`
 Generated 2026 calibration report, including the machine-readable production
 gate status and baseline-vs-model metrics.

@@ -157,6 +157,9 @@ dashboard:
 
 # Baseline 2026 Predictor Parameters (used before real season data)
 baseline_predictor:
+  # Production remains the immutable champion unless a replay/shadow run opts
+  # into one of the registered challenger variants explicitly.
+  model_variant: champion
   # Team-strength blending schedule across early season races.
   # rapid_adaptive reaches ~70-90% current-season influence by races 2-3.
   team_strength_schedule: rapid_adaptive
@@ -167,11 +170,12 @@ baseline_predictor:
     stabilization_strength: 1.0
     saved_actual_race_weight: 0.75
   driver_form:
+    # Legacy position-scale fallback for artifacts that do not yet carry the
+    # complete seconds-native teammate state used by the live predictor.
     bayesian_pace_blend_per_race: 0.20
     bayesian_pace_blend_cap: 0.60
-    # Qualifying skill follows current-season Bayesian form quickly after each
-    # completed weekend. 2026 sequential replay supports this for the one-lap
-    # skill channel; race skill keeps the slower schedule below.
+    # Qualifying skill follows that fallback quickly after each completed
+    # weekend; race skill keeps the slower fallback schedule below.
     bayesian_quali_skill_blend_per_race: 0.45
     bayesian_quali_skill_blend_cap: 0.90
     # Race skill stays independent from the qualifying skill schedule. When
@@ -427,6 +431,11 @@ baseline_predictor:
       artifact_path: data/processed/model_artifacts/qualifying_residual/qualifying_residual_model.pkl
       clip_positions: 2.0
       allow_with_testing_seed: false
+    # Q1 is loaded only by an explicit challenger model_variant and an immutable
+    # launch envelope supplied through a research config overlay. Empty defaults
+    # keep the champion path active and make Q1 fail closed.
+    practice_challenger:
+      launch_envelope_path: null
 
   # Compound selection parameters
   compound_selection:
@@ -791,6 +800,9 @@ baseline_predictor:
       main_max: 0.57
       sprint_min: 0.85
       low_confidence_scale: 0.30
+      # Challenger-only replay calibrations. Empty values make
+      # r2_source_anchor fail closed to the champion's resolved weight.
+      source_calibrated: {}
 
     # Extra damping when the starting grid is itself probabilistic.
     # This keeps low-confidence checkpoint race runs from compounding grid
