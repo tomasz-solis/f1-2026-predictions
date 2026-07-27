@@ -32,9 +32,13 @@ Thumbs.db
 
 # Data
 data/raw/
-data/processed/driver_characteristics.json  # Generated file, ignore
+# Generated file
+data/processed/driver_characteristics.json
 data/validation/
 *.parquet
+
+# Replay outputs (hundreds of MB, regenerable, machine-local)
+data/historical_replay/
 
 # FastF1 Cache
 .fastf1_cache/

@@ -528,7 +528,7 @@ def _load_cached_training_rows(
     if not isinstance(metadata, dict):
         return None
 
-    expected_cache_dir = str(Path(cache_dir))
+    expected_cache_dir = Path(cache_dir).as_posix()
     if int(metadata.get("cache_version", -1)) != _FEATURE_CACHE_VERSION:
         return None
     if int(metadata.get("auxiliary_event_limit", -1)) != int(auxiliary_event_limit):
@@ -558,7 +558,8 @@ def _save_cached_training_rows(
             "cache_version": _FEATURE_CACHE_VERSION,
             "season_year": int(year),
             "auxiliary_event_limit": int(auxiliary_event_limit),
-            "fastf1_cache_dir": str(Path(cache_dir)),
+            # POSIX form keeps the cached artifact byte-identical across platforms.
+            "fastf1_cache_dir": Path(cache_dir).as_posix(),
             "generated_at": datetime.now(UTC).isoformat(),
         },
         "rows": rows,

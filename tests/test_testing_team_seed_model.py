@@ -644,3 +644,30 @@ def test_write_validation_report_outputs_compact_json(tmp_path):
 
     assert written["seed_mode"] == "testing_model"
     assert written["teams_ranked"][0]["team_name"] == "McLaren"
+
+
+def test_feature_cache_round_trip_uses_posix_paths(tmp_path):
+    """Cached metadata should stay POSIX so artifacts are byte-identical anywhere."""
+    cache_dir = tmp_path / "raw" / ".fastf1_cache"
+    rows = [_feature_row(season_year=2025, team_name="McLaren")]
+
+    cache_path = testing_team_seed._save_cached_training_rows(
+        year=2025,
+        rows=rows,
+        auxiliary_event_limit=2,
+        cache_dir=cache_dir,
+        feature_cache_dir=tmp_path / "features",
+    )
+    metadata = json.loads(cache_path.read_text())["metadata"]
+
+    assert "\\" not in metadata["fastf1_cache_dir"]
+    assert metadata["fastf1_cache_dir"] == cache_dir.as_posix()
+
+    # The loader must accept back what the writer produced.
+    loaded = testing_team_seed._load_cached_training_rows(
+        2025,
+        auxiliary_event_limit=2,
+        cache_dir=cache_dir,
+        feature_cache_dir=tmp_path / "features",
+    )
+    assert loaded == rows
