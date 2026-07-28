@@ -666,11 +666,11 @@ button[kind="primary"]:focus-visible,
 
 /* The movement ladder is a two-column slopegraph, so a shorter measure makes
    one-place changes legible and leaves the Finish-side hover card on-canvas. */
-.st-key-ts-biggest-movers {
+[class*="st-key-ts-biggest-movers"] {
   max-width: var(--ts-readable-max);
   margin-inline: auto;
 }
-.st-key-ts-biggest-movers .ts-movement-chart-title {
+[class*="st-key-ts-biggest-movers"] .ts-movement-chart-title {
   max-width: var(--ts-movement-chart-max);
   margin: 1.25rem auto 0;
   padding-inline: 0.4rem;
@@ -680,18 +680,18 @@ button[kind="primary"]:focus-visible,
   font-weight: 650;
   line-height: 1.3;
 }
-.st-key-ts-biggest-movers .ts-movement-chart-title span {
+[class*="st-key-ts-biggest-movers"] .ts-movement-chart-title span {
   margin-left: 0.4rem;
   color: rgba(139,148,158,0.96);
   font-size: 0.84rem;
   font-weight: 500;
 }
-.st-key-ts-biggest-movers [data-testid="stCaptionContainer"] {
+[class*="st-key-ts-biggest-movers"] [data-testid="stCaptionContainer"] {
   max-width: var(--ts-movement-chart-max);
   margin: 0.4rem auto 0;
   padding-inline: 0.4rem;
 }
-.st-key-ts-biggest-movers [data-testid="stPlotlyChart"] {
+[class*="st-key-ts-biggest-movers"] [data-testid="stPlotlyChart"] {
   max-width: var(--ts-movement-chart-max);
   margin: 0.65rem auto 1.25rem;
 }
@@ -1358,7 +1358,7 @@ footer, [data-testid="stFooter"] { display: none !important; }
   .ts-stat-grid--movement {
     grid-template-columns: 1fr;
   }
-  .st-key-ts-biggest-movers .ts-movement-chart-title span {
+  [class*="st-key-ts-biggest-movers"] .ts-movement-chart-title span {
     display: block;
     margin: 0.2rem 0 0;
   }

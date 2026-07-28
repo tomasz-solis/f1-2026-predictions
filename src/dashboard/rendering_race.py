@@ -1,6 +1,7 @@
 """Race-specific rendering helpers for dashboard prediction output."""
 
 import logging
+import re
 from typing import Any
 
 import pandas as pd
@@ -372,7 +373,8 @@ def _render_position_change_chart(
         )
         return
 
-    with st.container(key="ts-biggest-movers"):
+    key_suffix = re.sub(r"[^a-z0-9]+", "-", prediction_name.lower()).strip("-")
+    with st.container(key=f"ts-biggest-movers-{key_suffix}"):
         st.markdown(
             '<h3 class="ts-movement-chart-title">'
             "Grid to projected finish <span>Movers only</span>"
@@ -386,7 +388,7 @@ def _render_position_change_chart(
         st.plotly_chart(
             _position_change_ladder_figure(_movement_ladder_rows(comparison)),
             width="stretch",
-            key="ts-position-change",
+            key=f"ts-position-change-{key_suffix}",
             config={"displayModeBar": False},
         )
 

@@ -316,6 +316,47 @@ def test_render_position_change_chart_shows_plot_for_starting_grid(patcher):
     assert any("Biggest gainer" in block and "NOR +2" in block for block in markdown_blocks)
 
 
+def test_render_position_change_chart_keys_are_unique_per_section(patcher):
+    """Sprint weekends render this chart twice (sprint race + main race) in one script
+    run; a shared hardcoded key trips StreamlitDuplicateElementKey."""
+    container_keys: list[str] = []
+    chart_keys: list[str] = []
+    _stub_streamlit(patcher)
+    patcher.setattr(
+        rendering.st,
+        "container",
+        lambda **kwargs: (container_keys.append(kwargs.get("key")), _Ctx())[1],
+    )
+    patcher.setattr(
+        rendering.st,
+        "plotly_chart",
+        lambda _fig, **kwargs: chart_keys.append(kwargs.get("key")),
+    )
+
+    starting_grid = [
+        {"position": 3, "driver": "NOR", "team": "McLaren"},
+        {"position": 1, "driver": "VER", "team": "Red Bull Racing"},
+        {"position": 2, "driver": "LEC", "team": "Ferrari"},
+    ]
+    finish_df = pd.DataFrame(
+        [
+            {"position": 1, "driver": "NOR", "team": "McLaren"},
+            {"position": 2, "driver": "VER", "team": "Red Bull Racing"},
+            {"position": 3, "driver": "LEC", "team": "Ferrari"},
+        ]
+    )
+
+    for prediction_name in ("Sprint Race Prediction", "Main Race Prediction"):
+        rendering._render_position_change_chart(
+            finish_df,
+            result={"starting_grid": starting_grid, "starting_session_name": "Q"},
+            prediction_name=prediction_name,
+        )
+
+    assert len(set(container_keys)) == 2
+    assert len(set(chart_keys)) == 2
+
+
 def test_render_prediction_hero_deck_uses_fixed_meta_grid(patcher):
     calls = _stub_streamlit(patcher)
 
