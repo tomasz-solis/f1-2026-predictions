@@ -509,9 +509,7 @@ class BaselineQualifyingConfig(StrictConfigModel):
     qualifying_residual_model: QualifyingResidualModelConfig = Field(
         default_factory=QualifyingResidualModelConfig
     )
-    practice_challenger: PracticeChallengerConfig = Field(
-        default_factory=PracticeChallengerConfig
-    )
+    practice_challenger: PracticeChallengerConfig = Field(default_factory=PracticeChallengerConfig)
 
 
 class SprintCompoundDistributionConfig(StrictConfigModel):
