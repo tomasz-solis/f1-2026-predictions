@@ -267,8 +267,57 @@ def test_get_predictor_passes_year_to_predictor_bootstrap(patcher):
     patcher.setattr(baseline_module, "Baseline2026Predictor", _Predictor)
     patcher.setattr(Config, "reload", lambda self: None)
 
-    cache.get_predictor.clear()
+    cache._build_predictor.clear()
     cache.get_predictor({"artifact": (1, "ts")}, year=2027)
-    cache.get_predictor.clear()
+    cache._build_predictor.clear()
 
     assert calls == [2027]
+
+
+def test_artifact_versions_digest_ignores_key_order_but_tracks_content():
+    """The digest must depend on what changed, not on mapping iteration order."""
+    same_content_other_order = cache.artifact_versions_digest(
+        {"b": (2, "2026-02-02"), "a": (1, "2026-01-01")}
+    )
+    baseline = cache.artifact_versions_digest({"a": (1, "2026-01-01"), "b": (2, "2026-02-02")})
+    bumped_version = cache.artifact_versions_digest(
+        {"a": (1, "2026-01-01"), "b": (3, "2026-02-02")}
+    )
+    bumped_timestamp = cache.artifact_versions_digest(
+        {"a": (1, "2026-01-01"), "b": (2, "2026-09-09")}
+    )
+
+    assert same_content_other_order == baseline
+    assert bumped_version != baseline
+    assert bumped_timestamp != baseline
+
+
+def test_get_predictor_rebuilds_when_a_tracked_artifact_changes(patcher):
+    """Regression: the fingerprint must actually key the cache.
+
+    ``get_predictor`` used to be the cached function itself, taking the fingerprint as
+    ``_artifact_versions``. Streamlit skips hashing underscore-prefixed parameters, so
+    the fingerprint was discarded and a changed artifact kept serving the old predictor.
+    """
+    builds: list[int] = []
+    patcher.setattr(
+        cache,
+        "_construct_predictor",
+        lambda year: (builds.append(year), f"predictor-{len(builds)}")[1],
+    )
+    cache._build_predictor.clear()
+
+    stale = {"car_characteristics::2026": (1, "2026-07-01")}
+    fresh = {"car_characteristics::2026": (2, "2026-07-29")}
+
+    first = cache.get_predictor(stale, year=2026)
+    cached = cache.get_predictor(stale, year=2026)
+    after_update = cache.get_predictor(fresh, year=2026)
+    other_season = cache.get_predictor(stale, year=2025)
+
+    cache._build_predictor.clear()
+
+    assert cached == first, "an unchanged fingerprint must reuse the cached predictor"
+    assert after_update != first, "a changed artifact must rebuild the predictor"
+    assert other_season != first, "a different season must rebuild the predictor"
+    assert builds == [2026, 2026, 2025]

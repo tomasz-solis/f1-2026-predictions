@@ -1,7 +1,9 @@
 """Dashboard caching and predictor bootstrap."""
 
 import hashlib
+import json
 import logging
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -20,8 +22,10 @@ _PREDICTION_CODE_FINGERPRINT_FILES = [
     "src/dashboard/warmup_prediction_builders.py",
     "src/data/data_generator.py",
     "src/models/bayesian.py",
+    "src/models/driver_seconds_state.py",
     "src/models/priors_factory.py",
     "src/models/regulations.py",
+    "src/models/team_strength_mapping.py",
     "src/predictors/baseline/data_mixin.py",
     "src/predictors/baseline/data_support.py",
     "src/predictors/baseline/qualifying_mixin.py",
@@ -224,9 +228,40 @@ def _fingerprint_file(path: Path) -> tuple[int, str]:
     return fingerprint
 
 
+def artifact_versions_digest(artifact_versions: Mapping[str, tuple[int, str]]) -> str:
+    """Reduce an artifact-version map to one hashable cache-key string.
+
+    ``st.cache_resource`` ignores any parameter whose name starts with an underscore,
+    so passing the map itself as ``_artifact_versions`` silently disabled invalidation
+    entirely. Collapsing it to a sorted digest gives the cache something it will
+    actually hash.
+    """
+    payload = json.dumps(
+        {key: list(value) for key, value in artifact_versions.items()},
+        sort_keys=True,
+        default=str,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 @st.cache_resource(show_spinner=False)
+def _build_predictor(artifact_digest: str, year: int):
+    """Build one predictor per (artifact fingerprint, season)."""
+    _ = artifact_digest  # cache key only; the fingerprint itself is not needed here
+    return _construct_predictor(year)
+
+
 def get_predictor(_artifact_versions: dict[str, tuple[int, str]], year: int = _DEFAULT_SEASON):
-    """Load and cache predictor (invalidates when artifacts change)."""
+    """Load and cache predictor, rebuilding it whenever a tracked artifact changes.
+
+    ``_artifact_versions`` keeps its underscore for backwards compatibility with the
+    existing call sites; the digest derived from it is what the cache keys on.
+    """
+    return _build_predictor(artifact_versions_digest(_artifact_versions), int(year))
+
+
+def _construct_predictor(year: int):
+    """Construct a fresh predictor with a reloaded config."""
     from src.predictors.baseline_2026 import Baseline2026Predictor
     from src.utils.config_loader import Config
 
