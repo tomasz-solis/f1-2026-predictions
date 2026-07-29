@@ -90,3 +90,33 @@ def test_validate_qualifying_grid_respects_custom_max_position():
 
     with pytest.raises(ValueError, match="position"):
         validate_qualifying_grid(grid, max_position=22)
+
+
+def test_validate_qualifying_grid_preserves_start_type():
+    """Official start metadata must survive validation.
+
+    The validator rebuilds each entry from an allow-list of known keys, so a field it
+    does not name is silently dropped. Replay consumers that reconstruct a real race
+    require start_type on every row and fail closed without it.
+    """
+    grid = [
+        {"driver": "VER", "team": "Red Bull Racing", "position": 1, "start_type": "grid"},
+        {"driver": "HAM", "team": "Ferrari", "position": 2, "start_type": "pit_lane"},
+    ]
+
+    validated = validate_qualifying_grid(grid, min_entries=2)
+
+    assert [row["start_type"] for row in validated] == ["grid", "pit_lane"]
+
+
+def test_validate_qualifying_grid_omits_absent_start_type():
+    grid = [{"driver": "VER", "team": "Red Bull Racing", "position": 1}]
+
+    assert "start_type" not in validate_qualifying_grid(grid)[0]
+
+
+def test_validate_qualifying_grid_rejects_blank_start_type():
+    grid = [{"driver": "VER", "team": "Red Bull Racing", "position": 1, "start_type": "  "}]
+
+    with pytest.raises(ValueError, match="start_type"):
+        validate_qualifying_grid(grid)

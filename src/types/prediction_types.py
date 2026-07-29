@@ -20,6 +20,11 @@ class QualifyingGridEntry(TypedDict):
     # True for race-session results where the driver did not finish / was not classified.
     # Used by finisher-only MAE and DNF calibration; absent for qualifying and predictions.
     dnf: NotRequired[bool]
+    # How the entrant actually took the start ("grid", or a pit-lane start). Present only
+    # on official starting grids, never on a prediction: a predicted grid cannot know that
+    # a car will be sent to the pit lane. Replay consumers that reconstruct a real race
+    # require it on every row and fail closed without it.
+    start_type: NotRequired[str]
 
 
 class DriverRaceInfo(TypedDict):
