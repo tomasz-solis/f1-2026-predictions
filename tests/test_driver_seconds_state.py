@@ -9,6 +9,7 @@ import pytest
 
 from src.models.driver_seconds_state import (
     DriverSecondsState,
+    center_rating_mu_by_team,
     preserve_driver_seconds_fields,
     read_driver_seconds_state,
     update_driver_seconds_from_teammate_aggregates,
@@ -238,3 +239,34 @@ def test_seconds_update_ignores_wet_and_skipped_rows() -> None:
         quali_rating_sigma_s=0.30,
     )
     assert summary.observations_applied == 0
+
+
+def test_center_rating_mu_by_team_removes_team_mean_and_keeps_within_team_gap() -> None:
+    """Team mean should vanish while the teammate-relative gap survives."""
+    records = [
+        {"driver": "AAA", "team": "Ferrari", "quali_rating_mu_s": 0.30},
+        {"driver": "BBB", "team": "Ferrari", "quali_rating_mu_s": -0.10},
+        {"driver": "CCC", "team": "Audi", "quali_rating_mu_s": -0.40},
+    ]
+
+    center_rating_mu_by_team(records, field="quali_rating_mu_s")
+
+    ferrari_gap = records[0]["quali_rating_mu_s"] - records[1]["quali_rating_mu_s"]
+    assert ferrari_gap == pytest.approx(0.40)
+    assert records[0]["quali_rating_mu_s"] + records[1]["quali_rating_mu_s"] == pytest.approx(0.0)
+    # Audi has only one rated driver, so it is left untouched rather than zeroed.
+    assert records[2]["quali_rating_mu_s"] == pytest.approx(-0.40)
+
+
+def test_center_rating_mu_by_team_skips_missing_field_without_error() -> None:
+    """A record without the target field should be skipped, not raise."""
+    records = [
+        {"driver": "AAA", "team": "Williams", "quali_rating_mu_s": 0.20},
+        {"driver": "BBB", "team": "Williams"},
+    ]
+
+    center_rating_mu_by_team(records, field="quali_rating_mu_s")
+
+    # Only one finite value present for Williams, so the team is untouched.
+    assert records[0]["quali_rating_mu_s"] == pytest.approx(0.20)
+    assert "quali_rating_mu_s" not in records[1]

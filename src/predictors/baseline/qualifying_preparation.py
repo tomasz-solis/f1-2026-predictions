@@ -7,7 +7,10 @@ from typing import Any
 
 import numpy as np
 
-from src.models.driver_seconds_state import read_driver_rating_mu_seconds
+from src.models.driver_seconds_state import (
+    center_rating_mu_by_team,
+    read_driver_rating_mu_seconds,
+)
 from src.models.team_strength_mapping import team_strength_seconds_components
 
 
@@ -801,4 +804,5 @@ def build_driver_list_with_strengths_core(
             )
             all_drivers.append(record)
 
+    center_rating_mu_by_team(all_drivers, field="quali_rating_mu_s")
     return all_drivers, teams_with_short_profile

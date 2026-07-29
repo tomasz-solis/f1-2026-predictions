@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -63,6 +63,45 @@ class DriverSecondsUpdateSummary:
     observations_applied: int
     drivers_touched: int
     rows_skipped_missing_state: int
+
+
+def center_rating_mu_by_team(
+    records: Sequence[MutableMapping[str, Any]],
+    *,
+    field: str,
+    team_key: str = "team",
+) -> None:
+    """Remove each team's mean seconds rating so only the teammate-relative part remains.
+
+    Groups ``records`` by ``record[team_key]`` and subtracts the team mean of ``field``
+    from each record's value, in place. A team with fewer than two finite values for
+    ``field`` is left untouched: a driver with no rated teammate has no identifiable
+    within-team residual, so zeroing it would delete real signal rather than remove a
+    team-level offset.
+    """
+    values_by_team: dict[Any, list[float]] = {}
+    for record in records:
+        value = _coerce_float(record.get(field))
+        if value is None:
+            continue
+        values_by_team.setdefault(record.get(team_key), []).append(value)
+
+    team_means = {
+        team: sum(values) / len(values)
+        for team, values in values_by_team.items()
+        if len(values) >= 2
+    }
+    if not team_means:
+        return
+
+    for record in records:
+        team_mean = team_means.get(record.get(team_key))
+        if team_mean is None:
+            continue
+        value = _coerce_float(record.get(field))
+        if value is None:
+            continue
+        record[field] = value - team_mean
 
 
 def read_driver_seconds_state(driver_entry: Mapping[str, Any]) -> DriverSecondsState | None:
