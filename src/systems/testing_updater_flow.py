@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -11,6 +10,7 @@ from typing import Any
 
 import numpy as np
 
+from src.persistence.artifact_store import ArtifactStore
 from src.utils.car_snapshot_history import (
     merge_snapshot_team_metrics,
     resolve_session_snapshot_metadata,
@@ -42,15 +42,26 @@ class SessionCollectionResult:
 
 
 def load_characteristics_payload(data_dir: str, target_year: int) -> tuple[Path, dict]:
-    """Load characteristics JSON and validate required top-level keys."""
+    """Load characteristics payload and validate required top-level keys.
+
+    Reads through ``ArtifactStore`` so DB-backed deployments see the same state the
+    predictor and the race-learning path write. Reading the file directly served the
+    copy baked into the deployment image, so every practice capture overwrote the
+    accumulated season history with a months-old snapshot.
+    """
     characteristics_file = (
         Path(data_dir) / "car_characteristics" / f"{target_year}_car_characteristics.json"
     )
-    if not characteristics_file.exists():
-        raise FileNotFoundError(f"Characteristics file not found: {characteristics_file}")
-
-    with open(characteristics_file) as f:
-        characteristics = json.load(f)
+    store = ArtifactStore(data_root=characteristics_file.parent.parent.parent)
+    characteristics = store.load_artifact(
+        artifact_type="car_characteristics",
+        artifact_key=f"{target_year}::car_characteristics",
+    )
+    if not characteristics:
+        raise FileNotFoundError(
+            f"Characteristics file not found and no stored artifact for season "
+            f"{target_year}: {characteristics_file}"
+        )
 
     if "teams" not in characteristics:
         raise ValueError(

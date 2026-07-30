@@ -191,14 +191,24 @@ class BayesianDriverRanking:
         adjusted_positions: dict[str, int] = {}
 
         for driver_code, _finish_pos in observations.items():
-            raw_rating = observed_ratings[driver_code]
             driver_team = driver_to_team.get(driver_code)
-            adjusted_rating = raw_rating
-            if driver_team is not None and driver_team in team_means:
-                adjusted_rating = raw_rating - team_means[driver_team] + field_mean
+            if driver_team is None or driver_team not in team_means:
+                # No rated teammate in this session (usually a DNF), so there is no
+                # within-team residual to observe. Feeding the raw rating here mixed
+                # the absolute 1..grid_size scale into a model centred on the field
+                # mean: a front-runner whose teammate retired was observed at 22 and
+                # a backmarker's at 1, which measures teammate reliability rather
+                # than driver skill. Skipping keeps the scale coherent.
+                continue
+
+            raw_rating = observed_ratings[driver_code]
+            adjusted_rating = raw_rating - team_means[driver_team] + field_mean
 
             adjusted_ratings[driver_code] = adjusted_rating
             adjusted_positions[driver_code] = self._rating_to_position(adjusted_rating)
+
+        if not adjusted_ratings:
+            return
 
         self._apply_rating_updates(
             observed_ratings=adjusted_ratings,

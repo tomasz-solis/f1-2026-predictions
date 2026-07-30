@@ -34,6 +34,9 @@ from src.systems.driver_update_trace import (
     snapshot_driver_update_state,
 )
 from src.systems.updater_flow import (
+    extract_dnf_drivers as _extract_dnf_drivers,
+)
+from src.systems.updater_flow import (
     update_team_characteristics_core as _update_team_characteristics_core,
 )
 from src.utils import config_loader
@@ -448,25 +451,6 @@ def update_team_characteristics(
         config_get_fn=config_loader.get,
         logger=logger,
     )
-
-
-def _extract_dnf_drivers(race_results: pd.DataFrame) -> set[str]:
-    """Return driver codes that retired rather than finishing the race.
-
-    Keeps drivers who finished or were classified as lapped (Status contains
-    "Lap") but excludes mechanical retirements, collisions, and other DNFs.
-    """
-    dnf_drivers: set[str] = set()
-    if not isinstance(race_results, pd.DataFrame) or "Status" not in race_results.columns:
-        return dnf_drivers
-
-    for _, row in race_results.iterrows():
-        status = str(row.get("Status", "")).strip()
-        if status and status != "Finished" and "Lap" not in status:
-            abbrev = str(row.get("Abbreviation", "")).strip()
-            if abbrev:
-                dnf_drivers.add(abbrev)
-    return dnf_drivers
 
 
 def _status_observed_driver_codes(session_results: pd.DataFrame) -> set[str]:

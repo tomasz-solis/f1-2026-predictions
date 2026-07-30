@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -48,6 +48,25 @@ def _load_characteristics_payload(
     return store, year, char_data
 
 
+def extract_dnf_drivers(race_results: pd.DataFrame) -> set[str]:
+    """Return driver codes that retired rather than finishing the race.
+
+    Keeps drivers who finished or were classified as lapped (Status contains
+    "Lap") but excludes mechanical retirements, collisions, and other DNFs.
+    """
+    dnf_drivers: set[str] = set()
+    if not isinstance(race_results, pd.DataFrame) or "Status" not in race_results.columns:
+        return dnf_drivers
+
+    for _, row in race_results.iterrows():
+        status = str(row.get("Status", "")).strip()
+        if status and status != "Finished" and "Lap" not in status:
+            abbrev = str(row.get("Abbreviation", "")).strip()
+            if abbrev:
+                dnf_drivers.add(abbrev)
+    return dnf_drivers
+
+
 def _build_position_fallback_race_pace(
     *,
     race_results: pd.DataFrame,
@@ -55,9 +74,20 @@ def _build_position_fallback_race_pace(
     map_team_to_characteristics_fn: MapTeamToCharacteristicsFn,
     logger: logging.Logger,
 ) -> RacePaceMap:
-    """Fallback race pace estimate using rank-based team finishing order."""
+    """Fallback race pace estimate from where teams finished, keeping the margin.
+
+    Scores each team on the grid scale rather than by rank. Rank rescaled the field
+    to a fixed 1.0..0.0 spread every race, so the best car always scored 1.0 and the
+    worst always 0.0 no matter how large the gap was. An upgrade that halved a team's
+    deficit scored identically to the weekend before unless it changed their rank,
+    which is why in-season car improvements could never register.
+
+    DNFs are excluded. They are excluded from the Bayesian driver update for the same
+    reason, and margin scoring is far more sensitive to them than rank was: one
+    retirement classified near the back drags a front team's mean position by ten
+    places, where under rank it cost at most a place or two.
+    """
     logger.warning("No telemetry data, using positions as fallback")
-    race_pace: dict[str, float] = {}
     known_teams = set(team_names)
     canonical_results = race_results.copy()
     if "TeamName" in canonical_results.columns:
@@ -67,27 +97,54 @@ def _build_position_fallback_race_pace(
     else:
         canonical_results["_canonical_team"] = None
 
-    team_average_positions: dict[str, float] = {}
+    dnf_drivers = extract_dnf_drivers(race_results)
+    if dnf_drivers and "Abbreviation" in canonical_results.columns:
+        classified = canonical_results[~canonical_results["Abbreviation"].isin(dnf_drivers)]
+        # Only drop retirements when doing so still leaves a field to score against.
+        if not classified.empty:
+            canonical_results = classified
 
+    all_positions = pd.to_numeric(canonical_results["Position"], errors="coerce").dropna()
+    if all_positions.empty:
+        return {}
+    # Scale against the cars that started, not the ones still classified. These scores
+    # are averaged across a season, so the scale has to mean the same thing every race:
+    # scaling by the classified count would stretch a high-attrition race and pin the
+    # last surviving car at 0.0, which is the rank flattening this fix removes.
+    entered_field = float(len(race_results.index))
+    field_size = max(entered_field, float(all_positions.max()), 2.0)
+
+    race_pace: dict[str, float] = {}
     for team in team_names:
         team_results = canonical_results[canonical_results["_canonical_team"] == team]
-        if len(team_results) > 0:
-            positions = pd.to_numeric(team_results["Position"], errors="coerce").dropna()
-            if positions.empty:
-                continue
-            team_average_positions[team] = float(positions.mean())
-
-    ranked_teams = sorted(team_average_positions, key=lambda team: team_average_positions[team])
-    team_count = len(ranked_teams)
-    if team_count == 1:
-        return {ranked_teams[0]: 0.5}
-    if team_count < 1:
-        return {}
-
-    for rank_index, team in enumerate(ranked_teams):
-        race_pace[team] = float(1.0 - (rank_index / max(team_count - 1, 1)))
+        if len(team_results) == 0:
+            continue
+        positions = pd.to_numeric(team_results["Position"], errors="coerce").dropna()
+        if positions.empty:
+            continue
+        mean_position = float(positions.mean())
+        race_pace[team] = float(
+            np.clip(1.0 - ((mean_position - 1.0) / (field_size - 1.0)), 0.0, 1.0)
+        )
 
     return race_pace
+
+
+def _recency_weighted_mean(observations: Sequence[float], *, recency_exponent: float) -> float:
+    """Average season observations with later races weighted more heavily.
+
+    Matches the weighting the predictor already applies to saved-actual form in
+    ``data_mixin._resolve_saved_actual_team_score``: weight race ``i`` (1-based) by
+    ``i ** recency_exponent``. A flat mean let five stale rounds outvote the most
+    recent weekend, so an in-season car upgrade could never move the baseline.
+    """
+    values = [float(value) for value in observations]
+    if not values:
+        return 0.0
+    if len(values) == 1 or recency_exponent == 0.0:
+        return float(np.mean(values))
+    weights = np.power(np.arange(1, len(values) + 1, dtype=float), recency_exponent)
+    return float(np.average(values, weights=weights))
 
 
 def _apply_team_performance_updates(
@@ -106,6 +163,10 @@ def _apply_team_performance_updates(
             1.0,
         )
     )
+    recency_exponent = max(
+        0.0,
+        float(config_get_fn("baseline_predictor.current_season_form.recency_exponent", 1.5)),
+    )
     for team, new_performance in race_pace.items():
         if team in char_data["teams"]:
             team_data = char_data["teams"][team]
@@ -115,7 +176,10 @@ def _apply_team_performance_updates(
 
             team_data["current_season_performance"].append(new_performance)
 
-            running_avg = np.mean(team_data["current_season_performance"])
+            running_avg = _recency_weighted_mean(
+                team_data["current_season_performance"],
+                recency_exponent=recency_exponent,
+            )
             old_uncertainty = team_data["uncertainty"]
             updated_uncertainty = max(0.10, old_uncertainty * 0.9)
             old_baseline = float(team_data.get("overall_performance", 0.5))
