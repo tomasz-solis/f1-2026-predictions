@@ -169,6 +169,56 @@ Ranked by expected value, not by effort.
    champion. Nothing has tested two changes together, so an interaction that
    only appears when both are active has never been visible.
 
+## 2026-07-30: learning-path fixes, measured by decomposition
+
+Baseline for every number below: `3810c1ad`, rebuilt from the 2026-04-25
+preseason driver artifact (`710fb551`) with seconds re-seeded, then all 11
+completed rounds replayed offline. **Qualifying MAE 2.6195, mean per-driver
+|bias| 1.5522**, scored as the champion protocol above over the 9-event catalog
+x 3 seeds (594 driver-events).
+
+Rebuilding matters: the same old code measured against the *stored* 6-round
+artifact scores 2.8788. Production had been stuck at 6 rounds because practice
+capture reset the season history every Friday. Comparing a fixed model against
+that stale artifact credits the fixes with 0.164 MAE they did not earn.
+
+| variant | MAE | mean \|bias\| | verdict |
+|---|---|---|---|
+| DB-first read + recency-weighted season mean + margin-scored fallback | **2.5993** | **1.4747** | `adopted` |
+| the above, plus skipping unpaired drivers in the Bayesian update | 2.8148 | 1.6094 | `worse` |
+| the above, with learn-time recency neutralised | 2.8013 | 1.6128 | `worse` |
+
+The three-way split is the point. Measured as one change the package looks like
+a 0.064 MAE improvement over the stale artifact and is really a 0.195
+regression against a fair baseline. Neutralising the recency weighting moved it
+0.014, so that was not the cause. Reverting only the Bayesian change recovered
+0.215 and beat baseline.
+
+**Skipping unpaired drivers is `worse`, and the reasoning behind it still
+holds.** `update_teammate_relative` gives a driver whose teammate retired the
+raw absolute 1..grid_size rating, mixing that scale into a model centred on the
+field mean — 32 such observations across the replay set, including one driver
+observed at the maximum 22.00 from the single race their teammate retired from.
+Dropping those observations costs more than the contamination does. The next
+attempt should rescale them, not discard them. Do not re-test discarding.
+
+Related negative result the same day: disabling the `rating_mu` -> skill/pace
+blend (`bayesian_quali_skill_blend_cap: 0.0`) scored 3.0505 against a 2.8788
+baseline. `rating_mu` correlates only -0.068 with actual qualifying position,
+but the raw characteristics it falls back to are worse still.
+
+### Still open
+
+- `extract_team_performance_from_telemetry` computes real median lap times per
+  team, then discards them for `1.0 - rank/(team_count-1)`. It is the primary
+  path for most races, so team strength still cannot express margin; the
+  2026-07-30 fallback fix only reached races where telemetry was missing.
+  `team_strength_seconds_mapping/latest.json` already has the calibrated slope
+  to convert lap-time deltas directly.
+- HUL degrades **as the season is learned**, on unmodified code: +1.52 at 6
+  rounds, +5.26 at 11. RUS moves +0.15 -> +2.19 the same way. Whatever causes
+  that is in the learning path and predates all of the above.
+
 ## Adding an entry
 
 Keep it to what a future reader needs to trust or discard the result:
