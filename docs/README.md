@@ -29,6 +29,11 @@ Session-based prediction storage, attaching actual results, and accuracy metrics
 Production readiness gates, shadow challenger audits, movement diagnostics, and
 adaptive-learning safety checks for research components.
 
+### `MODEL_LEDGER.md`
+Running record of every model variant tried, how it was measured, and whether it
+helped. Read it before proposing a change — several plausible ideas have already
+been tested and lost, and two more only look neutral because they never ran.
+
 ### `QUALIFYING_RACE_CHALLENGER.md`
 Q0/Q1/R0/R1/R2 evidence, replay, governance, and champion-safe release workflow.
 
