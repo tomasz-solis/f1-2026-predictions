@@ -14,7 +14,7 @@ grid:
   size: 22  # 11 teams x 2 drivers in the 2026 field
 
 model:
-  version: "2.3"
+  version: "2.4"
 
 # Bayesian Model Parameters
 bayesian:
