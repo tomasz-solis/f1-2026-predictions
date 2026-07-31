@@ -77,3 +77,12 @@ notebooks/
 # Local Claude preview scaffolding (machine-specific)
 .claude/launch.json
 .claude/settings.local.json
+
+# Generated artifacts and tool state (regenerable, machine-local)
+# Snapshots are ArtifactStore output mirrored from Supabase in production; the
+# tracked copies were a stale naming-migration leftover, not a required input.
+data/car_characteristics_snapshot/
+data/systems/
+.impeccable/
+# `*.backup` above does NOT match `<name>.json.rebuild_backup`, hence this line.
+*.rebuild_backup
