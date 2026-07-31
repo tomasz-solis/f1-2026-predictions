@@ -120,17 +120,26 @@ on 2026-07-19.
 
 ## Blocked
 
-**Challenger work is shelved as of 2026-07-29.** The tree stays untracked in the
-worktree; no branch was made.
+**Challenger work is shelved as of 2026-07-29.** ~~The tree stays untracked in
+the worktree; no branch was made.~~ **Updated 2026-07-31: it is now on the branch
+`shelved/challenger-research`** and no longer sits loose in the `master` working
+tree.
 
 > Paths in this section — `docs/RAW_LAPS_REPLAY_HANDOFF.md`,
 > `docs/QUALIFYING_RACE_CHALLENGER.md`,
-> `scripts/run_challenger_research_walk_forward.py`, and the
-> `src/analysis/challenger_*` modules — live only in that untracked tree. They
-> are not in a fresh clone. The walk-forward artifacts under
-> `data/historical_replay/2026/` and
-> `data/model_diagnostics/2026/race_mae_investigation/` are also untracked, and
-> they are the evidence behind every number above: keep them.
+> `scripts/run_challenger_research_walk_forward.py`, the
+> `src/analysis/challenger_*` modules, their tests, and
+> `data/model_diagnostics/2026/race_mae_investigation/` — are on
+> `shelved/challenger-research`, not on `master`. To read or run any of them,
+> check that branch out. Nothing in production imports them: a scan of all 409
+> tracked Python files finds zero imports, and `master` passes its own suite
+> without them.
+>
+> **The walk-forward artifacts under `data/historical_replay/2026/` are the one
+> exception and are NOT on that branch.** They are 909 MB and gitignored
+> (`.gitignore:41`), so they exist only on local disk, unversioned. They are the
+> evidence behind every number above and there is no copy anywhere else: keep
+> them, and do not assume a branch checkout restores them.
 
 Re-running the three scoring variants against the fixed champion was attempted
 and stopped. The challenger modules were written against production code that no
@@ -276,6 +285,452 @@ scale error, mixing two different definitions of "seconds".
 - HUL degrades **as the season is learned**, on unmodified code: +1.52 at 6
   rounds, +5.26 at 11. RUS moves +0.15 -> +2.19 the same way. Whatever causes
   that is in the learning path and predates all of the above.
+  **Superseded 2026-07-31** — see the section below. The "learning path" framing
+  is wrong, and treating HUL and RUS as one phenomenon is wrong.
+
+## 2026-07-31: the HUL/RUS drift is not a driver-rating problem
+
+**No prediction run was made for this entry.** Everything below is derived from
+the shipped artifacts (`car_characteristics` v23 at 11 rounds,
+`driver_characteristics` v26, `team_strength_seconds_mapping/latest.json`), the
+9-event `event_catalog.json`, and code at `6771a8a5`. It carries no MAE because
+it scores no variant. It is here to stop the next session spending runs on a
+path that arithmetic already closes.
+
+### The driver rating cannot produce an error this large
+
+Centred `quali_rating_mu_s` for HUL is **-0.1225 s**
+(`center_rating_mu_by_team`, `qualifying_preparation.py:807`). The qualifying
+simulation projects it as `0.5 + seconds_delta / 1.9708`, clipped to [0, 1]
+(`qualifying_simulation.py:359`). So HUL's entire driver term is **0.062 score
+units**, and a 22-car grid spans 1.0 unit at roughly 0.045 units per position.
+
+**Driver-term authority: about 1.4 grid positions. HUL's bias is +5.26.**
+
+This is the explanation for the four failed hypotheses above. None of them was
+obviously wrong in mechanism; all of them were pulling a lever with ~1.4
+positions of authority against a ~5.3 position error. Do not test another
+driver-rating variant against this bias without first showing the path has
+enough authority to matter.
+
+### Both teammates carry the same-signed bias, so it is a team offset
+
+Recorded elsewhere in this file but never connected: HUL +5.26 / BOR +4.44
+(champion-history note), RUS +2.19 / ANT +2.78 (confidence-rebalance section).
+Same sign, comparable magnitude, same team, both pairs. That is the signature of
+a team-strength offset, not a driver-rating error. **"The HUL/RUS bias" is a
+misnomer for an Audi and Mercedes team-strength bias.**
+
+### HUL and RUS do not share a mechanism
+
+Model teammate ordering (centred `quali_rating_mu_s`, positive = faster) against
+actual head-to-head over the 9 catalog events:
+
+| team | model rates faster | actual H2H | agrees |
+|---|---|---|---|
+| Audi | BOR (+0.1225) | **HUL 5-4** | no |
+| Red Bull | HAD (+0.0079) | **VER 6-3** | no |
+| RB | LIN (+0.0955) | **LAW 6-3** | no |
+| Cadillac | BOT (+0.1440) | **PER 6-3** | no |
+| Mercedes | ANT (+0.1003) | ANT 5-4 | yes |
+| McLaren | NOR (+0.0878) | NOR 5-4 | yes |
+| Ferrari | LEC (+0.0099) | LEC 5-4 | yes |
+| Aston Martin | ALO (+0.3537) | ALO 7-2 | yes |
+| Alpine | GAS (+0.0221) | GAS 6-3 | yes |
+| Haas | BEA (+0.1161) | BEA 7-2 | yes |
+| Williams | SAI (+0.0442) | SAI 7-2 | yes |
+
+Four of eleven pairs are ordered backwards. HUL is one of them. **RUS is not** —
+Antonelli genuinely out-qualified him 5-4, so that rating direction is correct
+and RUS's residual has to come from Mercedes team strength alone. Lumping the
+two drivers into one phenomenon is what framed the whole search wrongly.
+
+Sign convention verified rather than assumed: `sign_convention:
+positive_seconds_means_faster_than_field` in the mapping artifact, consistent
+with the `0.5 + delta/scale` projection where higher score is a better grid slot.
+
+### Observation count does not compress the teammate gap - hypothesis killed
+
+Worth stating because it looks plausible and costs a run to test. Centred
+teammate gap against `quali_rating_observations` across all 11 teams shows no
+relationship: Audi at 11 observations has the **largest** gap among
+well-observed teams (0.245 s), Red Bull at 12 observations has the **smallest**
+(0.016 s). Aston Martin's 0.708 s gap sits on 3 observations, so the two
+extremes are the low-observation teams in both directions.
+
+Do not test "more learning shrinks teammate gaps".
+
+### Separate bug found while measuring: qualifying uses the race slope
+
+`config/default.yaml:219` sets
+`team_strength_seconds_score_scale: 1.9707717329051126`. That is the **race**
+slope from `team_strength_seconds_mapping/latest.json`. It is applied in the
+**qualifying** projection at `qualifying_simulation.py:359`, where the fitted
+qualifying slope is **1.7741686893278807**.
+
+Every qualifying deviation from 0.5 is therefore compressed by about 11%. This
+is unrelated to the HUL residual and is a one-line fix, but it rescales the
+whole qualifying grid, so measure it on its own before or after anything else —
+never bundled.
+
+### Team-vs-driver decomposition, measured - confirms the reframe
+
+`identify_systematic_errors` (`src/analysis/model_evaluation.py:427`) already
+computes `team_bias` alongside `driver_bias`. Every measurement before this one
+read `driver_bias` only. Running both over cached champion predictions
+decomposes each driver's residual into a team-shared component and a
+within-pair component.
+
+**Baseline caveat, and it is material.** The only cached champion predictions
+are `source_digest` `3f07ca70`, written **2026-07-19 to 2026-07-22**, so they
+predate the 2026-07-28 centering fix `93bfbeb0`. The prediction cache key does
+not cover code version — the trap documented under "Measurement protocol" — so
+these levels are *not* current-champion numbers. HUL reads +6.86 here against
++5.26 on rebuilt current code.
+
+**The levels are stale; the decomposition is the claim.** The centering fix
+removes the team-mean component of the driver rating, so on current code the
+within-pair component can only be smaller than what is shown here. That
+strengthens the conclusion rather than threatening it.
+
+Protocol: champion variant, `qualifying` kind, `PRE` checkpoint, 7 events x 3
+seeds, 462 driver-observations, actuals from `actual_qualifying_grid` in
+`event_catalog.json`. Positive means too pessimistic.
+
+| team | team bias | driver 1 | driver 2 | within-pair spread |
+|---|---|---|---|---|
+| **Audi** | **+6.71** | HUL **+6.86** | BOR **+6.57** | **0.29** |
+| Williams | -7.10 | SAI -7.86 | ALB -6.33 | 1.53 |
+| RB | +3.33 | LAW +2.48 | LIN +4.19 | 1.71 |
+| McLaren | +1.74 | NOR +0.90 | PIA +2.57 | 1.67 |
+| Mercedes | +1.14 | RUS +0.14 | ANT +2.14 | 2.00 |
+| Alpine | +1.12 | GAS +1.48 | COL +0.76 | 0.72 |
+| Cadillac F1 | +0.05 | PER +1.29 | BOT -1.19 | 2.48 |
+| Haas F1 Team | -0.81 | OCO +0.62 | BEA -2.24 | 2.86 |
+| Ferrari | -0.90 | LEC -0.76 | HAM -1.05 | 0.29 |
+| Red Bull Racing | -2.43 | VER -5.52 | HAD +0.67 | **6.19** |
+| Aston Martin | -2.86 | ALO -5.52 | STR -0.19 | **5.33** |
+
+#### Correction, same day: the two extreme rows are the already-fixed bug
+
+The first reading of this table treated Audi +6.71 and Williams -7.10 as the
+largest *unexplained* errors in this file. That was wrong, and the table's own
+baseline is why.
+
+These cached predictions predate `93bfbeb0`, so they ran with **uncentered**
+`quali_rating_mu_s` — the double-counted car pace that `93bfbeb0` fixed. The raw
+team-mean driver rating still shows the size of it (values from the current
+11-round artifact, so indicative of the state in force rather than exact):
+
+| team | team-mean raw rating | implied position effect |
+|---|---|---|
+| Williams | +0.412 s | **+4.60** |
+| Audi | -0.387 s | **-4.32** |
+
+That is an 8.9 position spread between the two teams from the driver-rating term
+alone. The observed gap in predicted mean position is **9.67** (Audi 18.86 vs
+Williams 9.19) on team strengths that are nearly identical (0.366 vs 0.354) and
+correctly ranked — Williams' strength rank 9 matches its actual rank 9.
+
+So the team strength for both teams is approximately right, and the prediction
+error is the uncentered driver term. This is the same defect the champion-history
+entry already records collapsing: HUL +6.11 -> +1.67, ALB -5.78 -> +0.11.
+**Audi and Williams are not open problems. They are the pre-`93bfbeb0` state.**
+
+#### What this does to the HUL conclusion
+
+The "HUL is closed as a driver problem" reading above is **withdrawn**, but the
+stated reason for withdrawing it was also wrong, and the third pass settled both.
+Recorded in full because two of the three readings here were mistakes.
+
+**The within-pair column measures separation *error*, not driver-term magnitude.**
+Bias is predicted minus actual per driver, so the spread between teammates is
+`(predicted gap) - (actual gap)`. Audi's 0.29 does not mean the driver term is
+inert; it means the pre-fix model got HUL-vs-BOR *separation* about right while
+both drivers carried the same large shared offset. The column is readable — just
+not as "how many positions of driver signal exist".
+
+**The clip is not what compresses Audi.** Neither Audi driver is near a bound.
+That hypothesis is dead.
+
+### The clip is binding, at the front of the grid
+
+Testing it turned up a different result. Deterministic score is
+`clip(0.5 + 1.7742*(strength-0.5)/1.9708 + driver_mu/1.9708, 0, 1)`. Evaluated
+over all 22 drivers on 6-round strengths:
+
+| state | drivers hitting a bound |
+|---|---|
+| raw / pre-`93bfbeb0` | **ANT 1.136, LEC 1.060, HAM 1.050, RUS 1.035** (all clipped to 1.0), STR -0.049 (clipped to 0) |
+| centred / post-`93bfbeb0` | STR only |
+
+Before the fix, **four front-runners collapsed onto the identical score 1.0**, so
+their relative order was simulation noise rather than signal. That is a second,
+previously unrecorded consequence of the uncentered ratings, and `93bfbeb0`
+incidentally fixed it. Worth knowing for any pre-fix number involving Mercedes or
+Ferrari: their internal ordering was not being modelled at all.
+
+The team term alone cannot reach a bound — it spans only ±0.42 against a ±0.5
+threshold — so every clip event needs the driver term to push it over. Post-
+centering, only Aston Martin still clips.
+
+### Current-state driver ordering, and the one that is wrong
+
+Ranking all 22 drivers by centred deterministic score — current 11-round
+strengths and current ratings, so this *is* today's state — against actual
+head-to-head over the 9 catalog events:
+
+| pair | model order (centred rank) | actual H2H | |
+|---|---|---|---|
+| **Audi** | **BOR 13, HUL 18** | **HUL 5-4** | **inverted by 5 positions** |
+| Red Bull | HAD 7, VER 8 | VER 6-3 | inverted by 1 |
+| Mercedes | ANT 1, RUS 2 | ANT 5-4 | correct |
+| Williams | SAI 14, ALB 16 | SAI 7-2 | correct |
+| Aston Martin | ALO 19, STR 22 | ALO 7-2 | correct |
+
+**HUL sits five places behind the teammate he actually outqualifies.** That is
+the largest live driver-level error on the grid and it is a sign error, not a
+magnitude error. It is unaffected by everything withdrawn above: it uses centred
+ratings, current artifacts, and actual results — no cached prediction, no
+pre-fix state.
+
+So driver-level work does belong on HUL/BOR after all, but for the inversion, not
+for the "degrades as the season is learned" framing that opened this
+investigation. Caveat: deterministic score ordering is not simulated mean
+position — Q1/Q2/Q3 structure and noise both intervene — so treat the rank gaps
+as indicative and the sign as the finding.
+
+### Mechanism of the inversion: rookie prior sigma sets the update gain
+
+**There is no sign bug.** The path was checked end to end and is consistent:
+`matched_gap_s = comparison_lap_time_s - reference_lap_time_s`, positive means
+reference faster (`matched_laps.py:164`); `innovation = observed_gap -
+(reference_mu - comparison_mu)` raises `reference_mu` on positive innovation
+(`driver_seconds_state.py:267`); higher mu is faster. Do not re-hunt this.
+
+**The prior had HUL and VER the right way round; 2026 flipped them.** Seed values
+from `teammate_network_prior/latest.json` (2022-2025) against the current
+11-round state:
+
+| pair | prior mu (a / b) | prior sigma | var ratio b:a | now | flipped |
+|---|---|---|---|---|---|
+| Red Bull VER/HAD | +0.447 / -0.145 | 0.152 / 0.530 | **12.2** | +0.299 / +0.315 | **yes** |
+| Audi HUL/BOR | -0.461 / -0.554 | 0.231 / 0.530 | **5.3** | -0.509 / -0.264 | **yes** |
+| Mercedes RUS/ANT | +0.453 / +0.232 | 0.277 / 0.530 | **3.7** | +0.226 / +0.426 | **yes** |
+| Aston ALO/STR | +0.143 / -0.111 | 0.152 / 0.155 | 1.1 | +0.364 / -0.343 | no |
+| Ferrari LEC/HAM | +0.498 / +0.395 | 0.273 / 0.275 | 1.0 | +0.456 / +0.437 | no |
+| Williams SAI/ALB | +0.421 / +0.405 | 0.272 / 0.260 | 0.9 | +0.456 / +0.368 | no |
+
+**Every pair with a variance ratio above ~3 reordered. Every pair near 1.0 held.**
+The pair update splits each innovation in proportion to variance
+(`updated_reference_mu = reference_mu + (reference_var/denominator)*innovation`),
+so the wider-prior driver absorbs the update. Audi: BOR moved +0.289 while HUL
+moved -0.048. Red Bull: HAD moved +0.460 while VER moved -0.148.
+
+`BOR`, `HAD` and `ANT` all carry sigma **0.5304206197376727** — bit-identical, so
+it is a shared default for low-observation drivers, not a fitted value. Against
+HUL's 0.231 (n=37) and VER's 0.152 (n=74) that is a 5x to 12x gain advantage on
+every observation.
+
+Cadillac PER/BOT has ratio 12.2 and did *not* flip, because the prior already had
+BOT ahead and he simply moved further ahead. Consistent with the mechanism rather
+than a counterexample.
+
+**This is correct Bayesian behaviour given those priors, and it is not always
+wrong** — the Mercedes flip agrees with actual head-to-head (ANT 5-4). The
+question the mechanism raises is narrower: whether 0.5304 is the right default,
+and whether qualifying evidence is strong enough to justify that gain.
+`min_matched_pairs_quali` is **3**, most qualifying sessions produce exactly 3
+matched pairs, and in 2025 eleven of twenty-one BOR/HUL qualifying sessions
+produced no usable aggregate at all (`insufficient_matched_pairs`). Ratings are
+being reordered on three-lap medians.
+
+Two levers, neither tested: raise the low-observation prior sigma default, or
+raise `min_matched_pairs_quali`. See the scoring note at the end of this section
+for what testing them actually costs — it is not just a config edit.
+
+### Measured on current code, and the mechanism holds
+
+The blocked walk-forward was routed around. A champion-only scorer calling
+production `Baseline2026Predictor.predict_qualifying(..., practice_signal_mode=
+"stored_profiles")` plus the tracked `identify_systematic_errors` reproduces the
+decomposition without touching the shelved tree. 7 dry events x 3 seeds x 20
+simulations, 462 driver-observations, about 2 minutes.
+
+**This is not a walk-forward.** Every event is predicted against the current
+artifact state, which already contains that event's results. Absolute error is
+optimistic and **not comparable to the walk-forward numbers above**. Both arms of
+an A/B carry the same leakage, so deltas remain usable. Recorded level:
+MAE 2.6494, mean per-driver |bias| 1.7186.
+
+| team | team bias | driver 1 | driver 2 | spread |
+|---|---|---|---|---|
+| Audi | +2.26 | HUL **+4.62** | BOR -0.10 | 4.71 |
+| RB | +1.45 | LAW **+3.38** | LIN -0.48 | 3.86 |
+| Mercedes | +1.29 | RUS **+3.14** | ANT -0.57 | 3.71 |
+| Cadillac F1 | +0.98 | PER +1.67 | BOT +0.29 | 1.38 |
+| Ferrari | +0.55 | LEC +0.29 | HAM +0.81 | 0.52 |
+| Haas F1 Team | +0.31 | OCO **+2.38** | BEA -1.76 | 4.14 |
+| Alpine | -0.43 | GAS +0.24 | COL -1.10 | 1.33 |
+| Williams | -1.38 | SAI -2.19 | ALB -0.57 | 1.62 |
+| Red Bull Racing | -1.52 | VER -3.95 | HAD +0.90 | 4.86 |
+| McLaren | -1.69 | NOR -4.05 | PIA +0.67 | 4.71 |
+| Aston Martin | -1.81 | ALO -4.14 | STR +0.52 | 4.67 |
+
+**The picture inverted relative to the pre-`93bfbeb0` table, exactly as
+predicted.** Largest team offset fell from 7.10 to 2.26 — the centering fix
+removed the shared component — and the within-pair spreads grew from a 0.29-2.00
+band to 3.7-4.9. Pre-fix, teammates shared one large offset and the driver error
+was hidden inside it. Post-fix the offset is gone and the driver error is what is
+left. This also retroactively confirms the correction above: the pre-fix
+within-pair column really was measuring separation error against a shared offset.
+
+**Where a wide-prior rookie exists, the veteran carries the positive bias and the
+rookie sits near zero**: Audi (HUL +4.62 / BOR -0.10), RB (LAW +3.38 / LIN
+-0.48), Mercedes (RUS +3.14 / ANT -0.57), Haas (OCO +2.38 / BEA -1.76). Four of
+the six such pairs. The rookie's rating has been pulled to fit and the veteran
+absorbs the residual.
+
+**Refinement: the mechanism is overshoot, not inversion.** Mercedes is the case
+that shows it. The model's ANT-ahead ordering *agrees* with head-to-head, yet the
+rating gap is 0.20 s (~2.3 positions) on a 5-4 split, and RUS still carries
++3.14. Rookie gain moves the rating too far whether or not it crosses over.
+Crossing over (Audi, RB) is the visible symptom; the magnitude error is the
+disease, and it is present in pairs that look correctly ordered.
+
+**Red Bull is not this mechanism.** VER -3.95 with HAD +0.90 is the opposite
+sign, and the VER/HAD rating gap is 0.016 s — about one position, far too small
+to produce it. Red Bull's error is team strength, not driver rating. Same for
+McLaren and Aston Martin, both of which have near-equal teammate sigmas and so no
+gain asymmetry at all.
+
+### The prior sigma is a clamp, not an estimate - both tuning levers rejected
+
+Before scoring either lever, the quantity they tune was checked. It is not a
+per-driver uncertainty for most of the grid.
+
+`_driver_sigma` (`scripts/build_teammate_network_prior.py:841`) has three
+branches:
+
+```python
+fallback_sigma = max(1.75 * population_sd_s, sigma_floor_s)
+if not anchored:                                    return fallback_sigma
+if n_observations < config.min_driver_observations: return fallback_sigma
+trusted_sigma = max(bootstrap_sigmas[driver], 0.5 * population_sd_s, sigma_floor_s)
+```
+
+With `main_component_population_sd_s = 0.3030975`, both saturation values in the
+artifact fall out exactly:
+
+- `1.75 * 0.3030975 = 0.530421` — the fallback, **14 of 31 drivers**
+- `0.5  * 0.3030975 = 0.151549` — the floor, **9 of 31 drivers**
+
+**23 of 31 drivers carry a clamp. Only 8 have a sigma derived from their own
+bootstrap.** The cliff is `min_driver_observations = 24`:
+
+| driver | n_obs | sigma | source |
+|---|---|---|---|
+| DOO | 3 | 0.5304 | fallback |
+| BOR | 10 | 0.5304 | fallback |
+| ANT | 19 | 0.5304 | fallback |
+| LAW | 23 | 0.5304 | fallback |
+| RIC | 31 | 0.1515 | floor |
+| HUL | 37 | 0.2309 | bootstrap |
+
+DOO at 3 observations and LAW at 23 are assigned identical uncertainty. LAW and
+RIC differ by eight observations and land 3.5x apart. **The quantity that sets
+Bayesian update gain is a step function at an arbitrary threshold, with no
+gradient across three quarters of the grid.**
+
+**Both tuning levers are therefore rejected without being scored.** Raising the
+`0.5304` default would mean overriding a fitted population quantity with a
+hand-picked one to compensate for a threshold artefact, and it would move all 14
+fallback drivers together regardless of whether they have 3 observations or 23.
+Raising `min_matched_pairs_quali` starves an evidence stream that already fails
+to produce an aggregate in half of all qualifying sessions. Neither survives at
+20 rounds; both are counter-tuning.
+
+**The structural fix, not attempted:** make the prior sigma continuous in
+evidence — one shrinkage scaling with observation count and graph connectivity —
+replacing the fallback / bootstrap / floor branches. Then BOR at 10 and LAW at 23
+differ because their evidence differs, and the rookie-gain overshoot dissolves
+rather than being counter-tuned.
+
+Two caveats before anyone builds it. First, **nothing here has been shown to
+convert into MAE** — the base rate on this bias is four mechanisms, four losses,
+and a smaller |bias| is not automatically a smaller MAE. Run the cheap
+prediction-side proxy (scale the centred teammate gap and re-score) to establish
+the sign before spending a rebuild. Second, `population_sd_s` is itself a
+main-component fit output, so a continuous scheme needs its own validation rather
+than a drop-in swap.
+
+### What scoring the two levers would have cost
+
+Neither lever is testable by editing config and re-predicting. Both change how
+state is *learned*:
+
+- `min_matched_pairs_quali` gates aggregate-row production in the extractor.
+- the 0.5304 prior sigma lives in `teammate_network_prior/latest.json`, built by
+  `scripts/build_teammate_network_prior.py`.
+
+So each arm needs: rebuild the prior (sigma arm only) -> re-seed driver seconds
+-> replay all completed rounds -> then score. That is the rebuild procedure with
+its two documented silent traps (the driver-baseline default that double-counts,
+and `USE_DB_STORAGE` replaying onto stored state). Budget an hour per arm, not a
+config edit. The scorer is the cheap half and it already exists.
+
+### Still open after this
+
+- Re-measure the decomposition on current code. The table above is structurally
+  sound but its levels predate `93bfbeb0`, and no cached champion prediction
+  exists after that commit.
+  **Attempted 2026-07-31 via `run_challenger_research_walk_forward.py` and
+  `refused`** — `TypeError: BaselineQualifyingMixin.predict_qualifying() got an
+  unexpected keyword argument 'include_grid_scenarios'`. That is the first row
+  of the "Blocked" table above: the challenger harness has been shelved since
+  2026-07-29 and cannot run against current production code. **The walk-forward
+  runner is not a route to a champion re-measurement.** Note the runner exits 0
+  after printing the traceback, so a re-run that "completes" has still produced
+  nothing.
+  The remaining route is champion-only and avoids the shelved tree entirely:
+  `predict_qualifying(year, race_name, practice_signal_mode="stored_profiles")`
+  is production API, and `historical_replay.py`, `checkpoint_reconstruction.py`
+  and `model_evaluation.py` are all tracked. It needs a small purpose-built
+  driver loop over the 9 catalog events, which is a reconstruction — smaller
+  and lower-risk than the race-scenario reconstruction that stopped the
+  challenger work, but still capable of producing plausible wrong numbers if
+  the checkpoint state is assembled incorrectly. Not attempted.
+- ~~The Audi and Williams team offsets are the two largest single errors in this
+  file and have no mechanism.~~ **Withdrawn the same day** — see the correction
+  above. Both are the pre-`93bfbeb0` uncentered driver rating, already fixed.
+  Neither is a team-strength question: both teams' strength values are about
+  right and correctly ranked.
+- ~~Why does a back-of-grid pair's predicted positions compress?~~ **Settled the
+  same day** — nothing compresses. The within-pair column is a separation
+  *error*, and no Audi driver is near the clip. See the correction above.
+- **HUL/BOR is inverted by five positions in the current state** and is the
+  largest live driver-level error found. Sign error, not magnitude. This is the
+  one open item from this investigation that rests on nothing withdrawn.
+  Mechanism identified and then confirmed on current code (HUL +4.62 against BOR
+  -0.10): the shared low-observation prior sigma `0.5304` gives a rookie teammate
+  5-12x the update gain of an established one, so thin qualifying evidence pulls
+  the rookie's rating too far. **Overshoot, not inversion** — Mercedes is ordered
+  correctly and still carries RUS +3.14, so pairs that look right are affected
+  too. ~~Two levers: the prior sigma default and `min_matched_pairs_quali`.~~
+  **Both rejected without scoring** — see "The prior sigma is a clamp, not an
+  estimate". The open item is the structural fix (continuous sigma), gated on the
+  cheap proxy showing the direction pays at all.
+- **Red Bull, McLaren and Aston Martin are a separate problem.** Large
+  within-pair spreads (4.9, 4.7, 4.7) with the wrong sign for rookie gain, and
+  near-equal teammate sigmas, so no gain asymmetry exists to explain them. VER
+  -3.95, NOR -4.05, ALO -4.14 are all the stronger driver predicted too well.
+  Unexplained; likely team strength.
+- **Four front-runners clipped to an identical 1.0 before `93bfbeb0`.** Any
+  pre-fix result that depends on the internal ordering of Mercedes or Ferrari is
+  reading noise. Applies retroactively to entries above measured on that state.
+- The four inverted teammate pairs (Audi, Red Bull, RB, Cadillac) are measured
+  against actual head-to-head, not against a model state, so they are unaffected
+  by the baseline problem above.
 
 ## Adding an entry
 
