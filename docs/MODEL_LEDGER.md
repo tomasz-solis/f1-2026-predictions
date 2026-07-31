@@ -197,7 +197,7 @@ regression against a fair baseline. Neutralising the recency weighting moved it
 **Skipping unpaired drivers is `worse`, and the reasoning behind it still
 holds.** `update_teammate_relative` gives a driver whose teammate retired the
 raw absolute 1..grid_size rating, mixing that scale into a model centred on the
-field mean — 32 such observations across the replay set, including one driver
+field mean â€” 32 such observations across the replay set, including one driver
 observed at the maximum 22.00 from the single race their teammate retired from.
 Dropping those observations costs more than the contamination does. The next
 attempt should rescale them, not discard them. Do not re-test discarding.
@@ -206,6 +206,32 @@ Related negative result the same day: disabling the `rating_mu` -> skill/pace
 blend (`bayesian_quali_skill_blend_cap: 0.0`) scored 3.0505 against a 2.8788
 baseline. `rating_mu` correlates only -0.068 with actual qualifying position,
 but the raw characteristics it falls back to are worse still.
+
+### Bayesian update confidence rebalance - `worse`
+
+Same baseline and protocol as the entry above. `rating_mu` is a single
+position-scale rating updated by both race and qualifying, and it feeds the
+*qualifying* skill and pace blend. Race observations carry
+`teammate_relative_confidence: 0.35` while qualifying carries
+`qualifying_update_confidence: 0.15`, so the qualifying skill term is weighted
+more by race results than by qualifying ones.
+
+The distortion that predicts is visible in the 2026 data: backmarkers finish far
+better than they qualify (ALO -4.09, STR -4.00, PER -4.16 positions) and
+front-runners finish worse (ANT +2.78, RUS +0.94), matching the sign of the
+residual bias on both groups.
+
+| variant | MAE | mean abs bias | verdict |
+|---|---|---|---|
+| champion, quali 0.15 / race 0.35 | **2.5993** | **1.4747** | `adopted` |
+| quali 0.35 / race 0.35 | 2.6970 | 1.5354 | `worse` |
+| quali 0.35 / race 0.15 | 2.7811 | 1.6667 | `worse` |
+
+Both directions lost, so the shipped 0.15/0.35 split is better than either. The
+mechanism above is real but these weights are not the lever that fixes it.
+HUL's residual bias sat between +4.5 and +5.3 in every arm including champion,
+so nothing here moved the driver the hypothesis was aimed at. Do not re-test
+either direction without a new mechanism.
 
 ### Still open
 
