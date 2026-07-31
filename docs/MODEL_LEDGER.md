@@ -233,6 +233,38 @@ HUL's residual bias sat between +4.5 and +5.3 in every arm including champion,
 so nothing here moved the driver the hypothesis was aimed at. Do not re-test
 either direction without a new mechanism.
 
+### Margin-scored telemetry race pace - `worse`
+
+Same baseline and protocol. `extract_team_performance_from_telemetry` computes a
+per-team median race lap time and then discards it for
+`1.0 - rank/(team_count-1)`, so team strength cannot express how large a gap
+was. This variant kept the margin: delta against the field median as a fraction
+of lap time (track-length invariant), mapped onto 0-1 by a configurable spread.
+
+| variant | MAE | mean abs bias | verdict |
+|---|---|---|---|
+| champion, rank-collapsed | **2.5993** | **1.4747** | `adopted` |
+| margin, spread 0.06 | 2.6700 | 1.7138 | `worse` |
+| margin, spread 0.10 | 2.7744 | 1.8586 | `worse` |
+
+It did what it was designed to do: Aston's season went from a flat
+`[0.1, 0.0, 0.0, ...]` to `[0.028, 0.042, 0.04, 0.147, 0.0, 0.43, ..., 0.447]`,
+so an upgrade that closes a deficit without changing rank is finally visible.
+Qualifying accuracy still got worse, and monotonically - the wider the spread,
+the worse the result, meaning the closer the scoring stays to rank the better.
+
+The reason is the input, not the idea. A race median lap time carries strategy,
+traffic, fuel load and safety cars: across three 2026 races the team spread was
+4.6-4.8s, more than twice the 1.97 s/unit that
+`team_strength_seconds_mapping` was fitted for. Rank is robust to that noise and
+margin propagates it. Do not retry margin scoring on race medians.
+
+The idea is not dead, but it needs a pace measure built for it. The matched-lap
+same-session construct in `src/extractors/matched_laps.py` is what the seconds
+mapping was actually fitted on; converting *that* through the calibrated slope
+is the version worth testing. Converting race medians through it would be a
+scale error, mixing two different definitions of "seconds".
+
 ### Still open
 
 - `extract_team_performance_from_telemetry` computes real median lap times per
