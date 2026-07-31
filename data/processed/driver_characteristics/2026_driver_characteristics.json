@@ -1,4 +1,5 @@
 {
+  "note": "Preseason 2026 prior built from driver form from seasons 2023, 2024, 2025. Used for historical replay without target-season race leakage.",
   "year": 2026,
   "years": [
     2023,
@@ -10,30 +11,30 @@
     "ALB": {
       "name": "Alexander Albon",
       "pace": {
-        "race_pace": 0.579,
-        "quali_pace": 0.495
+        "race_pace": 0.534,
+        "quali_pace": 0.473
       },
       "bayesian": {
-        "rating_mu": 11.656701998952416,
+        "rating_mu": 11.238029195848519,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 2.6554537450235873,
-        "race_rating_mu_s": 0.07561706863822026,
-        "quali_rating_mu_s": 0.25804223254799974,
-        "sessions_observed": 11,
-        "race_rating_sigma_s": 0.07995983774644551,
-        "quali_rating_sigma_s": 0.15917892858565985,
-        "race_rating_observations": 5,
-        "quali_rating_observations": 4
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 2.4959638935595976,
+        "race_rating_mu_s": 0.09557078501320794,
+        "quali_rating_mu_s": 0.3677314155982056,
+        "sessions_observed": 23,
+        "race_rating_sigma_s": 0.04689786094934741,
+        "quali_rating_sigma_s": 0.11645872112607433,
+        "race_rating_observations": 11,
+        "quali_rating_observations": 7
       },
       "dnf_risk": {
-        "dnf_rate": 0.267
+        "dnf_rate": 0.215
       },
       "racecraft": {
-        "skill_score": 0.75,
-        "overtaking_skill": 0.69
+        "skill_score": 0.705,
+        "overtaking_skill": 0.672
       },
       "wet_skill": 0.75,
       "experience": {
@@ -46,30 +47,30 @@
     "ALO": {
       "name": "Fernando Alonso",
       "pace": {
-        "race_pace": 0.634,
-        "quali_pace": 0.551
+        "race_pace": 0.459,
+        "quali_pace": 0.537
       },
       "bayesian": {
-        "rating_mu": 11.575452413784323,
+        "rating_mu": 9.331998376692638,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 2.831976671151325,
-        "race_rating_mu_s": 0.03374950606606206,
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 3.1873952648925328,
+        "race_rating_mu_s": -0.10635746455008421,
         "quali_rating_mu_s": 0.3641419834169052,
-        "sessions_observed": 9,
-        "race_rating_sigma_s": 0.08127859753661094,
+        "sessions_observed": 21,
+        "race_rating_sigma_s": 0.048932233451128425,
         "quali_rating_sigma_s": 0.099489874592454,
-        "race_rating_observations": 4,
+        "race_rating_observations": 10,
         "quali_rating_observations": 3
       },
       "dnf_risk": {
-        "dnf_rate": 0.318
+        "dnf_rate": 0.218
       },
       "racecraft": {
-        "skill_score": 0.758,
-        "overtaking_skill": 0.673
+        "skill_score": 0.714,
+        "overtaking_skill": 0.663
       },
       "wet_skill": 0.85,
       "experience": {
@@ -82,30 +83,30 @@
     "ANT": {
       "name": "Kimi Antonelli",
       "pace": {
-        "race_pace": 0.67,
-        "quali_pace": 0.524
+        "race_pace": 0.679,
+        "quali_pace": 0.546
       },
       "bayesian": {
-        "rating_mu": 17.187421168439634,
+        "rating_mu": 16.63150889100509,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 4.1167766000528285,
-        "race_rating_mu_s": -0.04859309847066749,
-        "quali_rating_mu_s": 0.34947257301792306,
-        "sessions_observed": 13,
-        "race_rating_sigma_s": 0.04813702933617866,
-        "quali_rating_sigma_s": 0.08183676932553793,
-        "race_rating_observations": 8,
-        "quali_rating_observations": 8
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 3.384842655519758,
+        "race_rating_mu_s": 0.05141405582518907,
+        "quali_rating_mu_s": 0.42626372344814906,
+        "sessions_observed": 25,
+        "race_rating_sigma_s": 0.03394981092293381,
+        "quali_rating_sigma_s": 0.04153272138357715,
+        "race_rating_observations": 14,
+        "quali_rating_observations": 15
       },
       "dnf_risk": {
-        "dnf_rate": 0.084
+        "dnf_rate": 0.104
       },
       "racecraft": {
-        "skill_score": 0.459,
-        "overtaking_skill": 0.584
+        "skill_score": 0.545,
+        "overtaking_skill": 0.614
       },
       "wet_skill": 0.7,
       "experience": {
@@ -118,30 +119,30 @@
     "BEA": {
       "name": "Oliver Bearman",
       "pace": {
-        "race_pace": 0.648,
-        "quali_pace": 0.532
+        "race_pace": 0.599,
+        "quali_pace": 0.517
       },
       "bayesian": {
-        "rating_mu": 14.146320082855366,
+        "rating_mu": 13.548254703802746,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 2.937303076731105,
-        "race_rating_mu_s": 0.026203662333445094,
-        "quali_rating_mu_s": 0.08738719809561044,
-        "sessions_observed": 12,
-        "race_rating_sigma_s": 0.05814283228764152,
-        "quali_rating_sigma_s": 0.08557461921898049,
-        "race_rating_observations": 8,
-        "quali_rating_observations": 7
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 1.8980215412406394,
+        "race_rating_mu_s": -0.00383715396978695,
+        "quali_rating_mu_s": 0.13672545340019784,
+        "sessions_observed": 23,
+        "race_rating_sigma_s": 0.04065083087389963,
+        "quali_rating_sigma_s": 0.07362765271116901,
+        "race_rating_observations": 15,
+        "quali_rating_observations": 10
       },
       "dnf_risk": {
-        "dnf_rate": 0.129
+        "dnf_rate": 0.184
       },
       "racecraft": {
-        "skill_score": 0.571,
-        "overtaking_skill": 0.657
+        "skill_score": 0.601,
+        "overtaking_skill": 0.65
       },
       "wet_skill": 0.7,
       "experience": {
@@ -154,30 +155,30 @@
     "BOR": {
       "name": "Gabriel Bortoleto",
       "pace": {
-        "race_pace": 0.596,
-        "quali_pace": 0.482
+        "race_pace": 0.604,
+        "quali_pace": 0.497
       },
       "bayesian": {
-        "rating_mu": 12.5840839844257,
+        "rating_mu": 13.120321595681029,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 3.55176632928898,
-        "race_rating_mu_s": -0.3488985050335889,
-        "quali_rating_mu_s": -0.43482648371901195,
-        "sessions_observed": 11,
-        "race_rating_sigma_s": 0.15275190597106938,
-        "quali_rating_sigma_s": 0.12403721763712379,
-        "race_rating_observations": 4,
-        "quali_rating_observations": 7
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 3.6528414454731277,
+        "race_rating_mu_s": -0.05922405732979899,
+        "quali_rating_mu_s": -0.26416671068599334,
+        "sessions_observed": 24,
+        "race_rating_sigma_s": 0.08462705074658856,
+        "quali_rating_sigma_s": 0.08005542664620681,
+        "race_rating_observations": 11,
+        "quali_rating_observations": 11
       },
       "dnf_risk": {
-        "dnf_rate": 0.21
+        "dnf_rate": 0.106
       },
       "racecraft": {
-        "skill_score": 0.675,
-        "overtaking_skill": 0.68
+        "skill_score": 0.653,
+        "overtaking_skill": 0.662
       },
       "wet_skill": 0.65,
       "experience": {
@@ -190,29 +191,30 @@
     "BOT": {
       "name": "Valtteri Bottas",
       "pace": {
-        "race_pace": 0.488,
-        "quali_pace": 0.519
+        "race_pace": 0.428,
+        "quali_pace": 0.515
       },
       "bayesian": {
-        "rating_mu": 10.372305692709173,
+        "rating_mu": 8.665361829119483,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 3.4869547996057393,
-        "race_rating_mu_s": 0.09169221127264565,
-        "quali_rating_mu_s": 0.13799208001694666,
-        "sessions_observed": 11,
-        "race_rating_sigma_s": 0.11460363189363218,
-        "quali_rating_sigma_s": 0.5304206197376727,
-        "race_rating_observations": 8
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 3.7148390530549062,
+        "race_rating_mu_s": 0.33842041560811953,
+        "quali_rating_mu_s": 0.2567234712876471,
+        "sessions_observed": 20,
+        "race_rating_sigma_s": 0.08073171956489374,
+        "quali_rating_sigma_s": 0.13567015578133207,
+        "race_rating_observations": 12,
+        "quali_rating_observations": 4
       },
       "dnf_risk": {
-        "dnf_rate": 0.141
+        "dnf_rate": 0.342
       },
       "racecraft": {
-        "skill_score": 0.546,
-        "overtaking_skill": 0.579
+        "skill_score": 0.576,
+        "overtaking_skill": 0.602
       },
       "wet_skill": 0.7,
       "experience": {
@@ -225,30 +227,30 @@
     "COL": {
       "name": "Franco Colapinto",
       "pace": {
-        "race_pace": 0.621,
-        "quali_pace": 0.528
+        "race_pace": 0.555,
+        "quali_pace": 0.449
       },
       "bayesian": {
-        "rating_mu": 13.049054315753333,
+        "rating_mu": 12.212432300957328,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 2.3697970171628553,
-        "race_rating_mu_s": -0.24056584286178045,
-        "quali_rating_mu_s": -0.3346279836635401,
-        "sessions_observed": 13,
-        "race_rating_sigma_s": 0.08099801152063894,
-        "quali_rating_sigma_s": 0.0902430378173265,
-        "race_rating_observations": 7,
-        "quali_rating_observations": 7
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 2.6849991899731,
+        "race_rating_mu_s": -0.2674472645926212,
+        "quali_rating_mu_s": -0.35701543604614905,
+        "sessions_observed": 26,
+        "race_rating_sigma_s": 0.03646729070043517,
+        "quali_rating_sigma_s": 0.06139752555197807,
+        "race_rating_observations": 14,
+        "quali_rating_observations": 13
       },
       "dnf_risk": {
-        "dnf_rate": 0.057
+        "dnf_rate": 0.029
       },
       "racecraft": {
-        "skill_score": 0.581,
-        "overtaking_skill": 0.623
+        "skill_score": 0.606,
+        "overtaking_skill": 0.633
       },
       "wet_skill": 0.65,
       "experience": {
@@ -261,13 +263,15 @@
     "DEV": {
       "name": "Nyck de Vries",
       "pace": {
-        "race_pace": 0.416,
-        "quali_pace": 0.416
+        "race_pace": 0.507,
+        "quali_pace": 0.513
       },
       "bayesian": {
-        "rating_mu": 10.786,
+        "rating_mu": 12.235,
+        "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "rating_sigma": 2.5,
+        "last_updated": null,
+        "rating_sigma": 2.7,
         "race_rating_mu_s": -0.2349593387079074,
         "quali_rating_mu_s": -0.26736583657342095,
         "sessions_observed": 0,
@@ -278,8 +282,8 @@
         "dnf_rate": 0.2
       },
       "racecraft": {
-        "skill_score": 0.466,
-        "overtaking_skill": 0.491
+        "skill_score": 0.535,
+        "overtaking_skill": 0.555
       },
       "wet_skill": 0.7,
       "experience": {
@@ -292,13 +296,15 @@
     "DOO": {
       "name": "Jack Doohan",
       "pace": {
-        "race_pace": 0.365,
-        "quali_pace": 0.465
+        "race_pace": 0.498,
+        "quali_pace": 0.555
       },
       "bayesian": {
-        "rating_mu": 9.715,
+        "rating_mu": 11.983,
+        "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "rating_sigma": 2.5,
+        "last_updated": null,
+        "rating_sigma": 2.9,
         "race_rating_mu_s": -0.4703648855874647,
         "quali_rating_mu_s": 0.11898813623457953,
         "sessions_observed": 0,
@@ -309,8 +315,8 @@
         "dnf_rate": 0.286
       },
       "racecraft": {
-        "skill_score": 0.415,
-        "overtaking_skill": 0.54
+        "skill_score": 0.523,
+        "overtaking_skill": 0.592
       },
       "wet_skill": 0.7,
       "experience": {
@@ -323,30 +329,30 @@
     "GAS": {
       "name": "Pierre Gasly",
       "pace": {
-        "race_pace": 0.654,
-        "quali_pace": 0.552
+        "race_pace": 0.626,
+        "quali_pace": 0.559
       },
       "bayesian": {
-        "rating_mu": 12.395983741698046,
+        "rating_mu": 14.190030323064658,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 4.0965132485483045,
-        "race_rating_mu_s": -0.20772516591712584,
-        "quali_rating_mu_s": -0.3347292798001281,
-        "sessions_observed": 12,
-        "race_rating_sigma_s": 0.07891855881417299,
-        "quali_rating_sigma_s": 0.08626425778866481,
-        "race_rating_observations": 7,
-        "quali_rating_observations": 7
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 1.8772003869637826,
+        "race_rating_mu_s": -0.18316692853531127,
+        "quali_rating_mu_s": -0.3127232711076503,
+        "sessions_observed": 25,
+        "race_rating_sigma_s": 0.036382378151318485,
+        "quali_rating_sigma_s": 0.060462245414643366,
+        "race_rating_observations": 14,
+        "quali_rating_observations": 13
       },
       "dnf_risk": {
-        "dnf_rate": 0.151
+        "dnf_rate": 0.077
       },
       "racecraft": {
-        "skill_score": 0.712,
-        "overtaking_skill": 0.647
+        "skill_score": 0.681,
+        "overtaking_skill": 0.646
       },
       "wet_skill": 0.75,
       "experience": {
@@ -359,30 +365,30 @@
     "HAD": {
       "name": "Isack Hadjar",
       "pace": {
-        "race_pace": 0.577,
-        "quali_pace": 0.473
+        "race_pace": 0.569,
+        "quali_pace": 0.436
       },
       "bayesian": {
-        "rating_mu": 10.883837143457828,
+        "rating_mu": 11.967719375467915,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 3.9203897363654168,
-        "race_rating_mu_s": 0.5796824304329399,
-        "quali_rating_mu_s": 0.25138310945054076,
-        "sessions_observed": 11,
-        "race_rating_sigma_s": 0.09404700735726407,
-        "quali_rating_sigma_s": 0.09257916779370051,
-        "race_rating_observations": 4,
-        "quali_rating_observations": 6
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 3.6194005012753587,
+        "race_rating_mu_s": 0.545560969359876,
+        "quali_rating_mu_s": 0.3147427925846363,
+        "sessions_observed": 24,
+        "race_rating_sigma_s": 0.05368297674164132,
+        "quali_rating_sigma_s": 0.05943537001743134,
+        "race_rating_observations": 10,
+        "quali_rating_observations": 12
       },
       "dnf_risk": {
-        "dnf_rate": 0.205
+        "dnf_rate": 0.104
       },
       "racecraft": {
-        "skill_score": 0.717,
-        "overtaking_skill": 0.677
+        "skill_score": 0.674,
+        "overtaking_skill": 0.66
       },
       "wet_skill": 0.65,
       "experience": {
@@ -395,30 +401,30 @@
     "HAM": {
       "name": "Lewis Hamilton",
       "pace": {
-        "race_pace": 0.603,
-        "quali_pace": 0.524
+        "race_pace": 0.613,
+        "quali_pace": 0.514
       },
       "bayesian": {
-        "rating_mu": 13.789377460323163,
+        "rating_mu": 13.055251130898673,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 2.8123799593459626,
-        "race_rating_mu_s": 0.07862687567119621,
-        "quali_rating_mu_s": 0.4817324153702201,
-        "sessions_observed": 13,
-        "race_rating_sigma_s": 0.049587245329743845,
-        "quali_rating_sigma_s": 0.07876660768328453,
-        "race_rating_observations": 8,
-        "quali_rating_observations": 8
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 2.583555351087923,
+        "race_rating_mu_s": 0.058764067601158224,
+        "quali_rating_mu_s": 0.43653196105900244,
+        "sessions_observed": 26,
+        "race_rating_sigma_s": 0.029177966118669237,
+        "quali_rating_sigma_s": 0.04612909567066938,
+        "race_rating_observations": 15,
+        "quali_rating_observations": 14
       },
       "dnf_risk": {
-        "dnf_rate": 0.05
+        "dnf_rate": 0.026
       },
       "racecraft": {
-        "skill_score": 0.635,
-        "overtaking_skill": 0.705
+        "skill_score": 0.634,
+        "overtaking_skill": 0.684
       },
       "wet_skill": 0.9,
       "experience": {
@@ -431,30 +437,30 @@
     "HUL": {
       "name": "Nico Hulkenberg",
       "pace": {
-        "race_pace": 0.646,
-        "quali_pace": 0.6
+        "race_pace": 0.574,
+        "quali_pace": 0.512
       },
       "bayesian": {
-        "rating_mu": 14.153018972405597,
+        "rating_mu": 13.063006996807346,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 3.1360712689069405,
-        "race_rating_mu_s": -0.20629985422650648,
-        "quali_rating_mu_s": -0.3439778153410377,
-        "sessions_observed": 9,
-        "race_rating_sigma_s": 0.15192202300148522,
-        "quali_rating_sigma_s": 0.12154212391855285,
-        "race_rating_observations": 4,
-        "quali_rating_observations": 7
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 1.9330038776993559,
+        "race_rating_mu_s": -0.49367717661669863,
+        "quali_rating_mu_s": -0.5091182733493789,
+        "sessions_observed": 20,
+        "race_rating_sigma_s": 0.08457843839599265,
+        "quali_rating_sigma_s": 0.07964862900100539,
+        "race_rating_observations": 11,
+        "quali_rating_observations": 11
       },
       "dnf_risk": {
-        "dnf_rate": 0.267
+        "dnf_rate": 0.278
       },
       "racecraft": {
-        "skill_score": 0.702,
-        "overtaking_skill": 0.604
+        "skill_score": 0.677,
+        "overtaking_skill": 0.618
       },
       "wet_skill": 0.7,
       "experience": {
@@ -467,30 +473,30 @@
     "LAW": {
       "name": "Liam Lawson",
       "pace": {
-        "race_pace": 0.624,
-        "quali_pace": 0.523
+        "race_pace": 0.599,
+        "quali_pace": 0.484
       },
       "bayesian": {
-        "rating_mu": 13.536028256663224,
+        "rating_mu": 13.558381436290325,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 2.877208159516759,
-        "race_rating_mu_s": 0.21674670668337132,
-        "quali_rating_mu_s": -0.3656741593579532,
-        "sessions_observed": 12,
-        "race_rating_sigma_s": 0.11664813366295017,
-        "quali_rating_sigma_s": 0.194931750959481,
-        "race_rating_observations": 3,
-        "quali_rating_observations": 5
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 1.7191812515686757,
+        "race_rating_mu_s": 0.18143300296484954,
+        "quali_rating_mu_s": -0.23522453832449947,
+        "sessions_observed": 25,
+        "race_rating_sigma_s": 0.04116722115471836,
+        "quali_rating_sigma_s": 0.0643194855489564,
+        "race_rating_observations": 10,
+        "quali_rating_observations": 11
       },
       "dnf_risk": {
-        "dnf_rate": 0.172
+        "dnf_rate": 0.087
       },
       "racecraft": {
-        "skill_score": 0.622,
-        "overtaking_skill": 0.679
+        "skill_score": 0.626,
+        "overtaking_skill": 0.664
       },
       "wet_skill": 0.7,
       "experience": {
@@ -503,30 +509,30 @@
     "LEC": {
       "name": "Charles Leclerc",
       "pace": {
-        "race_pace": 0.63,
-        "quali_pace": 0.543
+        "race_pace": 0.594,
+        "quali_pace": 0.494
       },
       "bayesian": {
-        "rating_mu": 14.05738746588806,
+        "rating_mu": 12.9171841161301,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 4.182020151325142,
-        "race_rating_mu_s": 0.09653419617533189,
-        "quali_rating_mu_s": 0.4110972724651956,
-        "sessions_observed": 13,
-        "race_rating_sigma_s": 0.04958437062879362,
-        "quali_rating_sigma_s": 0.07876283209412689,
-        "race_rating_observations": 8,
-        "quali_rating_observations": 8
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 2.2789253191971266,
+        "race_rating_mu_s": 0.11639466136499046,
+        "quali_rating_mu_s": 0.4562996854217716,
+        "sessions_observed": 24,
+        "race_rating_sigma_s": 0.029177530519098317,
+        "quali_rating_sigma_s": 0.04612863343080008,
+        "race_rating_observations": 15,
+        "quali_rating_observations": 14
       },
       "dnf_risk": {
-        "dnf_rate": 0.05
+        "dnf_rate": 0.144
       },
       "racecraft": {
-        "skill_score": 0.852,
-        "overtaking_skill": 0.782
+        "skill_score": 0.768,
+        "overtaking_skill": 0.73
       },
       "wet_skill": 0.75,
       "experience": {
@@ -539,30 +545,30 @@
     "LIN": {
       "name": "Arvid Lindblad",
       "pace": {
-        "race_pace": 0.514,
-        "quali_pace": 0.514
+        "race_pace": 0.564,
+        "quali_pace": 0.523
       },
       "bayesian": {
-        "rating_mu": 12.214116056001053,
+        "rating_mu": 12.78146374533485,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 1.7832475337042308,
-        "race_rating_mu_s": 0.14762113029995577,
-        "quali_rating_mu_s": 0.08615222378055615,
-        "sessions_observed": 10,
-        "race_rating_sigma_s": 0.11764643227884378,
-        "quali_rating_sigma_s": 0.194931750959481,
-        "race_rating_observations": 3,
-        "quali_rating_observations": 5
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 1.9476805844602119,
+        "race_rating_mu_s": 0.18267604519602165,
+        "quali_rating_mu_s": -0.04429739725289755,
+        "sessions_observed": 23,
+        "race_rating_sigma_s": 0.041171816455003826,
+        "quali_rating_sigma_s": 0.0643194855489564,
+        "race_rating_observations": 10,
+        "quali_rating_observations": 11
       },
       "dnf_risk": {
-        "dnf_rate": 0.183
+        "dnf_rate": 0.093
       },
       "racecraft": {
-        "skill_score": 0.542,
-        "overtaking_skill": 0.542
+        "skill_score": 0.595,
+        "overtaking_skill": 0.603
       },
       "wet_skill": 0.6,
       "experience": {
@@ -576,12 +582,14 @@
     "MAG": {
       "name": "Kevin Magnussen",
       "pace": {
-        "race_pace": 0.508,
-        "quali_pace": 0.605
+        "race_pace": 0.551,
+        "quali_pace": 0.619
       },
       "bayesian": {
-        "rating_mu": 11.836,
+        "rating_mu": 12.676,
+        "season_year": 2026,
         "seeded_from": "extraction_prior",
+        "last_updated": null,
         "rating_sigma": 2.5,
         "race_rating_mu_s": -0.3934127617582333,
         "quali_rating_mu_s": -0.47901914619435665,
@@ -593,8 +601,8 @@
         "dnf_rate": 0.159
       },
       "racecraft": {
-        "skill_score": 0.516,
-        "overtaking_skill": 0.618
+        "skill_score": 0.556,
+        "overtaking_skill": 0.627
       },
       "wet_skill": 0.7,
       "experience": {
@@ -607,30 +615,30 @@
     "NOR": {
       "name": "Lando Norris",
       "pace": {
-        "race_pace": 0.663,
-        "quali_pace": 0.561
+        "race_pace": 0.714,
+        "quali_pace": 0.568
       },
       "bayesian": {
-        "rating_mu": 13.891341904318356,
+        "rating_mu": 17.630136737600658,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 2.4809181561383467,
-        "race_rating_mu_s": 0.3517390737697692,
-        "quali_rating_mu_s": 0.08495798174174653,
-        "sessions_observed": 11,
-        "race_rating_sigma_s": 0.06388814779393082,
-        "quali_rating_sigma_s": 0.05071567319631833,
-        "race_rating_observations": 6,
-        "quali_rating_observations": 8
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 3.951685089327636,
+        "race_rating_mu_s": 0.24364823186017853,
+        "quali_rating_mu_s": 0.16727285494702054,
+        "sessions_observed": 23,
+        "race_rating_sigma_s": 0.03732694753640587,
+        "quali_rating_sigma_s": 0.034565049652218446,
+        "race_rating_observations": 13,
+        "quali_rating_observations": 15
       },
       "dnf_risk": {
-        "dnf_rate": 0.195
+        "dnf_rate": 0.155
       },
       "racecraft": {
-        "skill_score": 0.777,
-        "overtaking_skill": 0.714
+        "skill_score": 0.721,
+        "overtaking_skill": 0.687
       },
       "wet_skill": 0.8,
       "experience": {
@@ -643,30 +651,30 @@
     "OCO": {
       "name": "Esteban Ocon",
       "pace": {
-        "race_pace": 0.575,
-        "quali_pace": 0.524
+        "race_pace": 0.557,
+        "quali_pace": 0.49
       },
       "bayesian": {
-        "rating_mu": 13.111586041763598,
+        "rating_mu": 12.401131037969877,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 2.2838241181976464,
-        "race_rating_mu_s": -0.1001716923407872,
-        "quali_rating_mu_s": -0.04749659286462095,
-        "sessions_observed": 13,
-        "race_rating_sigma_s": 0.05795421096327104,
-        "quali_rating_sigma_s": 0.08392725901237372,
-        "race_rating_observations": 8,
-        "quali_rating_observations": 7
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 1.8948191587153815,
+        "race_rating_mu_s": -0.07022346031205527,
+        "quali_rating_mu_s": -0.09541522040541917,
+        "sessions_observed": 26,
+        "race_rating_sigma_s": 0.04059540871557452,
+        "quali_rating_sigma_s": 0.07261148635420768,
+        "race_rating_observations": 15,
+        "quali_rating_observations": 10
       },
       "dnf_risk": {
-        "dnf_rate": 0.074
+        "dnf_rate": 0.037
       },
       "racecraft": {
-        "skill_score": 0.687,
-        "overtaking_skill": 0.64
+        "skill_score": 0.666,
+        "overtaking_skill": 0.641
       },
       "wet_skill": 0.7,
       "experience": {
@@ -679,29 +687,30 @@
     "PER": {
       "name": "Sergio Perez",
       "pace": {
-        "race_pace": 0.524,
-        "quali_pace": 0.509
+        "race_pace": 0.499,
+        "quali_pace": 0.49
       },
       "bayesian": {
-        "rating_mu": 12.161116354021521,
+        "rating_mu": 11.683207856660909,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 2.336298598010081,
-        "race_rating_mu_s": 0.9514675864585248,
-        "quali_rating_mu_s": 0.050894241176247655,
-        "sessions_observed": 12,
-        "race_rating_sigma_s": 0.11098688161268361,
-        "quali_rating_sigma_s": 0.15154874849647793,
-        "race_rating_observations": 8
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 1.8134051374297677,
+        "race_rating_mu_s": 0.7129514034418883,
+        "quali_rating_mu_s": -0.03132963689553846,
+        "sessions_observed": 22,
+        "race_rating_sigma_s": 0.07975264814161719,
+        "quali_rating_sigma_s": 0.11851259926112923,
+        "race_rating_observations": 12,
+        "quali_rating_observations": 4
       },
       "dnf_risk": {
-        "dnf_rate": 0.177
+        "dnf_rate": 0.348
       },
       "racecraft": {
-        "skill_score": 0.417,
-        "overtaking_skill": 0.542
+        "skill_score": 0.492,
+        "overtaking_skill": 0.578
       },
       "wet_skill": 0.7,
       "experience": {
@@ -714,30 +723,30 @@
     "PIA": {
       "name": "Oscar Piastri",
       "pace": {
-        "race_pace": 0.543,
-        "quali_pace": 0.508
+        "race_pace": 0.569,
+        "quali_pace": 0.44
       },
       "bayesian": {
-        "rating_mu": 12.964055761762305,
+        "rating_mu": 13.17747464893285,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 1.812272370618941,
-        "race_rating_mu_s": 0.03717120553777604,
-        "quali_rating_mu_s": 0.07398801166597853,
-        "sessions_observed": 11,
-        "race_rating_sigma_s": 0.06394583846439021,
-        "quali_rating_sigma_s": 0.05071567319631833,
-        "race_rating_observations": 6,
-        "quali_rating_observations": 8
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 2.011904058410114,
+        "race_rating_mu_s": 0.14538598456787852,
+        "quali_rating_mu_s": -0.008326861539295481,
+        "sessions_observed": 23,
+        "race_rating_sigma_s": 0.037334172057724754,
+        "quali_rating_sigma_s": 0.034565049652218446,
+        "race_rating_observations": 13,
+        "quali_rating_observations": 15
       },
       "dnf_risk": {
-        "dnf_rate": 0.158
+        "dnf_rate": 0.179
       },
       "racecraft": {
-        "skill_score": 0.589,
-        "overtaking_skill": 0.659
+        "skill_score": 0.607,
+        "overtaking_skill": 0.653
       },
       "wet_skill": 0.7,
       "experience": {
@@ -750,12 +759,14 @@
     "RIC": {
       "name": "Daniel Ricciardo",
       "pace": {
-        "race_pace": 0.611,
-        "quali_pace": 0.656
+        "race_pace": 0.618,
+        "quali_pace": 0.652
       },
       "bayesian": {
-        "rating_mu": 12.949,
+        "rating_mu": 13.411,
+        "season_year": 2026,
         "seeded_from": "extraction_prior",
+        "last_updated": null,
         "rating_sigma": 2.5,
         "race_rating_mu_s": 0.04057543152386005,
         "quali_rating_mu_s": -0.1338069192715026,
@@ -767,8 +778,8 @@
         "dnf_rate": 0.08
       },
       "racecraft": {
-        "skill_score": 0.569,
-        "overtaking_skill": 0.593
+        "skill_score": 0.591,
+        "overtaking_skill": 0.611
       },
       "wet_skill": 0.75,
       "experience": {
@@ -781,30 +792,30 @@
     "RUS": {
       "name": "George Russell",
       "pace": {
-        "race_pace": 0.631,
-        "quali_pace": 0.538
+        "race_pace": 0.637,
+        "quali_pace": 0.461
       },
       "bayesian": {
-        "rating_mu": 13.182998315270169,
+        "rating_mu": 12.783616129037831,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 2.653804562428153,
-        "race_rating_mu_s": -0.12690204381398854,
-        "quali_rating_mu_s": 0.30253183966048497,
-        "sessions_observed": 12,
-        "race_rating_sigma_s": 0.04813331554193123,
-        "quali_rating_sigma_s": 0.08167979655738887,
-        "race_rating_observations": 8,
-        "quali_rating_observations": 8
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 3.6117763039823187,
+        "race_rating_mu_s": -0.22689906300032836,
+        "quali_rating_mu_s": 0.22575079527461214,
+        "sessions_observed": 24,
+        "race_rating_sigma_s": 0.03394873596409863,
+        "quali_rating_sigma_s": 0.04152744061807807,
+        "race_rating_observations": 14,
+        "quali_rating_observations": 15
       },
       "dnf_risk": {
-        "dnf_rate": 0.15
+        "dnf_rate": 0.167
       },
       "racecraft": {
-        "skill_score": 0.82,
-        "overtaking_skill": 0.72
+        "skill_score": 0.748,
+        "overtaking_skill": 0.691
       },
       "wet_skill": 0.8,
       "experience": {
@@ -817,30 +828,30 @@
     "SAI": {
       "name": "Carlos Sainz",
       "pace": {
-        "race_pace": 0.643,
-        "quali_pace": 0.589
+        "race_pace": 0.552,
+        "quali_pace": 0.535
       },
       "bayesian": {
-        "rating_mu": 14.260394563395472,
+        "rating_mu": 11.248229269673319,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 1.6734226410180633,
-        "race_rating_mu_s": 0.33255028277211385,
-        "quali_rating_mu_s": 0.5667954541982826,
-        "sessions_observed": 12,
-        "race_rating_sigma_s": 0.08002650087685417,
-        "quali_rating_sigma_s": 0.15998250671964664,
-        "race_rating_observations": 5,
-        "quali_rating_observations": 4
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 2.7908964403710232,
+        "race_rating_mu_s": 0.3124413078058764,
+        "quali_rating_mu_s": 0.45603725959245556,
+        "sessions_observed": 23,
+        "race_rating_sigma_s": 0.046905097779525846,
+        "quali_rating_sigma_s": 0.11668163675110638,
+        "race_rating_observations": 11,
+        "quali_rating_observations": 7
       },
       "dnf_risk": {
-        "dnf_rate": 0.066
+        "dnf_rate": 0.158
       },
       "racecraft": {
-        "skill_score": 0.648,
-        "overtaking_skill": 0.703
+        "skill_score": 0.642,
+        "overtaking_skill": 0.682
       },
       "wet_skill": 0.75,
       "experience": {
@@ -853,13 +864,15 @@
     "SAR": {
       "name": "Logan Sargeant",
       "pace": {
-        "race_pace": 0.42,
-        "quali_pace": 0.45
+        "race_pace": 0.509,
+        "quali_pace": 0.532
       },
       "bayesian": {
-        "rating_mu": 10.87,
+        "rating_mu": 12.298,
+        "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "rating_sigma": 2.5,
+        "last_updated": null,
+        "rating_sigma": 2.7,
         "race_rating_mu_s": 0.01964940890246814,
         "quali_rating_mu_s": 0.048932265649148064,
         "sessions_observed": 0,
@@ -870,8 +883,8 @@
         "dnf_rate": 0.25
       },
       "racecraft": {
-        "skill_score": 0.47,
-        "overtaking_skill": 0.525
+        "skill_score": 0.538,
+        "overtaking_skill": 0.575
       },
       "wet_skill": 0.65,
       "experience": {
@@ -884,30 +897,30 @@
     "STR": {
       "name": "Lance Stroll",
       "pace": {
-        "race_pace": 0.437,
-        "quali_pace": 0.497
+        "race_pace": 0.505,
+        "quali_pace": 0.469
       },
       "bayesian": {
-        "rating_mu": 10.078945990717372,
+        "rating_mu": 10.910192746106045,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 2.431426192176121,
-        "race_rating_mu_s": -0.29141620332678814,
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 1.9276440119991345,
+        "race_rating_mu_s": -0.15130923271064187,
         "quali_rating_mu_s": -0.34332281455701463,
-        "sessions_observed": 10,
-        "race_rating_sigma_s": 0.08127859753661094,
+        "sessions_observed": 19,
+        "race_rating_sigma_s": 0.048932233451128425,
         "quali_rating_sigma_s": 0.09990554633076094,
-        "race_rating_observations": 4,
+        "race_rating_observations": 10,
         "quali_rating_observations": 3
       },
       "dnf_risk": {
-        "dnf_rate": 0.204
+        "dnf_rate": 0.315
       },
       "racecraft": {
-        "skill_score": 0.593,
-        "overtaking_skill": 0.678
+        "skill_score": 0.607,
+        "overtaking_skill": 0.665
       },
       "wet_skill": 0.6,
       "experience": {
@@ -920,13 +933,15 @@
     "TSU": {
       "name": "Yuki Tsunoda",
       "pace": {
-        "race_pace": 0.497,
-        "quali_pace": 0.522
+        "race_pace": 0.554,
+        "quali_pace": 0.574
       },
       "bayesian": {
-        "rating_mu": 12.487,
+        "rating_mu": 13.222,
+        "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "rating_sigma": 2.5,
+        "last_updated": null,
+        "rating_sigma": 2.7,
         "race_rating_mu_s": -0.008871756926109803,
         "quali_rating_mu_s": -0.01826717338177214,
         "sessions_observed": 0,
@@ -937,8 +952,8 @@
         "dnf_rate": 0.1
       },
       "racecraft": {
-        "skill_score": 0.547,
-        "overtaking_skill": 0.597
+        "skill_score": 0.582,
+        "overtaking_skill": 0.617
       },
       "wet_skill": 0.6,
       "experience": {
@@ -951,30 +966,30 @@
     "VER": {
       "name": "Max Verstappen",
       "pace": {
-        "race_pace": 0.78,
-        "quali_pace": 0.707
+        "race_pace": 0.686,
+        "quali_pace": 0.581
       },
       "bayesian": {
-        "rating_mu": 16.49047394795514,
+        "rating_mu": 14.87157639734963,
         "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "last_session": "Qualifying_Canadian Grand Prix",
-        "last_updated": "2026-05-30T15:10:44.681146",
-        "rating_sigma": 2.516395595104801,
-        "race_rating_mu_s": 0.9190510329970469,
-        "quali_rating_mu_s": 0.3603057540479398,
-        "sessions_observed": 11,
-        "race_rating_sigma_s": 0.09312351348563157,
-        "quali_rating_sigma_s": 0.09005900770309733,
-        "race_rating_observations": 4,
-        "quali_rating_observations": 6
+        "last_session": "Qualifying_Hungarian Grand Prix",
+        "last_updated": "2026-07-30T23:10:08.651296",
+        "rating_sigma": 2.8316544617407624,
+        "race_rating_mu_s": 0.951752629008182,
+        "quali_rating_mu_s": 0.29894730179700996,
+        "sessions_observed": 22,
+        "race_rating_sigma_s": 0.05357724728686301,
+        "quali_rating_sigma_s": 0.05893819542560169,
+        "race_rating_observations": 10,
+        "quali_rating_observations": 12
       },
       "dnf_risk": {
-        "dnf_rate": 0.081
+        "dnf_rate": 0.178
       },
       "racecraft": {
-        "skill_score": 0.95,
-        "overtaking_skill": 0.893
+        "skill_score": 0.833,
+        "overtaking_skill": 0.806
       },
       "wet_skill": 0.9,
       "experience": {
@@ -987,13 +1002,15 @@
     "ZHO": {
       "name": "Guanyu Zhou",
       "pace": {
-        "race_pace": 0.767,
-        "quali_pace": 0.714
+        "race_pace": 0.71,
+        "quali_pace": 0.685
       },
       "bayesian": {
-        "rating_mu": 16.057,
+        "rating_mu": 15.301,
+        "season_year": 2026,
         "seeded_from": "extraction_prior",
-        "rating_sigma": 2.5,
+        "last_updated": null,
+        "rating_sigma": 2.7,
         "race_rating_mu_s": -0.10127365318653098,
         "quali_rating_mu_s": -0.13799208001694666,
         "sessions_observed": 0,
@@ -1004,8 +1021,8 @@
         "dnf_rate": 0.109
       },
       "racecraft": {
-        "skill_score": 0.717,
-        "overtaking_skill": 0.639
+        "skill_score": 0.681,
+        "overtaking_skill": 0.641
       },
       "wet_skill": 0.65,
       "experience": {
@@ -1016,8 +1033,8 @@
       }
     }
   },
-  "version": 9,
-  "last_updated": "2026-05-30T15:10:44.682284",
-  "extraction_date": "2026-03-30T12:44:57.846556+00:00",
+  "version": 16,
+  "last_updated": "2026-07-30T23:10:08.657312",
+  "extraction_date": "2026-04-25T08:04:41.351012+00:00",
   "bayesian_last_updated_year": 2026
 }

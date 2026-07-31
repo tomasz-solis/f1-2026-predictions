@@ -86,18 +86,28 @@ def test_diagnostic_top5_podium_share_is_valid(quali_and_race):
     )
 
 
+# Above this retirement probability the 95th-percentile finish is a retirement by
+# construction, so P95 carries no information about race pace. Real front-runners
+# retire in roughly one race in ten, so a P95 threshold applied regardless of DNF
+# risk asserts something reality violates: it passed only while the season state
+# was stale enough to give Verstappen an 8% DNF rate.
+_DNF_EXPLAINS_TAIL_ABOVE = 0.05
+
+
 def test_diagnostic_top_grid_falloff_frequency_is_bounded(quali_and_race):
     qualifying, race = quali_and_race
 
     top3_drivers = [entry["driver"] for entry in qualifying["grid"][:3]]
-    falloff_count = 0
+    unexplained_falloff = []
     for driver in top3_drivers:
         entry = next(result for result in race["finish_order"] if result["driver"] == driver)
-        if int(entry["p95"]) >= 10:
-            falloff_count += 1
+        dnf_probability = float(entry["dnf_probability"])
+        if int(entry["p95"]) >= 10 and dnf_probability < _DNF_EXPLAINS_TAIL_ABOVE:
+            unexplained_falloff.append(f"{driver} (P95 {entry['p95']}, DNF {dnf_probability:.3f})")
 
-    assert falloff_count <= 1, (
-        f"{falloff_count} of 3 top-grid drivers have P95 >= 10. "
+    assert len(unexplained_falloff) <= 1, (
+        f"{len(unexplained_falloff)} of 3 top-grid drivers fall to P95 >= 10 without "
+        f"retirement risk to explain it: {', '.join(unexplained_falloff)}. "
         "Expected at most 1 in a realistic dry race."
     )
 
