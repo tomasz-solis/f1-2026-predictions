@@ -1,0 +1,1 @@
+Correction: no stale Brazil predictions existed. The 2025 backtests containing São Paulo rows predate circuit_registry.py (2026-04-24 vs 2026-06-10) and used the raw-name lookup, which matched correctly. No Brazil artifact was produced in the bug window.
