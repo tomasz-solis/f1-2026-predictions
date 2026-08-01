@@ -125,15 +125,22 @@ the worktree; no branch was made.~~ **Updated 2026-07-31: it is now on the branc
 `shelved/challenger-research`** and no longer sits loose in the `master` working
 tree.
 
-> Paths in this section — `docs/RAW_LAPS_REPLAY_HANDOFF.md`,
-> `docs/QUALIFYING_RACE_CHALLENGER.md`,
+> **The methodology is on `master`:** `docs/QUALIFYING_RACE_CHALLENGER.md` and
+> `docs/RAW_LAPS_REPLAY_HANDOFF.md` were promoted here, since the reasoning
+> outlives the code. Every path *they* cite resolves only on the branch.
+>
+> **The implementation is on `shelved/challenger-research`:**
 > `scripts/run_challenger_research_walk_forward.py`, the
-> `src/analysis/challenger_*` modules, their tests, and
-> `data/model_diagnostics/2026/race_mae_investigation/` — are on
-> `shelved/challenger-research`, not on `master`. To read or run any of them,
-> check that branch out. Nothing in production imports them: a scan of all 409
+> `src/analysis/challenger_*` and `src/models/qualifying_practice_*` modules,
+> their tests, and the human-readable reports under
+> `data/model_diagnostics/2026/race_mae_investigation/`. Check the branch out to
+> read or run any of it. Nothing in production imports them: a scan of all 409
 > tracked Python files finds zero imports, and `master` passes its own suite
 > without them.
+>
+> The generated `*_variant_comparison*.json` dumps behind those reports were
+> **not** kept — 27,340 lines of machine output whose conclusions are already in
+> this file. Regenerate them from the branch if a raw payload is ever needed.
 >
 > **The walk-forward artifacts under `data/historical_replay/2026/` are the one
 > exception and are NOT on that branch.** They are 909 MB and gitignored

@@ -36,6 +36,13 @@ been tested and lost, and two more only look neutral because they never ran.
 
 ### `QUALIFYING_RACE_CHALLENGER.md`
 Q0/Q1/R0/R1/R2 evidence, replay, governance, and champion-safe release workflow.
+**Shelved research** — the implementation it describes lives on the branch
+`shelved/challenger-research`, so its path references only resolve there. Kept
+on `master` for the preregistration and leakage-boundary methodology.
+
+### `RAW_LAPS_REPLAY_HANDOFF.md`
+What raw per-lap replay would take, and why Q1 and R0 stay structurally inert
+without it. **Shelved research**, same branch as above.
 
 ### `MODEL_CALIBRATION.md`
 Generated 2026 calibration report, including the machine-readable production
