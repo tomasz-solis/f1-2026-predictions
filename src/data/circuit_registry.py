@@ -212,11 +212,14 @@ _CIRCUITS: tuple[Circuit, ...] = (
         ("Mexico City",),
         ("Mexico City Grand Prix", "Mexican Grand Prix"),
     ),
+    # data_key carries the accent because that is how FastF1 names the event, and every
+    # generated/hand-maintained table below is keyed off that name. An ASCII 'Sao Paulo'
+    # here silently misses all of them and falls back to config defaults.
     _c(
         "interlagos",
         "Interlagos",
         "Brazil",
-        "Sao Paulo Grand Prix",
+        "São Paulo Grand Prix",
         ("Sao Paulo",),
         ("Sao Paulo Grand Prix", "Brazilian Grand Prix"),
     ),
@@ -377,6 +380,15 @@ def resolve_track_data_key(
     migrating GP name (Spanish GP -> Madrid) never resolves to another circuit's data.
     """
     return resolve_circuit(race_name, year=year, location=location).data_key
+
+
+def pirelli_key(data_key: str) -> str:
+    """Return the ``data/<year>_pirelli_info.json`` key for a track data key.
+
+    Accent-folded (``São Paulo`` -> ``sao_paulo_grand_prix``) so an accented event name
+    still matches the ASCII snake_case keys those files use.
+    """
+    return _normalize(data_key).replace(" ", "_")
 
 
 def circuit_aggregation_key(

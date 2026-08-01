@@ -11,7 +11,11 @@ import fastf1
 import numpy as np
 from fastf1.exceptions import DataNotLoadedError
 
-from src.data.circuit_registry import CircuitResolutionError, resolve_track_data_key
+from src.data.circuit_registry import (
+    CircuitResolutionError,
+    pirelli_key,
+    resolve_track_data_key,
+)
 from src.utils import config_loader
 from src.utils.prediction_context import get_config_value, get_prediction_reference_now
 from src.utils.track_overtaking import get_track_overtaking_baseline
@@ -31,11 +35,15 @@ KNOWN_MAIN_RACE_LAPS: dict[str, int] = {
     "Austrian Grand Prix": 71,
     "British Grand Prix": 52,
     "Belgian Grand Prix": 44,
+    "Hungarian Grand Prix": 70,
     "Dutch Grand Prix": 72,
     "Italian Grand Prix": 53,
+    "Emilia Romagna Grand Prix": 63,
+    "Azerbaijan Grand Prix": 51,
     "Singapore Grand Prix": 62,
     "United States Grand Prix": 56,
     "Mexico City Grand Prix": 71,
+    "São Paulo Grand Prix": 71,
     "Brazilian Grand Prix": 71,
     "Las Vegas Grand Prix": 50,
     "Qatar Grand Prix": 57,
@@ -60,6 +68,7 @@ KNOWN_SPRINT_LAPS: dict[str, int] = {
     "Singapore Grand Prix": 20,
     "United States Grand Prix": 19,
     "Mexico City Grand Prix": 24,
+    "São Paulo Grand Prix": 24,
     "Brazilian Grand Prix": 24,
     "Las Vegas Grand Prix": 17,
     "Qatar Grand Prix": 19,
@@ -776,10 +785,20 @@ def load_track_specific_params(
                 if lap1_risk is not None:
                     track_params["lap1_risk_modifier"] = float(lap1_risk)
 
+            elif data_key is None:
+                # Registered circuit with no characteristics data yet (e.g. Madrid). Expected,
+                # so it must not look like the accidental-miss warning below.
+                logger.info(
+                    "No track characteristics recorded yet for '%s' (new circuit). "
+                    "Using config defaults.",
+                    race_name,
+                )
             else:
                 logger.warning(
-                    "Track '%s' not found in track_characteristics. Using config defaults.",
+                    "Track '%s' (data key '%s') not found in %s. Using config defaults.",
                     race_name,
+                    data_key,
+                    track_chars_path.name,
                 )
 
         except json.JSONDecodeError:
@@ -829,8 +848,7 @@ def get_tire_stress_score(
         with open(pirelli_path) as f:
             pirelli_data = json.load(f)
 
-        # Normalize the resolved circuit key (lowercase, underscores)
-        race_key = data_key.lower().replace(" ", "_")
+        race_key = pirelli_key(data_key)
         race_info = pirelli_data.get(race_key)
 
         if race_info and "tyre_stress" in race_info:

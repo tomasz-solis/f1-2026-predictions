@@ -164,3 +164,43 @@ def test_no_two_circuits_share_a_data_key():
             f"{circuit.circuit_id}"
         )
         seen[circuit.data_key] = circuit.circuit_id
+
+
+def test_every_data_key_resolves_in_the_files_it_keys():
+    """A ``data_key`` that matches no table silently degrades a race to config defaults.
+
+    This is exactly how Interlagos regressed: the registry spelled it ``Sao Paulo`` while
+    every table is keyed on FastF1's accented ``São Paulo``, so pit loss, SC/VSC, lap
+    count, overtaking prior and tyre stress all fell back to defaults with no error.
+    """
+    import json
+    from pathlib import Path
+
+    from src.data.circuit_registry import all_circuits, pirelli_key
+    from src.data.track_data_loader import KNOWN_MAIN_RACE_LAPS
+    from src.utils.track_overtaking import TRACK_OVERTAKING_BASELINES
+
+    track_chars = json.loads(
+        Path("data/processed/track_characteristics/2026_track_characteristics.json").read_text(
+            encoding="utf-8"
+        )
+    )["tracks"]
+    pirelli = json.loads(Path("data/2025_pirelli_info.json").read_text(encoding="utf-8"))
+
+    # Circuits that are registered but genuinely have no data yet resolve to None and are
+    # covered by the defaults path, so only keyed circuits are checked here.
+    missing: list[str] = []
+    for circuit in all_circuits():
+        key = circuit.data_key
+        if key is None:
+            continue
+        for table_name, present in (
+            ("2026_track_characteristics.json", key in track_chars),
+            ("2025_pirelli_info.json", pirelli_key(key) in pirelli),
+            ("TRACK_OVERTAKING_BASELINES", key in TRACK_OVERTAKING_BASELINES),
+            ("KNOWN_MAIN_RACE_LAPS", key in KNOWN_MAIN_RACE_LAPS),
+        ):
+            if not present:
+                missing.append(f"{circuit.circuit_id}: {key!r} missing from {table_name}")
+
+    assert not missing, "Track data keys with no matching entry:\n  " + "\n  ".join(missing)

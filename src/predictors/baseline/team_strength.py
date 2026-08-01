@@ -202,7 +202,11 @@ def select_race_compound(*, race_name: str, season_year: int, cfg: Any) -> str:
         # Resolve the physical circuit so tyre stress is read for the right track. The 2026
         # Spanish GP (Madrid) must not inherit Barcelona's tyre data; an unknown circuit or
         # a circuit without tyre data safely defaults to MEDIUM rather than guessing.
-        from src.data.circuit_registry import CircuitResolutionError, resolve_track_data_key
+        from src.data.circuit_registry import (
+            CircuitResolutionError,
+            pirelli_key,
+            resolve_track_data_key,
+        )
 
         try:
             data_key = resolve_track_data_key(race_name, year=season_year)
@@ -211,7 +215,7 @@ def select_race_compound(*, race_name: str, season_year: int, cfg: Any) -> str:
         if not data_key:
             return "MEDIUM"
 
-        race_key = data_key.lower().replace(" ", "_").replace("-", "_")
+        race_key = pirelli_key(data_key).replace("-", "_")
         track_info = pirelli_data.get(race_key, {})
         if not track_info or "tyre_stress" not in track_info:
             return "MEDIUM"
