@@ -739,6 +739,75 @@ config edit. The scorer is the cheap half and it already exists.
   against actual head-to-head, not against a model state, so they are unaffected
   by the baseline problem above.
 
+## 2026-08-03: the low-observation prior sigma, finally scored — `noise`
+
+Supersedes "both tuning levers rejected without being scored" above for the
+sigma lever only. The rejection reasoning there still reads correctly; what it
+could not know is how little the lever moves. `min_matched_pairs_quali` remains
+unscored.
+
+**What the variant changes.** One number: the low-observation prior sigma
+multiplier in `_driver_sigma`, `1.75 * population_sd_s`. Exposed as
+`--low-observation-sigma-multiplier` in `2aafbfc2` so an arm needs no source
+edit. Nothing else differs between arms.
+
+**Baseline.** Champion `b1381e06`. Arms ran on `71fa3615`, which adds only the
+flag and the scorer; rebuilding the prior at the 1.75 default reproduces the
+shipped artifact except at the 16th significant digit, so the flag is
+behaviour-preserving.
+
+**Protocol — differs from the one above.** Scored with
+`scripts/champion_quali_bias.py`, 9 catalog events x 3 seeds x 20 simulations,
+`--all-events` so wet rounds are included. **Leakage-inclusive**: every event is
+predicted against a state containing its own result, so these MAEs are not
+comparable to the walk-forward numbers elsewhere in this file. Valid only as
+a delta between arms carrying identical leakage.
+
+Each arm ran the full path — rebuild prior, rebuild rookie fallback, restore the
+`710fb551` preseason driver artifact, re-seed, replay all 11 rounds, score. Both
+documented traps were avoided (explicit `--driver-baseline-file` via the
+preseason restore, `USE_DB_STORAGE` unset). Cost was **16s per race, about 6
+minutes per arm**, not the hour budgeted above.
+
+**Harness validation.** The 1.75 arm — full preseason reseed plus 11-round
+replay — reproduces the shipped production artifact's score exactly: MAE 2.6734,
+HUL +4.89, BOR -1.22, every team row identical. The rebuild path is faithful.
+
+| arm | multiplier | rookie:established update gain | MAE | mean per-driver \|bias\| | HUL | Audi spread |
+|---|---|---|---|---|---|---|
+| baseline | 1.75 | 5.28x | 2.6734 | 1.4747 | +4.89 | 6.11 |
+| arm | 1.00 | 1.72x | 2.6734 | 1.4579 | +4.85 | 6.00 |
+| bound | 0.50 | 0.43x | 2.6599 | 1.4141 | +4.74 | 5.81 |
+
+**Verdict: `noise`.** Cutting rookie update gain from 5.28x to 1.72x moves HUL
+by 0.04 grid positions and leaves MAE bit-identical. The 0.5 bound is included
+only to bracket the channel — it is not a defensible setting, because it gives a
+10-observation rookie *less* update gain than a 37-observation veteran — and even
+there HUL improves 0.15 against a +4.89 error, roughly 3% of the authority
+required. The scorer is deterministic (verified: byte-identical artifacts and
+exact MAE reproduction across runs), so these are real differences, not sampling
+variation. They are simply immaterial.
+
+Direction of every pair is consistent and correct — spreads shrink, |bias|
+falls — so the mechanism described above is real. It is not load-bearing.
+
+**Which pairs respond.** RB moves most (spread 4.00 -> 3.19 at the bound, -0.81),
+consistent with LAW sitting at 23 observations, one short of the cliff. Mercedes
+moves the wrong way (RUS +2.59 -> +2.67). Aston Martin does not move at all.
+
+**What this closes.** The open item above gates the structural fix (continuous
+sigma) on "the cheap proxy showing the direction pays at all". The proxy has now
+been run at two settings including an extreme bound. **The direction pays, and
+pays about 3% of what is needed.** Building a continuous-shrinkage scheme to
+capture a 0.15-position effect on the largest live error is not worth it on this
+evidence. The clamp remains poor engineering — a step function where a gradient
+belongs — but it is not the cause of the HUL/RUS drift, and fixing it will not
+fix that.
+
+This is the fifth mechanism tested against this bias and the fifth to lose. The
+authority-ceiling argument continues to hold: the driver-rating path cannot
+produce a 5-position error, so the cause is not on that path.
+
 ## Adding an entry
 
 Keep it to what a future reader needs to trust or discard the result:
