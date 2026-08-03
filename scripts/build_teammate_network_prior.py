@@ -40,6 +40,7 @@ class PriorFitConfig:
     race_sigma_floor_s: float = 0.05
     quali_sigma_floor_s: float = 0.10
     min_driver_observations: int = 24
+    low_observation_sigma_multiplier: float = 1.75
     effective_n_cap: int = 32
     main_min_observation_share: float = 0.90
     main_min_driver_share: float = 0.80
@@ -287,6 +288,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=32,
         help="Maximum matched-pair count contribution per aggregate row.",
     )
+    parser.add_argument(
+        "--low-observation-sigma-multiplier",
+        type=float,
+        default=1.75,
+        help=(
+            "Multiplier on the component population SD used as the prior sigma for "
+            "drivers below --min-driver-observations. Higher means a looser prior and "
+            "a faster Bayesian update for thinly observed drivers."
+        ),
+    )
     return parser
 
 
@@ -297,6 +308,7 @@ def main() -> None:
         bootstrap_replicates=args.bootstrap_replicates,
         bootstrap_random_seed=args.bootstrap_seed,
         effective_n_cap=args.effective_n_cap,
+        low_observation_sigma_multiplier=args.low_observation_sigma_multiplier,
     )
     observations = pd.read_csv(args.observations)
     artifact = build_teammate_network_prior(observations, config=config)
@@ -329,6 +341,7 @@ def build_teammate_network_prior(
             "race_sigma_floor_s": config.race_sigma_floor_s,
             "quali_sigma_floor_s": config.quali_sigma_floor_s,
             "min_driver_observations": config.min_driver_observations,
+            "low_observation_sigma_multiplier": config.low_observation_sigma_multiplier,
             "effective_n_cap": config.effective_n_cap,
             "main_min_observation_share": config.main_min_observation_share,
             "main_min_driver_share": config.main_min_driver_share,
@@ -849,7 +862,7 @@ def _driver_sigma(
     config: PriorFitConfig,
 ) -> float:
     """Apply the configured uncertainty floor and fallback rules for one driver."""
-    fallback_sigma = max(1.75 * population_sd_s, sigma_floor_s)
+    fallback_sigma = max(config.low_observation_sigma_multiplier * population_sd_s, sigma_floor_s)
     if not anchored:
         return float(fallback_sigma)
     if n_observations < config.min_driver_observations:
