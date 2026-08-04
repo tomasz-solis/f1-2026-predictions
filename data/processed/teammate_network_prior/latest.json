@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-05-18T05:27:03.661214+00:00",
+  "built_at": "2026-08-04T15:32:18.417739+00:00",
   "config": {
     "bootstrap_random_seed": 2026,
     "bootstrap_replicates": 1000,
@@ -262,317 +262,317 @@
         "component_id": 0,
         "first_session": "2022 Miami Grand Prix Qualifying",
         "last_session": "2025 Qatar Grand Prix Qualifying",
-        "mu_s": 0.4053446987189551,
+        "mu_s": 0.40534469871895357,
         "n_observations": 43,
         "n_teammate_partners": 4,
-        "sigma_s": 0.26008325187332465
+        "sigma_s": 0.26008325187332454
       },
       "ALO": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Qualifying",
         "last_session": "2025 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": 0.14345355062000661,
+        "mu_s": 0.14345355062000759,
         "n_observations": 61,
         "n_teammate_partners": 2,
-        "sigma_s": 0.15154874849647793
+        "sigma_s": 0.15154874849647773
       },
       "ANT": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2025 Chinese Grand Prix Qualifying",
         "last_session": "2025 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": 0.23237994816558635,
+        "mu_s": 0.23237994816558571,
         "n_observations": 19,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5304206197376727
+        "sigma_s": 0.5304206197376721
       },
       "BEA": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2024 Saudi Arabian Grand Prix Qualifying",
         "last_session": "2025 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": 0.1909954717993887,
+        "mu_s": 0.19099547179938908,
         "n_observations": 16,
         "n_teammate_partners": 3,
-        "sigma_s": 0.5304206197376727
+        "sigma_s": 0.5304206197376721
       },
       "BOR": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2025 Chinese Grand Prix Qualifying",
         "last_session": "2025 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": -0.5535069083600311,
+        "mu_s": -0.5535069083600308,
         "n_observations": 10,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5304206197376727
+        "sigma_s": 0.5304206197376721
       },
       "BOT": {
         "component_anchored": false,
         "component_id": 1,
         "first_session": "2022 Bahrain Grand Prix Qualifying",
         "last_session": "2024 Qatar Grand Prix Qualifying",
-        "mu_s": 0.13799208001694666,
+        "mu_s": 0.13799208001694668,
         "n_observations": 43,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5304206197376727
+        "sigma_s": 0.5304206197376721
       },
       "COL": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2024 Azerbaijan Grand Prix Qualifying",
         "last_session": "2025 Qatar Grand Prix Qualifying",
-        "mu_s": -0.24517484313212232,
+        "mu_s": -0.24517484313212295,
         "n_observations": 10,
         "n_teammate_partners": 2,
-        "sigma_s": 0.5304206197376727
+        "sigma_s": 0.5304206197376721
       },
       "DEV": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2023 Bahrain Grand Prix Qualifying",
         "last_session": "2023 British Grand Prix Qualifying",
-        "mu_s": -0.26736583657342095,
+        "mu_s": -0.2673658365734202,
         "n_observations": 8,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5304206197376727
+        "sigma_s": 0.5304206197376721
       },
       "DOO": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2025 Australian Grand Prix Qualifying",
         "last_session": "2025 Miami Grand Prix Qualifying",
-        "mu_s": 0.11898813623457953,
+        "mu_s": 0.11898813623458045,
         "n_observations": 3,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5304206197376727
+        "sigma_s": 0.5304206197376721
       },
       "GAS": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Australian Grand Prix Qualifying",
         "last_session": "2025 Qatar Grand Prix Qualifying",
-        "mu_s": -0.08121862419797127,
+        "mu_s": -0.08121862419797132,
         "n_observations": 52,
         "n_teammate_partners": 4,
-        "sigma_s": 0.15154874849647793
+        "sigma_s": 0.15154874849647773
       },
       "HAD": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2025 Australian Grand Prix Qualifying",
         "last_session": "2025 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": -0.14520422670120633,
+        "mu_s": -0.14520422670120622,
         "n_observations": 17,
         "n_teammate_partners": 2,
-        "sigma_s": 0.5304206197376727
+        "sigma_s": 0.5304206197376721
       },
       "HAM": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Qualifying",
         "last_session": "2025 Qatar Grand Prix Qualifying",
-        "mu_s": 0.3949955738094543,
+        "mu_s": 0.39499557380945327,
         "n_observations": 78,
         "n_teammate_partners": 2,
-        "sigma_s": 0.27540976373635573
+        "sigma_s": 0.2754097637363556
       },
       "HUL": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Saudi Arabian Grand Prix Qualifying",
         "last_session": "2025 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": -0.46068755930034505,
+        "mu_s": -0.46068755930034533,
         "n_observations": 37,
         "n_teammate_partners": 4,
-        "sigma_s": 0.23086365376112838
+        "sigma_s": 0.23086365376112836
       },
       "LAT": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Miami Grand Prix Qualifying",
         "last_session": "2022 S\u00e3o Paulo Grand Prix Qualifying",
-        "mu_s": -0.040943622740378334,
+        "mu_s": -0.040943622740379465,
         "n_observations": 6,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5304206197376727
+        "sigma_s": 0.5304206197376721
       },
       "LAW": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2023 Dutch Grand Prix Qualifying",
         "last_session": "2025 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": -0.24819032494534726,
+        "mu_s": -0.2481903249453467,
         "n_observations": 23,
         "n_teammate_partners": 2,
-        "sigma_s": 0.5304206197376727
+        "sigma_s": 0.5304206197376721
       },
       "LEC": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Qualifying",
         "last_session": "2025 Qatar Grand Prix Qualifying",
-        "mu_s": 0.4980360426406395,
+        "mu_s": 0.4980360426406378,
         "n_observations": 81,
         "n_teammate_partners": 3,
-        "sigma_s": 0.27344937176891926
+        "sigma_s": 0.2734493717689191
       },
       "MAG": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Qualifying",
         "last_session": "2024 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": -0.47901914619435665,
+        "mu_s": -0.4790191461943558,
         "n_observations": 40,
         "n_teammate_partners": 2,
-        "sigma_s": 0.24052946135428896
+        "sigma_s": 0.2405294613542889
       },
       "MSC": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Qualifying",
         "last_session": "2022 Mexico City Grand Prix Qualifying",
-        "mu_s": -0.5884665298845578,
+        "mu_s": -0.5884665298845572,
         "n_observations": 15,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5304206197376727
+        "sigma_s": 0.5304206197376721
       },
       "NOR": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Qualifying",
         "last_session": "2025 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": 0.12450891586109554,
+        "mu_s": 0.12450891586109657,
         "n_observations": 71,
         "n_teammate_partners": 2,
-        "sigma_s": 0.15154874849647793
+        "sigma_s": 0.15154874849647773
       },
       "OCO": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Qualifying",
         "last_session": "2025 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": -0.06464507161486799,
+        "mu_s": -0.0646450716148675,
         "n_observations": 58,
         "n_teammate_partners": 3,
-        "sigma_s": 0.15154874849647793
+        "sigma_s": 0.15154874849647773
       },
       "PER": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Qualifying",
         "last_session": "2024 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": 0.050894241176247655,
+        "mu_s": 0.05089424117624812,
         "n_observations": 57,
         "n_teammate_partners": 1,
-        "sigma_s": 0.15154874849647793
+        "sigma_s": 0.15154874849647773
       },
       "PIA": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2023 Australian Grand Prix Qualifying",
         "last_session": "2025 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": 0.03443707754662947,
+        "mu_s": 0.03443707754662985,
         "n_observations": 56,
         "n_teammate_partners": 1,
-        "sigma_s": 0.15154874849647793
+        "sigma_s": 0.15154874849647773
       },
       "RIC": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Qualifying",
         "last_session": "2024 Dutch Grand Prix Qualifying",
-        "mu_s": -0.1338069192715026,
+        "mu_s": -0.13380691927150196,
         "n_observations": 31,
         "n_teammate_partners": 2,
-        "sigma_s": 0.15154874849647793
+        "sigma_s": 0.15154874849647773
       },
       "RUS": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Qualifying",
         "last_session": "2025 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": 0.45271685282537005,
+        "mu_s": 0.452716852825369,
         "n_observations": 77,
         "n_teammate_partners": 2,
-        "sigma_s": 0.2767550399448911
+        "sigma_s": 0.27675503994489103
       },
       "SAI": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Qualifying",
         "last_session": "2025 Qatar Grand Prix Qualifying",
-        "mu_s": 0.42089768077579187,
+        "mu_s": 0.42089768077579054,
         "n_observations": 76,
         "n_teammate_partners": 2,
-        "sigma_s": 0.27240938592755765
+        "sigma_s": 0.2724093859275575
       },
       "SAR": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2023 Australian Grand Prix Qualifying",
         "last_session": "2024 Belgian Grand Prix Qualifying",
-        "mu_s": 0.048932265649148064,
+        "mu_s": 0.04893226564914643,
         "n_observations": 18,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5304206197376727
+        "sigma_s": 0.5304206197376721
       },
       "STR": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Saudi Arabian Grand Prix Qualifying",
         "last_session": "2025 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": -0.11131040426236238,
+        "mu_s": -0.11131040426236125,
         "n_observations": 57,
         "n_teammate_partners": 3,
-        "sigma_s": 0.15533608609633573
+        "sigma_s": 0.15533608609633578
       },
       "TSU": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Australian Grand Prix Qualifying",
         "last_session": "2025 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": -0.01826717338177214,
+        "mu_s": -0.018267173381771785,
         "n_observations": 64,
         "n_teammate_partners": 6,
-        "sigma_s": 0.15154874849647793
+        "sigma_s": 0.15154874849647773
       },
       "VER": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Qualifying",
         "last_session": "2025 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": 0.44653785362151754,
+        "mu_s": 0.44653785362151766,
         "n_observations": 74,
         "n_teammate_partners": 2,
-        "sigma_s": 0.15154874849647793
+        "sigma_s": 0.15154874849647773
       },
       "VET": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Emilia Romagna Grand Prix Qualifying",
         "last_session": "2022 Abu Dhabi Grand Prix Qualifying",
-        "mu_s": -0.12531111888416818,
+        "mu_s": -0.12531111888416696,
         "n_observations": 10,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5304206197376727
+        "sigma_s": 0.5304206197376721
       },
       "ZHO": {
         "component_anchored": false,
         "component_id": 1,
         "first_session": "2022 Bahrain Grand Prix Qualifying",
         "last_session": "2024 Qatar Grand Prix Qualifying",
-        "mu_s": -0.13799208001694666,
+        "mu_s": -0.13799208001694668,
         "n_observations": 43,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5304206197376727
+        "sigma_s": 0.5304206197376721
       }
     },
     "fit_diagnostics": {
       "main_component_driver_share": 0.9354838709677419,
       "main_component_id": 0,
       "main_component_observation_share": 0.9314194577352473,
-      "main_component_population_sd_s": 0.30309749699295585,
+      "main_component_population_sd_s": 0.30309749699295546,
       "n_components": 2,
       "n_drivers": 31,
       "n_observations": 627,
@@ -582,7 +582,7 @@
         "count": 627,
         "max": 599.9999999999999,
         "median": 109.97416722444031,
-        "min": 0.7072966317005911
+        "min": 0.7072966317005908
       }
     }
   },
@@ -820,50 +820,50 @@
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": 0.26859346837757936,
+        "mu_s": 0.26859346837757975,
         "n_observations": 75,
         "n_teammate_partners": 4,
-        "sigma_s": 0.18394926623057103
+        "sigma_s": 0.18394926623057078
       },
       "ALO": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": 0.016901313346079846,
+        "mu_s": 0.016901313346079895,
         "n_observations": 79,
         "n_teammate_partners": 2,
-        "sigma_s": 0.15122019877212567
+        "sigma_s": 0.15122019877212559
       },
       "ANT": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2025 Australian Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": -0.24773778002094068,
+        "mu_s": -0.24773778002094046,
         "n_observations": 22,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5292706957024398
+        "sigma_s": 0.5292706957024396
       },
       "BEA": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2024 Saudi Arabian Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": 0.0345295176463184,
+        "mu_s": 0.034529517646318814,
         "n_observations": 26,
         "n_teammate_partners": 3,
-        "sigma_s": 0.18526479040161073
+        "sigma_s": 0.18526479040161076
       },
       "BOR": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2025 Australian Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": -0.23563312919797155,
+        "mu_s": -0.23563312919797194,
         "n_observations": 19,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5292706957024398
+        "sigma_s": 0.5292706957024396
       },
       "BOT": {
         "component_anchored": false,
@@ -873,94 +873,94 @@
         "mu_s": 0.10127365318653098,
         "n_observations": 58,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5292706957024398
+        "sigma_s": 0.5292706957024396
       },
       "COL": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2024 Italian Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": 0.06255266167480363,
+        "mu_s": 0.06255266167480328,
         "n_observations": 22,
         "n_teammate_partners": 2,
-        "sigma_s": 0.5292706957024398
+        "sigma_s": 0.5292706957024396
       },
       "DEV": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Italian Grand Prix Race",
         "last_session": "2023 British Grand Prix Race",
-        "mu_s": -0.2349593387079074,
+        "mu_s": -0.23495933870790836,
         "n_observations": 9,
         "n_teammate_partners": 2,
-        "sigma_s": 0.5292706957024398
+        "sigma_s": 0.5292706957024396
       },
       "DOO": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2024 Abu Dhabi Grand Prix Race",
         "last_session": "2025 Bahrain Grand Prix Race",
-        "mu_s": -0.4703648855874647,
+        "mu_s": -0.4703648855874646,
         "n_observations": 4,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5292706957024398
+        "sigma_s": 0.5292706957024396
       },
       "GAS": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": 0.03412313799982952,
+        "mu_s": 0.034123137999829335,
         "n_observations": 76,
         "n_teammate_partners": 4,
-        "sigma_s": 0.15122019877212567
+        "sigma_s": 0.15122019877212559
       },
       "HAD": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2025 Chinese Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": 0.19209060622006915,
+        "mu_s": 0.1920906062200686,
         "n_observations": 21,
         "n_teammate_partners": 2,
-        "sigma_s": 0.5292706957024398
+        "sigma_s": 0.5292706957024396
       },
       "HAM": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": -0.03013038881255811,
+        "mu_s": -0.030130388812557658,
         "n_observations": 82,
         "n_teammate_partners": 2,
-        "sigma_s": 0.21026784215265495
+        "sigma_s": 0.21026784215265468
       },
       "HUL": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": -0.18641475160805335,
+        "mu_s": -0.18641475160805274,
         "n_observations": 63,
         "n_teammate_partners": 4,
-        "sigma_s": 0.2743728554857683
+        "sigma_s": 0.27437285548576823
       },
       "LAT": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2022 Abu Dhabi Grand Prix Race",
-        "mu_s": -0.27089614105394466,
+        "mu_s": -0.27089614105394455,
         "n_observations": 19,
         "n_teammate_partners": 2,
-        "sigma_s": 0.5292706957024398
+        "sigma_s": 0.5292706957024396
       },
       "LAW": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2023 Japanese Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": -0.0020845522345543707,
+        "mu_s": -0.0020845522345546955,
         "n_observations": 29,
         "n_teammate_partners": 3,
         "sigma_s": 0.20117389324421628
@@ -970,17 +970,17 @@
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": 0.1958228383996559,
+        "mu_s": 0.19582283839965606,
         "n_observations": 82,
         "n_teammate_partners": 3,
-        "sigma_s": 0.20363082658234938
+        "sigma_s": 0.20363082658234907
       },
       "MAG": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2024 Abu Dhabi Grand Prix Race",
-        "mu_s": -0.3934127617582333,
+        "mu_s": -0.3934127617582326,
         "n_observations": 58,
         "n_teammate_partners": 2,
         "sigma_s": 0.2941807578650942
@@ -990,130 +990,130 @@
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2022 Abu Dhabi Grand Prix Race",
-        "mu_s": -0.26790288101912896,
+        "mu_s": -0.26790288101912874,
         "n_observations": 17,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5292706957024398
+        "sigma_s": 0.5292706957024396
       },
       "NOR": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": 0.2594772926936577,
+        "mu_s": 0.2594772926936578,
         "n_observations": 83,
         "n_teammate_partners": 2,
-        "sigma_s": 0.1703439183029761
+        "sigma_s": 0.17034391830297627
       },
       "OCO": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": -0.12843307985374308,
+        "mu_s": -0.12843307985374355,
         "n_observations": 80,
         "n_teammate_partners": 3,
-        "sigma_s": 0.15122019877212567
+        "sigma_s": 0.15122019877212559
       },
       "PER": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2024 Qatar Grand Prix Race",
-        "mu_s": 0.6328857924494375,
+        "mu_s": 0.6328857924494363,
         "n_observations": 60,
         "n_teammate_partners": 1,
-        "sigma_s": 0.18846615588348087
+        "sigma_s": 0.18846615588348095
       },
       "PIA": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2023 Saudi Arabian Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": 0.12747228817738215,
+        "mu_s": 0.12747228817738257,
         "n_observations": 63,
         "n_teammate_partners": 1,
-        "sigma_s": 0.17602293505956196
+        "sigma_s": 0.17602293505956204
       },
       "RIC": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2024 Singapore Grand Prix Race",
-        "mu_s": 0.04057543152386005,
+        "mu_s": 0.04057543152385992,
         "n_observations": 42,
         "n_teammate_partners": 2,
-        "sigma_s": 0.15759917166086554
+        "sigma_s": 0.15759917166086565
       },
       "RUS": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": -0.09081960026679484,
+        "mu_s": -0.09081960026679434,
         "n_observations": 81,
         "n_teammate_partners": 2,
-        "sigma_s": 0.21355110686600062
+        "sigma_s": 0.21355110686600037
       },
       "SAI": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": 0.13770117581501623,
+        "mu_s": 0.13770117581501656,
         "n_observations": 79,
         "n_teammate_partners": 2,
-        "sigma_s": 0.2028209139476397
+        "sigma_s": 0.2028209139476395
       },
       "SAR": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2023 Bahrain Grand Prix Race",
         "last_session": "2024 Dutch Grand Prix Race",
-        "mu_s": 0.01964940890246814,
+        "mu_s": 0.01964940890246837,
         "n_observations": 30,
         "n_teammate_partners": 1,
-        "sigma_s": 0.19706746381713583
+        "sigma_s": 0.1970674638171355
       },
       "STR": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": -0.2745680106068059,
+        "mu_s": -0.2745680106068058,
         "n_observations": 79,
         "n_teammate_partners": 3,
-        "sigma_s": 0.15122019877212567
+        "sigma_s": 0.15122019877212559
       },
       "TSU": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": -0.008871756926109803,
+        "mu_s": -0.008871756926110445,
         "n_observations": 77,
         "n_teammate_partners": 6,
-        "sigma_s": 0.15122019877212567
+        "sigma_s": 0.15122019877212559
       },
       "VER": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Bahrain Grand Prix Race",
         "last_session": "2025 Abu Dhabi Grand Prix Race",
-        "mu_s": 1.05349042621627,
+        "mu_s": 1.0534904262162699,
         "n_observations": 82,
         "n_teammate_partners": 3,
-        "sigma_s": 0.1736931764576469
+        "sigma_s": 0.17369317645764693
       },
       "VET": {
         "component_anchored": true,
         "component_id": 0,
         "first_session": "2022 Australian Grand Prix Race",
         "last_session": "2022 Abu Dhabi Grand Prix Race",
-        "mu_s": -0.23363630178821726,
+        "mu_s": -0.2336363017882167,
         "n_observations": 17,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5292706957024398
+        "sigma_s": 0.5292706957024396
       },
       "ZHO": {
         "component_anchored": false,
@@ -1123,14 +1123,14 @@
         "mu_s": -0.10127365318653098,
         "n_observations": 58,
         "n_teammate_partners": 1,
-        "sigma_s": 0.5292706957024398
+        "sigma_s": 0.5292706957024396
       }
     },
     "fit_diagnostics": {
       "main_component_driver_share": 0.9354838709677419,
       "main_component_id": 0,
       "main_component_observation_share": 0.9271356783919598,
-      "main_component_population_sd_s": 0.30244039754425134,
+      "main_component_population_sd_s": 0.30244039754425117,
       "n_components": 2,
       "n_drivers": 31,
       "n_observations": 796,
@@ -1171,9 +1171,9 @@
         "failure_analysis": "passed",
         "failure_reason": null,
         "faster_driver": "VER",
-        "margin_s": 0.18660463376683253,
+        "margin_s": 0.18660463376683353,
         "network_key": "race_network",
-        "observed_delta_s": 0.42060463376683255,
+        "observed_delta_s": 0.42060463376683355,
         "pass_rule": "VER_mu_s - PER_mu_s >= 0.234",
         "passed": true,
         "scope": "Red Bull race pace, 2022 only",
@@ -1207,9 +1207,9 @@
         "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
         "failure_reason": "below_threshold",
         "faster_driver": "VER",
-        "margin_s": -0.030395366233167465,
+        "margin_s": -0.030395366233166465,
         "network_key": "race_network",
-        "observed_delta_s": 0.42060463376683255,
+        "observed_delta_s": 0.42060463376683355,
         "pass_rule": "VER_mu_s - PER_mu_s >= 0.451",
         "passed": false,
         "scope": "Red Bull race pace, 2023 only",
@@ -1243,9 +1243,9 @@
         "failure_analysis": "pooled_prior_below_source_scope_direct_delta",
         "failure_reason": "below_threshold",
         "faster_driver": "VER",
-        "margin_s": -0.1393953662331675,
+        "margin_s": -0.1393953662331665,
         "network_key": "race_network",
-        "observed_delta_s": 0.42060463376683255,
+        "observed_delta_s": 0.42060463376683355,
         "pass_rule": "VER_mu_s - PER_mu_s >= 0.56",
         "passed": false,
         "scope": "Red Bull race pace, 2024 only",
@@ -1279,9 +1279,9 @@
         "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
         "failure_reason": "below_threshold",
         "faster_driver": "ALO",
-        "margin_s": -0.19453067604711421,
+        "margin_s": -0.19453067604711427,
         "network_key": "race_network",
-        "observed_delta_s": 0.2914693239528858,
+        "observed_delta_s": 0.2914693239528857,
         "pass_rule": "ALO_mu_s - STR_mu_s >= 0.486",
         "passed": false,
         "scope": "Aston Martin race pace, 2023 only",
@@ -1315,9 +1315,9 @@
         "failure_analysis": "passed",
         "failure_reason": null,
         "faster_driver": "ALO",
-        "margin_s": 0.04146932395288577,
+        "margin_s": 0.04146932395288572,
         "network_key": "race_network",
-        "observed_delta_s": 0.2914693239528858,
+        "observed_delta_s": 0.2914693239528857,
         "pass_rule": "ALO_mu_s - STR_mu_s >= 0.25",
         "passed": true,
         "scope": "Aston Martin race pace, 2024 only",
@@ -1351,9 +1351,9 @@
         "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
         "failure_reason": "below_threshold",
         "faster_driver": "ALB",
-        "margin_s": -0.04405594052488876,
+        "margin_s": -0.04405594052488859,
         "network_key": "race_network",
-        "observed_delta_s": 0.24894405947511122,
+        "observed_delta_s": 0.2489440594751114,
         "pass_rule": "ALB_mu_s - SAR_mu_s >= 0.293",
         "passed": false,
         "scope": "Williams race pace, 2023 only",
@@ -1387,9 +1387,9 @@
         "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
         "failure_reason": "below_threshold",
         "faster_driver": "ALB",
-        "margin_s": -0.13105594052488878,
+        "margin_s": -0.13105594052488861,
         "network_key": "race_network",
-        "observed_delta_s": 0.24894405947511122,
+        "observed_delta_s": 0.2489440594751114,
         "pass_rule": "ALB_mu_s - SAR_mu_s >= 0.38",
         "passed": false,
         "scope": "Williams race pace, 2024 Sargeant sample",
@@ -1423,9 +1423,9 @@
         "failure_analysis": "passed",
         "failure_reason": null,
         "faster_driver": "VER",
-        "margin_s": 0.10564361244526993,
+        "margin_s": 0.10564361244526954,
         "network_key": "quali_network",
-        "observed_delta_s": 0.3956436124452699,
+        "observed_delta_s": 0.3956436124452695,
         "pass_rule": "VER_mu_s - PER_mu_s >= 0.29",
         "passed": true,
         "scope": "Red Bull qualifying, 2022",
@@ -1459,9 +1459,9 @@
         "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
         "failure_reason": "below_threshold",
         "faster_driver": "VER",
-        "margin_s": -0.2253563875547301,
+        "margin_s": -0.22535638755473048,
         "network_key": "quali_network",
-        "observed_delta_s": 0.3956436124452699,
+        "observed_delta_s": 0.3956436124452695,
         "pass_rule": "VER_mu_s - PER_mu_s >= 0.621",
         "passed": false,
         "scope": "Red Bull qualifying, 2023",
@@ -1495,9 +1495,9 @@
         "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
         "failure_reason": "below_threshold",
         "faster_driver": "VER",
-        "margin_s": -0.2643563875547301,
+        "margin_s": -0.2643563875547305,
         "network_key": "quali_network",
-        "observed_delta_s": 0.3956436124452699,
+        "observed_delta_s": 0.3956436124452695,
         "pass_rule": "VER_mu_s - PER_mu_s >= 0.66",
         "passed": false,
         "scope": "Red Bull qualifying, 2024",
@@ -1567,9 +1567,9 @@
         "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
         "failure_reason": "below_threshold",
         "faster_driver": "ALB",
-        "margin_s": -0.16558756693019294,
+        "margin_s": -0.1655875669301929,
         "network_key": "quali_network",
-        "observed_delta_s": 0.3564124330698071,
+        "observed_delta_s": 0.35641243306980713,
         "pass_rule": "ALB_mu_s - SAR_mu_s >= 0.522",
         "passed": false,
         "scope": "Williams qualifying, 2023 only",
@@ -1603,9 +1603,9 @@
         "failure_analysis": "matched_lap_direct_delta_below_source_threshold",
         "failure_reason": "below_threshold",
         "faster_driver": "ALB",
-        "margin_s": -0.30358756693019295,
+        "margin_s": -0.3035875669301929,
         "network_key": "quali_network",
-        "observed_delta_s": 0.3564124330698071,
+        "observed_delta_s": 0.35641243306980713,
         "pass_rule": "ALB_mu_s - SAR_mu_s >= 0.66",
         "passed": false,
         "scope": "Williams qualifying, 2024 Sargeant sample",

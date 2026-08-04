@@ -1,19 +1,19 @@
 # Team-Strength Seconds Mapping Candidate Diagnostics
 
-Built at: `2026-05-18T17:33:38.701924+00:00`
+Built at: `2026-08-03T21:40:34.859243+00:00`
 
 ## Coverage
 
 | Policy | Session kind | Usable rows | Total rows |
 | --- | --- | ---: | ---: |
-| `same_session_construct` | `qualifying` | 1286 | 1286 |
-| `same_session_construct` | `race` | 1604 | 1604 |
-| `race_event_shared_scalar` | `qualifying` | 1148 | 1286 |
-| `race_event_shared_scalar` | `race` | 1604 | 1604 |
-| `race_season_mean_shared_scalar` | `qualifying` | 1286 | 1286 |
-| `race_season_mean_shared_scalar` | `race` | 1604 | 1604 |
-| `race_trailing_mean_shared_scalar` | `qualifying` | 1098 | 1286 |
-| `race_trailing_mean_shared_scalar` | `race` | 1524 | 1604 |
+| `same_session_construct` | `qualifying` | 1467 | 1467 |
+| `same_session_construct` | `race` | 1797 | 1797 |
+| `race_event_shared_scalar` | `qualifying` | 1300 | 1467 |
+| `race_event_shared_scalar` | `race` | 1797 | 1797 |
+| `race_season_mean_shared_scalar` | `qualifying` | 1467 | 1467 |
+| `race_season_mean_shared_scalar` | `race` | 1797 | 1797 |
+| `race_trailing_mean_shared_scalar` | `qualifying` | 1235 | 1467 |
+| `race_trailing_mean_shared_scalar` | `race` | 1696 | 1797 |
 
 ## `same_session_construct`
 

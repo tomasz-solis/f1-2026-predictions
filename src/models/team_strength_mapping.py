@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -394,6 +394,93 @@ def _load_live_team_strength_mappings_cached(path_str: str) -> dict[str, LinearT
             training_years=tuple(int(year) for year in training_years),
         )
     return mappings
+
+
+def resolve_era_training_years(
+    observations: pd.DataFrame,
+    *,
+    target_year: int,
+    regulation_eras: Sequence[Mapping[str, Any]],
+) -> tuple[int, ...]:
+    """Return the seasons of ``target_year``'s regulation era present in the data.
+
+    Calibration is scoped to a regulation era because the seconds gap between a
+    fast car and a slow one is set by the regulations. Pooling across a boundary
+    averages two different fields and describes neither.
+    """
+    for era in regulation_eras:
+        start = int(era["start_year"])
+        end = era.get("end_year")
+        if start <= target_year and (end is None or target_year <= int(end)):
+            available = sorted({int(y) for y in observations["year"].dropna().unique()})
+            years = tuple(y for y in available if start <= y and (end is None or y <= int(end)))
+            if not years:
+                raise ValueError(
+                    f"No calibration rows for the regulation era containing {target_year}"
+                )
+            return years
+    raise ValueError(f"No regulation era covers {target_year}")
+
+
+def evaluate_within_season_folds(
+    observations: pd.DataFrame,
+    *,
+    policy: str,
+    year: int,
+) -> dict[str, Any]:
+    """Evaluate one policy with leave-one-round-out folds inside a single season.
+
+    Leave-one-season-out degenerates when a mapping is fitted on one year, which
+    is what a regulation change forces. Holding out one round at a time measures
+    whether that season's slope is stable enough to fit on, or whether it is an
+    artefact of the particular events in it.
+    """
+    policy_column = _resolve_policy_column(policy)
+    _require_columns(
+        observations,
+        {
+            "year",
+            "race_name",
+            "session_kind",
+            "observed_driver_to_field_s",
+            "driver_rating_mu_s",
+            "team_target_s",
+            policy_column,
+        },
+        "observations",
+    )
+
+    season = observations[observations["year"].eq(year)]
+    fold_rows: list[dict[str, Any]] = []
+    for session_kind in ("race", "qualifying"):
+        kind_rows = season[season["session_kind"].eq(session_kind)]
+        for holdout_race in sorted(kind_rows["race_name"].dropna().unique()):
+            train = kind_rows[kind_rows["race_name"].ne(holdout_race)]
+            test = kind_rows[kind_rows["race_name"].eq(holdout_race)].dropna(
+                subset=[policy_column, "observed_driver_to_field_s", "driver_rating_mu_s"]
+            )
+            if test.empty or len(train) < 20:
+                continue
+            mapping = fit_linear_team_strength_mapping(
+                train, session_kind=session_kind, policy=policy, training_years=(int(year),)
+            )
+            predicted = (
+                mapping.predict(test[policy_column])
+                + test["driver_rating_mu_s"].astype(float).to_numpy()
+            )
+            observed = test["observed_driver_to_field_s"].astype(float).to_numpy()
+            fold_rows.append(
+                {
+                    "session_kind": session_kind,
+                    "holdout_race": str(holdout_race),
+                    "n_rows": int(len(test)),
+                    "slope_s_per_unit": mapping.slope_s_per_unit,
+                    "intercept_s": mapping.intercept_s,
+                    "prediction_slope": _prediction_slope(observed=observed, predicted=predicted),
+                    "rmse_s": float(np.sqrt(np.mean(np.square(observed - predicted)))),
+                }
+            )
+    return {"policy": policy, "year": int(year), "folds": fold_rows}
 
 
 def evaluate_policy_folds(

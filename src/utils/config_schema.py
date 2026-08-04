@@ -36,10 +36,29 @@ class GridConfig(StrictConfigModel):
     size: int = Field(default=22, ge=2)
 
 
+class RegulationEra(StrictConfigModel):
+    """One regulation period over which field spread is treated as comparable."""
+
+    label: str = Field(min_length=1)
+    start_year: int = Field(ge=1950)
+    # Open-ended for the current era. It closes when the next era is added.
+    end_year: int | None = Field(default=None)
+
+
 class ModelConfig(StrictConfigModel):
     """Model release metadata shared across generated artifacts."""
 
     version: str = Field(default="2.3", min_length=1)
+    # The seconds gap between a fast car and a slow one is a property of the
+    # regulations. Fitting a seconds mapping across a regulation boundary averages
+    # two different fields and describes neither, so calibration is scoped to an era
+    # rather than to a fixed year list.
+    regulation_eras: list[RegulationEra] = Field(
+        default_factory=lambda: [
+            RegulationEra(label="ground_effect_2022", start_year=2022, end_year=2025),
+            RegulationEra(label="regulations_2026", start_year=2026, end_year=None),
+        ]
+    )
 
 
 class BayesianConfig(StrictConfigModel):

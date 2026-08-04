@@ -15,6 +15,23 @@ grid:
 
 model:
   version: "2.4"
+  # Regulation eras for seconds calibration. The gap between a fast car and a slow
+  # one is set by the regulations, so team_strength_seconds_mapping is fitted within
+  # one era and never across a boundary: pooling 2022-2025 with 2026 produced a slope
+  # that described no field that ever existed. Add a new entry and close the previous
+  # end_year when regulations change; the mapping refit follows automatically.
+  #
+  # Expect the field to compact within an era as teams converge on the same answers.
+  # That has NOT been detectable in 2026 so far - across 11 rounds the per-round slope
+  # sd is ~0.70, which swamps any trend - so no decay weighting is applied. Refit as
+  # rounds accumulate and watch the drift diagnostic in the frozen artifact instead.
+  regulation_eras:
+    - label: "ground_effect_2022"
+      start_year: 2022
+      end_year: 2025
+    - label: "regulations_2026"
+      start_year: 2026
+      end_year: null
 
 # Bayesian Model Parameters
 bayesian:

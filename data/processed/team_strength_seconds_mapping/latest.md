@@ -1,7 +1,7 @@
 # Team-Strength Seconds Mapping
 
-Built at: `2026-05-19T16:37:02.358552+00:00`
-Model version: `2.1`
+Built at: `2026-08-04T15:33:07.614861+00:00`
+Model version: `2.4`
 Policy: `same_session_construct`
 Stored state: `single_team_strength_scalar`
 
@@ -13,8 +13,8 @@ Positive seconds mean a faster-than-field team contribution.
 
 | Session | Intercept (s) | Slope (s/unit) | Training years |
 | --- | ---: | ---: | --- |
-| `race` | -0.033571 | 1.970772 | 2022, 2023, 2024, 2025 |
-| `qualifying` | -0.173160 | 1.774169 | 2022, 2023, 2024, 2025 |
+| `race` | -0.119412 | 3.897273 | 2026 |
+| `qualifying` | -0.188358 | 2.762814 | 2026 |
 
 ## Validation fold summary
 

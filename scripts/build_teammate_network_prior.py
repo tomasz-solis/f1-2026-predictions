@@ -40,7 +40,6 @@ class PriorFitConfig:
     race_sigma_floor_s: float = 0.05
     quali_sigma_floor_s: float = 0.10
     min_driver_observations: int = 24
-    low_observation_sigma_multiplier: float = 1.75
     effective_n_cap: int = 32
     main_min_observation_share: float = 0.90
     main_min_driver_share: float = 0.80
@@ -288,16 +287,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=32,
         help="Maximum matched-pair count contribution per aggregate row.",
     )
-    parser.add_argument(
-        "--low-observation-sigma-multiplier",
-        type=float,
-        default=1.75,
-        help=(
-            "Multiplier on the component population SD used as the prior sigma for "
-            "drivers below --min-driver-observations. Higher means a looser prior and "
-            "a faster Bayesian update for thinly observed drivers."
-        ),
-    )
     return parser
 
 
@@ -308,7 +297,6 @@ def main() -> None:
         bootstrap_replicates=args.bootstrap_replicates,
         bootstrap_random_seed=args.bootstrap_seed,
         effective_n_cap=args.effective_n_cap,
-        low_observation_sigma_multiplier=args.low_observation_sigma_multiplier,
     )
     observations = pd.read_csv(args.observations)
     artifact = build_teammate_network_prior(observations, config=config)
@@ -324,7 +312,7 @@ def build_teammate_network_prior(
 ) -> dict[str, Any]:
     """Build the full teammate-network prior artifact from aggregate rows."""
     built_at = built_at or datetime.now(UTC).isoformat()
-    fit_rows = _valid_fit_rows(observations)
+    fit_rows = _valid_fit_rows(observations, config=config)
     race_network = build_network_prior(fit_rows, session_kind="race", config=config)
     quali_network = build_network_prior(fit_rows, session_kind="qualifying", config=config)
     artifact: dict[str, Any] = {
@@ -341,7 +329,6 @@ def build_teammate_network_prior(
             "race_sigma_floor_s": config.race_sigma_floor_s,
             "quali_sigma_floor_s": config.quali_sigma_floor_s,
             "min_driver_observations": config.min_driver_observations,
-            "low_observation_sigma_multiplier": config.low_observation_sigma_multiplier,
             "effective_n_cap": config.effective_n_cap,
             "main_min_observation_share": config.main_min_observation_share,
             "main_min_driver_share": config.main_min_driver_share,
@@ -360,7 +347,7 @@ def build_network_prior(
     config: PriorFitConfig,
 ) -> dict[str, Any]:
     """Fit one dry teammate network for race or qualifying observations."""
-    observations = _valid_fit_rows(observations)
+    observations = _valid_fit_rows(observations, config=config)
     network_rows = observations[
         observations["session_kind"].eq(session_kind) & observations["weather_bucket"].eq("dry")
     ].copy()
@@ -458,8 +445,10 @@ def evaluate_validation(
     config: PriorFitConfig | None = None,
 ) -> dict[str, Any]:
     """Evaluate locked validation checks and attach direct-pair diagnostics."""
-    fit_rows = _valid_fit_rows(observations) if observations is not None else None
     fit_config = config or PriorFitConfig()
+    fit_rows = (
+        _valid_fit_rows(observations, config=fit_config) if observations is not None else None
+    )
     hard_results = [
         _evaluate_check(check, artifact, observations=fit_rows, config=fit_config)
         for check in HARD_VALIDATION_CHECKS
@@ -608,8 +597,17 @@ def format_validation_report(artifact: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _valid_fit_rows(observations: pd.DataFrame) -> pd.DataFrame:
-    """Return aggregate rows that are valid prior-fit observations."""
+def _valid_fit_rows(
+    observations: pd.DataFrame, *, config: PriorFitConfig | None = None
+) -> pd.DataFrame:
+    """Return aggregate rows that are valid prior-fit observations.
+
+    Rows outside ``historical_start..historical_end`` are dropped. That window is
+    recorded in the artifact as the prior's scope, so it has to be enforced here:
+    this prior is deliberately historical, and letting a current season in would
+    both change every seeded rating and double-count that season, which the
+    in-season updater already learns.
+    """
     required = {
         "reference_driver_code",
         "comparison_driver_code",
@@ -640,6 +638,9 @@ def _valid_fit_rows(observations: pd.DataFrame) -> pd.DataFrame:
         & rows["matched_gap_se_s"].notna()
         & rows["session_kind"].isin(["race", "qualifying"])
     )
+    scope = config or PriorFitConfig()
+    years = pd.to_numeric(rows["year"], errors="coerce")
+    mask &= years.ge(scope.historical_start) & years.le(scope.historical_end)
     return rows[mask].copy()
 
 
@@ -862,7 +863,7 @@ def _driver_sigma(
     config: PriorFitConfig,
 ) -> float:
     """Apply the configured uncertainty floor and fallback rules for one driver."""
-    fallback_sigma = max(config.low_observation_sigma_multiplier * population_sd_s, sigma_floor_s)
+    fallback_sigma = max(1.75 * population_sd_s, sigma_floor_s)
     if not anchored:
         return float(fallback_sigma)
     if n_observations < config.min_driver_observations:

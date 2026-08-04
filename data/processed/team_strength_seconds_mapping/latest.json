@@ -1,14 +1,11 @@
 {
   "artifact_type": "team_strength_seconds_mapping",
   "schema_version": 1,
-  "model_version": "2.1",
-  "built_at": "2026-05-19T16:37:02.358552+00:00",
+  "model_version": "2.4",
+  "built_at": "2026-08-04T15:33:07.614861+00:00",
   "policy": "same_session_construct",
   "training_years": [
-    2022,
-    2023,
-    2024,
-    2025
+    2026
   ],
   "stored_state_policy": "single_team_strength_scalar",
   "sign_convention": "positive_seconds_means_faster_than_field",
@@ -17,124 +14,320 @@
     "race": {
       "session_kind": "race",
       "policy": "same_session_construct",
-      "intercept_s": -0.03357082219154591,
-      "slope_s_per_unit": 1.9707717329051126,
+      "intercept_s": -0.11941203391694134,
+      "slope_s_per_unit": 3.8972727611543667,
       "training_years": [
-        2022,
-        2023,
-        2024,
-        2025
+        2026
       ]
     },
     "qualifying": {
       "session_kind": "qualifying",
       "policy": "same_session_construct",
-      "intercept_s": -0.17315963297281994,
-      "slope_s_per_unit": 1.7741686893278807,
+      "intercept_s": -0.18835794525509228,
+      "slope_s_per_unit": 2.762814339554613,
       "training_years": [
-        2022,
-        2023,
-        2024,
-        2025
+        2026
       ]
     }
   },
   "validation": {
     "selected_policy": "same_session_construct",
+    "primary_folds": "within_season_leave_one_round_out",
+    "within_season_folds": [
+      {
+        "session_kind": "race",
+        "holdout_race": "Australian Grand Prix",
+        "n_rows": 13,
+        "slope_s_per_unit": 3.813137532332375,
+        "intercept_s": -0.12004711658757587,
+        "prediction_slope": 1.3147256604278197,
+        "rmse_s": 0.7273864310363989
+      },
+      {
+        "session_kind": "race",
+        "holdout_race": "Austrian Grand Prix",
+        "n_rows": 17,
+        "slope_s_per_unit": 3.986024800870908,
+        "intercept_s": -0.11351668945920289,
+        "prediction_slope": 0.7442826403680254,
+        "rmse_s": 0.5683517971417037
+      },
+      {
+        "session_kind": "race",
+        "holdout_race": "Barcelona Grand Prix",
+        "n_rows": 19,
+        "slope_s_per_unit": 3.9392255964398615,
+        "intercept_s": -0.14758352011732986,
+        "prediction_slope": 0.8921638172779797,
+        "rmse_s": 0.6418190912158737
+      },
+      {
+        "session_kind": "race",
+        "holdout_race": "Belgian Grand Prix",
+        "n_rows": 17,
+        "slope_s_per_unit": 3.904536788151622,
+        "intercept_s": -0.11923797954994045,
+        "prediction_slope": 0.9559363010882608,
+        "rmse_s": 0.8455565537884734
+      },
+      {
+        "session_kind": "race",
+        "holdout_race": "British Grand Prix",
+        "n_rows": 21,
+        "slope_s_per_unit": 3.8445830969677837,
+        "intercept_s": -0.10872039320179713,
+        "prediction_slope": 1.097695311740868,
+        "rmse_s": 0.47846587757878123
+      },
+      {
+        "session_kind": "race",
+        "holdout_race": "Canadian Grand Prix",
+        "n_rows": 18,
+        "slope_s_per_unit": 3.873277365271211,
+        "intercept_s": -0.08134176561620496,
+        "prediction_slope": 1.0268386266683425,
+        "rmse_s": 0.7497242570603311
+      },
+      {
+        "session_kind": "race",
+        "holdout_race": "Chinese Grand Prix",
+        "n_rows": 13,
+        "slope_s_per_unit": 3.936303521743538,
+        "intercept_s": -0.1219310693460603,
+        "prediction_slope": 0.7864186828248169,
+        "rmse_s": 0.6254640525043962
+      },
+      {
+        "session_kind": "race",
+        "holdout_race": "Hungarian Grand Prix",
+        "n_rows": 21,
+        "slope_s_per_unit": 3.8807008358237534,
+        "intercept_s": -0.13356815721619095,
+        "prediction_slope": 0.9695619051954492,
+        "rmse_s": 0.5939859287977524
+      },
+      {
+        "session_kind": "race",
+        "holdout_race": "Japanese Grand Prix",
+        "n_rows": 21,
+        "slope_s_per_unit": 3.8130305804445634,
+        "intercept_s": -0.10540190962129792,
+        "prediction_slope": 1.143773563683599,
+        "rmse_s": 0.6038292575944685
+      },
+      {
+        "session_kind": "race",
+        "holdout_race": "Miami Grand Prix",
+        "n_rows": 14,
+        "slope_s_per_unit": 3.8398886631215117,
+        "intercept_s": -0.10794231291048138,
+        "prediction_slope": 1.16270147167221,
+        "rmse_s": 0.6484932303723584
+      },
+      {
+        "session_kind": "race",
+        "holdout_race": "Monaco Grand Prix",
+        "n_rows": 19,
+        "slope_s_per_unit": 4.039531471047814,
+        "intercept_s": -0.15452945345030983,
+        "prediction_slope": 0.6088996076335432,
+        "rmse_s": 0.8896583899463443
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_race": "Australian Grand Prix",
+        "n_rows": 13,
+        "slope_s_per_unit": 2.8500956635468757,
+        "intercept_s": -0.19595321602653304,
+        "prediction_slope": 0.6385860833933269,
+        "rmse_s": 0.537162116829578
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_race": "Austrian Grand Prix",
+        "n_rows": 19,
+        "slope_s_per_unit": 2.814767187767587,
+        "intercept_s": -0.18797714960595888,
+        "prediction_slope": 0.7647814812338133,
+        "rmse_s": 0.3871358398866406
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_race": "Barcelona Grand Prix",
+        "n_rows": 14,
+        "slope_s_per_unit": 2.730926914508297,
+        "intercept_s": -0.21388882716935695,
+        "prediction_slope": 1.046428535080931,
+        "rmse_s": 0.5228286611104199
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_race": "Belgian Grand Prix",
+        "n_rows": 13,
+        "slope_s_per_unit": 2.768899232261219,
+        "intercept_s": -0.1949156831916476,
+        "prediction_slope": 0.8937349605490689,
+        "rmse_s": 0.603328865800253
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_race": "British Grand Prix",
+        "n_rows": 13,
+        "slope_s_per_unit": 2.8524752961829316,
+        "intercept_s": -0.17959738299736122,
+        "prediction_slope": 0.5639688464811642,
+        "rmse_s": 0.636780166150135
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_race": "Canadian Grand Prix",
+        "n_rows": 19,
+        "slope_s_per_unit": 2.728051206524674,
+        "intercept_s": -0.18974243492875753,
+        "prediction_slope": 1.0312566012803368,
+        "rmse_s": 0.44427869629916306
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_race": "Chinese Grand Prix",
+        "n_rows": 19,
+        "slope_s_per_unit": 2.7537688246357654,
+        "intercept_s": -0.20394338332495676,
+        "prediction_slope": 0.9219895967051991,
+        "rmse_s": 0.5096232706271164
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_race": "Hungarian Grand Prix",
+        "n_rows": 17,
+        "slope_s_per_unit": 2.6620751299871857,
+        "intercept_s": -0.1735586278653356,
+        "prediction_slope": 1.1789264676581506,
+        "rmse_s": 0.706342772350476
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_race": "Japanese Grand Prix",
+        "n_rows": 19,
+        "slope_s_per_unit": 2.7017186308799563,
+        "intercept_s": -0.17303958468410544,
+        "prediction_slope": 1.112527842437387,
+        "rmse_s": 0.5529799804374025
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_race": "Miami Grand Prix",
+        "n_rows": 14,
+        "slope_s_per_unit": 2.8530865156890703,
+        "intercept_s": -0.17467743169419261,
+        "prediction_slope": 0.5805985467589899,
+        "rmse_s": 0.5991581247320773
+      },
+      {
+        "session_kind": "qualifying",
+        "holdout_race": "Monaco Grand Prix",
+        "n_rows": 21,
+        "slope_s_per_unit": 2.668767930216667,
+        "intercept_s": -0.18427535912021611,
+        "prediction_slope": 1.1545480906390133,
+        "rmse_s": 0.6755847684960209
+      }
+    ],
+    "cross_season_folds_note": "Cross-season folds below are retained for provenance only. They are measured on seasons this mapping was not fitted on, across a regulation boundary, so they do not validate it.",
     "folds": [
       {
         "session_kind": "race",
         "holdout_year": 2022,
         "n_rows": 376,
-        "intercept_s": -0.061072332917908756,
-        "slope_s_per_unit": 1.9108829682622177,
+        "intercept_s": -0.06107233291790877,
+        "slope_s_per_unit": 1.9108829682622182,
         "r_squared": 0.4379647879164741,
-        "prediction_slope": 0.9931845904000137,
+        "prediction_slope": 0.993184590400014,
         "rmse_s": 0.9214615852297658
       },
       {
         "session_kind": "race",
         "holdout_year": 2023,
         "n_rows": 384,
-        "intercept_s": -0.009294886591909165,
+        "intercept_s": -0.00929488659190917,
         "slope_s_per_unit": 2.0380847887809495,
         "r_squared": 0.317540647829301,
-        "prediction_slope": 0.7909208463715857,
+        "prediction_slope": 0.7909208463715859,
         "rmse_s": 0.9431458433107496
       },
       {
         "session_kind": "race",
         "holdout_year": 2024,
         "n_rows": 418,
-        "intercept_s": -0.025918665133080214,
-        "slope_s_per_unit": 1.9949560374827155,
+        "intercept_s": -0.02591866513308016,
+        "slope_s_per_unit": 1.9949560374827153,
         "r_squared": 0.6252581271938973,
-        "prediction_slope": 0.8628359879255308,
+        "prediction_slope": 0.8628359879255307,
         "rmse_s": 0.5365415220232204
       },
       {
         "session_kind": "race",
         "holdout_year": 2025,
         "n_rows": 426,
-        "intercept_s": -0.037747600231379096,
-        "slope_s_per_unit": 1.939086684931943,
-        "r_squared": 0.3150614555249721,
-        "prediction_slope": 0.9823173084473354,
+        "intercept_s": -0.03774760023137914,
+        "slope_s_per_unit": 1.9390866849319426,
+        "r_squared": 0.315061455524972,
+        "prediction_slope": 0.9823173084473357,
         "rmse_s": 1.0761629133004704
       },
       {
         "session_kind": "qualifying",
         "holdout_year": 2022,
         "n_rows": 304,
-        "intercept_s": -0.17763012142505677,
+        "intercept_s": -0.17763012142505671,
         "slope_s_per_unit": 1.7361989317782647,
         "r_squared": 0.5178909611380491,
-        "prediction_slope": 0.9689855938098937,
+        "prediction_slope": 0.9689855938098929,
         "rmse_s": 0.7256877637545143
       },
       {
         "session_kind": "qualifying",
         "holdout_year": 2023,
         "n_rows": 334,
-        "intercept_s": -0.13666342679180896,
-        "slope_s_per_unit": 1.4804192316144054,
-        "r_squared": 0.25564352596704665,
-        "prediction_slope": 1.4496120120957265,
+        "intercept_s": -0.136663426791809,
+        "slope_s_per_unit": 1.4804192316144058,
+        "r_squared": 0.25564352596704676,
+        "prediction_slope": 1.449612012095726,
         "rmse_s": 1.5034935240229959
       },
       {
         "session_kind": "qualifying",
         "holdout_year": 2024,
         "n_rows": 332,
-        "intercept_s": -0.1893021580205484,
-        "slope_s_per_unit": 1.9229131901602987,
+        "intercept_s": -0.18930215802054848,
+        "slope_s_per_unit": 1.9229131901602985,
         "r_squared": 0.5501718980980543,
-        "prediction_slope": 0.700601663629574,
+        "prediction_slope": 0.7006016636295739,
         "rmse_s": 0.46202491563947384
       },
       {
         "session_kind": "qualifying",
         "holdout_year": 2025,
         "n_rows": 316,
-        "intercept_s": -0.18857653990961698,
-        "slope_s_per_unit": 1.9571477637476147,
-        "r_squared": 0.3038639385498816,
-        "prediction_slope": 0.6058063059522204,
-        "rmse_s": 0.5405567993333071
+        "intercept_s": -0.18857653990961706,
+        "slope_s_per_unit": 1.9571477637476133,
+        "r_squared": 0.30386393854988225,
+        "prediction_slope": 0.6058063059522206,
+        "rmse_s": 0.5405567993333069
       }
     ],
     "coverage": [
       {
         "policy": "same_session_construct",
         "session_kind": "qualifying",
-        "usable_rows": 1286,
-        "total_rows": 1286
+        "usable_rows": 1467,
+        "total_rows": 1467
       },
       {
         "policy": "same_session_construct",
         "session_kind": "race",
-        "usable_rows": 1604,
-        "total_rows": 1604
+        "usable_rows": 1797,
+        "total_rows": 1797
       }
     ]
   }

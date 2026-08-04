@@ -11,6 +11,7 @@ from src.models.team_strength_mapping import (
     build_construct_aligned_driver_observations,
     evaluate_policy_folds,
     load_live_team_strength_mappings,
+    resolve_era_training_years,
     team_strength_seconds_components,
 )
 
@@ -305,3 +306,25 @@ def test_live_mapping_loader_supports_environment_override(tmp_path, monkeypatch
 
     assert components is not None
     assert components["team_strength_seconds"] == pytest.approx(1.0)
+
+
+def test_era_training_years_stop_at_a_regulation_boundary() -> None:
+    """Calibration years come from one regulation era, never across a boundary."""
+    observations = pd.DataFrame({"year": [2022, 2023, 2024, 2025, 2026, 2026]})
+    eras = [
+        {"label": "old", "start_year": 2022, "end_year": 2025},
+        {"label": "new", "start_year": 2026, "end_year": None},
+    ]
+
+    assert resolve_era_training_years(observations, target_year=2026, regulation_eras=eras) == (
+        2026,
+    )
+    assert resolve_era_training_years(observations, target_year=2024, regulation_eras=eras) == (
+        2022,
+        2023,
+        2024,
+        2025,
+    )
+
+    with pytest.raises(ValueError, match="No regulation era covers"):
+        resolve_era_training_years(observations, target_year=2019, regulation_eras=eras)

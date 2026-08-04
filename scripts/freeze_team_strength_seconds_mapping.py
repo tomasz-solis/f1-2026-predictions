@@ -15,7 +15,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.models.team_strength_mapping import fit_linear_team_strength_mapping  # noqa: E402
+import yaml  # noqa: E402
+
+from src.models.team_strength_mapping import (  # noqa: E402
+    evaluate_within_season_folds,
+    fit_linear_team_strength_mapping,
+    resolve_era_training_years,
+)
+from src.utils.config_schema import ModelConfig  # noqa: E402
 from src.utils.model_version import get_model_version  # noqa: E402
 
 DEFAULT_TRAINING_YEARS = (2022, 2023, 2024, 2025)
@@ -54,7 +61,42 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_POLICY,
         help="Team-strength proxy policy to freeze.",
     )
+    parser.add_argument(
+        "--training-years",
+        type=int,
+        nargs="+",
+        default=None,
+        help=(
+            "Override the seasons the mapping is fitted on. By default they are "
+            "resolved from the regulation era covering --target-year, because the "
+            "seconds spread of the field is regulation-dependent and a mapping fitted "
+            "across a boundary mixes two different fields."
+        ),
+    )
+    parser.add_argument(
+        "--target-year",
+        type=int,
+        default=None,
+        help="Season the mapping is being frozen for. Defaults to the latest in the data.",
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path("config/default.yaml"),
+        help="Config file supplying model.regulation_eras.",
+    )
     return parser
+
+
+def _regulation_eras(config_path: Path) -> list[dict[str, Any]]:
+    """Read the regulation-era table, falling back to the schema default."""
+    if not config_path.exists():
+        return [era.model_dump() for era in ModelConfig().regulation_eras]
+    raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    eras = (raw.get("model") or {}).get("regulation_eras")
+    if not eras:
+        return [era.model_dump() for era in ModelConfig().regulation_eras]
+    return list(eras)
 
 
 def main() -> None:
@@ -62,11 +104,20 @@ def main() -> None:
     args = build_parser().parse_args()
     observations = pd.read_csv(args.observations)
     diagnostics = _load_candidate_diagnostics(args.candidate_diagnostics)
+    target_year = int(args.target_year or observations["year"].max())
+    if args.training_years:
+        training_years = tuple(int(year) for year in args.training_years)
+    else:
+        training_years = resolve_era_training_years(
+            observations,
+            target_year=target_year,
+            regulation_eras=_regulation_eras(args.config),
+        )
     artifact = build_mapping_artifact(
         observations=observations,
         diagnostics=diagnostics,
         policy=str(args.policy),
-        training_years=DEFAULT_TRAINING_YEARS,
+        training_years=training_years,
     )
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
     args.output_json.write_text(json.dumps(artifact, indent=2), encoding="utf-8")
@@ -92,6 +143,15 @@ def build_mapping_artifact(
         for session_kind in ("race", "qualifying")
     }
     selected_eval = diagnostics.get("policy_evaluations", {}).get(policy, {})
+    # Leave-one-season-out folds compare across seasons, so they only validate a
+    # mapping fitted across seasons. Fitting on one year - which a regulation change
+    # forces - needs leave-one-round-out inside that year instead, or the artifact
+    # ships validation drawn from a field it was deliberately not fitted on.
+    within_season = (
+        evaluate_within_season_folds(observations, policy=policy, year=training_years[0])
+        if len(training_years) == 1
+        else None
+    )
     return {
         "artifact_type": "team_strength_seconds_mapping",
         "schema_version": 1,
@@ -117,6 +177,17 @@ def build_mapping_artifact(
         },
         "validation": {
             "selected_policy": policy,
+            "primary_folds": (
+                "within_season_leave_one_round_out" if within_season else "leave_one_season_out"
+            ),
+            "within_season_folds": (within_season or {}).get("folds", []),
+            "cross_season_folds_note": (
+                "Cross-season folds below are retained for provenance only. They are "
+                "measured on seasons this mapping was not fitted on, across a "
+                "regulation boundary, so they do not validate it."
+                if within_season
+                else ""
+            ),
             "folds": selected_eval.get("folds", []),
             "coverage": [
                 row for row in diagnostics.get("coverage", []) if row.get("policy") == policy
@@ -150,6 +221,7 @@ def format_mapping_summary(artifact: dict[str, Any]) -> str:
             f"| `{session_kind}` | {mapping['intercept_s']:.6f} | "
             f"{mapping['slope_s_per_unit']:.6f} | {years} |"
         )
+
     lines.extend(
         [
             "",
