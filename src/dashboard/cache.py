@@ -178,6 +178,13 @@ def _get_file_timestamps(
         f"data/{previous_year}_pirelli_info.json",
         f"data/{season_year}_pirelli_info.json",
         "config/default.yaml",
+        # The seconds mapping converts team strength into a time gap on every
+        # prediction, but it is read from disk rather than through ArtifactStore, so
+        # nothing else in this fingerprint moves when it is refitted. Without it a
+        # recalibration deploys and every precomputed prediction keeps being served
+        # from before the change, until an unrelated season artifact happens to bump
+        # the hash.
+        "data/processed/team_strength_seconds_mapping/latest.json",
         *_PREDICTION_CODE_FINGERPRINT_FILES,
     ]
     runtime_files = [

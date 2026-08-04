@@ -321,3 +321,41 @@ def test_get_predictor_rebuilds_when_a_tracked_artifact_changes(patcher):
     assert after_update != first, "a changed artifact must rebuild the predictor"
     assert other_season != first, "a different season must rebuild the predictor"
     assert builds == [2026, 2026, 2025]
+
+
+def test_seconds_mapping_is_fingerprinted_so_a_refit_invalidates_precomputes(patcher):
+    """Refitting the seconds mapping must move the cache key.
+
+    The mapping converts team strength into a time gap on every prediction, but it
+    is read from disk rather than through ArtifactStore, so no store version moves
+    when it is refitted. Without it in the fingerprint a recalibration deploys and
+    every precomputed prediction keeps being served from before the change.
+    """
+    mapping_path = "data/processed/team_strength_seconds_mapping/latest.json"
+    content = {mapping_path: b'{"slope": 1.0}'}
+
+    class _FakePath:
+        def __init__(self, raw_path: str):
+            self._raw_path = raw_path
+
+        def exists(self) -> bool:
+            return self._raw_path in content
+
+        def read_bytes(self) -> bytes:
+            return content[self._raw_path]
+
+        def stat(self):  # noqa: ANN201 - test stub standing in for os.stat_result
+            raise OSError("no stat in this stub, force a content read")
+
+        def __fspath__(self) -> str:
+            return self._raw_path
+
+    patcher.setattr(cache, "resolve_repo_data_path", _FakePath)
+
+    before = cache._get_file_timestamps(include_runtime_files=False)
+    assert mapping_path in before, "the seconds mapping must be fingerprinted"
+
+    content[mapping_path] = b'{"slope": 2.5}'
+    after = cache._get_file_timestamps(include_runtime_files=False)
+
+    assert after[mapping_path] != before[mapping_path]
