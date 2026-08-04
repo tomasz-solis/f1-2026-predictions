@@ -41,6 +41,8 @@ the only way to keep the table meaningful.
 |---|---|---|---|
 | 2026-07-28 | Centre `quali_rating_mu_s` within team when the qualifying driver list is built. It was carrying a team-level component on top of the team-strength term, so car pace was counted twice. | qualifying MAE **3.525 → 2.828**; mean per-driver \|bias\| **2.889 → 1.677**. HUL +6.11 → +1.67, ALB −5.78 → +0.11, GAS +4.33 → +0.33 | `93bfbeb0` |
 
+| 2026-08-04 | Refit `team_strength_seconds_mapping` on **2026 only**. It was fitted on 2022–2025 and had never seen a 2026 lap, so it converted team-strength rank into a time gap using a pre-regulation field and compressed team separation all season. | qualifying MAE **2.6599 → 2.5724**, mean per-driver \|bias\| **1.5017 → 1.2997**; race MAE **4.0606 → 3.9192**, race \|bias\| **2.4242 → 2.3434**, both at 60 simulations. Slopes: qualifying 1.77417 → 2.76281, race 1.97077 → 3.89727 | `fdf7be6f` |
+
 Known residual after that change, measured the same way: SAI −5.67, LAW +6.44,
 BOR +4.44, ALO −4.11, VER −4.11. These are team-strength errors (Williams
 over-rated, RB under-rated), not driver-rating errors, and the centering fix
@@ -807,6 +809,297 @@ fix that.
 This is the fifth mechanism tested against this bias and the fifth to lose. The
 authority-ceiling argument continues to hold: the driver-rating path cannot
 produce a 5-position error, so the cause is not on that path.
+
+## 2026-08-03: centring the prior mu at fit time — `worse`, built and reverted
+
+Built, measured, adopted, then reverted the same day, so it reaches `master` only
+as this entry. Recorded in full because the failure mode is more useful than the
+change: **it improved the headline metric and was still wrong.**
+
+**The thesis.** `93bfbeb0` centred `quali_rating_mu_s` on the prediction path and
+named the rest of the job in its own message — centre inside
+`attach_driver_rating_mus` before `team_target_s` is formed, then refit the
+mapping. Fit time used the uncentered mu while prediction time used the centred
+one, so the two disagreed. Making them agree steepened the fitted slopes by ~20%
+(qualifying 1.77417 → 2.12643, race 1.97077 → 2.33329).
+
+**It measured better.** Qualifying MAE 2.6599 → 2.5724 and mean per-driver
+\|bias\| 1.5017 → 1.3771 at 60 simulations, delta stable from 20 sims, within-pair
+spread shrinking or holding for all 11 teams. Full suite green, golden fixtures
+unmoved. On the evidence in this paragraph alone it looks like a clean adopt,
+and it was committed as one.
+
+**Four checks killed it**, in ascending order of how much they should have been
+run first:
+
+1. **The gain is a scalar.** Take the *shipped* mapping, multiply both slopes by
+   1.1985, change nothing else — no centring, original intercepts — and it
+   reproduces MAE 2.5724 and \|bias\| 1.3771 exactly. The intercept move
+   contributes nothing, which is obvious in hindsight: a uniform shift cannot
+   reorder a grid, and MAE here is a position metric.
+2. **The derived multiplier is not the best one.** Sweeping the slope:
+
+   | slope x | 0.8 | 1.0 | 1.1985 | 1.4 | 1.7 | 2.1 |
+   |---|---|---|---|---|---|---|
+   | MAE | 2.7845 | 2.6734 | 2.5993 | **2.5825** | 2.6162 | 2.7071 |
+   | \|bias\| | 1.6566 | 1.4747 | 1.3906 | 1.3502 | **1.2492** | 1.3367 |
+
+   There is a real interior optimum, near 1.4, and the "principled" value misses
+   it. Note also that \|bias\| and MAE optimise at different points — more
+   evidence that \|bias\| is not a proxy for MAE.
+3. **The refit generalises worse on its own held-out folds.** Qualifying mean
+   \|prediction_slope − 1\| 0.2936 → 0.3097, race 0.0927 → **0.1941**, rmse worse
+   in both session kinds, 2025 qualifying r² 0.3039 → 0.1192. `prediction_slope`
+   falling means the steeper fit over-predicts spread on holdout years.
+4. **The premise was wrong.** Centring assumed the prior's `mu_s` carries a
+   spurious team component, by analogy with `93bfbeb0`. Measured: the
+   within-team component has sd **0.2733** against a total mu sd of **0.3014**,
+   so ~82% of that quantity's variance is *between*-team — largely real driver
+   quality that correlates with team, because quick drivers sit in quick cars.
+   Centring it moves genuine driver signal into `team_target_s`, which is why the
+   target's spread inflated and the slope steepened. The 2026 season state that
+   `93bfbeb0` fixed had drifted to carry a team offset; the historical
+   teammate-network prior has not, and the analogy does not transfer.
+
+**Verdict: `worse`.** Adopting would have baked a tuning constant into a
+calibrated artefact on the strength of a 9-event leakage-inclusive delta, while
+its own cross-validation said it was worse. Reverted, artefacts back to the
+2026-05-19 fit.
+
+### Correction to the above, same day — one kill-criterion retracted
+
+Criterion 3, "generalises worse on held-out folds", **is withdrawn.** Those folds
+are 2022–2025. The 2026 regulations changed the competitive structure of the
+field, so pre-2026 seasons are not a valid arbiter of a 2026 mapping and should
+not have been weighted as one. Criteria 1, 2 and 4 stand — all three are measured
+on 2026 — so the revert itself still holds: the centring derivation is not what
+produced the gain, and the value it produced was not the best one.
+
+### The real finding — the mapping is fitted on the wrong regulations
+
+`training_years` is **2022–2025**, entirely pre-regulation-change, and the
+mapping has never seen a 2026 lap. Extracting 2026 matched laps with
+`scripts/build_matched_lap_observations.py --years 2026` (3,356 matched pairs,
+242 aggregate rows, 11 rounds) and fitting the same construct on 2026 alone:
+
+| session | 2022–25 slope | 2026 slope | ratio |
+|---|---|---|---|
+| qualifying | 1.77417 | **2.76281** | **1.557** |
+| race | 1.97077 | **3.89727** | **1.978** |
+
+The current field is roughly 56% more spread in qualifying and nearly twice as
+spread in the race. That is the actual defect: not a 20% miscalibration to be
+patched, a mapping calibrated to a field that no longer exists. It also explains
+why the centring hack appeared to work — it moved the slope 1.1985x, the right
+direction and about a third of the way.
+
+Scored against champion `52dd79c6`, 9 events x 3 seeds, 60 simulations:
+
+| mapping | source | MAE | mean \|bias\| |
+|---|---|---|---|
+| shipped | 2022–25 | 2.6599 | 1.5017 |
+| slope x1.1985 | tuned | 2.5724 | 1.3771 |
+| fitted on all 2026 | in-sample | 2.5724 | **1.2997** |
+| fitted on rounds 10–11 only | **out-of-sample** | 2.6263 | 1.3131 |
+
+The last row is the one that matters: Belgian and Hungarian are **not** in the
+9-event scoring catalog, so a mapping fitted on those two rounds alone and scored
+on rounds 1–9 is genuinely out of sample, and it still improves both metrics.
+That is a measured recalibration, not a constant tuned against the score.
+
+**Also worth noting: position-MAE saturates here.** Three different mappings all
+land on exactly 2.5724 while mean \|bias\| keeps falling from 1.3771 to 1.2997.
+MAE is discretised to integer positions and is a coarse instrument at this
+margin; do not read a flat MAE as "no change".
+
+**Status: `open`, deliberately not adopted in this session.** The evidence is
+much stronger than the centring case, but the honest limits are: 11 rounds of
+2026 exist, the out-of-sample fit rests on 30 qualifying rows, and the race
+mapping nearly doubled while the scorer measures qualifying only. The right
+implementation is a 2026-inclusive or recency-weighted refit run through the
+normal pipeline with its own validation — not a hand-edited artefact. Given this
+file already contains one change adopted too quickly today, that decision is left
+explicit rather than taken in passing.
+
+## 2026-08-04: refit the seconds mapping on 2026 — `adopted`
+
+Closes the `open` item from 2026-08-03. That entry established the defect and
+deliberately stopped short of adopting; this is the pipeline version, with the
+training-year choice argued from data rather than asserted.
+
+**The defect.** `team_strength_seconds_mapping` converts a team-strength rank
+into a time gap. `training_years` was 2022–2025, so it had **never seen a 2026
+lap**, and the 2026 field is materially more spread. Every prediction all season
+compressed team separation.
+
+**Baseline.** Champion `52dd79c6`. Local artefacts verified equal to production
+Supabase `car_characteristics` v101 / `driver_characteristics` v26.
+
+**Protocol.** `scripts/champion_quali_bias.py`, 9 events x 3 seeds x 60
+simulations, `--all-events`. Leakage-inclusive, so deltas only. The mapping is
+prediction-time only, so both arms ran on byte-identical state with the mapping
+file the single difference.
+
+| | champion | 2026 refit |
+|---|---|---|
+| qualifying MAE | 2.6599 | **2.5724** |
+| mean per-driver \|bias\| | 1.5017 | **1.2997** |
+| qualifying slope | 1.77417 | 2.76281 |
+| race slope | 1.97077 | 3.89727 |
+
+**Why 2026-only and not pooled or recency-weighted.** Per-season slopes:
+
+| kind | 2022 | 2023 | 2024 | 2025 | 2026 |
+|---|---|---|---|---|---|
+| qualifying | 1.895 | 2.634 | 1.351 | 1.216 | **2.763** |
+| race | 2.165 | 1.757 | 1.902 | 2.059 | **3.897** |
+
+Race is a clean regime break — 2026 is nearly double any prior season. Qualifying
+is **not**: 2023 reached 2.634, so 2026 is high but not unprecedented, and the
+pooled 1.774 is simply the four-season mean, describing no field that ever
+existed. Pooling would import pre-regulation seasons that cannot arbitrate a 2026
+calibration anyway.
+
+**The check that justifies fitting on one season.** Leave-one-round-out inside
+2026, 11 folds per session kind:
+
+| kind | slope min–max | slope sd | held-out prediction_slope | rmse |
+|---|---|---|---|---|
+| qualifying | 2.662–2.853 | 0.068 | 0.899 | 0.5614 |
+| race | 3.813–4.040 | 0.069 | 0.973 | 0.6702 |
+
+Dropping any single round moves the slope by at most 0.09, so the 2026 value is a
+property of the season and not of particular events. Held-out calibration is
+**better** than the old mapping achieved on its own seasons (mean
+\|prediction_slope − 1\|: qualifying 0.101 vs 0.294, race 0.027 vs 0.093).
+
+**Verdict: `adopted`.**
+
+### Three things this change also fixed or exposed
+
+- **The prior was one regeneration away from silently absorbing the current
+  season.** `PriorFitConfig.historical_start/end` were recorded in the artifact
+  but never applied in `_valid_fit_rows`, so putting 2026 into the shared
+  observations would have pulled it into the historical teammate-network prior —
+  double-counting a season the in-season updater already learns, and changing
+  every seeded rating. Now enforced; verified a no-op on 2022–2025 and verified
+  the prior is unchanged with 2026 present.
+- **Single-season fits had no valid validation.** Leave-one-season-out
+  degenerates on one training year. `evaluate_within_season_folds` adds
+  leave-one-round-out, and the frozen artefact now reports it as
+  `primary_folds` when fitted on one season, marking the cross-season folds as
+  provenance only.
+- **The golden fixtures are tolerance-based, not exact.** They passed through
+  both this change and the reverted one on 2026-08-03. Passing them does not mean
+  predictions are unchanged — they bound position drift and top-N overlap, so
+  they catch gross regressions, not recalibration.
+
+### Closed the same day
+
+Both open items below were resolved; kept here so the sequence is legible.
+
+- ~~The race mapping is unvalidated against race results.~~ **Measured** — see
+  the next entry. It helps.
+- ~~`training_years` needs a policy, not a constant.~~ **Now
+  `model.regulation_eras`.**
+- 2026 has 11 rounds and 181 qualifying calibration rows. Re-run this fit as the
+  season extends; the slope is stable so far, but that is 11 rounds of evidence.
+
+## 2026-08-04: validate the race half, and scope calibration to a regulation era — `adopted`
+
+The refit above changed a race slope nobody had scored, and pinned
+`training_years` to a constant that would be wrong at the next regulation change.
+This closes both.
+
+**Race validation.** `scripts/champion_race_bias.py` is new: the qualifying
+scorer cannot see the race slope at all, so half the refit was unmeasured. Each
+event is predicted **from its actual starting grid** rather than a predicted one,
+so qualifying error cannot leak into the number. 9 events x 3 seeds x 60
+simulations, same leakage on both arms:
+
+| | 2022–25 mapping | 2026 refit | delta |
+|---|---|---|---|
+| race MAE | 4.0606 | **3.9192** | **−0.1414** |
+| race mean \|bias\| | 2.4242 | **2.3434** | −0.0808 |
+
+The race half helps by more in absolute terms than the qualifying half did
+(−0.141 vs −0.088). Both halves of the refit are now measured against a control.
+
+**Era policy.** `model.regulation_eras` replaces the `DEFAULT_TRAINING_YEARS`
+constant. Calibration is scoped to one era and never fitted across a boundary.
+When regulations change, adding an era and closing the previous `end_year` is the
+whole change — the refit follows. `--training-years` still overrides for one-off
+fits. Freezing through the policy reproduces `[2026]` and identical slopes, so
+adopting it changed no numbers.
+
+### Field compaction: expected, not yet measurable, and now detectable
+
+Teams converge within a regulation era, the field compacts, and a frozen slope
+becomes progressively too steep. How fast is unknown.
+
+**No decay weighting was applied, deliberately.** It is not measurable yet.
+Across 11 rounds of 2026 the per-round slope sd is **~0.73**, and non-overlapping
+thirds are not monotone in either session kind:
+
+| kind | rounds 1–4 | 5–8 | 9–11 |
+|---|---|---|---|
+| qualifying | 2.481 | 3.013 | 2.777 |
+| race | 4.420 | 3.292 | 4.082 |
+
+A trend estimate over 11 rounds at that scatter carries a standard error near
+0.067, so the −0.10/round "compaction" an earlier rolling-window pass appeared to
+show was about one standard error, and was an artefact of overlapping windows.
+**That claim was retracted rather than built on** — fitting a decay to it would
+have repeated the 2026-08-03 mistake.
+
+A drift diagnostic (`evaluate_slope_drift`) was built to watch for it — recent
+window against the era fit, in standard errors of per-round scatter — and then
+**removed the same day**. It measured 0.14 SE (race) and 0.96 SE
+(qualifying), i.e. nothing, which is the point: it was monitoring for a
+phenomenon this very section establishes is not detectable yet, and any refit
+would recompute the fit anyway. Building a detector before there is anything to
+detect is speculation, not rigour.
+
+What remains is the check that catches the failure that *does* happen: rounds
+accumulate, nobody refreezes, and the committed mapping stops describing its own
+calibration rows. See `tests/test_team_strength_mapping_freshness.py`.
+
+So the answer to "how long until compaction matters" is: unknown, not yet
+measurable, and **refit as rounds accumulate rather than trying to predict it**.
+The freshness test makes that automatic by failing when the mapping falls behind
+its own data.
+
+### Open after this
+
+- The race scorer takes roughly 15 minutes per arm against ~4 for qualifying, so
+  race A/Bs are not free the way qualifying ones are.
+- Still 11 rounds. Every conclusion here is 11 rounds deep.
+
+### The staleness guard
+
+The failure that actually happens is mundane: rounds accumulate, nobody
+refreezes, and the committed mapping stops describing its own calibration rows.
+`tests/test_team_strength_mapping_freshness.py` fails the build when refitting on
+the current rows no longer reproduces the frozen slope, judged against per-round
+scatter rather than a fixed tolerance, at three standard errors.
+
+It was originally two guards; the second watched the drift diagnostic and went
+with it. **Verified to fire, not merely to pass** — perturbing the committed
+qualifying slope by 40% reports `4.9 standard errors apart. Re-run
+scripts/freeze_team_strength_seconds_mapping.py`. A freshness test that cannot
+fail reads as coverage while providing none.
+
+Both judge against per-round scatter rather than a fixed tolerance. Staleness
+fails at three standard errors, one above the diagnostic's own two-standard-error
+prompt, so ordinary round-to-round movement does not break the build.
+
+**The guard was verified to fire, not just to pass.** Perturbing the committed
+qualifying slope by 40% fails with `4.9 standard errors apart. Re-run
+scripts/freeze_team_strength_seconds_mapping.py`. A freshness test that cannot
+fail is worse than none, because it reads as coverage.
+
+`latest.md` now carries the drift table too, so the numbers are visible to
+someone reading the artefact rather than only to `json.load`.
 
 ## Adding an entry
 
