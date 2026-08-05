@@ -363,7 +363,9 @@ class BaselineQualifyingConfig(StrictConfigModel):
         return self
 
     team_strength_compression: float = Field(default=0.60, ge=0.0)
-    team_strength_seconds_score_scale: float = Field(default=1.9707717329051126, gt=0.0)
+    # None means "derive from the live qualifying mapping slope" (the correct default).
+    # A number is an explicit override, kept so an A/B arm can vary it without code.
+    team_strength_seconds_score_scale: float | None = Field(default=None, gt=0.0)
     driver_quali_pace_weight: float = Field(default=0.70, ge=0.0, le=1.0)
     driver_skill_weight: float = Field(default=0.30, ge=0.0, le=1.0)
     teammate_setup_std: float = Field(default=0.018, ge=0.0)

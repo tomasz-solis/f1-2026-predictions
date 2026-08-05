@@ -102,3 +102,82 @@ def test_shipped_slope_still_matches_its_calibration_rows(session_kind: str) -> 
         f"{abs(shipped - refit) / standard_error:.1f} standard errors apart. "
         "Re-run scripts/freeze_team_strength_seconds_mapping.py."
     )
+
+
+# --- the mapping must also agree with what consumes it -----------------------
+#
+# The freshness checks above guard the artifact against its own calibration rows.
+# They cannot see the other way this mapping goes wrong: a consumer that hardcodes
+# a slope-derived constant and then does not follow a refit.
+#
+# That is not hypothetical. `team_strength_seconds_score_scale` was pinned to
+# 1.9707717329051126 -- the frozen *race* slope -- while being used on the
+# *qualifying* path, and it stayed pinned through the 2026 refit until 7 of 22
+# drivers saturated the [0, 1] clip and their learned driver ratings were erased.
+
+
+class _StubConfig:
+    """Minimal config stand-in exposing the dotted ``get`` the simulator uses."""
+
+    def __init__(self, values: dict[str, object] | None = None) -> None:
+        self._values = values or {}
+
+    def get(self, key: str, default: object = None) -> object:
+        return self._values.get(key, default)
+
+
+def test_qualifying_score_scale_tracks_the_live_qualifying_slope() -> None:
+    """The seconds-to-score divisor must be the qualifying slope, not a frozen copy."""
+    from src.models.team_strength_mapping import load_live_team_strength_mappings
+    from src.predictors.baseline.qualifying_simulation import _resolve_seconds_score_scale
+
+    mappings = load_live_team_strength_mappings()
+    qualifying = mappings.get("qualifying")
+    if qualifying is None:
+        pytest.skip("Live qualifying mapping not present")
+
+    resolved = _resolve_seconds_score_scale(_StubConfig())
+
+    assert math.isclose(resolved, qualifying.slope_s_per_unit, rel_tol=1e-9), (
+        f"qualifying score scale {resolved:.9f} does not track the live qualifying "
+        f"slope {qualifying.slope_s_per_unit:.9f}. Do not hardcode this value -- "
+        "delta = slope * (team_strength - 0.5), so only the qualifying slope inverts "
+        "the conversion and keeps the projected signal inside [0, 1]."
+    )
+
+    race = mappings.get("race")
+    if race is not None and not math.isclose(
+        race.slope_s_per_unit, qualifying.slope_s_per_unit, rel_tol=1e-9
+    ):
+        assert not math.isclose(resolved, race.slope_s_per_unit, rel_tol=1e-9), (
+            "qualifying score scale is using the RACE slope. That was the original "
+            "defect: a different session's calibration on the qualifying path."
+        )
+
+
+def test_qualifying_team_signal_never_saturates_across_the_strength_range() -> None:
+    """Team strength alone must not pin the projected signal to the clip bounds."""
+    from src.models.team_strength_mapping import load_live_team_strength_mappings
+    from src.predictors.baseline.qualifying_simulation import _resolve_seconds_score_scale
+
+    qualifying = load_live_team_strength_mappings().get("qualifying")
+    if qualifying is None:
+        pytest.skip("Live qualifying mapping not present")
+
+    scale = _resolve_seconds_score_scale(_StubConfig())
+    # 0.02 and 0.98 stand in for the strongest and weakest car the field can show.
+    for team_strength in (0.02, 0.25, 0.5, 0.75, 0.98):
+        raw = 0.5 + (qualifying.predict_delta_one(team_strength) / scale)
+        assert 0.0 < raw < 1.0, (
+            f"team_strength {team_strength} projects to {raw:.4f}, which the clip "
+            "pins to a bound. Saturated drivers lose their learned quali_rating_mu_s "
+            "entirely and teammates become indistinguishable."
+        )
+
+
+def test_explicit_config_value_still_overrides_the_derived_scale() -> None:
+    """An A/B arm must still be able to vary the scale without a code change."""
+    from src.predictors.baseline.qualifying_simulation import _resolve_seconds_score_scale
+
+    cfg = _StubConfig({"baseline_predictor.qualifying.team_strength_seconds_score_scale": 2.6060})
+    assert math.isclose(_resolve_seconds_score_scale(cfg), 2.6060, rel_tol=1e-9)

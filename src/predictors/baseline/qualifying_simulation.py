@@ -8,7 +8,37 @@ from typing import Any
 
 import numpy as np
 
+from src.models.team_strength_mapping import load_live_team_strength_mappings
 from src.utils.validation_helpers import normalize_weather_key
+
+# Used only when the mapping artifact is missing entirely. This is the frozen *race*
+# slope the scale was wrongly hardcoded to before it was derived; kept solely so an
+# artifact-less environment reproduces the old path instead of dividing by zero.
+_LEGACY_SECONDS_SCORE_SCALE = 1.9707717329051126
+
+
+def _resolve_seconds_score_scale(cfg: Any) -> float:
+    """Return the seconds-to-score divisor for the qualifying team signal.
+
+    The conversion is ``delta = slope * (team_strength - 0.5)``, so dividing by that
+    same qualifying slope recovers the centred team strength and keeps the projected
+    signal inside ``[0, 1]`` by construction. Any other divisor either saturates the
+    clip or wastes the range, and a frozen one silently drifts when the mapping is
+    refitted. An explicit config value still wins so an A/B arm can vary it.
+    """
+    configured = cfg.get("baseline_predictor.qualifying.team_strength_seconds_score_scale", None)
+    if configured is not None:
+        try:
+            override = float(configured)
+        except (TypeError, ValueError):
+            override = 0.0
+        if override > 0:
+            return override
+
+    mapping = load_live_team_strength_mappings().get("qualifying")
+    if mapping is not None and float(mapping.slope_s_per_unit) > 0:
+        return float(mapping.slope_s_per_unit)
+    return _LEGACY_SECONDS_SCORE_SCALE
 
 
 @dataclass(frozen=True)
@@ -505,12 +535,7 @@ def _load_base_quali_weights(cfg: Any, is_sprint: bool) -> dict[str, float]:
         "team_strength_compression": float(
             cfg.get("baseline_predictor.qualifying.team_strength_compression", 0.60)
         ),
-        "team_strength_seconds_score_scale": float(
-            cfg.get(
-                "baseline_predictor.qualifying.team_strength_seconds_score_scale",
-                1.9707717329051126,
-            )
-        ),
+        "team_strength_seconds_score_scale": _resolve_seconds_score_scale(cfg),
         "driver_offset_cap": float(
             cfg.get("baseline_predictor.qualifying.driver_offset_cap", 0.18)
         ),

@@ -1101,6 +1101,95 @@ fail is worse than none, because it reads as coverage.
 `latest.md` now carries the drift table too, so the numbers are visible to
 someone reading the artefact rather than only to `json.load`.
 
+## 2026-08-05: the qualifying seconds-to-score scale was never coupled to the mapping — `adopted`
+
+**The thesis.** Qualifying projects the team-strength seconds delta into its
+latent `[0, 1]` score space by dividing by `team_strength_seconds_score_scale`.
+That divisor was a frozen config constant, so the 2026-08-04 refit moved the
+mapping and the consumer did not follow. Deriving it from the live qualifying
+slope fixes the coupling permanently.
+
+**Two defects, stacked.** The constant was `1.9707717329051126`. That is exactly
+the pre-refit **race** slope, to the last digit — a different session's
+calibration, used on the qualifying path since `0590c376` (2026-05-19). The
+refit then froze it in place while the qualifying slope moved 1.7742 -> 2.7628.
+
+**This supersedes a claim recorded above.** The 2026-07-31 section "The clip is
+binding, at the front of the grid" concluded: "The team term alone cannot reach a
+bound — it spans only +/-0.42 against a +/-0.5 threshold — so every clip event
+needs the driver term to push it over." That was true when measured. It is no
+longer. Under the refitted slope Mercedes at strength 0.901 projects to 0.562 on
+the team term alone, so the team term now clips **without any driver
+contribution**. Both the slope increase and the move from 6-round to 11-round
+strengths contributed.
+
+**Measured saturation**, live Dutch GP state, all 22 drivers:
+
+| scale | drivers hitting a bound |
+|---|---|
+| 1.9708 frozen (shipped 2026-08-04) | **7 / 22** — LEC, HAM, RUS, ANT, STR, PER, BOT |
+| 1.9708 under the *pre-refit* slope | 1 / 22 — STR only |
+| 2.7628 derived (this change) | **0 / 22** |
+
+Saturation is not cosmetic: both teammates pin to the identical value, so the
+learned `quali_rating_mu_s` is erased. Mercedes lost 0.200s of RUS/ANT
+separation, Cadillac 0.288s, Ferrari 0.020s. Ferrari and Mercedes both pinned to
+exactly 1.000, so the seconds channel could not separate the two teams at all.
+
+**Why the qualifying slope is the right divisor, not a fitted constant.**
+`delta = slope * (team_strength - 0.5)`, so `delta / slope` recovers the centred
+team strength exactly and the driver rating enters as `mu / slope`. The signal
+is then inside `[0, 1]` by construction for any team strength in `[0, 1]`. Any
+other divisor either saturates the clip or wastes the range.
+
+**Baseline.** Champion `76d26fcf`, working tree clean, in sync with origin.
+
+**Protocol.** `scripts/champion_quali_bias.py --all-events`, 9 events x 3 seeds x
+20 simulations. Leakage-inclusive, so deltas only. Arms varied through
+`F1_CONFIG` alone; no state replay, no artifact was touched.
+
+| | champion (1.9708) | derived (2.7628) |
+|---|---|---|
+| qualifying MAE | 2.5758 | **2.5556** |
+| mean per-driver \|bias\| | 1.2862 | **1.2660** |
+
+**The MAE gain is not evidence and is not claimed as one.** A nine-point sweep
+of the scale gives:
+
+| scale | 1.9708 | 2.2 | 2.4 | 2.606 | 2.8 | 3.069 | 3.3 | 3.7 | 4.2 |
+|---|---|---|---|---|---|---|---|---|---|
+| MAE | 2.5758 | 2.5791 | 2.5791 | 2.5791 | **2.5488** | 2.5623 | 2.5657 | 2.5892 | 2.6027 |
+| \|bias\| | 1.2862 | 1.2795 | 1.3064 | 1.2761 | 1.2559 | 1.2559 | 1.2458 | **1.2290** | 1.2458 |
+
+Three different scales return byte-identical MAE 2.5791, because MAE over
+integer grid positions is a step function. There is no bowl: 2.8 is an isolated
+dip with 3.069 and 3.3 both worse. The whole sweep spans 0.054, so the adopted
+arm's 0.0202 sits inside the jitter. Picking the sweep minimum would be fitting
+9 events x 3 seeds. Per-driver `|bias|` is the smoother, broadly monotone series
+and is the metric the mechanism actually predicts, since it measures exactly the
+driver ratings that saturation erases.
+
+**Adopted on the structural argument, not the metric.** The measurement is
+neutral-to-slightly-positive and is recorded as such. The reason to take it is
+that the two values were never coupled, so every future refit silently
+re-saturates until someone notices.
+
+**Race side is unaffected.** `lap_by_lap_simulator.py` consumes the seconds delta
+and `race_rating_mu_s` natively in seconds — no projection, no clip — so despite
+the race slope moving further (1.9708 -> 3.8973) it cannot saturate. The bounded
+score space is a legacy of qualifying's latent-ranking design.
+
+**Guarded.** `tests/test_team_strength_mapping_freshness.py` gains three tests:
+the resolved scale must equal the live qualifying slope, must not be the race
+slope, and no team strength in `[0.02, 0.98]` may project onto a clip bound. The
+freshness tests above guard the artifact against its calibration rows; these
+guard it against its consumer, which is how this defect survived. Verified to
+fire, not merely to pass: under the old constant the scale test fails and the
+saturation test trips at 2 of 5 sampled strengths.
+
+**Do not hardcode this value again.** An explicit config number still overrides,
+so an A/B arm costs no code change — that is what the sweep above used.
+
 ## Adding an entry
 
 Keep it to what a future reader needs to trust or discard the result:

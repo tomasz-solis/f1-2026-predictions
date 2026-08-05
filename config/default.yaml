@@ -230,10 +230,14 @@ baseline_predictor:
     # 1.0 = raw team deltas, lower = closer field.
     team_strength_compression: 0.60
     # Converts the Phase 7 team-strength seconds delta into the existing
-    # qualifying latent-score scale. The value is anchored to the frozen race
-    # seconds slope so qualifying can use its own calibrated seconds spread
-    # without changing the rest of the scoring model.
-    team_strength_seconds_score_scale: 1.9707717329051126
+    # qualifying latent-score scale. Leave null: the scale is the live *qualifying*
+    # mapping slope, which is the only value that inverts the conversion cleanly,
+    # since delta = slope * (team_strength - 0.5) so delta / slope recovers the
+    # centred team strength and the driver rating enters as mu / slope.
+    # It was previously hardcoded to the frozen *race* slope, which is a different
+    # session's calibration, and froze through the 2026 refit until 7 of 22 drivers
+    # saturated the [0, 1] clip. Set a number here only to override for an A/B arm.
+    team_strength_seconds_score_scale: null
 
     # Driver signal composition for qualifying
     driver_quali_pace_weight: 0.70
