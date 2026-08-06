@@ -83,6 +83,12 @@ notebooks/
 # tracked copies were a stale naming-migration leftover, not a required input.
 data/car_characteristics_snapshot/
 data/systems/
+# PredictionLogger writes here at runtime and also saves to ArtifactStore. Tracked
+# copies made the dashboard load each prediction twice -- once from the file, once
+# from Supabase -- which PredictionLogger._deduplicate_predictions then collapsed
+# with a warning. The three that were tracked are published to Supabase; archived
+# to ~/Documents/trackside-labs-archive/predictions_local_20260806.tar.gz.
+data/predictions/
 .impeccable/
 # `*.backup` above does NOT match `<name>.json.rebuild_backup`, hence this line.
 *.rebuild_backup
