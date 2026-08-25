@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import unicodedata
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import plotly.graph_objects as go
 import streamlit as st
@@ -24,6 +25,7 @@ from src.utils.accuracy_targets import (
     target_checkpoint_sequence,
     target_label,
 )
+from src.utils.grid_penalties import apply_grid_penalties
 from src.utils.weekend import get_schedule_rows
 
 METRIC_OPTIONS = {
@@ -42,6 +44,8 @@ _TARGET_HIGHLIGHT_METRICS = (
     ("within_3", "Within 3", "{:.1f}%"),
     ("correlation", "Correlation", "{:.2f}"),
 )
+
+logger = logging.getLogger(__name__)
 
 
 def render_overall_accuracy_metrics(summary: SeasonAccuracySummary) -> None:
@@ -193,6 +197,43 @@ def build_saved_prediction_browser_rows(
     return rows
 
 
+def _starting_grid_from_saved_penalties(
+    qualifying_rows: list[dict[str, Any]],
+    saved_penalties: list[Any],
+) -> list[dict[str, Any]]:
+    """Rebuild the grid a saved checkpoint actually raced from.
+
+    A checkpoint stores the qualifying order and the penalties that were applied to it,
+    not the penalised grid itself. Replaying the recorded penalties through the same
+    ordering rule keeps the movers chart measuring from the real start.
+    """
+    if not qualifying_rows or not saved_penalties:
+        return qualifying_rows
+
+    penalties = {
+        str(row.get("driver", "")).strip().upper(): row.get("penalty")
+        for row in saved_penalties
+        if isinstance(row, dict) and str(row.get("driver", "")).strip()
+    }
+    if not penalties:
+        return qualifying_rows
+
+    class _RecordedPenalties:
+        """Config stub serving exactly the penalties this checkpoint recorded."""
+
+        def get(self, key: str, default: Any = None) -> Any:
+            return {"saved": penalties} if key == "grid.penalties" else default
+
+    try:
+        penalised = apply_grid_penalties(
+            cast(Any, qualifying_rows), race_name="saved", cfg=_RecordedPenalties()
+        )
+        return [dict(row) for row in penalised.grid]
+    except ValueError as exc:
+        logger.warning("Could not rebuild the penalised grid for a saved checkpoint: %s", exc)
+        return qualifying_rows
+
+
 def build_saved_prediction_view_model(prediction: dict[str, Any]) -> dict[str, Any]:
     """Adapt one saved checkpoint artifact into display payloads."""
     metadata = prediction.get("metadata", {})
@@ -260,6 +301,14 @@ def build_saved_prediction_view_model(prediction: dict[str, Any]) -> dict[str, A
             ),
         }
 
+    race_diagnostics = metadata.get("race_model_diagnostics")
+    saved_penalties = (
+        race_diagnostics.get("grid_penalties") if isinstance(race_diagnostics, dict) else None
+    )
+    if not isinstance(saved_penalties, list):
+        saved_penalties = []
+    starting_grid_rows = _starting_grid_from_saved_penalties(qualifying_rows, saved_penalties)
+
     race_result: dict[str, Any] | None = None
     if race_rows:
         race_result = {
@@ -271,7 +320,8 @@ def build_saved_prediction_view_model(prediction: dict[str, Any]) -> dict[str, A
             .strip()
             .upper(),
             "data_source": f"Saved checkpoint ({checkpoint_session})",
-            "starting_grid": qualifying_rows,
+            "starting_grid": starting_grid_rows,
+            "grid_penalties": saved_penalties,
             "starting_session_name": str(
                 qualifying_target.get("target_session")
                 or metadata.get("top_level_qualifying_session")

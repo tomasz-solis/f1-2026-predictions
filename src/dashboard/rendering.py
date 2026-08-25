@@ -36,6 +36,7 @@ _position_change_chart_figure = rendering_race._position_change_chart_figure
 _position_change_chart_title = rendering_race._position_change_chart_title
 _render_compound_strategies = rendering_race._render_compound_strategies
 _render_pit_lap_distribution = rendering_race._render_pit_lap_distribution
+_render_grid_penalty_notice = rendering_race._render_grid_penalty_notice
 _render_position_change_chart = rendering_race._render_position_change_chart
 _render_race_result = rendering_race._render_race_result
 _render_track_temperature_context = rendering_race._render_track_temperature_context
@@ -65,6 +66,7 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
         if classification_note:
             render_notice_banner(classification_note, tone="success", label="Completed session")
         if is_race:
+            _render_grid_penalty_notice(result)
             _render_position_change_chart(
                 df,
                 result=result,
@@ -165,6 +167,7 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
         )
 
     if is_race:
+        _render_grid_penalty_notice(result)
         _render_position_change_chart(
             df,
             result=result,

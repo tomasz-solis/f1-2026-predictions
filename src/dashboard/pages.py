@@ -16,6 +16,7 @@ from . import prediction_horizon as _prediction_horizon
 from . import prediction_messages as _prediction_messages
 from .analytics import track_event
 from .cache import get_artifact_versions
+from .grid_penalty_admin import render_grid_penalty_editor
 from .layout import BRAND_LAST_UPDATED, BRAND_MODEL_VERSION, ENABLE_PREDICTION_ACCURACY_TAB
 from .live_prediction_flow import (
     execute_live_prediction_pipeline_core as _execute_live_prediction_pipeline_core,
@@ -955,6 +956,9 @@ def render_live_prediction_page(enable_logging: bool) -> None:
             help="Assumed race-day conditions. Switch it to see how wet or mixed weather changes the forecast.",
         )
     selected_race_prediction_available = False
+
+    # Operator-only, token-gated: renders nothing for an ordinary visitor.
+    render_grid_penalty_editor(race_name=race_name, year=selected_season)
 
     # Horizon-coverage detail (which upcoming races are warmed yet) is operator
     # plumbing, not a fan's answer — it no longer gets its own banner above the

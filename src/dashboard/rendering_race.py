@@ -325,6 +325,43 @@ def _position_change_ladder_figure(rows: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def format_grid_penalty(penalty: dict[str, Any]) -> str:
+    """Describe one applied penalty the way a race engineer would say it."""
+    driver = str(penalty.get("driver", "")).strip() or "Unknown"
+    qualified = penalty.get("qualified")
+    starts = penalty.get("starts")
+    raw = str(penalty.get("penalty", "")).strip().lower()
+    if raw == "pit":
+        detail = "pit-lane start"
+    elif raw == "back":
+        detail = "back of the grid"
+    else:
+        detail = f"{raw}-place penalty"
+    return f"{driver} P{qualified} -> P{starts} ({detail})"
+
+
+def _render_grid_penalty_notice(result: dict) -> None:
+    """Show the penalties that moved this grid, so the movers chart is readable.
+
+    Without this the chart reads a penalised driver as gaining places, which is true
+    against his start slot and badly misleading against where he qualified.
+    """
+    penalties = result.get("grid_penalties")
+    if not isinstance(penalties, list) or not penalties:
+        return
+
+    described = "; ".join(format_grid_penalty(penalty) for penalty in penalties if penalty)
+    if not described:
+        return
+
+    render_notice_banner(
+        f"Grid penalties applied: {described}. Positions below are measured from the "
+        "penalised starting grid, not from qualifying.",
+        tone="warning",
+        label="Starting grid",
+    )
+
+
 def _render_position_change_chart(
     finish_df: pd.DataFrame,
     *,

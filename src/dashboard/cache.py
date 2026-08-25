@@ -155,6 +155,28 @@ def get_artifact_versions(year: int = _DEFAULT_SEASON) -> dict[str, tuple[int, s
         logger.warning("Failed to fingerprint car_characteristics_snapshot: %s", exc)
         versions[snapshot_fingerprint_key] = (0, "")
 
+    # Grid penalties are entered at runtime, so a saved penalty has to move the prediction
+    # cache key or every precompute keeps serving the un-penalised grid until an unrelated
+    # artifact happens to change. Same shape as the snapshot fingerprint above.
+    penalty_fingerprint_key = f"grid_penalties::{season_year}"
+    try:
+        recent_penalties = store.list_artifacts(
+            "grid_penalties",
+            key_prefix=f"{season_year}::",
+            limit=1,
+        )
+        if recent_penalties:
+            newest = recent_penalties[0]
+            versions[penalty_fingerprint_key] = (
+                int(newest.get("version", 0) or 0),
+                f"{newest.get('artifact_key', '')}|{newest.get('created_at', '')}",
+            )
+        else:
+            versions[penalty_fingerprint_key] = (0, "")
+    except Exception as exc:  # noqa: BLE001 - cache fingerprint must never break serving
+        logger.warning("Failed to fingerprint grid_penalties: %s", exc)
+        versions[penalty_fingerprint_key] = (0, "")
+
     # In DB-backed modes, ignore mutable local runtime files so hashes remain
     # consistent across web/worker instances (for example Render web + cron).
     file_fingerprints = _get_file_timestamps(

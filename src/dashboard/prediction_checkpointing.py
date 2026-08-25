@@ -70,6 +70,9 @@ _QUALIFYING_DIAGNOSTIC_KEYS = (
 _RACE_DIAGNOSTIC_KEYS = (
     "data_regime",
     "grid_source",
+    # Which drivers were moved off their qualifying slot, and by how much. Saved so a
+    # historical checkpoint can still explain a grid that no longer matches qualifying.
+    "grid_penalties",
     "input_confidence",
     "characteristics_profile_used",
     "teams_with_characteristics_profile",
