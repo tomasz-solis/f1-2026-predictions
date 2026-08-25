@@ -1190,6 +1190,66 @@ saturation test trips at 2 of 5 sampled strengths.
 **Do not hardcode this value again.** An explicit config number still overrides,
 so an A/B arm costs no code change — that is what the sweep above used.
 
+## 2026-08-24: qualifying classification is not the starting grid — `never activated` on the replay, `adopted` for the residual dataset
+
+**The thesis.** Nothing in this repo read FastF1's `GridPosition`. Every path that
+needed a race start position used the qualifying classification instead, which
+carries no penalties: a driver who qualifies P3 and takes a ten-place drop is still
+classified P3 by the timing feed. `fetch_actual_starting_grid()` in
+`src/data/actual_results_fetcher.py` is the first producer of the real grid, and of
+the `start_type` field the `QualifyingGridEntry` type has declared and validated
+since it was written with nothing ever setting it.
+
+**Baseline.** `19085bd5`, rebuilt — a fresh 12-round 2026 walk-forward replay, not the
+stored artifact. Both arms carry the practice-session tolerance below, so the only
+difference between them is the starting grid.
+
+**How wrong the classification is, in 2026.** 41 of 264 driver-races, 15.5%, disagree
+with the real grid. The error distribution in positions:
+
+| error | -11 | -10 | -4 | -3 | -1 | +1 | +2 |
+|---|---|---|---|---|---|---|---|
+| rows | 1 | 1 | 2 | 3 | 4 | 18 | 12 |
+
+Most are one-or-two-place cascades behind someone else's penalty. Seven rows exceed
+the residual model's own +/-2.5 target clip, and the two worst — Spa, where NOR
+qualified P3 and started P13, and HAD P10 -> P21 — saturate it in the wrong direction.
+
+**Replay: `never activated`.** Baseline and grid arms produced identical race MAE at
+all 42 shared checkpoints — mean 3.8468 both, zero difference to four decimals. The
+reason is structural, not marginal: every replay checkpoint is pre-qualifying
+(`PRE`, `FP1`, `FP2`, `FP3`, `SQ`), so the replay always predicts the grid and never
+reads a classification as a start position. The swap in
+`_resolve_race_section_for_replay` is guarded on `qualifying_grid_source == "ACTUAL"`
+and correctly never fires. **This corrects a claim made while planning the change** —
+that the ledger's race MAE was partly scored against grids that never happened. It
+was not. The replay was never exposed to this defect.
+
+**Residual dataset: `adopted`.** `build_race_residual_dataset` built both the
+`grid_position` feature and the `target_positions_gained` label from the qualifying
+classification, so 15.5% of its rows were labelled with positions the driver never
+gained or lost. It now builds both from the starting grid. Unmeasured against a
+scored run: `baseline_predictor.race.race_residual_model.enabled` is `false`, so this
+changes no live prediction today. It changes what the model learns the next time
+anyone evaluates it, which is the point.
+
+**A separate fix the replay needed first.** FastF1 publishes 2026 Barcelona FP1 with
+laps but no team names — confirmed by deleting the cache entry and refetching from
+the live API: 22 drivers, 544 laps, every `TeamName` empty. It is the only session in
+the 2026 season with zero team names. `_apply_session_update` raised on it, so the
+whole season replay aborted at round 7 and wrote no checkpoints. Practice sessions now
+degrade: the failure is logged, recorded in `HistoricalReplaySummary.skipped_sessions`,
+and the replay continues. Testing days and competitive sessions still fail closed —
+a season seed or a scored result built on missing data is not a replay. Both arms
+above record `skipped_sessions: ['Barcelona Grand Prix::FP1']`.
+
+**Indicative side measurement, not walk-forward.** Predicting each 2026 round directly
+from the two grids, 3 seeds x 100 simulations, scored against the actual finish: the
+six affected rounds averaged -0.056 MAE with the real grid (Spa -0.242, Hungary
++0.242), and all six unaffected rounds were identical to three decimals. The unaffected
+rounds matching exactly is the control that matters; the -0.056 is inside noise and
+is not a claim.
+
 ## Adding an entry
 
 Keep it to what a future reader needs to trust or discard the result:

@@ -58,6 +58,12 @@ logger = logging.getLogger(__name__)
 DEFAULT_EXCLUDED_SCORING_TARGETS = frozenset({TARGET_SPRINT_QUALIFYING})
 _NORMAL_REPLAY_CHECKPOINTS = ("PRE", "FP1", "FP2", "FP3")
 _SPRINT_REPLAY_CHECKPOINTS = ("PRE", "FP1", "SQ")
+# A practice session can be genuinely unusable: FastF1 publishes 2026 Barcelona FP1 with
+# laps but no team names, so no team profile can be extracted from it. A weekend like that
+# still happened, and the checkpoint after it is simply the state that preceded it. Only
+# practice degrades this way. Testing days ("Day 1"..) and competitive sessions still fail
+# closed, because a season seed or a scored result built on missing data is not a replay.
+_DEGRADABLE_SESSIONS = frozenset({"FP1", "FP2", "FP3"})
 
 
 @dataclass
@@ -90,6 +96,7 @@ class HistoricalReplaySummary:
     excluded_scoring_targets: list[str]
     testing_sessions_replayed: list[str] = field(default_factory=list)
     weekend_sessions_replayed: list[str] = field(default_factory=list)
+    skipped_sessions: list[str] = field(default_factory=list)
     race_updates: list[str] = field(default_factory=list)
     checkpoints: list[ReplayCheckpointRecord] = field(default_factory=list)
     driver_update_trace_path: str | None = None
@@ -299,6 +306,26 @@ def _fetch_actual_session_results(
     return deepcopy(actual_cache[cache_key])
 
 
+def _fetch_actual_starting_grid(
+    *,
+    year: int,
+    race_name: str,
+    actual_cache: dict[tuple[int, str, str], list[QualifyingGridEntry]],
+) -> list[QualifyingGridEntry]:
+    """Load the grid a completed race actually started from, penalties included."""
+    from src.data.actual_results_fetcher import fetch_actual_starting_grid
+
+    cache_key = (int(year), str(race_name), "R_STARTING_GRID")
+    if cache_key not in actual_cache:
+        loaded = fetch_actual_starting_grid(int(year), str(race_name))
+        if not loaded:
+            raise FileNotFoundError(
+                f"Could not load the actual starting grid for {race_name} {year}"
+            )
+        actual_cache[cache_key] = deepcopy(loaded)
+    return deepcopy(actual_cache[cache_key])
+
+
 def _resolve_qualifying_section_for_replay(
     *,
     predictor: Any,
@@ -355,6 +382,17 @@ def _resolve_race_section_for_replay(
     actual_cache: dict[tuple[int, str, str], list[QualifyingGridEntry]],
 ) -> dict[str, Any]:
     """Return the checkpoint-appropriate race payload for one target session."""
+    # Qualifying classification is not the starting grid. Once qualifying is inside the
+    # checkpoint the penalties are known too, so the race replays from the grid the cars
+    # actually lined up on. Before qualifying the grid is genuinely being predicted, and
+    # substituting the post-penalty order there would leak the future into the replay.
+    if str(target_session).strip().upper() == "R" and qualifying_grid_source == "ACTUAL":
+        qualifying_grid = _fetch_actual_starting_grid(
+            year=year,
+            race_name=race_name,
+            actual_cache=actual_cache,
+        )
+
     if session_is_available_at_checkpoint(checkpoint_session, target_session):
         actual_results = _fetch_actual_session_results(
             year=year,
@@ -899,8 +937,12 @@ def _apply_session_update(
     session_name: str,
     cache_dirs: list[str],
     processed_dir: Path,
-) -> None:
-    """Replay one cached session into the sidecar season state."""
+) -> bool:
+    """Replay one cached session into the sidecar season state.
+
+    Returns whether the session was applied. An unusable practice session returns
+    ``False`` instead of raising; every other session still fails closed.
+    """
     errors: list[str] = []
     for cache_dir in cache_dirs:
         try:
@@ -911,11 +953,19 @@ def _apply_session_update(
                 sessions=[session_name],
                 cache_dir=cache_dir,
             )
-            return
+            return True
         except ValueError as exc:
             errors.append(f"{cache_dir}: {exc}")
 
     joined_errors = "; ".join(errors) if errors else "no cache directories were available"
+    if str(session_name).strip().upper() in _DEGRADABLE_SESSIONS:
+        logger.warning(
+            "Skipping unusable practice session %s %s: %s",
+            event_name,
+            session_name,
+            joined_errors,
+        )
+        return False
     raise ValueError(f"Could not replay {event_name} {session_name}: {joined_errors}")
 
 
@@ -1004,14 +1054,17 @@ def run_historical_checkpoint_replay(
 
             for session_name in plan_entry.get("sessions", []):
                 normalized_session = str(session_name).strip().upper()
-                _apply_session_update(
+                applied = _apply_session_update(
                     year=year,
                     event_name=race_name,
                     session_name=normalized_session,
                     cache_dirs=cache_dirs,
                     processed_dir=processed_dir,
                 )
-                summary.weekend_sessions_replayed.append(f"{race_name}::{normalized_session}")
+                if applied:
+                    summary.weekend_sessions_replayed.append(f"{race_name}::{normalized_session}")
+                else:
+                    summary.skipped_sessions.append(f"{race_name}::{normalized_session}")
 
                 if normalized_session in replay_checkpoints and normalized_session != "PRE":
                     summary.checkpoints.append(

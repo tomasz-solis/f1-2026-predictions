@@ -18,7 +18,10 @@ from sklearn.linear_model import RidgeCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from src.data.actual_results_fetcher import fetch_actual_session_results
+from src.data.actual_results_fetcher import (
+    fetch_actual_session_results,
+    fetch_actual_starting_grid,
+)
 from src.models.conformal_calibration import resolve_race_data_regime
 from src.types.prediction_types import DriverRaceInfo, QualifyingGridEntry
 from src.utils.backtesting import (
@@ -357,14 +360,18 @@ def build_race_residual_dataset(
             reset_state(season=year)
 
         for race_name in get_races_for_year(year=year, max_races=max_races):
-            qualifying_actual = fetch_actual_session_results(year, race_name, "Q")
+            # The label is positions gained from the start, so the start has to be the
+            # grid the cars lined up on. Qualifying classification carries no penalties:
+            # in 2026 it disagrees with the real grid on 15% of driver-races, and on 20
+            # of 22 rows at Spa, which is exactly where the residual signal is largest.
+            starting_grid = fetch_actual_starting_grid(year, race_name)
             race_actual = fetch_actual_session_results(year, race_name, "R")
-            if not qualifying_actual or not race_actual:
+            if not starting_grid or not race_actual:
                 continue
 
             try:
                 driver_info_map, _profile_count = predictor._prepare_driver_info_with_compounds(  # noqa: SLF001
-                    qualifying_actual,
+                    starting_grid,
                     race_name,
                 )
             except (
@@ -384,7 +391,7 @@ def build_race_residual_dataset(
                 year=year,
                 race_name=race_name,
                 weather=weather,
-                qualifying_grid=qualifying_actual,
+                qualifying_grid=starting_grid,
                 driver_info_map=driver_info_map,
                 input_confidence=1.0,
                 mean_grid_confidence=1.0,

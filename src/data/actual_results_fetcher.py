@@ -310,6 +310,125 @@ def fetch_actual_session_results(
         return None
 
 
+def fetch_actual_starting_grid(year: int, race_name: str) -> list[QualifyingGridEntry] | None:
+    """Fetch the grid a completed race actually started from, penalties included.
+
+    Qualifying classification is not the starting grid: a driver who qualifies P3 and
+    takes a ten-place penalty is still classified P3 by the timing feed. FastF1 carries
+    the post-penalty slot as ``GridPosition`` on the race session, which only exists once
+    the race has run. Before that there is no automated source and callers must fall back
+    to the qualifying classification.
+
+    Returns ``None`` when the race has not run or the grid does not reconcile.
+    """
+    labels = {"year": year, "race_name": race_name, "session_name": "R"}
+    try:
+        session = call_with_resilience(
+            "fastf1_get_session",
+            lambda: fastf1.get_session(year, race_name, "R"),
+            labels=labels,
+        )
+        call_with_resilience(
+            "fastf1_session_load_results",
+            lambda: session.load(**_session_load_options("R")),
+            labels=labels,
+        )
+        results = getattr(session, "results", None)
+        if results is None or len(results) == 0:
+            logger.warning("No race results available for %s %s", race_name, year)
+            record_counter("fastf1_starting_grid_empty_total", labels=labels)
+            return None
+
+        gridded: list[dict[str, Any]] = []
+        pit_lane: list[dict[str, Any]] = []
+        for _, row in results.iterrows():
+            driver = _clean_result_str(row.get("Abbreviation")) or _clean_result_str(
+                row.get("DriverNumber")
+            )
+            team_raw = _clean_result_str(row.get("TeamName"))
+            if not driver or not team_raw:
+                logger.error(
+                    "Malformed FastF1 starting-grid row for %s %s: driver=%r team=%r",
+                    race_name,
+                    year,
+                    driver,
+                    team_raw,
+                )
+                record_counter("fastf1_starting_grid_malformed_total", labels=labels)
+                return None
+            entry: dict[str, Any] = {
+                "driver": driver,
+                "team": map_team_to_characteristics(team_raw) or team_raw,
+                "classification": _coerce_optional_position(row.get("Position")),
+            }
+            slot = _coerce_optional_position(row.get("GridPosition"))
+            if slot is None:
+                logger.error("Missing GridPosition for %s at %s %s", driver, race_name, year)
+                record_counter("fastf1_starting_grid_malformed_total", labels=labels)
+                return None
+            if slot == 0:
+                # FastF1 reports a pit-lane start as grid slot zero. It is a real start,
+                # not a missing value, and it holds no place on the grid itself.
+                pit_lane.append(entry)
+                continue
+            entry["slot"] = slot
+            gridded.append(entry)
+
+        grid_rows: list[dict[str, Any]] = []
+        for entry in sorted(gridded, key=lambda item: int(item["slot"])):
+            grid_rows.append(
+                {
+                    "driver": entry["driver"],
+                    "team": entry["team"],
+                    "position": int(entry["slot"]),
+                    "start_type": "grid",
+                }
+            )
+        # Pit-lane starters hold no grid slot. They take the places behind the last
+        # gridded car, in classification order, so the grid stays a 1-N permutation.
+        next_position = len(grid_rows) + 1
+        for entry in sorted(
+            pit_lane,
+            key=lambda item: (item["classification"] is None, item["classification"] or 0),
+        ):
+            grid_rows.append(
+                {
+                    "driver": entry["driver"],
+                    "team": entry["team"],
+                    "position": next_position,
+                    "start_type": "pit_lane",
+                }
+            )
+            next_position += 1
+
+        try:
+            grid = validate_qualifying_grid(
+                cast(list[QualifyingGridEntry], grid_rows),
+                min_entries=_MIN_COMPETITIVE_ENTRIES_BY_SESSION["R"],
+                require_sequential_positions=True,
+            )
+        except ValueError as exc:
+            logger.error("Invalid FastF1 starting grid for %s %s: %s", race_name, year, exc)
+            record_counter("fastf1_starting_grid_invalid_total", labels=labels)
+            return None
+
+        logger.info("Fetched starting grid for %s %s: %s entries", race_name, year, len(grid))
+        return grid
+
+    except (
+        AttributeError,
+        ConnectionError,
+        FileNotFoundError,
+        KeyError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as e:
+        logger.error("Failed to fetch starting grid for %s %s: %s", race_name, year, e)
+        record_counter("fastf1_starting_grid_fetch_failure_total", labels=labels)
+        return None
+
+
 def get_competitive_session_completion_state(
     year: int,
     race_name: str,
