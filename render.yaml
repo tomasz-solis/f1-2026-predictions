@@ -31,4 +31,6 @@ services:
         sync: false
       - key: SUPABASE_KEY
         sync: false
+      - key: TL_ADMIN_TOKEN
+        sync: false
     autoDeploy: true
