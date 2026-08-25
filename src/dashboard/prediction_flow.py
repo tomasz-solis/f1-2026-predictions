@@ -5,6 +5,7 @@ import time
 from typing import Any
 
 from src.types.prediction_types import QualifyingGridEntry
+from src.utils.grid_penalties import apply_grid_penalties
 from src.utils.race_input_confidence import (
     cap_predicted_main_race_input_confidence,
     derive_race_input_confidence,
@@ -353,6 +354,13 @@ def _resolve_qualifying_section(
     return predicted_result, qualifying_grid, grid_source
 
 
+def _attach_grid_penalties(race_section: dict[str, Any], applied: list[Any]) -> dict[str, Any]:
+    """Record the penalties that shaped this grid so the page can show them."""
+    if applied:
+        race_section["grid_penalties"] = [penalty.to_dict() for penalty in applied]
+    return race_section
+
+
 def _resolve_race_section(
     predictor: Any,
     *,
@@ -366,6 +374,12 @@ def _resolve_race_section(
     input_confidence: float,
 ) -> dict[str, Any]:
     """Return actual completed-session race results or a predicted race payload."""
+    # Penalties are applied to the Grand Prix grid, not to a sprint grid.
+    applied_penalties: list[Any] = []
+    if str(session_name).strip().upper() != "SPRINT":
+        qualifying_grid, applied_penalties = apply_grid_penalties(
+            qualifying_grid, race_name=race_name, year=year
+        )
     actual_results, _ = fetch_actual_competitive_results_if_completed(
         year=year,
         race_name=race_name,
@@ -375,6 +389,7 @@ def _resolve_race_section(
         actual_payload = build_actual_race_section(actual_results, session_name=session_name)
         actual_payload["grid_source"] = qualifying_grid_source
         attach_starting_grid_context(actual_payload, qualifying_grid, grid_session_name)
+        _attach_grid_penalties(actual_payload, applied_penalties)
         if qualifying_grid_source == "ACTUAL":
             actual_payload["starting_grid_note"] = build_starting_grid_note(grid_session_name)
         return actual_payload
@@ -398,6 +413,7 @@ def _resolve_race_section(
         )
     race_result["grid_source"] = qualifying_grid_source
     attach_starting_grid_context(race_result, qualifying_grid, grid_session_name)
+    _attach_grid_penalties(race_result, applied_penalties)
     if qualifying_grid_source == "ACTUAL":
         race_result["starting_grid_note"] = build_starting_grid_note(grid_session_name)
     return race_result

@@ -34,6 +34,8 @@ class GridConfig(StrictConfigModel):
     """Race-weekend field size assumptions."""
 
     size: int = Field(default=22, ge=2)
+    # {race name: {driver code: places dropped | "back" | "pit"}}. See config/default.yaml.
+    penalties: dict[str, dict[str, int | str]] = Field(default_factory=dict)
 
 
 class RegulationEra(StrictConfigModel):

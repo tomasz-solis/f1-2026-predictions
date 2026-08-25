@@ -12,6 +12,18 @@ paths:
 
 grid:
   size: 22  # 11 teams x 2 drivers in the 2026 field
+  # Post-qualifying grid drops, keyed by race name exactly as the schedule spells it,
+  # then by driver code. Value: places dropped, "back" (start last) or "pit" (pit-lane
+  # start). Qualifying classification carries no penalties, so the drop is applied to
+  # the grid handed to race prediction and never to the qualifying prediction itself.
+  #
+  # Applies to the Grand Prix only, not to a sprint grid. Before qualifying has run the
+  # drop lands on a *predicted* position, so the start slot inherits that prediction
+  # error. Once the race has run the real grid is read from FastF1 and an entry here
+  # stops having any effect, so old entries are harmless.
+  penalties: {}
+    # Italian Grand Prix:
+    #   ANT: 20
 
 model:
   version: "2.4"

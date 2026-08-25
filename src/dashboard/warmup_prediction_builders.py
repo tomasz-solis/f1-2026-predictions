@@ -7,6 +7,8 @@ import time
 from copy import deepcopy
 from typing import Any
 
+from src.utils.grid_penalties import apply_grid_penalties
+
 from .prediction_checkpointing import (
     resolve_prediction_checkpoint_session,
     session_is_within_prediction_boundary,
@@ -171,6 +173,7 @@ def compute_base_features(
                 main_grid_source = "PREDICTED"
                 main_quali_payload = deepcopy(main_quali)
                 main_quali_payload["grid_source"] = main_grid_source
+        main_penalised = apply_grid_penalties(main_grid, race_name=target_race, year=year)
         main_quali_elapsed = time.time() - main_quali_start
         main_input_confidence = derive_race_input_confidence_fn(
             main_quali_payload,
@@ -190,7 +193,8 @@ def compute_base_features(
             "sprint_grid_for_race": sprint_grid,
             "sprint_race_input_confidence": float(sprint_input_confidence),
             "main_quali": main_quali_payload,
-            "main_grid_for_race": main_grid,
+            "main_grid_for_race": main_penalised.grid,
+            "main_grid_penalties": [penalty.to_dict() for penalty in main_penalised.applied],
             "main_race_input_confidence": float(main_input_confidence),
             "timing": {
                 "sprint_quali": float(sprint_quali_elapsed),
@@ -245,6 +249,7 @@ def compute_base_features(
             grid_source = "PREDICTED"
             qualifying_payload = deepcopy(qualifying)
             qualifying_payload["grid_source"] = grid_source
+    penalised = apply_grid_penalties(qualifying_grid, race_name=target_race, year=year)
     qualifying_elapsed = time.time() - qualifying_start
     race_input_confidence = derive_race_input_confidence_fn(
         qualifying_payload,
@@ -254,7 +259,8 @@ def compute_base_features(
     return {
         "is_sprint": False,
         "qualifying": qualifying_payload,
-        "qualifying_grid_for_race": qualifying_grid,
+        "qualifying_grid_for_race": penalised.grid,
+        "qualifying_grid_penalties": [penalty.to_dict() for penalty in penalised.applied],
         "race_input_confidence": float(race_input_confidence),
         "timing": {
             "qualifying": float(qualifying_elapsed),
@@ -340,6 +346,8 @@ def compute_weather_predictions(
         main_grid_source = main_grid_source.strip().upper() or "PREDICTED"
         main_race["grid_source"] = main_grid_source
         attach_starting_grid_context(main_race, base_features["main_grid_for_race"], "Q")
+        if base_features.get("main_grid_penalties"):
+            main_race["grid_penalties"] = list(base_features["main_grid_penalties"])
         if main_grid_source == "ACTUAL":
             main_race["starting_grid_note"] = build_starting_grid_note_fn("Q")
         if str(main_race.get("result_mode", "")).upper() != "ACTUAL":
@@ -389,6 +397,8 @@ def compute_weather_predictions(
     race_grid_source = race_grid_source.strip().upper() or "PREDICTED"
     race["grid_source"] = race_grid_source
     attach_starting_grid_context(race, base_features["qualifying_grid_for_race"], "Q")
+    if base_features.get("qualifying_grid_penalties"):
+        race["grid_penalties"] = list(base_features["qualifying_grid_penalties"])
     if race_grid_source == "ACTUAL":
         race["starting_grid_note"] = build_starting_grid_note_fn("Q")
     if str(race.get("result_mode", "")).upper() != "ACTUAL":
