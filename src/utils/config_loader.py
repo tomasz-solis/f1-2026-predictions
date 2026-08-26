@@ -136,6 +136,7 @@ class Config:
             ("baseline_predictor.race.dnf_rate_historical_cap", float, 0.0, 1.0),
             ("baseline_predictor.race.dnf_rate_final_cap", float, 0.0, 1.0),
             ("baseline_predictor.race.dnf_rate_floor", float, 0.0, 1.0),
+            ("baseline_predictor.race.dnf_season_calibration_multiplier", float, 0.1, 5.0),
             ("baseline_predictor.race.team_uncertainty_dnf_multiplier", float, 0.0, 1.0),
             ("baseline_predictor.race.missing_driver_teammate_weight", float, 0.0, 1.0),
             ("baseline_predictor.race.missing_driver_default_dnf_rate", float, 0.0, 1.0),

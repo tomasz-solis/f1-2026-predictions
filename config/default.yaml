@@ -588,16 +588,36 @@ baseline_predictor:
     dnf_rate_final_cap: 0.35       # Final maximum DNF probability per driver
     dnf_rate_floor: 0.02           # Minimum per-race DNF probability to avoid zero-risk overconfidence
 
+    # Season DNF calibration: a single field-wide multiplier applied to each
+    # driver's per-race DNF probability before the floor/cap above, so the
+    # simulator's per-driver inputs sum to the observed season retirement rate
+    # instead of the driver-history EMA's rate. It scales the whole
+    # distribution (preserving relative driver ordering) rather than flattening
+    # it, and dnf_rate_final_cap / dnf_rate_floor still bind afterward.
+    # Fitted to the 2026 observed rate: 42 retirements over 264 driver-races
+    # across 12 completed rounds (0.201 per driver-race) against an unscaled
+    # model mean of 0.142 per driver-race -> 0.201 / 0.142 = 1.415. Refit this
+    # constant whenever the season or regulation era changes.
+    dnf_season_calibration_multiplier: 1.415
+
     # Output-layer DNF probability calibration (reported number only; the Monte
     # Carlo DNF sampling inputs are untouched). lambda 1.0 = report the simulated
-    # rate unchanged; 0.0 = report the base rate. Set to 0.25 per the 2026 probe
-    # (data/model_diagnostics/2026/dnf_calibration_probe.md): the raw output
-    # overforecasts retirement risk (Brier 0.046 -> 0.037 shrunk toward the
-    # season base rate). Trade-off: this compresses the reported range to about
-    # [0.03, 0.12], so the "DNF Risk %" surface reads relative risk, not absolute
-    # crash odds. Raise toward 0.5 (Brier 0.038) to keep more spread.
+    # rate unchanged; 0.0 = report the base rate.
+    #
+    # dnf_probability_base_rate is the observed 2026 retirement rate: 42
+    # retirements over 264 driver-races across the 12 completed rounds, read
+    # from raw FastF1 ClassifiedPosition (0.201 per driver-race, 4.42 per race).
+    # The prior value of 0.04 came from data/model_diagnostics/2026/dnf_calibration_probe.md,
+    # which scored stored predictions against actuals missing 31 of the 42
+    # retirements (it recorded 11) and concluded the raw output overforecasts
+    # risk. That premise is the reverse of what the complete actuals show: the
+    # model under-forecasts. lambda is kept at 0.25 rather than raised toward
+    # 1.0 — re-scored on the complete 264 driver-race set, pooled Brier is
+    # 0.16045 at lambda 0.00 and 0.16086 at lambda 0.25 (within 0.0004 of the
+    # best value), rising to 0.17622 at lambda 1.00, so a moderate shrink
+    # toward the (now correct) base rate is still the better calibration.
     dnf_probability_shrinkage_lambda: 0.25
-    dnf_probability_base_rate: 0.04
+    dnf_probability_base_rate: 0.20
 
     # Program-aware testing/practice modifier
     # Uses long-run profile characteristics to make a small team-strength adjustment.
