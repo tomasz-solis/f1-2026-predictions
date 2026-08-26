@@ -171,8 +171,8 @@ def _pirelli_candidate_years(year: int) -> list[int]:
     return list(dict.fromkeys(candidates))
 
 
-def _resolve_track_characteristics_path(year: int) -> Path | None:
-    """Resolve season-aware track characteristics file with conservative fallback."""
+def _track_characteristics_candidate_paths(year: int) -> list[Path]:
+    """Existing track_characteristics files for `year`, in fallback priority order."""
     processed_root = Path(_cfg_get("paths.processed", "data/processed"))
     candidates = [int(year)]
     if year > 0:
@@ -180,6 +180,7 @@ def _resolve_track_characteristics_path(year: int) -> Path | None:
     if 2026 not in candidates:
         candidates.append(2026)
 
+    paths = []
     for candidate_year in dict.fromkeys(candidates):
         candidate_path = (
             processed_root
@@ -187,8 +188,22 @@ def _resolve_track_characteristics_path(year: int) -> Path | None:
             / f"{int(candidate_year)}_track_characteristics.json"
         )
         if candidate_path.exists():
-            return candidate_path
-    return None
+            paths.append(candidate_path)
+    return paths
+
+
+def _resolve_track_characteristics_path(year: int) -> Path | None:
+    """Resolve season-aware track characteristics file with conservative fallback."""
+    paths = _track_characteristics_candidate_paths(year)
+    return paths[0] if paths else None
+
+
+@lru_cache(maxsize=8)
+def _load_track_characteristics_tracks(path_str: str) -> dict[str, Any]:
+    """Load and cache the `tracks` mapping from one track_characteristics file."""
+    with open(path_str) as f:
+        data = json.load(f)
+    return cast(dict[str, Any], data.get("tracks", {}))
 
 
 def _resolve_pirelli_path(year: int) -> Path | None:
@@ -621,29 +636,15 @@ def _normalize_overtaking_difficulty(
     return overtaking
 
 
-def _blend_overtaking_with_transition_prior(
-    race_name: str,
-    observed_overtaking: float,
-    *,
-    observed_races: int | None,
-    baseline_key: str | None,
-) -> float:
-    """Blend observed overtaking with track prior for gradual regulation adaptation.
+def _resolve_overtaking_observed_weight(observed_races: int) -> float:
+    """Evidence-based weight for blending an observed value toward its prior-era value.
 
-    When a track payload includes ``overtaking_observed_races``, this applies a
-    bounded transition from historical prior to observed value. Early races
-    nudge the prior; larger evidence allows stronger movement.
+    Shared by both ``overtaking_difficulty`` (bounded 0..1) and
+    ``overtaking_avg_changes_per_lap`` (unbounded rate) blending: the observed weight
+    scales linearly between ``min_observed_weight`` (n=1, low evidence) and
+    ``max_observed_weight`` (full confidence) as ``observed_races`` approaches
+    ``races_to_full_weight``.
     """
-    if observed_races is None:
-        return observed_overtaking
-    if observed_races <= 0:
-        return observed_overtaking
-
-    prior = get_track_overtaking_baseline(
-        baseline_key,
-        default=float(_cfg_get("track_defaults.overtaking_difficulty", 0.5)),
-    )
-
     min_weight = float(
         _cfg_get(
             "baseline_predictor.race.overtaking_transition.min_observed_weight",
@@ -662,20 +663,48 @@ def _blend_overtaking_with_transition_prior(
             8,
         )
     )
+
+    races_to_full = max(1, races_to_full)
+    min_weight = float(np.clip(min_weight, 0.0, 1.0))
+    max_weight = float(np.clip(max_weight, min_weight, 1.0))
+
+    evidence_ratio = float(np.clip(float(observed_races) / float(races_to_full), 0.0, 1.0))
+    return min_weight + ((max_weight - min_weight) * evidence_ratio)
+
+
+def _blend_overtaking_with_transition_prior(
+    race_name: str,
+    observed_overtaking: float,
+    *,
+    observed_races: int | None,
+    baseline_key: str | None,
+) -> float:
+    """Blend observed overtaking with track prior for gradual regulation adaptation.
+
+    When a track payload includes ``overtaking_observed_races``, this applies a
+    bounded transition from the previous regulation era's prior to the observed
+    2026 value. Early races nudge the prior; larger evidence allows stronger
+    movement.
+    """
+    if observed_races is None:
+        return observed_overtaking
+    if observed_races <= 0:
+        return observed_overtaking
+
+    prior = get_track_overtaking_baseline(
+        baseline_key,
+        default=float(_cfg_get("track_defaults.overtaking_difficulty", 0.5)),
+    )
+
     max_delta = float(
         _cfg_get(
             "baseline_predictor.race.overtaking_transition.max_delta_from_prior",
             0.25,
         )
     )
-
-    races_to_full = max(1, races_to_full)
-    min_weight = float(np.clip(min_weight, 0.0, 1.0))
-    max_weight = float(np.clip(max_weight, min_weight, 1.0))
     max_delta = float(max(0.0, min(1.0, max_delta)))
 
-    evidence_ratio = float(np.clip(float(observed_races) / float(races_to_full), 0.0, 1.0))
-    observed_weight = min_weight + ((max_weight - min_weight) * evidence_ratio)
+    observed_weight = _resolve_overtaking_observed_weight(observed_races)
 
     capped_delta = float(np.clip(observed_overtaking - prior, -max_delta, max_delta))
     blended = float(np.clip(prior + (capped_delta * observed_weight), 0.0, 1.0))
@@ -690,6 +719,51 @@ def _blend_overtaking_with_transition_prior(
         blended,
     )
     return blended
+
+
+def _blend_avg_changes_per_lap_with_transition_prior(
+    race_name: str,
+    observed_avg_changes_per_lap: float,
+    prior_avg_changes_per_lap: float,
+    *,
+    observed_races: int,
+) -> float:
+    """Blend a measured rate toward the prior regulation era's value as evidence grows.
+
+    The prior-era measurement is stale for 2026, not wrong: the regulation change
+    altered the field it describes.
+
+    Unlike the difficulty blend this does NOT apply
+    ``overtaking_transition.max_delta_from_prior``: that clamp is expressed on the
+    bounded 0..1 difficulty scale and would silently truncate a legitimate
+    multi-changes-per-lap swing on this unbounded rate.
+    """
+    observed_weight = _resolve_overtaking_observed_weight(observed_races)
+    blended = prior_avg_changes_per_lap + (
+        (observed_avg_changes_per_lap - prior_avg_changes_per_lap) * observed_weight
+    )
+    blended = max(0.0, blended)
+
+    logger.info(
+        "Blended overtaking_avg_changes_per_lap for %s using transition prior: prior=%.3f observed=%.3f races=%s weight=%.2f result=%.3f",
+        race_name,
+        prior_avg_changes_per_lap,
+        observed_avg_changes_per_lap,
+        observed_races,
+        observed_weight,
+        blended,
+    )
+    return blended
+
+
+def _lookup_fallback_avg_changes_per_lap(data_key: str, year: int) -> float | None:
+    """Look up ``overtaking_avg_changes_per_lap`` from the nearest fallback-year file."""
+    for candidate_path in _track_characteristics_candidate_paths(year)[1:]:
+        candidate_info = _load_track_characteristics_tracks(str(candidate_path)).get(data_key, {})
+        candidate_value = _coerce_float(candidate_info.get("overtaking_avg_changes_per_lap"))
+        if candidate_value is not None:
+            return candidate_value
+    return None
 
 
 def load_track_specific_params(
@@ -779,6 +853,42 @@ def load_track_specific_params(
                         baseline_key=data_key,
                     )
                     track_params["track_overtaking"] = overtaking
+
+                # Caps per-pair pass probability in the simulator. Once a circuit has a
+                # real 2026 measurement (overtaking_observed_races > 0), blend it toward
+                # the previous regulation era's measured value at that circuit instead of
+                # replacing it outright -- see
+                # _blend_avg_changes_per_lap_with_transition_prior. A present-but-
+                # unvalidated value (observed_races 0, e.g. a historical-average
+                # placeholder) is not treated as 2026 evidence: an actual prior-year
+                # measurement is preferred over it. Missing everywhere leaves the cap
+                # unset.
+                avg_changes_per_lap = _coerce_float(
+                    track_info.get("overtaking_avg_changes_per_lap")
+                )
+                avg_changes_observed_races_raw = _coerce_float(
+                    track_info.get("overtaking_observed_races")
+                )
+                avg_changes_observed_races = (
+                    int(avg_changes_observed_races_raw)
+                    if avg_changes_observed_races_raw is not None
+                    else None
+                )
+                if avg_changes_per_lap is not None and avg_changes_observed_races and data_key:
+                    prior_avg_changes_per_lap = _lookup_fallback_avg_changes_per_lap(data_key, year)
+                    if prior_avg_changes_per_lap is not None:
+                        avg_changes_per_lap = _blend_avg_changes_per_lap_with_transition_prior(
+                            race_name,
+                            avg_changes_per_lap,
+                            prior_avg_changes_per_lap,
+                            observed_races=avg_changes_observed_races,
+                        )
+                elif not avg_changes_observed_races and data_key:
+                    prior_avg_changes_per_lap = _lookup_fallback_avg_changes_per_lap(data_key, year)
+                    if prior_avg_changes_per_lap is not None:
+                        avg_changes_per_lap = prior_avg_changes_per_lap
+                if avg_changes_per_lap is not None:
+                    track_params["overtaking_avg_changes_per_lap"] = avg_changes_per_lap
 
                 # Extract lap 1 track-specific risk modifier
                 lap1_risk = track_info.get("lap1_risk_modifier")

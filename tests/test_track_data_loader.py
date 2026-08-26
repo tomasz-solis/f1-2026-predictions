@@ -125,6 +125,154 @@ def test_load_track_specific_params_falls_back_to_previous_available_year(tmp_pa
     assert params["track_overtaking"] == 0.44
 
 
+def test_load_track_specific_params_borrows_avg_changes_per_lap_from_prior_year(tmp_path):
+    """overtaking_avg_changes_per_lap is a near-static circuit property: when the
+    resolved season's file has not recorded it yet, reuse the nearest prior year's
+    measured value for the same circuit rather than leaving the cap unset."""
+    processed_root = tmp_path / "processed"
+    chars_dir = processed_root / "track_characteristics"
+    chars_dir.mkdir(parents=True, exist_ok=True)
+    (chars_dir / "2026_track_characteristics.json").write_text(
+        json.dumps({"tracks": {"Bahrain Grand Prix": {"overtaking_difficulty": 0.40}}})
+    )
+    (chars_dir / "2025_track_characteristics.json").write_text(
+        json.dumps(
+            {
+                "tracks": {
+                    "Bahrain Grand Prix": {
+                        "overtaking_difficulty": 0.40,
+                        "overtaking_avg_changes_per_lap": 3.9,
+                    }
+                }
+            }
+        )
+    )
+
+    with patch(
+        "src.data.track_data_loader.config_loader.get",
+        side_effect=lambda key, default=None: (
+            str(processed_root) if key == "paths.processed" else default
+        ),
+    ):
+        params = load_track_specific_params("Bahrain Grand Prix", year=2026)
+
+    assert params["overtaking_avg_changes_per_lap"] == 3.9
+
+
+def test_load_track_specific_params_blends_measured_avg_changes_per_lap_toward_prior(tmp_path):
+    """A real 2026 measurement (overtaking_observed_races > 0) moves the cap input
+    toward the 2026 value gradually rather than replacing the previous-era prior
+    outright -- the same transition convention used for overtaking_difficulty."""
+    processed_root = tmp_path / "processed"
+    chars_dir = processed_root / "track_characteristics"
+    chars_dir.mkdir(parents=True, exist_ok=True)
+    (chars_dir / "2026_track_characteristics.json").write_text(
+        json.dumps(
+            {
+                "tracks": {
+                    "Australian Grand Prix": {
+                        "overtaking_difficulty": 0.5,
+                        "overtaking_avg_changes_per_lap": 2.30,
+                        "overtaking_observed_races": 1,
+                    }
+                }
+            }
+        )
+    )
+    (chars_dir / "2025_track_characteristics.json").write_text(
+        json.dumps(
+            {
+                "tracks": {
+                    "Australian Grand Prix": {
+                        "overtaking_difficulty": 0.5,
+                        "overtaking_avg_changes_per_lap": 2.81,
+                        "overtaking_observed_races": 0,
+                    }
+                }
+            }
+        )
+    )
+
+    with patch(
+        "src.data.track_data_loader.config_loader.get",
+        side_effect=lambda key, default=None: (
+            str(processed_root) if key == "paths.processed" else default
+        ),
+    ):
+        params = load_track_specific_params("Australian Grand Prix", year=2026)
+
+    # Blended toward, not replaced by, the measured 2026 value: strictly between the
+    # raw 2026 measurement and the 2025 (previous-era) prior, closer to the prior at
+    # n=1 observed race.
+    assert 2.30 < params["overtaking_avg_changes_per_lap"] < 2.81
+    assert params["overtaking_avg_changes_per_lap"] == pytest.approx(2.715, abs=0.01)
+
+
+def test_load_track_specific_params_unvalidated_avg_changes_per_lap_keeps_prior_year(tmp_path):
+    """overtaking_observed_races == 0 means the resolved year's value has not been
+    checked against a real race (e.g. a historical-average placeholder); an actual
+    prior-year measurement is preferred over it, not the unvalidated estimate."""
+    processed_root = tmp_path / "processed"
+    chars_dir = processed_root / "track_characteristics"
+    chars_dir.mkdir(parents=True, exist_ok=True)
+    (chars_dir / "2026_track_characteristics.json").write_text(
+        json.dumps(
+            {
+                "tracks": {
+                    "Bahrain Grand Prix": {
+                        "overtaking_difficulty": 0.5,
+                        "overtaking_avg_changes_per_lap": 5.0,
+                        "overtaking_observed_races": 0,
+                    }
+                }
+            }
+        )
+    )
+    (chars_dir / "2025_track_characteristics.json").write_text(
+        json.dumps(
+            {
+                "tracks": {
+                    "Bahrain Grand Prix": {
+                        "overtaking_difficulty": 0.5,
+                        "overtaking_avg_changes_per_lap": 3.9,
+                    }
+                }
+            }
+        )
+    )
+
+    with patch(
+        "src.data.track_data_loader.config_loader.get",
+        side_effect=lambda key, default=None: (
+            str(processed_root) if key == "paths.processed" else default
+        ),
+    ):
+        params = load_track_specific_params("Bahrain Grand Prix", year=2026)
+
+    assert params["overtaking_avg_changes_per_lap"] == 3.9
+
+
+def test_load_track_specific_params_leaves_avg_changes_per_lap_unset_when_missing_everywhere(
+    tmp_path,
+):
+    processed_root = tmp_path / "processed"
+    chars_dir = processed_root / "track_characteristics"
+    chars_dir.mkdir(parents=True, exist_ok=True)
+    (chars_dir / "2026_track_characteristics.json").write_text(
+        json.dumps({"tracks": {"Bahrain Grand Prix": {"overtaking_difficulty": 0.40}}})
+    )
+
+    with patch(
+        "src.data.track_data_loader.config_loader.get",
+        side_effect=lambda key, default=None: (
+            str(processed_root) if key == "paths.processed" else default
+        ),
+    ):
+        params = load_track_specific_params("Bahrain Grand Prix", year=2026)
+
+    assert "overtaking_avg_changes_per_lap" not in params
+
+
 def test_load_track_specific_params_normalizes_underscaled_overtaking_values(tmp_path):
     processed_root = tmp_path / "processed"
     track_path = processed_root / "track_characteristics" / "2026_track_characteristics.json"

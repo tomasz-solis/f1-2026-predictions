@@ -9,7 +9,9 @@
       "pit_stop_loss": 20.0,
       "safety_car_prob": 0.2,
       "lap1_risk_modifier": 0.1,
-      "overtaking_difficulty": 0.5
+      "overtaking_difficulty": 0.5,
+      "overtaking_avg_changes_per_lap": 3.557,
+      "overtaking_observed_races": 1
     },
     "Miami Grand Prix": {
       "type": "street",
@@ -19,7 +21,9 @@
       "pit_stop_loss": 22.5,
       "safety_car_prob": 0.45,
       "lap1_risk_modifier": 0.1,
-      "overtaking_difficulty": 0.5
+      "overtaking_difficulty": 0.5,
+      "overtaking_avg_changes_per_lap": 2.804,
+      "overtaking_observed_races": 1
     },
     "Qatar Grand Prix": {
       "type": "permanent",
@@ -37,7 +41,9 @@
       "pit_stop_loss": 24.6,
       "safety_car_prob": 0.6,
       "lap1_risk_modifier": 0.4,
-      "overtaking_difficulty": 0.95
+      "overtaking_difficulty": 0.95,
+      "overtaking_avg_changes_per_lap": 1.263,
+      "overtaking_observed_races": 1
     },
     "Bahrain Grand Prix": {
       "type": "permanent",
@@ -55,7 +61,9 @@
       "pit_stop_loss": 23.3,
       "safety_car_prob": 0.3,
       "lap1_risk_modifier": 0.05,
-      "overtaking_difficulty": 0.3
+      "overtaking_difficulty": 0.3,
+      "overtaking_avg_changes_per_lap": 3.163,
+      "overtaking_observed_races": 1
     },
     "British Grand Prix": {
       "type": "permanent",
@@ -65,7 +73,9 @@
       "pit_stop_loss": 29.0,
       "safety_car_prob": 0.25,
       "lap1_risk_modifier": 0.05,
-      "overtaking_difficulty": 0.4
+      "overtaking_difficulty": 0.4,
+      "overtaking_avg_changes_per_lap": 3.137,
+      "overtaking_observed_races": 1
     },
     "Chinese Grand Prix": {
       "type": "permanent",
@@ -75,7 +85,9 @@
       "pit_stop_loss": 22.8,
       "safety_car_prob": 0.35,
       "lap1_risk_modifier": 0.05,
-      "overtaking_difficulty": 0.3
+      "overtaking_difficulty": 0.3,
+      "overtaking_avg_changes_per_lap": 3.2,
+      "overtaking_observed_races": 1
     },
     "Italian Grand Prix": {
       "type": "permanent",
@@ -102,7 +114,9 @@
       "pit_stop_loss": 22.4,
       "safety_car_prob": 0.2,
       "lap1_risk_modifier": 0.0,
-      "overtaking_difficulty": 0.4
+      "overtaking_difficulty": 0.4,
+      "overtaking_avg_changes_per_lap": 3.615,
+      "overtaking_observed_races": 1
     },
     "Austrian Grand Prix": {
       "type": "permanent",
@@ -111,7 +125,9 @@
       "pit_stop_loss": 21.8,
       "safety_car_prob": 0.25,
       "lap1_risk_modifier": 0.05,
-      "overtaking_difficulty": 0.4
+      "overtaking_difficulty": 0.4,
+      "overtaking_avg_changes_per_lap": 2.8,
+      "overtaking_observed_races": 1
     },
     "Canadian Grand Prix": {
       "type": "permanent",
@@ -121,7 +137,9 @@
       "pit_stop_loss": 22.5,
       "safety_car_prob": 0.5,
       "lap1_risk_modifier": 0.15,
-      "overtaking_difficulty": 0.5
+      "overtaking_difficulty": 0.5,
+      "overtaking_avg_changes_per_lap": 2.212,
+      "overtaking_observed_races": 1
     },
     "Japanese Grand Prix": {
       "type": "permanent",
@@ -130,7 +148,9 @@
       "pit_stop_loss": 23.5,
       "safety_car_prob": 0.3,
       "lap1_risk_modifier": 0.1,
-      "overtaking_difficulty": 0.5
+      "overtaking_difficulty": 0.5,
+      "overtaking_avg_changes_per_lap": 2.827,
+      "overtaking_observed_races": 1
     },
     "Abu Dhabi Grand Prix": {
       "type": "permanent",
@@ -148,7 +168,9 @@
       "pit_stop_loss": 21.7,
       "safety_car_prob": 0.2,
       "lap1_risk_modifier": 0.1,
-      "overtaking_difficulty": 0.8
+      "overtaking_difficulty": 0.8,
+      "overtaking_avg_changes_per_lap": 3.391,
+      "overtaking_observed_races": 1
     },
     "Las Vegas Grand Prix": {
       "type": "street",
@@ -176,7 +198,9 @@
       "pit_stop_loss": 18.2,
       "safety_car_prob": 0.55,
       "lap1_risk_modifier": 0.15,
-      "overtaking_difficulty": 0.5
+      "overtaking_difficulty": 0.5,
+      "overtaking_avg_changes_per_lap": 2.298,
+      "overtaking_observed_races": 1
     },
     "Azerbaijan Grand Prix": {
       "type": "street",

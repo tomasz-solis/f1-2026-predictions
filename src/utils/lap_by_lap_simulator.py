@@ -492,6 +492,11 @@ def simulate_race_lap_by_lap(
                 sc_luck_range = race_params.get("safety_car_luck_range", 0.08)
                 sc_luck = rng.uniform(-sc_luck_range, sc_luck_range)
 
+            # The persistent half of the teammate spread stays out of ``base_pace`` on
+            # purpose. It is a random per-driver draw, not measured pace, so feeding it
+            # to the overtake model turns noise into position changes: doing so cost
+            # 0.068 race MAE over the 12 completed 2026 rounds (3.5758 -> 3.6439) and
+            # scored worse than champion. See docs/MODEL_LEDGER.md.
             teammate_variance = state.get("teammate_setup_offset", 0.0)
             if teammate_lap_variance_std > 0.0:
                 teammate_variance += float(rng.normal(0.0, teammate_lap_variance_std))
@@ -745,7 +750,23 @@ def _get_traffic_overtake_effect(
         (overtake_score - pass_threshold) * overtake_cfg.get("pass_probability_scale", 0.45)
     )
     pass_probability *= zone_probability_scale
-    pass_probability = np.clip(pass_probability, 0.05, 0.95)
+    # Track difficulty otherwise enters only as an additive threshold, which the pace
+    # term swamps: at Monaco a 3.4 s/lap advantage produced a raw probability of 1.05,
+    # so a quick car passed 95% of the time on the least passable circuit in F1. Cap it
+    # with the track's own observed rate instead. overtaking_avg_changes_per_lap is
+    # field-wide position changes per lap; with (field_size - 1) following pairs each
+    # lap, dividing gives the per-pair chance a pass happens. That treats every pair as
+    # a potential pass every lap, so it under-estimates the rate conditioned on being
+    # inside the pass window - a deliberately conservative bound. Missing track data
+    # falls back to the previous ceiling rather than guessing a rate.
+    max_pass_probability = 0.95
+    avg_changes_per_lap = race_params.get("overtaking_avg_changes_per_lap")
+    field_size = len(driver_states)
+    if avg_changes_per_lap is not None and field_size > 1:
+        max_pass_probability = min(0.95, float(avg_changes_per_lap) / (field_size - 1))
+    pass_probability = np.clip(
+        pass_probability, min(0.05, max_pass_probability), max_pass_probability
+    )
 
     if rng.random() < pass_probability:
         bonus_range = overtake_cfg.get("pass_time_bonus_range", [0.08, 0.35])
