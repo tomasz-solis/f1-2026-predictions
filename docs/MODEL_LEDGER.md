@@ -1250,6 +1250,166 @@ six affected rounds averaged -0.056 MAE with the real grid (Spa -0.242, Hungary
 rounds matching exactly is the control that matters; the -0.056 is inside noise and
 is not a claim.
 
+## 2026-08-26: track difficulty must cap pass probability, not merely nudge it — `adopted`
+
+**The thesis.** In the lap-by-lap simulator, track difficulty entered pass probability only as
+an additive threshold, and the pace term swamped it. At Monaco, for a car 3.4 s/lap quicker
+than the one ahead:
+
+    overtake_score   = pace_delta * 0.55 = 1.87
+    pass_threshold   = 0.06 + 0.95 * 0.16 = 0.21
+    pass_probability = 0.30 + (1.87 - 0.21) * 0.45 = 1.05  ->  clipped to 0.95
+
+A quick car passed 95% of the time on the least passable circuit in F1. Track difficulty was
+outweighed roughly nine to one. The fix caps the probability with the track's own observed
+rate: `overtaking_avg_changes_per_lap / (field_size - 1)`, i.e. field-wide position changes
+per lap divided by the number of following pairs. Measured pass rates for a 4 s/lap advantage
+in a 22-car field: Monaco 0.048, Monza 0.142, Spa 0.200; a track with no observed-change data
+keeps the previous 0.95 ceiling rather than guessing.
+
+**Baseline.** `c7623714`, rebuilt: mean race MAE 3.6136 over the 12 completed 2026 rounds,
+each predicted from its actual qualifying classification, 100 simulations, seed 42, scored
+against actual finishing positions.
+
+**Result — 3.6136 -> 3.5909.** A modest improvement, and it is recorded as modest.
+
+**What was measured and rejected.** A queue invariant — a driver who failed a pass could not
+end the lap ahead of the car he failed to pass, enforced on cumulative time — scored better
+still, 3.5152. It was rejected because the full test suite showed it broke four pre-existing
+behaviours that all pass on champion:
+
+| test | failure |
+|---|---|
+| `test_higher_skill_driver_wins_majority_of_intra_team_battles` | 58.8% vs 60% required |
+| `test_high_sc_probability_produces_variance` | zero upsets |
+| `test_race_simulation_uses_mapped_team_seconds_delta` | faster car finished second |
+| `test_race_simulation_uses_seconds_native_driver_residual` | faster car finished second |
+
+A safety car bunching the field and producing zero upsets is wrong: SC restarts are a primary
+overtaking mechanism, and especially so at Monaco. **The 0.0984 MAE gain was bought with
+physically false behaviour, and MAE alone did not reveal it** — only the qualitative tests did.
+Recorded here so the number is not rediscovered and adopted later without its cost. None of the
+four tests set `overtaking_avg_changes_per_lap`, so the cap adopted above is inactive in all of
+them and is not implicated.
+
+**Known limitation.** A Mercedes penalised to P22 is predicted P5 at Monza, P8 in Hungary and
+P9 at Monaco — correct ordering, but Monaco is roughly 4-6 places optimistic. The cause is not
+the passing model: it is attrition. The simulator produces 3.1 retirements per Monaco race
+against 6 in the actual 2026 event. Real 2026 Monaco has the season's second-highest mean
+grid-to-finish movement (3.88 places, behind Britain's 4.05) precisely because six cars
+retired, not because anyone overtook. That is DNF calibration; see `shelved/dnf-calibration`.
+
+**Unresolved.** `overtaking_avg_changes_per_lap` and `overtaking_difficulty` carry
+`overtaking_observed_races: 0` for all 25 tracks. Both are static priors this repo has never
+validated against a race, and the adopted cap now rests on one of them.
+
+## 2026-08-26: the 2026 overtaking rates, measured — `adopted`
+
+**The thesis.** The pass cap adopted in the entry below divides
+`overtaking_avg_changes_per_lap` by the number of following pairs. That input was a static
+prior derived from 2022-2024 races, carried in `2025_track_characteristics.json` with
+`overtaking_observed_races: 0` — never validated against a race — while
+`2026_track_characteristics.json` recorded it for none of its 25 circuits. A 2026 model was
+being capped by pre-regulation-change cars.
+
+**Measured from cached FastF1 lap data**, using the original prior's exact counting rule
+(skip lap 1, drop pit-out laps, skip laps with fewer than five cars, count every driver whose
+position changed — so one overtake counts twice):
+
+| race | 2026 | prior | race | 2026 | prior |
+|---|---:|---:|---|---:|---:|
+| Australian | 2.30 | 2.81 | British | 3.14 | 2.53 |
+| Chinese | 3.20 | 4.53 | Belgian | 3.16 | 5.15 |
+| Japanese | 2.83 | 3.68 | Hungarian | 3.39 | 3.27 |
+| Miami | 2.80 | 3.14 | Dutch | 3.56 | 3.11 |
+| Canadian | 2.21 | 2.28 | Monaco | 1.26 | 1.12 |
+| Austrian | 2.80 | 3.38 | Barcelona | 3.62 | n/a |
+
+**The prior is not wrong — it measured a different formula.** Nine of eleven comparable
+circuits sit lower in 2026 and the spread compresses from 4.03 to 2.36. That is the
+regulation change appearing in the data, the same reason `model.regulation_eras` scopes the
+seconds mapping. `scripts/extract_overtaking_rates.py` now measures a season and writes the
+value with an `overtaking_observed_races` count; the loader blends toward the previous era's
+value using the existing transition weighting, so with one race per circuit the 2026
+measurement earns roughly 12-19% weight.
+
+**Result — 3.5909 -> 3.5606** over the 12 completed rounds against the rebuilt `c7623714`
+baseline of 3.6136.
+
+**Worth knowing.** Belgium resolves to 4.78 from a previous-era 5.15 and a 2026 measurement of
+3.16. After a full season the input has moved about a fifth of the way. The transition
+schedule (`races_to_full_weight: 8`) was built for drift within an era, not for an era break;
+whether it should adapt faster after a regulation change is an open question, and it also
+governs `overtaking_difficulty`.
+
+## 2026-08-26: retirements, both layers — `adopted`, and a probe whose evidence failed
+
+**The thesis.** Actual 2026 retirements, read from raw FastF1 (`ClassifiedPosition` not
+numeric): **42 in 264 driver-races, 0.201 per driver-race, 4.42 per race.** Against that:
+
+| layer | before | after | actual |
+|---|---:|---:|---:|
+| simulator input `dnf_probability` (field sum) | 3.13 | 4.43 | 4.42 |
+| reported `dnf_probability` (mean) | 0.064 | 0.200 | 0.201 |
+
+The simulator retired too few cars and the output layer then shrank the reported risk to a
+third of reality. A user reading "6% retirement risk" was looking at a one-in-five event.
+
+**The probe that justified the shrinkage was scored against incomplete actuals.**
+`data/model_diagnostics/2026/dnf_calibration_probe.md` recorded **11 DNFs across 13 events**;
+raw FastF1 for the same races has **42**. Its per-event counts read zero for Australia, China,
+Japan, Miami, Canada and Monaco, all of which had between 2 and 7 retirements; only the last
+three events it scored are correct. The signature is actuals attached before
+`scripts/backfill_dnf_data.py` existed.
+
+Re-scored on complete actuals (264 driver-races, true rate 0.201), pooled Brier by lambda:
+
+| lambda | 0.00 | 0.25 | 0.50 | 0.75 | 1.00 |
+|---|---:|---:|---:|---:|---:|
+| Brier (true rate 0.201) | 0.16045 | 0.16086 | 0.16362 | 0.16875 | 0.17622 |
+| Brier (probe's 0.038) | 0.18694 | 0.18409 | 0.18135 | 0.17873 | 0.17622 |
+
+Under the probe's understated base rate, Brier improves monotonically as lambda rises — the
+opposite ranking to the one it reported. Its lambda=0.25 optimum, and the deployed knob's
+justification that "the raw output overforecasts retirement risk", are artifacts of the
+missing retirements. **The direction was backwards: the model under-forecasts.**
+
+**What changed.** `dnf_probability_base_rate` 0.04 -> 0.20, the observed rate.
+`dnf_probability_shrinkage_lambda` stays 0.25 — with a correct target it now blends toward
+reality, and Brier there is within 0.0004 of the best value. A single documented
+`dnf_season_calibration_multiplier` (1.415) scales the per-driver probability fed to the Monte
+Carlo so the field expectation matches the observed rate; it multiplies, so relative driver
+ordering survives, and the existing cap and floor still bind.
+
+**Cost — 3.5606 -> 3.5758.** Retirements are the least predictable event in a race, so
+simulating them at the true rate necessarily adds variance. The trade is 0.015 race MAE for a
+retirement model that is no longer wrong by a factor of three. Still 0.038 better than
+champion.
+
+**Not fixed.** The probe's own `.md` and `.json` are generated from production-stored
+predictions that are not reachable locally, so they still show the old numbers. Re-running the
+probe needs the stored actuals backfilled in production first.
+
+**Per-track attrition was considered and rejected as unfittable.** Actual 2026 retirements per
+race range 2 to 7, but the observed standard deviation (1.68) is *smaller* than Poisson noise
+for a mean of 4.4 (2.10). With one race per circuit there is no track signal to fit, only
+randomness. The global rate above is fitted to 264 driver-races; a per-track multiplier would
+be fitting noise.
+
+## 2026-08-26: teammate setup offset into base pace — `worse`, built and reverted
+
+**The thesis.** The persistent half of the teammate spread is added to lap time after
+`base_pace` is cached, so it never reaches `pace_delta_to_ahead`. A persistently quicker
+teammate never registered as quicker and never attempted an overtake. Moving it into
+`base_lap_time` leaves total lap time identical and makes it visible to the overtake model.
+
+**Result — 3.5758 -> 3.6439, worse than champion (3.6136). Reverted.**
+
+**Why it should have been obvious.** The offset is `rng.normal(0, std)` — a random per-driver
+draw, not measured pace. Feeding it to the overtake model converts noise into position
+changes. The code sits the way it does on purpose; a comment at the call site now says so with
+this number attached, because the shape of the code invites the same "fix" again.
+
 ## Adding an entry
 
 Keep it to what a future reader needs to trust or discard the result:
