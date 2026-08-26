@@ -290,9 +290,15 @@ def _compute_driver_dnf_probability(
     dnf_rate_final_cap: float,
     dnf_rate_floor: float,
     team_uncertainty_dnf_multiplier: float,
+    season_calibration_multiplier: float,
     resolve_effective_experience_tier_for_race_fn: Callable[[dict], str],
 ) -> float:
-    """Compute capped DNF probability with experience, uncertainty, and a safety floor."""
+    """Compute capped DNF probability with experience, uncertainty, and a safety floor.
+
+    ``season_calibration_multiplier`` scales the whole distribution to the season's
+    observed retirement rate. It multiplies rather than replaces, so a fragile car stays
+    likelier to retire than a reliable one; the cap and floor below still bind afterwards.
+    """
     raw_dnf_rate = driver_data.get("dnf_risk", {}).get("dnf_rate", 0.10)
     try:
         parsed_dnf_rate = float(raw_dnf_rate)
@@ -314,6 +320,7 @@ def _compute_driver_dnf_probability(
     else:
         adjusted_dnf = dnf_rate + experience_dnf_modifier
 
+    adjusted_dnf *= max(0.0, season_calibration_multiplier)
     floor = float(np.clip(dnf_rate_floor, 0.0, dnf_rate_final_cap))
     return max(floor, min(adjusted_dnf, dnf_rate_final_cap))
 
@@ -357,11 +364,14 @@ def _blend_race_skill_with_bayesian_form(
 
 def _load_preparation_config(
     config: Any | None,
-) -> tuple[float, float, float, float, dict, dict, float]:
+) -> tuple[float, float, float, float, float, dict, dict, float]:
     """Load shared prep configuration for race info builders."""
     cfg = config or config_loader
     dnf_rate_historical_cap = cfg.get("baseline_predictor.race.dnf_rate_historical_cap", 0.20)
     dnf_rate_final_cap = cfg.get("baseline_predictor.race.dnf_rate_final_cap", 0.35)
+    season_calibration_multiplier = cfg.get(
+        "baseline_predictor.race.dnf_season_calibration_multiplier", 1.0
+    )
     dnf_rate_floor = cfg.get("baseline_predictor.race.dnf_rate_floor", 0.02)
     long_profile_scale = cfg.get("baseline_predictor.race.testing_long_run_modifier_scale", 0.05)
     long_profile_weights = cfg.get(
@@ -386,6 +396,7 @@ def _load_preparation_config(
         dnf_rate_historical_cap,
         dnf_rate_final_cap,
         dnf_rate_floor,
+        season_calibration_multiplier,
         long_profile_scale,
         long_profile_weights,
         defensive_skill_weights,
@@ -426,6 +437,7 @@ def prepare_driver_info_core(
         dnf_rate_historical_cap,
         dnf_rate_final_cap,
         dnf_rate_floor,
+        season_calibration_multiplier,
         long_profile_scale,
         long_profile_weights,
         defensive_skill_weights,
@@ -442,6 +454,7 @@ def prepare_driver_info_core(
         driver_code = entry["driver"]
         team = entry["team"]
         grid_pos = entry["position"]
+        qualifying_pos = entry.get("qualifying_position")
         team_payload = _resolve_team_payload(teams, team)
 
         if race_name:
@@ -480,6 +493,7 @@ def prepare_driver_info_core(
             dnf_rate_final_cap=dnf_rate_final_cap,
             dnf_rate_floor=dnf_rate_floor,
             team_uncertainty_dnf_multiplier=team_uncertainty_dnf_multiplier,
+            season_calibration_multiplier=season_calibration_multiplier,
             resolve_effective_experience_tier_for_race_fn=resolve_effective_experience_tier_for_race_fn,
         )
 
@@ -509,6 +523,8 @@ def prepare_driver_info_core(
             ]
         if race_rating_mu_s is not None:
             driver_record["race_rating_mu_s"] = race_rating_mu_s
+        if qualifying_pos is not None:
+            driver_record["qualifying_pos"] = int(qualifying_pos)
         driver_info_map[driver_code] = driver_record
 
     return driver_info_map, len(teams_with_long_profile)
@@ -532,6 +548,7 @@ def prepare_driver_info_with_compounds_core(
         dnf_rate_historical_cap,
         dnf_rate_final_cap,
         dnf_rate_floor,
+        season_calibration_multiplier,
         long_profile_scale,
         long_profile_weights,
         defensive_skill_weights,
@@ -552,6 +569,7 @@ def prepare_driver_info_with_compounds_core(
         driver_code = entry["driver"]
         team = entry["team"]
         grid_pos = entry["position"]
+        qualifying_pos = entry.get("qualifying_position")
         team_payload = _resolve_team_payload(teams, team)
 
         if race_name:
@@ -620,6 +638,7 @@ def prepare_driver_info_with_compounds_core(
             dnf_rate_final_cap=dnf_rate_final_cap,
             dnf_rate_floor=dnf_rate_floor,
             team_uncertainty_dnf_multiplier=team_uncertainty_dnf_multiplier,
+            season_calibration_multiplier=season_calibration_multiplier,
             resolve_effective_experience_tier_for_race_fn=resolve_effective_experience_tier_for_race_fn,
         )
 
@@ -659,6 +678,8 @@ def prepare_driver_info_with_compounds_core(
             )
         if race_rating_mu_s is not None:
             driver_record["race_rating_mu_s"] = race_rating_mu_s
+        if qualifying_pos is not None:
+            driver_record["qualifying_pos"] = int(qualifying_pos)
         driver_info_map[driver_code] = driver_record
 
     return driver_info_map, len(teams_with_long_profile)

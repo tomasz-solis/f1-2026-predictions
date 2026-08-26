@@ -553,6 +553,25 @@ def _load_finish_order_config(
     )
 
 
+def resolve_pace_anchor(
+    *,
+    reference_grid_pos: float,
+    qualifying_pos: float | int | None,
+) -> tuple[float, float]:
+    """Return (pace_anchor_pos, pace_anchor_gap) for one driver's finish-order anchor.
+
+    Grid position normally proxies pace, which is why the finish-order anchor blends
+    toward it. A steward's penalty breaks that assumption for the driver it moves: his
+    pace is where he qualified, not the penalised slot he is forced to start from.
+    ``pace_anchor_pos`` becomes the qualifying position only when it beats the grid
+    slot; everyone else's is exactly their ``reference_grid_pos`` and nothing changes.
+    """
+    pace_anchor_pos = reference_grid_pos
+    if qualifying_pos is not None and float(qualifying_pos) < reference_grid_pos:
+        pace_anchor_pos = float(qualifying_pos)
+    return pace_anchor_pos, max(0.0, reference_grid_pos - pace_anchor_pos)
+
+
 def build_finish_order(
     *,
     aggregated: dict[str, Any],
@@ -603,6 +622,11 @@ def build_finish_order(
         grid_position_samples = list(grid_position_samples_by_driver.get(driver_code, []))
         if len(grid_position_samples) != len(positions):
             grid_position_samples = [reference_grid_pos for _ in positions]
+
+        pace_anchor_pos, pace_anchor_gap = resolve_pace_anchor(
+            reference_grid_pos=reference_grid_pos,
+            qualifying_pos=info.get("qualifying_pos"),
+        )
 
         position_std = np.std(positions)
         confidence = max(
@@ -661,11 +685,15 @@ def build_finish_order(
         max_gain *= fo_cfg.max_gain_confidence_scale
         max_gain *= fo_cfg.predicted_grid_max_gain_scale
         max_gain = np.clip(max_gain, fo_cfg.max_gain_floor, fo_cfg.max_gain_ceiling)
+        # A penalised driver's true pace can sit further ahead than the ordinary cap
+        # allows him to recover; widen the cap just enough that it cannot re-suppress
+        # the gap the pace anchor already earned him. A no-op for everyone else.
+        max_gain = max(max_gain, pace_anchor_gap)
         min_position_score = max(1.0, reference_grid_pos - max_gain)
 
         position_blend_score = (
             ((1.0 - fo_cfg.grid_anchor_weight) * median_pos)
-            + (fo_cfg.grid_anchor_weight * reference_grid_pos)
+            + (fo_cfg.grid_anchor_weight * pace_anchor_pos)
             - racecraft_adjustment
         )
         learned_position_adjustment = get_learned_position_adjustment(
@@ -684,12 +712,24 @@ def build_finish_order(
             grid_position_samples,
             strict=False,
         ):
-            min_sample_position_score = max(1.0, float(grid_position_sample) - max_gain)
+            # Same floor-raise as above, applied per sample: only a penalised driver's
+            # samples (pace_anchor_gap > 0) get the wider cap, using that sample's own
+            # grid position rather than the driver-level average.
+            sample_max_gain = (
+                max(max_gain, float(grid_position_sample) - pace_anchor_pos)
+                if pace_anchor_gap
+                else max_gain
+            )
+            min_sample_position_score = max(1.0, float(grid_position_sample) - sample_max_gain)
+            # The field is ranked from these samples, not from the driver-level score
+            # above, so the pace anchor has to be applied here too or it never reaches
+            # the output. Shifting by the gap keeps each sample's own grid variation.
+            sample_anchor = float(grid_position_sample) - pace_anchor_gap
             blended_position_samples.append(
                 max(
                     (
                         ((1.0 - fo_cfg.grid_anchor_weight) * position_sample)
-                        + (fo_cfg.grid_anchor_weight * float(grid_position_sample))
+                        + (fo_cfg.grid_anchor_weight * sample_anchor)
                         - racecraft_adjustment
                     ),
                     min_sample_position_score,

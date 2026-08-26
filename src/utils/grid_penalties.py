@@ -201,6 +201,10 @@ def apply_grid_penalties(
             # qualifying spread has to collapse with the move or the driver is sampled
             # straight back to where he qualified and the penalty does nothing.
             new_row.update(median_position=position, p5=position, p95=position, confidence=1.0)
+            # Record where pace put the driver before the drop. The grid slot below
+            # governs where the race simulation starts him; this is the separate pace
+            # evidence a penalty breaks the "grid proxies pace" assumption for.
+            new_row["qualifying_position"] = int(row["position"])
             if drop == _PIT_LANE:
                 new_row["start_type"] = "pit_lane"
         penalised.append(new_row)  # type: ignore[arg-type]

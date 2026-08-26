@@ -70,6 +70,15 @@ def validate_qualifying_grid(
                 raise ValueError(f"Grid entry start_type cannot be empty for {driver}")
             validated_entry["start_type"] = start_type
 
+        if "qualifying_position" in entry and entry["qualifying_position"] is not None:
+            validate_position(
+                entry["qualifying_position"],
+                "qualifying_position",
+                min_pos=1,
+                max_pos=max_position,
+            )
+            validated_entry["qualifying_position"] = int(entry["qualifying_position"])
+
         if "median_position" in entry and entry["median_position"] is not None:
             validate_position(
                 entry["median_position"],

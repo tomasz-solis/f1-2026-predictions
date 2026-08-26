@@ -25,6 +25,10 @@ class QualifyingGridEntry(TypedDict):
     # a car will be sent to the pit lane. Replay consumers that reconstruct a real race
     # require it on every row and fail closed without it.
     start_type: NotRequired[str]
+    # Where pace put the driver before a steward's penalty moved him back on the grid.
+    # Present only on a row a penalty has moved; the ``position`` above is the slot he
+    # actually starts from. Absent, everyone else's grid slot is already their pace.
+    qualifying_position: NotRequired[int]
 
 
 class DriverRaceInfo(TypedDict):
@@ -33,6 +37,7 @@ class DriverRaceInfo(TypedDict):
     driver: str
     team: str
     grid_pos: int
+    qualifying_pos: NotRequired[int]
     team_strength: float
     team_strength_score: NotRequired[float]
     team_strength_seconds: NotRequired[float]
