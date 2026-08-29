@@ -1410,6 +1410,159 @@ draw, not measured pace. Feeding it to the overtake model converts noise into po
 changes. The code sits the way it does on purpose; a comment at the call site now says so with
 this number attached, because the shape of the code invites the same "fix" again.
 
+## 2026-08-28: position changes were not caused by passing — `adopted` (anchor removal), `candidate` (queue invariant)
+
+**The thesis.** A penalised driver's predicted recovery was wrong: ANT was reported finishing P3
+from a P22 start. Chasing why exposed that position changes in the lap-by-lap simulator are not
+caused by passing at all — position is derived from cumulative lap time, so cars cross over
+whether or not the pass model fires.
+
+**Root cause, measured.** Counting successful pass events against position changes over 10
+simulations per circuit:
+
+| circuit | passes | changes | rate |
+|---|---:|---:|---:|
+| Monaco | 46 | 2949 | 1.6% |
+| Hungarian | 196 | 3151 | 6.2% |
+| Belgian | 357 | 2715 | 13.1% |
+
+Even at Belgium, the circuit with the most passing measured, 87% of position changes happen
+without a pass event.
+
+**Baseline.** `566b5d3b`, rebuilt: mean race MAE **3.5758** over the 12 completed 2026 rounds,
+each predicted from its actual qualifying classification, 100 simulations, seed 42.
+
+**Consequence — four measured dead ends.** Each moved the churn ratio by about 1%, none moved it
+meaningfully toward target:
+
+| change | result |
+|---|---|
+| pass-probability cap by contending pairs alone | MAE 3.5833 (worse) |
+| dirty air raised to its measured magnitude, ~24x | churn ratio 1.76 -> 1.74 |
+| per-circuit field spread from lap-1 timing | churn ratio 1.76 -> 1.69 |
+| pass probability scaled to 0.10 (90% cut) | churn ratio 1.76 -> 1.75 |
+
+None of these touch the mechanism: position derives from time, not from the pass model, so
+tuning the pass model tunes something the position order barely reads.
+
+**Adopted — `resolve_pace_anchor` deleted.** It restored a penalised driver's qualifying
+position as his finish-order anchor, silently erasing the penalty — the actual cause of ANT P3.
+Removing it changes ANT from P3 to P18 from a P22 start and costs **zero** MAE (3.5758 -> 3.5758,
+identical to four decimals), because no round in the 12-round scored set carries a penalty.
+
+**Candidate, not adopted — queue invariant plus contending-pairs cap.** Gates a position change
+on a completed pass, exempting pitted cars, retired cars and neutralised laps. **MAE 3.5758 ->
+3.5227**. At the time of measurement, recovery from P22 gave Monza P16, Hungary P18, Monaco P20,
+with a slow car (BOT) staying P22 at all three. Calibration metrics all moved toward target
+without reaching it: displacement ratio 2.07 -> 1.76, churn ratio 1.76 -> 1.25, churn correlation
++0.273 -> +0.453 against a target of 0.617.
+
+Each component measured **worse alone** — cap 3.5833, gating 3.6364 — so the combined 3.5227 may
+be two errors partly cancelling rather than a validated joint fix. **However, see the MAE note
+below: none of these differences is distinguishable at n=12.**
+
+Test cost at the time: 4 behavioural failures. Three were plumbing tests reading pace through
+free passing and have since been re-pointed at lap time; the fourth,
+`test_higher_skill_driver_wins_majority_of_intra_team_battles` at 58.8% against a 60% floor, was
+a real signal and is resolved by the skill calibration in the 2026-08-29 entry. **Now adopted**,
+with the full suite green.
+
+**MAE cannot arbitrate between any of these variants.** Per-race MAE over the 12 scored rounds has
+sd 1.339, so the standard error of the mean is 0.387. Every configuration measured this session —
+3.5152, 3.5227, 3.5758, 3.5833, 3.6364 — lies within 0.16 SE of champion, where 0.758 would be
+needed to clear two standard errors. MAE is a guard against catastrophe here, not a discriminator;
+every decision in this work was made on the physics metrics instead.
+
+**Measurement corrections.** Two earlier figures were inflated by a harness that patched
+`simulate_race_lap_by_lap` on the utils module; that function is injected via `deps` and bound in
+`prediction_mixin`, so the patch never fired and per-run state never reset. Corrected: churn
+ratio 2.01 -> 1.76, churn correlation +0.389 -> +0.273.
+
+**Reliability limits.** Churn reliability is 0.595 across circuits against a ceiling of 0.771, so
+a correlation target above about 0.62 is unreachable at one race per circuit. Displacement
+reliability is **negative** (-0.223): its between-circuit differences are entirely within
+sampling noise, so no per-track displacement criterion is evaluable until a second season
+exists.
+
+**Recovery evidence, 2022-2025** (n=401 driver-races starting P15 or worse, classified finishers,
+grid and finish ranked within the finishers, bucketed by the driver's median finish across his
+other races that season):
+
+| car quality | n | median | p75 | p90 | max |
+|---|---:|---:|---:|---:|---:|
+| top car (season median finish <= 6) | 31 | +7 | +10 | +13 | +13 |
+| upper-mid (6 < median <= 11) | 99 | +3 | +5 | +8 | +12 |
+| backmarker (median > 11) | 271 | +1 | +3 | +4 | +12 |
+
+2026 only, top car, n=2: HAD P21 -> P6 (+12), VER P20 -> P6 (+9). Largest top-car recoveries
+2022-2025: RUS P20 -> P6 (+13), LEC P19 -> P3 (+13), VER P15 -> P2 (+12), LEC P19 -> P5 (+12).
+
+**Verdict.** Anchor removal: `adopted`. Queue invariant plus contending-pairs cap: `candidate`,
+pending a decision on the four failing tests.
+
+## 2026-08-29: the blend was discarding a correct simulation — `adopted`, model version 3.0
+
+**The thesis.** With position changes gated on a completed pass, the simulator recovers a
+penalised driver realistically on its own: traced lap by lap at Monza, ANT climbs P22 -> P14 by
+lap 4, P10 by lap 12, P4 by lap 48. The reported finish was P17. Three damping heuristics were
+each discarding that answer, all justified by "a grid slot proxies pace" — which is false for a
+driver a steward moved.
+
+**Baseline.** `566b5d3b`, race MAE 3.5758 over the 12 completed 2026 rounds, 100 simulations,
+seed 42.
+
+**What was removed, for penalised drivers only.** `resolve_pace_anchor` replaced the anchor with
+the qualifying position, erasing the penalty (ANT P3). Deleting it left the grid anchor charging
+the penalty twice — started at P22 and anchored at P22 — giving P17. The `max_gain` floor,
+`max(1, grid - 11)`, would have clamped the result at P11 regardless. All three are now bypassed
+for a driver carrying an `is_penalised` flag; every other driver's blend is untouched, which the
+MAE control confirms.
+
+**A flag, deliberately, not a substitute position.** Replacing the grid slot with the qualifying
+slot is what made the pace anchor dangerous. A boolean cannot erase a penalty.
+
+**Team race pace, measured instead of inferred.** `team_strength` is reconstructed from classified
+results (`_get_current_season_observations`), which conflate pace with reliability, strategy and
+luck, and it fed `base_pace` — a lap-time quantity. The simulator had Red Bull fastest with
+Mercedes third at +0.240; measured 2026 race pace has Mercedes fastest and Red Bull fourth at
++0.750. `scripts/extract_team_race_pace.py` now measures median green-flag lap time per team per
+race, normalised to the fastest team, and `_resolve_team_pace_delta_seconds` prefers it, falling
+back to the results-derived mapping when absent.
+
+**Driver skill, fitted to two independent measurements.** `skill_improvement_max` 0.75 -> 1.75.
+
+| target | measured | model at 0.75 | model at 1.75 |
+|---|---|---|---|
+| team mate lap-time gap (114 team-races) | median 0.352 s/lap | 0.150 s | 0.350 s |
+| stronger driver's win rate (34 team-seasons) | median 0.667 | 0.546 | 0.692 |
+
+Two unrelated statistics converge on the same value, which is the reason to trust it over a
+single fitted target. It also lowers the team:driver influence ratio from 2.33 to 1.00, well
+inside the repo's 2.40 cap, and leaves equal-skill team mates at 0.471.
+
+**Result.**
+
+```
+ANT P22 ->  Monza P7   Hungary P7   Monaco P8     (champion: P3 / P4 / P5)
+BOT P22 ->  Monza P18  Hungary P20  Monaco P20
+MAE 3.5758 -> 3.5152   (0.16 SE — not a distinguishable difference)
+suite 1762 passed, 5 skipped, 3 xfailed, 0 failed
+```
+
+For scale: a top car starting at the back finishes P3-P6 in reality (HAD P21->P6 and VER P20->P6
+in 2026; SAI P18->P4 at Monza 2022). P7-P8 from one place further back is in range.
+
+**Watch this.** BOT — the slowest car — drifted P22 -> P19 -> P18 at Monza across the three
+changes. Each step is inside the measured envelope for a back-of-grid start (median +2, p90 +9 at
+Monza), but the cumulative trend was never examined and no single measurement flags it.
+
+**A measurement error worth not repeating.** The recovery bound this work was first scored against
+pooled every start from P15 or worse. That pool is 271 of 401 backmarkers, which dragged the p90
+to 4.8 places and made a correct P16 prediction look pessimistic — and sent this work toward a
+team-strength refit it did not need. Bucketed by car quality the top-car median is +7 and the
+four-season maximum +13. Pooling a conditional quantity is the same error class as fitting a
+per-track value to single-race noise.
+
 ## Adding an entry
 
 Keep it to what a future reader needs to trust or discard the result:

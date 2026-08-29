@@ -7,11 +7,26 @@ but regress when stacked.
 
 ## Current Release Posture
 
-Active model version: `2.3`.
+Active model version: `3.0`.
 
-`2.3` keeps the existing champion predictor in production and adds
+`3.0` is a mechanism change, not a recalibration, which is why it takes a major
+version. Position changes in the race simulation previously happened by free
+crossover on cumulative lap time: a quicker car moved ahead whether or not the
+pass model fired, and 98.4% of simulated position changes at Monaco involved no
+pass event at all. They are now gated on a completed pass, so behaviour before
+and after is not comparable rather than merely differently tuned.
+
+Three inputs were refitted to measurements in the same release: per-team race
+pace now comes from measured green-flag lap times rather than classified
+results, `skill_improvement_max` was fitted to the observed team mate lap-time
+gap, and a penalised driver is no longer re-anchored to the grid slot a steward
+put him in. See `docs/MODEL_LEDGER.md` for the numbers.
+
+`2.3` kept the existing champion predictor in production and added
 target-specific shadow challengers. The challenger outputs are recorded for
-audit; they are not dashboard-facing promotion decisions.
+audit; they are not dashboard-facing promotion decisions. Note that the doc
+recorded `2.3` while `config/default.yaml` carried `2.4` — the two had already
+drifted before this release.
 
 Targets are evaluated separately:
 
