@@ -6,6 +6,7 @@ import pytest
 from src.utils.lap_by_lap_simulator import (
     _get_traffic_overtake_effect,
     _resolve_base_chaos_std,
+    _resolve_team_pace_delta_seconds,
     _update_positions_from_times,
     simulate_race_lap_by_lap,
 )
@@ -69,6 +70,26 @@ def _strategy() -> dict:
         "compound_sequence": ["MEDIUM"],
         "stint_lengths": [60],
     }
+
+
+def test_team_pace_delta_prefers_measured_value_over_results_derived():
+    """A measured race-pace delta for the driver's team wins over the results-derived one."""
+    info = {"team": "Mercedes", "team_strength_seconds_delta": -1.0}
+    measured_deltas = {"Mercedes": 2.5, "Ferrari": 2.3}
+
+    resolved = _resolve_team_pace_delta_seconds(info, "MEDIUM", measured_deltas=measured_deltas)
+
+    assert resolved == 2.5
+
+
+def test_team_pace_delta_falls_back_when_team_not_measured():
+    """A team missing from the measured artifact falls back to the results-derived delta."""
+    info = {"team": "Cadillac F1", "team_strength_seconds_delta": -1.75}
+    measured_deltas = {"Mercedes": 2.5, "Ferrari": 2.3}
+
+    resolved = _resolve_team_pace_delta_seconds(info, "MEDIUM", measured_deltas=measured_deltas)
+
+    assert resolved == -1.75
 
 
 def test_mixed_weather_chaos_is_interpolated_between_dry_and_wet():
@@ -232,16 +253,36 @@ def test_persistent_teammate_setup_offset_can_break_identical_teammates():
     }
 
     strategies = {"A": _strategy(), "B": _strategy()}
-    result = simulate_race_lap_by_lap(
-        driver_info_map=driver_info_map,
-        strategies=strategies,
-        race_params=race_params,
-        race_distance=12,
-        weather="dry",
-        rng=np.random.default_rng(seed=3),
-    )
 
-    assert result["finish_order"] == ["B", "A"]
+    def _race(offset_ratio: float) -> float:
+        params = {**race_params, "teammate_setup_offset_ratio": offset_ratio}
+        # B leads: a car held up behind another has its cumulative time clamped to the
+        # car ahead, which would hide the offset this test is measuring. Finishing order
+        # can no longer show it either -- a position change requires a completed pass and
+        # passing is switched off here.
+        info = {name: dict(row) for name, row in driver_info_map.items()}
+        info["B"]["grid_pos"], info["A"]["grid_pos"] = 1, 2
+        return simulate_race_lap_by_lap(
+            driver_info_map=info,
+            strategies=strategies,
+            race_params=params,
+            race_distance=12,
+            weather="dry",
+            rng=np.random.default_rng(seed=3),
+        )["total_times"]["B"]
+
+    with_offset = _race(1.0)
+    without_offset = _race(0.0)
+    shift = abs(with_offset - without_offset)
+
+    # A persistent per-driver offset accumulates linearly with race distance; per-lap
+    # white noise of the same size would partly cancel and grow only with its square
+    # root. Over 12 laps at std 0.20 s a persistent offset should move total time by
+    # far more than a single lap's worth.
+    assert shift > 0.20, (
+        f"A persistent teammate setup offset moved B's 12-lap race time by only "
+        f"{shift:.3f}s, which is within one lap's worth of noise -- it is washing out."
+    )
 
 
 def test_strong_defender_reduces_overtake_success():
@@ -291,8 +332,9 @@ def test_strong_defender_reduces_overtake_success():
         driver_info_map=weak_map,
         driver_ahead_map=driver_ahead_map,
         race_params=race_params,
+        contending_pairs=21,
         rng=rng_weak,
-    )
+    ).effect
 
     rng_strong = np.random.default_rng(seed=1)
     strong_effect = _get_traffic_overtake_effect(
@@ -301,8 +343,9 @@ def test_strong_defender_reduces_overtake_success():
         driver_info_map=strong_map,
         driver_ahead_map=driver_ahead_map,
         race_params=race_params,
+        contending_pairs=21,
         rng=rng_strong,
-    )
+    ).effect
 
     # Lower effect is better for attacker (negative = pass gain).
     assert weak_effect < strong_effect
@@ -335,8 +378,9 @@ def test_dirty_air_penalty_is_stronger_on_monaco_than_monza():
         driver_info_map=driver_info_map,
         driver_ahead_map=driver_ahead_map,
         race_params=race_params,
+        contending_pairs=21,
         rng=np.random.default_rng(1),
-    )
+    ).effect
 
     race_params["track_name"] = "Italian Grand Prix"
     monza_effect = _get_traffic_overtake_effect(
@@ -345,8 +389,9 @@ def test_dirty_air_penalty_is_stronger_on_monaco_than_monza():
         driver_info_map=driver_info_map,
         driver_ahead_map=driver_ahead_map,
         race_params=race_params,
+        contending_pairs=21,
         rng=np.random.default_rng(1),
-    )
+    ).effect
 
     assert monaco_effect > monza_effect
     assert monaco_effect >= monza_effect * 1.8
@@ -378,8 +423,9 @@ def test_dirty_air_penalty_not_applied_beyond_gap_window():
         driver_info_map=driver_info_map,
         driver_ahead_map=driver_ahead_map,
         race_params=race_params,
+        contending_pairs=21,
         rng=np.random.default_rng(1),
-    )
+    ).effect
 
     assert effect == 0.0
 
@@ -424,8 +470,9 @@ def test_front_overtakes_are_harder_than_backfield_overtakes():
                 driver_info_map=info_map,
                 driver_ahead_map=front_ahead_map,
                 race_params=race_params,
+                contending_pairs=21,
                 rng=np.random.default_rng(seed),
-            )
+            ).effect
         )
         back_effects.append(
             _get_traffic_overtake_effect(
@@ -434,8 +481,9 @@ def test_front_overtakes_are_harder_than_backfield_overtakes():
                 driver_info_map=info_map,
                 driver_ahead_map=back_ahead_map,
                 race_params=race_params,
+                contending_pairs=21,
                 rng=np.random.default_rng(seed),
-            )
+            ).effect
         )
 
     # Lower effect is better for attacker (negative = pass gain).

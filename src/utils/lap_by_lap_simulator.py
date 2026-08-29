@@ -15,8 +15,11 @@ aggregates many runs rather than trusting one simulated race, which is the same
 reason teams run thousands of strategy scenarios before a grand prix.
 """
 
+import json
 import logging
-from typing import Any, cast
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, NamedTuple, cast
 
 import numpy as np
 
@@ -34,6 +37,41 @@ from src.types.prediction_types import PitStrategy, RaceSimulationResult
 from src.utils.validation_helpers import normalize_weather_key
 
 logger = logging.getLogger(__name__)
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+@lru_cache(maxsize=8)
+def _load_measured_team_pace_deltas(year: int) -> dict[str, float] | None:
+    """Load and centre a season's measured team race-pace deltas, cached per year.
+
+    Reads ``data/processed/team_race_pace/<year>_team_race_pace.json`` (built by
+    ``scripts/extract_team_race_pace.py``), which stores each team's mean gap in
+    seconds to that race's fastest team (smaller = faster). ``base_pace`` needs the
+    opposite convention -- larger delta = faster car -- so this centres the gaps
+    around their mean: ``delta = mean(all gaps) - gap_for_team``. Returns None when
+    the artifact is missing so callers fall back to the results-derived value.
+    """
+    path = _PROJECT_ROOT / "data" / "processed" / "team_race_pace" / f"{year}_team_race_pace.json"
+    try:
+        with open(path) as f:
+            payload = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    teams = payload.get("teams", {})
+    gaps = {team: float(stats["gap_s"]) for team, stats in teams.items()}
+    if not gaps:
+        return None
+
+    mean_gap = sum(gaps.values()) / len(gaps)
+    return {team: mean_gap - gap for team, gap in gaps.items()}
+
+
+# Breaks the ordering tie when a blocked driver is held behind the car he could not
+# pass. It exists so the two cumulative times are not exactly equal; it is not a
+# physical following distance and must not be tuned.
+_FOLLOWING_EPSILON_S = 0.001
 
 # Internal ratios used to expand the compact overtake model.
 #
@@ -245,6 +283,10 @@ def simulate_race_lap_by_lap(
     # Expand compact overtake config once before the lap loop.
     race_params = dict(race_params)
     race_params["overtake_model"] = _expand_overtake_cfg(race_params.get("overtake_model", {}))
+    measured_team_pace_deltas = None
+    _race_year = race_params.get("year")
+    if _race_year is not None:
+        measured_team_pace_deltas = _load_measured_team_pace_deltas(int(_race_year))
     track_temperature_c = race_params.get("track_temperature_c")
     weather_feature_modifiers = race_params.get("weather_feature_modifiers", {})
     chaos_multiplier = float(
@@ -367,9 +409,31 @@ def simulate_race_lap_by_lap(
         driver_ahead_map = {
             active_order[idx][0]: active_order[idx - 1][0] for idx in range(1, len(active_order))
         }
+        # Race order, leader first: a follower's queue constraint below reads the car
+        # ahead's cumulative time for THIS lap, which only holds if that car has
+        # already run it. Insertion order left the constraint reading stale state.
+        lap_driver_order = [driver for driver, _position in active_order]
+        lap_driver_order += [d for d in driver_states if d not in set(lap_driver_order)]
+        pitted_this_lap: set[str] = set()
+
+        # The measured overtaking rate is field-wide, so the per-pair budget it implies
+        # depends on how many pairs are close enough to contest a pass this lap, not on
+        # the size of the field. Counted from the start-of-lap snapshot.
+        pass_window_s = race_params.get("overtake_model", {}).get("pass_window_s", 1.2)
+        contending_pairs = sum(
+            1
+            for follower, ahead in driver_ahead_map.items()
+            if not driver_states[follower]["has_dnf"]
+            and not driver_states[ahead]["has_dnf"]
+            and (
+                driver_states[follower]["cumulative_time"] - driver_states[ahead]["cumulative_time"]
+            )
+            <= pass_window_s
+        )
+
         active_neutralization = _neutralization_by_lap.get(lap_num)  # "SC", "VSC", or None
 
-        for driver in list(driver_states.keys()):
+        for driver in lap_driver_order:
             state = driver_states[driver]
             info = driver_info_map[driver]
 
@@ -398,7 +462,9 @@ def simulate_race_lap_by_lap(
             skill_improvement_max = _skill_improvement_max
             team_strength_compression = _team_strength_compression
 
-            team_pace_delta_s = _resolve_team_pace_delta_seconds(info, compound)
+            team_pace_delta_s = _resolve_team_pace_delta_seconds(
+                info, compound, measured_deltas=measured_team_pace_deltas
+            )
             if team_pace_delta_s is None:
                 compressed_team_strength = 0.5 + ((team_strength - 0.5) * team_strength_compression)
                 compressed_team_strength = np.clip(compressed_team_strength, 0.0, 1.0)
@@ -501,12 +567,13 @@ def simulate_race_lap_by_lap(
             if teammate_lap_variance_std > 0.0:
                 teammate_variance += float(rng.normal(0.0, teammate_lap_variance_std))
 
-            traffic_overtake_effect = _get_traffic_overtake_effect(
+            traffic_overtake = _get_traffic_overtake_effect(
                 driver=driver,
                 driver_states=driver_states,
                 driver_info_map=driver_info_map,
                 driver_ahead_map=driver_ahead_map,
                 race_params=race_params,
+                contending_pairs=contending_pairs,
                 rng=rng,
             )
 
@@ -518,7 +585,7 @@ def simulate_race_lap_by_lap(
                 + chaos
                 + sc_luck
                 + teammate_variance
-                + traffic_overtake_effect
+                + traffic_overtake.effect
             )
 
             # Keep lap time within plausible bounds.
@@ -527,6 +594,25 @@ def simulate_race_lap_by_lap(
 
             # Update cumulative time and tire age.
             state["cumulative_time"] += lap_time
+
+            # A driver who failed to pass cannot end the lap ahead of the car he was
+            # stuck behind. The queue is an ordering constraint, so it is enforced on the
+            # ordering quantity rather than by flooring his lap time. A car that pitted
+            # this lap has left the road and blocks nobody. Neutralised laps are exempt:
+            # a safety-car restart is a primary overtaking mechanism, and enforcing the
+            # queue through one produced zero SC upsets, which is why an earlier version
+            # of this invariant was rejected. See docs/MODEL_LEDGER.md.
+            if traffic_overtake.blocked and active_neutralization is None:
+                blocking_driver = driver_ahead_map.get(driver)
+                if (
+                    blocking_driver is not None
+                    and blocking_driver not in pitted_this_lap
+                    and not driver_states[blocking_driver]["has_dnf"]
+                ):
+                    state["cumulative_time"] = max(
+                        state["cumulative_time"],
+                        driver_states[blocking_driver]["cumulative_time"] + _FOLLOWING_EPSILON_S,
+                    )
             # SC/VSC pace is much lower; model reduced thermal stress as fractional tire-age increment.
             sc_tire_wear_fraction = (
                 float(race_params.get("sc_tire_wear_fraction", 0.65))
@@ -544,6 +630,7 @@ def simulate_race_lap_by_lap(
                 _apply_pit_stop(
                     state, strategy, race_params, rng, neutralization_type=active_neutralization
                 )
+                pitted_this_lap.add(driver)
 
         # Field compression: applied once when SC first deploys, not every SC lap.
         if lap_num in _sc_first_laps and _neutralization_by_lap.get(lap_num) == "SC":
@@ -579,8 +666,24 @@ def _resolve_base_chaos_std(race_params: dict[str, Any], weather: str) -> float:
 def _resolve_team_pace_delta_seconds(
     info: dict[str, Any],
     compound: str,
+    measured_deltas: dict[str, float] | None = None,
 ) -> float | None:
-    """Return centered team pace seconds for a driver and compound when available."""
+    """Return centered team pace seconds for a driver and compound when available.
+
+    Preference order: a measured race-pace delta for the driver's team (see
+    ``_load_measured_team_pace_deltas``), then the compound-specific results-derived
+    delta, then the flat results-derived delta. The measured value is preferred
+    because ``team_strength`` is reconstructed from classified results, which
+    conflate pace with reliability, strategy and luck, while ``base_pace`` here
+    needs pace specifically.
+    """
+    if measured_deltas is not None:
+        team = info.get("team")
+        if team in measured_deltas:
+            value = measured_deltas[team]
+            if np.isfinite(value):
+                return float(value)
+
     compound_deltas = info.get("team_strength_seconds_delta_by_compound")
     if isinstance(compound_deltas, dict) and compound in compound_deltas:
         try:
@@ -647,14 +750,27 @@ def _compute_race_wet_skill_modifier(
     return -raw_adjustment
 
 
+class TrafficOvertakeResult(NamedTuple):
+    """Outcome of one driver's per-lap traffic/overtake interaction.
+
+    ``effect`` is the lap-time delta (positive = dirty-air loss, negative = a successful
+    pass's time gain). ``blocked`` is True when the driver was inside the pass window but
+    did not complete a pass, which the lap loop uses to hold him behind.
+    """
+
+    effect: float
+    blocked: bool
+
+
 def _get_traffic_overtake_effect(
     driver: str,
     driver_states: dict[str, dict[str, Any]],
     driver_info_map: dict[str, dict[str, Any]],
     driver_ahead_map: dict[str, str],
     race_params: dict[str, Any],
+    contending_pairs: int,
     rng: np.random.Generator,
-) -> float:
+) -> TrafficOvertakeResult:
     """Return lap-time delta from traffic and overtake attempts.
 
     Positive values are time losses (dirty air), negative values are gains
@@ -662,12 +778,12 @@ def _get_traffic_overtake_effect(
     """
     ahead_driver = driver_ahead_map.get(driver)
     if ahead_driver is None:
-        return 0.0  # Leader: clean air
+        return TrafficOvertakeResult(0.0, False)  # Leader: clean air
 
     state = driver_states[driver]
     ahead_state = driver_states[ahead_driver]
     if ahead_state.get("has_dnf", False):
-        return 0.0
+        return TrafficOvertakeResult(0.0, False)
 
     gap_to_ahead = max(0.0, state["cumulative_time"] - ahead_state["cumulative_time"])
     track_overtaking = race_params.get("track_overtaking", 0.5)
@@ -675,7 +791,7 @@ def _get_traffic_overtake_effect(
 
     dirty_air_window = overtake_cfg.get("dirty_air_window_s", 1.8)
     if gap_to_ahead > dirty_air_window:
-        return 0.0
+        return TrafficOvertakeResult(0.0, False)
 
     info = driver_info_map[driver]
     ahead_info = driver_info_map.get(ahead_driver, {})
@@ -707,7 +823,7 @@ def _get_traffic_overtake_effect(
 
     pass_window = overtake_cfg.get("pass_window_s", 1.2)
     if gap_to_ahead > pass_window:
-        return effect
+        return TrafficOvertakeResult(effect, False)
 
     pace_diff_scale = overtake_cfg.get("pace_diff_scale", 0.55)
     skill_scale = overtake_cfg.get("skill_scale", 0.25)
@@ -744,7 +860,8 @@ def _get_traffic_overtake_effect(
     )
     pass_threshold += zone_threshold_boost
     if overtake_score <= pass_threshold:
-        return effect
+        # Inside the pass window but not quick enough to try: still stuck behind.
+        return TrafficOvertakeResult(effect, True)
 
     pass_probability = overtake_cfg.get("pass_probability_base", 0.30) + (
         (overtake_score - pass_threshold) * overtake_cfg.get("pass_probability_scale", 0.45)
@@ -761,9 +878,8 @@ def _get_traffic_overtake_effect(
     # falls back to the previous ceiling rather than guessing a rate.
     max_pass_probability = 0.95
     avg_changes_per_lap = race_params.get("overtaking_avg_changes_per_lap")
-    field_size = len(driver_states)
-    if avg_changes_per_lap is not None and field_size > 1:
-        max_pass_probability = min(0.95, float(avg_changes_per_lap) / (field_size - 1))
+    if avg_changes_per_lap is not None and contending_pairs > 0:
+        max_pass_probability = min(0.95, float(avg_changes_per_lap) / contending_pairs)
     pass_probability = np.clip(
         pass_probability, min(0.05, max_pass_probability), max_pass_probability
     )
@@ -774,8 +890,9 @@ def _get_traffic_overtake_effect(
             bonus_range = [0.08, 0.35]
         pass_bonus = rng.uniform(bonus_range[0], bonus_range[1]) * zone_bonus_scale
         effect -= pass_bonus
+        return TrafficOvertakeResult(effect, False)
 
-    return effect
+    return TrafficOvertakeResult(effect, True)
 
 
 def _get_overtake_zone_adjustments(
@@ -934,6 +1051,13 @@ def _generate_race_result(
     return {
         "finish_order": finish_order,
         "dnf_drivers": dnf_drivers,
+        # Total race time per driver. Finishing order alone cannot show that a pace
+        # input reached the simulation: once a position change requires a completed
+        # pass, a quicker car held up behind a slower one finishes behind it, which is
+        # correct. Lap time is where a pace difference is actually observable.
+        "total_times": {
+            driver: state["cumulative_time"] for driver, state in driver_states.items()
+        },
         "strategies_used": strategies,
     }
 

@@ -81,6 +81,9 @@ def extract_overtakes_from_race(year: int, race_name: str) -> dict[str, Any] | N
             "laps_analyzed": len(overtakes),
             "avg_changes_per_lap": avg_per_lap,
             "max_changes_in_lap": max(o["position_changes"] for o in overtakes),
+            # The per-lap series, so a caller can measure how noisy this race's rate is
+            # without reimplementing the counting above and drifting from it.
+            "per_lap_changes": [o["position_changes"] for o in overtakes],
         }
 
     except (AttributeError, KeyError, ValueError, TypeError) as e:

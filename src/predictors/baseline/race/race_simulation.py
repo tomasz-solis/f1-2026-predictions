@@ -190,6 +190,10 @@ def predict_race_core(
 
     race_params = {**base_params, **track_params}
     race_params["track_name"] = race_name
+    # Lets simulate_race_lap_by_lap resolve the season's measured team race-pace
+    # artifact (data/processed/team_race_pace/) without threading a new parameter
+    # through this whole call chain.
+    race_params["year"] = year
 
     race_params["fuel"] = {
         "initial_load_kg": cfg.get("baseline_predictor.race.fuel.initial_load_kg", 110.0),

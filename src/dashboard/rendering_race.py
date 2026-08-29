@@ -354,9 +354,23 @@ def _render_grid_penalty_notice(result: dict) -> None:
     if not described:
         return
 
+    # What starting at the back actually yields, measured across 2022-2025: 401 driver-races
+    # starting P15 or worse and classified, with grid and finish ranked within the finishers so
+    # a retirement ahead does not count as a place gained, bucketed by the driver's median finish
+    # across his other races that season. Front-running car (season median finish <= 6): median
+    # gain +7, p90 +13, max +13. Backmarker (season median finish > 11): median gain +1, p90 +4,
+    # max +12. Regenerate with scripts/probe_recovery_envelope.py (NOT
+    # probe_overtaking_realism.py, which measures the 2026 pooled envelope and gives
+    # different, backmarker-dominated numbers).
+    # Shown because a single predicted position reads as a forecast the model cannot support
+    # for a penalised driver.
     render_notice_banner(
         f"Grid penalties applied: {described}. Positions below are measured from the "
-        "penalised starting grid, not from qualifying.",
+        "penalised starting grid, not from qualifying. "
+        "A penalised driver's recovery is the least certain number on this page: it depends "
+        "heavily on the car underneath him. From a back-of-grid start, a front-running car has "
+        "typically gained about 7 places and never more than 13, while a backmarker has "
+        "typically gained only about 1.",
         tone="warning",
         label="Starting grid",
     )

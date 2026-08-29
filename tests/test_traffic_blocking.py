@@ -55,8 +55,9 @@ def _pass_rate(
             driver_info_map=_info(states),
             driver_ahead_map={"CHASER": "AHEAD"},
             race_params=_params(avg_changes_per_lap, track_overtaking),
+            contending_pairs=21,
             rng=np.random.default_rng(seed),
-        )
+        ).effect
         passes += effect < 0.0
     return passes / runs
 

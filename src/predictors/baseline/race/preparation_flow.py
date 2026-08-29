@@ -454,7 +454,12 @@ def prepare_driver_info_core(
         driver_code = entry["driver"]
         team = entry["team"]
         grid_pos = entry["position"]
-        qualifying_pos = entry.get("qualifying_position")
+        # A steward's penalty put this driver where he starts; it is not evidence of his
+        # pace. The finish-order blend uses the flag to stop anchoring him to a slot the
+        # simulation has already started him from. A flag, deliberately, not a
+        # substitute position -- replacing the grid slot with the qualifying slot erases
+        # the penalty outright, which is what resolve_pace_anchor did.
+        is_penalised = entry.get("qualifying_position") is not None
         team_payload = _resolve_team_payload(teams, team)
 
         if race_name:
@@ -500,6 +505,7 @@ def prepare_driver_info_core(
         seconds_components = team_strength_seconds_components(team_strength, session_kind="race")
         race_rating_mu_s = read_driver_rating_mu_seconds(driver_data, session_kind="race")
         driver_record: DriverRaceInfo = {
+            "is_penalised": is_penalised,
             "driver": driver_code,
             "team": team,
             "grid_pos": grid_pos,
@@ -523,8 +529,6 @@ def prepare_driver_info_core(
             ]
         if race_rating_mu_s is not None:
             driver_record["race_rating_mu_s"] = race_rating_mu_s
-        if qualifying_pos is not None:
-            driver_record["qualifying_pos"] = int(qualifying_pos)
         driver_info_map[driver_code] = driver_record
 
     return driver_info_map, len(teams_with_long_profile)
@@ -569,7 +573,12 @@ def prepare_driver_info_with_compounds_core(
         driver_code = entry["driver"]
         team = entry["team"]
         grid_pos = entry["position"]
-        qualifying_pos = entry.get("qualifying_position")
+        # A steward's penalty put this driver where he starts; it is not evidence of his
+        # pace. The finish-order blend uses the flag to stop anchoring him to a slot the
+        # simulation has already started him from. A flag, deliberately, not a
+        # substitute position -- replacing the grid slot with the qualifying slot erases
+        # the penalty outright, which is what resolve_pace_anchor did.
+        is_penalised = entry.get("qualifying_position") is not None
         team_payload = _resolve_team_payload(teams, team)
 
         if race_name:
@@ -648,6 +657,7 @@ def prepare_driver_info_with_compounds_core(
         )
         race_rating_mu_s = read_driver_rating_mu_seconds(driver_data, session_kind="race")
         driver_record: DriverRaceInfo = {
+            "is_penalised": is_penalised,
             "driver": driver_code,
             "team": team,
             "grid_pos": grid_pos,
@@ -678,8 +688,6 @@ def prepare_driver_info_with_compounds_core(
             )
         if race_rating_mu_s is not None:
             driver_record["race_rating_mu_s"] = race_rating_mu_s
-        if qualifying_pos is not None:
-            driver_record["qualifying_pos"] = int(qualifying_pos)
         driver_info_map[driver_code] = driver_record
 
     return driver_info_map, len(teams_with_long_profile)

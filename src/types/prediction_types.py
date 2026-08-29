@@ -34,10 +34,12 @@ class QualifyingGridEntry(TypedDict):
 class DriverRaceInfo(TypedDict):
     """Driver information for race simulation."""
 
+    # True when a steward's penalty set this driver's start slot, so the grid position
+    # carries no pace information for him. See preparation_flow and build_finish_order.
+    is_penalised: NotRequired[bool]
     driver: str
     team: str
     grid_pos: int
-    qualifying_pos: NotRequired[int]
     team_strength: float
     team_strength_score: NotRequired[float]
     team_strength_seconds: NotRequired[float]
@@ -76,4 +78,8 @@ class RaceSimulationResult(TypedDict):
 
     finish_order: list[str]
     dnf_drivers: list[str]
+    # Total race time per driver. Finishing order cannot show that a pace input reached
+    # the simulation once a position change requires a completed pass, so lap time is
+    # the observable. See build_finish_order and tests/test_team_strength_seconds_live.py.
+    total_times: dict[str, float]
     strategies_used: dict[str, PitStrategy]
