@@ -1,0 +1,50 @@
+{
+  "built_at": "2026-08-28T21:08:13.782776+00:00",
+  "teams": {
+    "Alpine": {
+      "gap_s": 1.7611,
+      "races": 12
+    },
+    "Aston Martin": {
+      "gap_s": 3.8696,
+      "races": 12
+    },
+    "Audi": {
+      "gap_s": 1.8635,
+      "races": 12
+    },
+    "Cadillac F1": {
+      "gap_s": 3.8323,
+      "races": 11
+    },
+    "Ferrari": {
+      "gap_s": 0.1891,
+      "races": 12
+    },
+    "Haas F1 Team": {
+      "gap_s": 2.2858,
+      "races": 12
+    },
+    "McLaren": {
+      "gap_s": 0.5242,
+      "races": 11
+    },
+    "Mercedes": {
+      "gap_s": 0.0953,
+      "races": 12
+    },
+    "RB": {
+      "gap_s": 1.7874,
+      "races": 12
+    },
+    "Red Bull Racing": {
+      "gap_s": 0.7501,
+      "races": 12
+    },
+    "Williams": {
+      "gap_s": 2.4567,
+      "races": 12
+    }
+  },
+  "year": 2026
+}
