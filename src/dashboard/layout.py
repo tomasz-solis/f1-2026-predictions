@@ -230,12 +230,19 @@ def render_sidebar() -> tuple[str, bool]:
     segmented_control = getattr(st, "segmented_control", None)
     active_page = _active_navigation_page()
     if callable(segmented_control):
+        # Seed the widget's own state instead of passing `default=`. The deselect
+        # callback writes this key, and Streamlit warns when a keyed widget is both
+        # given a default and assigned through the Session State API.
+        try:
+            if _coerce_navigation_page(st.session_state.get(_NAVIGATION_WIDGET_KEY)) is None:
+                st.session_state[_NAVIGATION_WIDGET_KEY] = active_page
+        except Exception:
+            pass
         try:
             selection = segmented_control(
                 "Navigation",
                 options=NAVIGATION_PAGES,
                 selection_mode="single",
-                default=active_page,
                 key=_NAVIGATION_WIDGET_KEY,
                 on_change=_sync_navigation_widget,
             )
@@ -244,7 +251,6 @@ def render_sidebar() -> tuple[str, bool]:
                 selection = segmented_control(
                     "Navigation",
                     options=NAVIGATION_PAGES,
-                    default=active_page,
                     key=_NAVIGATION_WIDGET_KEY,
                     on_change=_sync_navigation_widget,
                 )
@@ -252,7 +258,6 @@ def render_sidebar() -> tuple[str, bool]:
                 selection = segmented_control(
                     "Navigation",
                     options=NAVIGATION_PAGES,
-                    default=active_page,
                     key=_NAVIGATION_WIDGET_KEY,
                 )
 
