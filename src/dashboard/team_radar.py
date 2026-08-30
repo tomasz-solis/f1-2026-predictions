@@ -31,7 +31,6 @@ _TEAM_BRAND_COLORS: dict[str, str] = {
 }
 _DEFAULT_TEAM_COLOR = "#B6BABD"
 _DEFAULT_BIG4_CANONICAL: tuple[str, ...] = ("MCLAREN", "MERCEDES", "FERRARI", "RED BULL")
-_UNIT_CHART_RANGE_PADDING = 0.02
 _TIRE_DEG_SLOPE_DISPLAY_RANGE: tuple[float, float] = (-0.20, 0.40)
 _DISPLAY_SCORE_FLOOR = 0.10
 _DISPLAY_SCORE_CEILING = 1.00
@@ -73,10 +72,14 @@ def _team_brand_color(team_name: str) -> str:
     return _DEFAULT_TEAM_COLOR
 
 
-def _unit_chart_axis_range(padding: float = _UNIT_CHART_RANGE_PADDING) -> list[float]:
-    """Return a slightly padded 0-1 range so endpoint markers are not clipped."""
-    bounded_padding = max(0.0, float(padding))
-    return [0.0 - bounded_padding, 1.0 + bounded_padding]
+def _unit_chart_axis_range() -> list[float]:
+    """
+    Return the score axis range, 0 to 105 on the display scale.
+
+    Anchored at zero rather than at the lowest score so the height of a line reads
+    as its score, and topped at the radar's own ceiling so both charts share one axis.
+    """
+    return [0.0, _RADAR_AXIS_DISPLAY_MAX]
 
 
 def _normalize_tire_deg_slope_for_display(
@@ -578,6 +581,26 @@ def _resolve_profile_display_metric_value(
             fallback_key=payload_key,
         )
     return _coerce_unit_metric(metrics_payload.get(payload_key))
+
+
+def _resolve_carried_tire_deg_source(team_data: dict[str, Any], profile: str) -> str | None:
+    """
+    Return the session a team's Tire Deg was carried from, or None when it is current.
+
+    Qualifying and sprint-qualifying snapshots hold no long-run signal, so the
+    comparison payload carries the last measured value forward. The view needs to
+    say so: a carried value is scored on the absolute slope scale rather than
+    against this session's field spread.
+    """
+    metrics_payload = _resolve_profile_metrics(team_data, profile)
+    if not isinstance(metrics_payload, dict):
+        return None
+    if metrics_payload.get("_tire_deg_history_fallback") is not True:
+        return None
+    source = metrics_payload.get("_tire_deg_history_fallback_source")
+    if isinstance(source, str) and source.strip():
+        return source.strip()
+    return "an earlier session"
 
 
 def _uses_placeholder_braking(metrics_payload: dict[str, Any]) -> bool:

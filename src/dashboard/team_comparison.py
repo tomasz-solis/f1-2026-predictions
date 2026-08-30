@@ -1,10 +1,12 @@
 """Streamlit entry points for team-comparison views."""
 
 import json
+import logging
 from hashlib import sha1
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import streamlit as st
 
 from src.dashboard import team_comparison_fallbacks, team_radar, team_snapshot_history
@@ -13,11 +15,12 @@ from src.persistence.config import should_read_db_first
 from src.utils import config_loader
 from src.utils.car_snapshot_history import SNAPSHOT_ARTIFACT_TYPE, sort_snapshot_payloads
 
+logger = logging.getLogger(__name__)
+
 _TEAM_RADAR_METRICS = team_radar._TEAM_RADAR_METRICS
 _TEAM_BRAND_COLORS = team_radar._TEAM_BRAND_COLORS
 _DEFAULT_TEAM_COLOR = team_radar._DEFAULT_TEAM_COLOR
 _DEFAULT_BIG4_CANONICAL = team_radar._DEFAULT_BIG4_CANONICAL
-_UNIT_CHART_RANGE_PADDING = team_radar._UNIT_CHART_RANGE_PADDING
 _TIRE_DEG_SLOPE_DISPLAY_RANGE = team_radar._TIRE_DEG_SLOPE_DISPLAY_RANGE
 _DISPLAY_SCORE_FLOOR = team_radar._DISPLAY_SCORE_FLOOR
 _DISPLAY_SCORE_CEILING = team_radar._DISPLAY_SCORE_CEILING
@@ -30,6 +33,8 @@ _RAW_SECTOR_MIN_PADDING_SECONDS = team_radar._RAW_SECTOR_MIN_PADDING_SECONDS
 _RAW_PACE_MIN_PADDING_SECONDS = team_radar._RAW_PACE_MIN_PADDING_SECONDS
 _RAW_BRAKING_MIN_PADDING_PERCENT = team_radar._RAW_BRAKING_MIN_PADDING_PERCENT
 _RAW_PACE_FIELD = team_radar._RAW_PACE_FIELD
+
+_SNAPSHOT_HISTORY_ROW_LIMIT = 5000
 _RAW_METRIC_FIELDS = team_radar._RAW_METRIC_FIELDS
 
 _coerce_unit_metric = team_radar._coerce_unit_metric
@@ -83,12 +88,16 @@ _resolve_same_event_metric_average_fallback = (
 )
 _resolve_latest_metric_fallback = team_snapshot_history._resolve_latest_metric_fallback
 _resolve_usable_history_metric_value = team_snapshot_history._resolve_usable_history_metric_value
+_resolve_carried_tire_deg_source = team_radar._resolve_carried_tire_deg_source
 _resolve_latest_tire_deg_fallback = team_snapshot_history._resolve_latest_tire_deg_fallback
 _apply_profile_tire_deg_fallbacks = team_snapshot_history._apply_profile_tire_deg_fallbacks
 _apply_profile_braking_fallbacks = team_snapshot_history._apply_profile_braking_fallbacks
 _build_snapshot_history_dataframe = team_snapshot_history._build_snapshot_history_dataframe
 _ordered_snapshot_labels = team_snapshot_history._ordered_snapshot_labels
 _smooth_development_history_dataframe = team_snapshot_history._smooth_development_history_dataframe
+_rescale_history_dataframe_per_session = team_snapshot_history._rescale_history_dataframe_per_session
+_recompute_history_composites = team_snapshot_history._recompute_history_composites
+_WINDOW_FILLED_SUFFIX = team_snapshot_history._WINDOW_FILLED_SUFFIX
 _build_development_summary_table = team_snapshot_history._build_development_summary_table
 
 _build_same_event_display_metric_fallbacks = (
@@ -128,6 +137,105 @@ def _run_characteristics_season_sync(year: int, payload: dict[str, Any]) -> dict
         run_profile=run_profile,
         dry_run=False,
     )
+
+
+def _apply_smoothed_radar_values(
+    comparison_df: Any,
+    *,
+    history_df: Any,
+    snapshot_label: str,
+) -> tuple[Any, dict[str, set[str]]]:
+    """
+    Replace the radar's single-session scores with the smoothed ones for that session.
+
+    Returns the updated frame and, per team, the metrics the session itself never
+    measured, so the view can say where those came from. `Radar Composite` is
+    recomputed from the metrics actually shown, keeping it equal to the mean of the
+    drawn spokes.
+    """
+    radar_labels = [label for _key, label in _TEAM_RADAR_METRICS]
+    filled_metrics: dict[str, set[str]] = {}
+    if comparison_df.empty or history_df is None or history_df.empty:
+        return comparison_df, filled_metrics
+    if "Snapshot" not in history_df.columns or not snapshot_label:
+        return comparison_df, filled_metrics
+
+    session_rows = history_df[history_df["Snapshot"] == snapshot_label]
+    if session_rows.empty:
+        return comparison_df, filled_metrics
+
+    by_team = {str(row["Team"]): row for _index, row in session_rows.iterrows()}
+    updated_rows: list[dict[str, Any]] = []
+    for row in comparison_df.to_dict(orient="records"):
+        team_name = str(row.get("Team", "")).strip()
+        smoothed_row = by_team.get(team_name)
+        updated_row = dict(row)
+        if smoothed_row is not None:
+            for label in radar_labels:
+                value = smoothed_row.get(label)
+                if value is None or pd.isna(value):
+                    continue
+                updated_row[label] = float(value)
+                # Mark the value the session itself never measured. Window size is the
+                # wrong test: a 2-sample window is simply what the first and last session
+                # of a weekend get, and says nothing about the value's provenance.
+                if bool(smoothed_row.get(f"{label}{_WINDOW_FILLED_SUFFIX}", False)):
+                    filled_metrics.setdefault(team_name, set()).add(label)
+            shown = [
+                float(updated_row[label])
+                for label in radar_labels
+                if updated_row.get(label) is not None and not pd.isna(updated_row[label])
+            ]
+            if shown:
+                composite = float(sum(shown) / len(shown))
+                updated_row["Radar Composite"] = composite
+                updated_row["Radar Minus Prior"] = composite - float(
+                    updated_row.get("Overall Performance", 0.0)
+                )
+        updated_rows.append(updated_row)
+
+    return pd.DataFrame(updated_rows), filled_metrics
+
+
+def _all_snapshot_team_names(snapshots: list[dict[str, Any]]) -> list[str]:
+    """Return every team appearing anywhere in the snapshot history, canonically named."""
+    names: set[str] = set()
+    for snapshot_payload in snapshots:
+        teams_payload = snapshot_payload.get("teams")
+        if not isinstance(teams_payload, dict):
+            continue
+        for raw_team_name in teams_payload:
+            mapped_name = team_snapshot_history.map_team_to_characteristics(str(raw_team_name))
+            names.add(
+                mapped_name if isinstance(mapped_name, str) and mapped_name else str(raw_team_name)
+            )
+    return sorted(names)
+
+
+def _build_display_history_frame(
+    snapshots: list[dict[str, Any]],
+    profile: str,
+    *,
+    smooth: bool,
+) -> Any:
+    """
+    Build the history frame both the radar and the season chart read from.
+
+    Always built over the whole field, never the current selection: the smoothed
+    scores are re-normalised against the other teams in each session, so scoping
+    this to the multiselect would make a team's score move when you tick another
+    team. Callers filter to their selection afterwards.
+    """
+    history_df = _build_snapshot_history_dataframe(
+        snapshots=snapshots,
+        selected_teams=_all_snapshot_team_names(snapshots),
+        profile=profile,
+    )
+    if history_df.empty or not smooth:
+        return history_df
+    history_df = _smooth_development_history_dataframe(history_df)
+    history_df = _rescale_history_dataframe_per_session(history_df)
+    return _recompute_history_composites(history_df)
 
 
 def _development_metric_options(history_df: Any) -> list[str]:
@@ -216,8 +324,18 @@ def _load_team_snapshot_history(year: int, cache_token: str = "") -> list[dict[s
     rows = store.list_artifacts(
         artifact_type=SNAPSHOT_ARTIFACT_TYPE,
         key_prefix=f"{year}::",
-        limit=600,
+        limit=_SNAPSHOT_HISTORY_ROW_LIMIT,
     )
+    if len(rows) >= _SNAPSHOT_HISTORY_ROW_LIMIT:
+        # Rows are artifact *versions*, not snapshots, so a re-sync adds a full season
+        # of them. Hitting the cap means the oldest weekends were silently dropped
+        # (the query is created_at DESC), which would look like missing history.
+        logger.warning(
+            "Snapshot history hit the %s-row cap for %s; the earliest weekends may be "
+            "missing from the chart. Prune old artifact versions or raise the cap.",
+            _SNAPSHOT_HISTORY_ROW_LIMIT,
+            year,
+        )
 
     deduped: dict[tuple[str, str], dict[str, Any]] = {}
     for row in rows:
@@ -245,12 +363,11 @@ def _short_event_label(event_name: str) -> str:
 def _development_race_ticks(
     history_df: Any, category_order: list[str]
 ) -> tuple[list[str], list[str]]:
-    """Return one x tick per race (at its first session) instead of one per session.
+    """Return one x tick per race weekend, at that weekend's first session.
 
     The development axis has a point for every session snapshot across the season, so
-    labelling each one makes it unreadable. We keep every data point but label only the
-    first session of each race with the short race name; the full "race + session" label
-    stays in the unified hover. (impeccable: declutter a dense time axis)
+    labelling each one makes it unreadable. Only the weekend is named on the axis; the
+    session lives in the hover. (impeccable: declutter a dense time axis)
     """
     if history_df.empty or "Event" not in history_df.columns:
         return [], []
@@ -278,9 +395,10 @@ def _render_development_history_section(
     selected_teams: list[str],
     profile: str,
     characteristics_payload: dict[str, Any],
+    history_df: Any,
 ) -> None:
     """Render per-session development trends from stored snapshot history."""
-    st.subheader("Development Over Time")
+    st.subheader("Relative Performance Over Time")
 
     st.caption(
         "Sync rebuilds the stored session snapshot history from cached sessions without "
@@ -307,11 +425,7 @@ def _render_development_history_section(
         st.info("No session snapshot history yet. Use the sync button to build it from cache.")
         return
 
-    history_df = _build_snapshot_history_dataframe(
-        snapshots=snapshots,
-        selected_teams=selected_teams,
-        profile=profile,
-    )
+    history_df = history_df[history_df["Team"].isin(selected_teams)].copy()
     if history_df.empty:
         st.info(
             "No snapshot history matches the selected teams/profile yet. Try a different team set "
@@ -320,15 +434,8 @@ def _render_development_history_section(
         return
 
     metric_options = _development_metric_options(history_df)
-    smooth_development = st.checkbox(
-        "Smooth development curves",
-        value=True,
-        help="Uses a centered three-session rolling mean per team while keeping missing sessions as gaps.",
-    )
-    if smooth_development:
-        history_df = _smooth_development_history_dataframe(history_df)
     metric_label = st.selectbox(
-        "Development metric",
+        "Relative performance metric",
         options=metric_options,
         index=0,
         help=(
@@ -369,16 +476,27 @@ def _render_development_history_section(
             if team_frame.empty:
                 continue
             trace_color = _team_brand_color(team_name)
-            customdata = None
-            hovertemplate = f"{metric_label}: %{{y:.2f}}<extra>{team_name}</extra>"
+            # Scores are stored 0-1 but the axis is labelled 0-100, so the hover reads
+            # from a pre-scaled copy; Plotly hover templates cannot do arithmetic.
+            display_values = [float(value) * 100.0 for value in team_frame[metric_label]]
+            customdata: list[list[float]] = [[value] for value in display_values]
+            hovertemplate = f"{metric_label}: %{{customdata[0]:.1f}}<extra>{team_name}</extra>"
             if metric_label in {"Radar Average", "Overall"}:
                 coverage_frame = team_frame.reindex(
                     columns=["Metric Count", "Metric Coverage"]
                 ).fillna({"Metric Count": 0, "Metric Coverage": 0.0})
-                customdata = coverage_frame.to_numpy()
+                customdata = [
+                    [display_value, float(metric_count), float(metric_coverage)]
+                    for display_value, metric_count, metric_coverage in zip(
+                        display_values,
+                        coverage_frame["Metric Count"],
+                        coverage_frame["Metric Coverage"],
+                        strict=False,
+                    )
+                ]
                 hovertemplate = (
-                    "Radar Average: %{y:.2f}<br>"
-                    "Coverage: %{customdata[0]:.0f}/6 metrics (%{customdata[1]:.0%})"
+                    "Radar Average: %{customdata[0]:.1f}<br>"
+                    "Coverage: %{customdata[1]:.0f}/6 metrics (%{customdata[2]:.0%})"
                     f"<extra>{team_name}</extra>"
                 )
             fig.add_trace(
@@ -420,9 +538,9 @@ def _render_development_history_section(
                 borderwidth=1,
             ),
             xaxis=dict(
-                # One label per race instead of one per session; sessions stay in the hover.
-                # Angle + automargin so back-to-back races (e.g. Barcelona/Austrian) that
-                # sit close on the axis don't overlap.
+                # One label per race weekend instead of one per session; the session
+                # stays in the hover. Angle + automargin so back-to-back races
+                # (e.g. Barcelona/Austrian) that sit close on the axis don't overlap.
                 tickmode="array",
                 tickvals=race_tickvals,
                 ticktext=race_ticktext,
@@ -435,8 +553,10 @@ def _render_development_history_section(
             ),
             yaxis=dict(
                 range=_unit_chart_axis_range(),
-                tickvals=[0.1, 0.3, 0.5, 0.7, 0.9, 1.0],
-                ticktext=["10", "30", "50", "70", "90", "100"],
+                # Zero is labelled because the axis is anchored there now; a line's
+                # height is its score rather than its distance above the lowest point.
+                tickvals=[0.0, 0.1, 0.3, 0.5, 0.7, 0.9, 1.0],
+                ticktext=["0", "10", "30", "50", "70", "90", "100"],
                 gridcolor="rgba(232,237,242,0.18)",
                 linecolor="rgba(232,237,242,0.20)",
             ),
@@ -451,9 +571,11 @@ def _render_development_history_section(
             config={"displayModeBar": False},
         )
     except Exception as exc:
-        st.info(f"Development chart unavailable ({exc}).")
+        st.info(f"Relative performance chart unavailable ({exc}).")
     st.caption(
-        "Each point is relative to the field in that session. Big swings can come from fuel loads, tires, and run plans, not just real development."
+        "Each point ranks a team against the field in that same session: the best car scores 100 "
+        "and the slowest 10, every session. A flat line means an unchanged position relative to "
+        "the field, not unchanged pace. Big swings can come from fuel loads, tires, and run plans."
     )
     if metric_label in {"Radar Average", "Overall"}:
         st.caption(
@@ -578,6 +700,20 @@ def _render_team_comparison_section(year: int = 2026) -> None:
         st.info("Select at least one team to view comparison metrics.")
         return
 
+    # Declared here, above the radar, because both panels read it. Streamlit renders
+    # in call order, so a toggle created inside the chart section could not reach the
+    # radar drawn before it.
+    smooth_history = st.toggle(
+        "Weekend average",
+        value=True,
+        help=(
+            "Averages each team across the sessions of one race weekend, never across two, "
+            "then re-spreads each session over 10-100 so the fastest car reads 100. Applies to "
+            "both the radar and the season chart. Sessions a team missed stay gaps."
+        ),
+    )
+    display_history_df = _build_display_history_frame(snapshots, profile, smooth=smooth_history)
+
     teams_with_signal = [
         team_name
         for team_name in selected_teams
@@ -627,7 +763,7 @@ def _render_team_comparison_section(year: int = 2026) -> None:
             )
             st.caption(
                 "This does not relabel the team, change season priors, or turn the missing race "
-                "session in Development Over Time into a proxy point."
+                "session in Relative Performance Over Time into a proxy point."
             )
 
     comparison_df, _neutral_fallbacks = _build_team_comparison_dataframe(
@@ -659,7 +795,34 @@ def _render_team_comparison_section(year: int = 2026) -> None:
         st.info("No comparable team metrics available for selected teams.")
         return
 
+    window_filled_metrics: dict[str, set[str]] = {}
+    if smooth_history:
+        comparison_df, window_filled_metrics = _apply_smoothed_radar_values(
+            comparison_df,
+            history_df=display_history_df,
+            snapshot_label=latest_snapshot_label,
+        )
+
     radar_labels = [label for _, label in _TEAM_RADAR_METRICS]
+    # Mark any value the named session did not measure, so it is never read as one it
+    # did. Smoothing supersedes the tire-deg carry-forward, so only one of these fires.
+    carried_tire_deg_sources: dict[str, str] = {}
+    if smooth_history:
+        marked_metrics = {label for labels in window_filled_metrics.values() for label in labels}
+    else:
+        carried_tire_deg_sources = {
+            team_name: source
+            for team_name in teams_with_signal
+            if (
+                source := _resolve_carried_tire_deg_source(
+                    teams_payload.get(team_name, {}), profile
+                )
+            )
+        }
+        marked_metrics = {"Tire Deg"} if carried_tire_deg_sources else set()
+    radar_display_labels = [
+        f"{label} †" if label in marked_metrics else label for label in radar_labels
+    ]
     if len(selected_teams) > 4:
         st.info(
             "Radar readability drops with more than 4 teams; use the table for dense comparisons."
@@ -677,18 +840,38 @@ def _render_team_comparison_section(year: int = 2026) -> None:
         for _, row in comparison_df.iterrows():
             values = [float(row[label]) for label in radar_labels]
             team_name = str(row["Team"])
+            carried_source = carried_tire_deg_sources.get(team_name)
+            team_filled_metrics = window_filled_metrics.get(team_name, set())
+            radar_hover_notes = [
+                f"<br>carried from {carried_source}"
+                if label == "Tire Deg" and carried_source
+                else ("<br>from other sessions this weekend" if label in team_filled_metrics else "")
+                for label in radar_labels
+            ]
             trace_color = _team_brand_color(team_name)
             fig.add_trace(
                 go.Scatterpolar(
                     mode="lines+markers",
                     r=values + [values[0]],
-                    theta=radar_labels + [radar_labels[0]],
+                    theta=radar_display_labels + [radar_display_labels[0]],
                     fill=fill_mode,
                     name=comparison_display_names.get(team_name, team_name),
                     line=dict(color=trace_color, width=line_width),
                     fillcolor=_hex_to_rgba(trace_color, fill_alpha),
                     marker=dict(color=trace_color, size=marker_size),
-                    hovertemplate="%{theta}: %{r:.2f}<extra>%{fullData.name}</extra>",
+                    # Radial ticks are labelled 0-100 over 0-1 data; hover matches them.
+                    customdata=[
+                        [value * 100.0, note]
+                        for value, note in zip(
+                            values + [values[0]],
+                            radar_hover_notes + [radar_hover_notes[0]],
+                            strict=True,
+                        )
+                    ],
+                    hovertemplate=(
+                        "%{theta}: %{customdata[0]:.1f}%{customdata[1]}"
+                        "<extra>%{fullData.name}</extra>"
+                    ),
                 )
             )
 
@@ -732,6 +915,45 @@ def _render_team_comparison_section(year: int = 2026) -> None:
     except Exception as exc:
         st.info(f"Radar chart unavailable ({exc}). Showing table only.")
     st.caption("Tip: compare 2-3 teams at a time for the clearest radar view.")
+    # Only one of these is ever populated: smoothing fills from the weekend, otherwise
+    # the tire-deg carry-forward reaches back to an earlier one.
+    if window_filled_metrics:
+        dagger_summary = ", ".join(
+            f"{comparison_display_names.get(team_name, team_name)}: {', '.join(sorted(labels))}"
+            for team_name, labels in sorted(window_filled_metrics.items())
+        )
+        dagger_note = f"† Supplied by other sessions of this weekend — {dagger_summary}."
+        dagger_detail = (
+            "This session recorded no reading for these metrics, so the value comes from the "
+            "other sessions of the same weekend. Qualifying and sprint-qualifying runs are too "
+            "short to measure tire degradation, which is the usual case."
+        )
+    elif carried_tire_deg_sources:
+        dagger_summary = ", ".join(
+            f"{comparison_display_names.get(team_name, team_name)} ({source})"
+            for team_name, source in sorted(carried_tire_deg_sources.items())
+        )
+        dagger_note = f"† Tire Deg carried forward for {dagger_summary}."
+        dagger_detail = (
+            "Qualifying and sprint-qualifying runs are too short to measure tire degradation, "
+            "so this session stores none and the comparison reuses each team's last measured "
+            "value. It is scored on the absolute degradation scale rather than against this "
+            "session's field, so read it as a standing estimate of race pace."
+        )
+    else:
+        dagger_note = ""
+        dagger_detail = ""
+    if dagger_note:
+        st.caption(dagger_note)
+        with st.expander("† What the dagger means"):
+            st.caption(dagger_detail)
+
+    if smooth_history:
+        st.caption(
+            "Radar and table show this weekend's average rather than the single session named "
+            "above, and Relative Performance Over Time draws the same numbers. Switch off "
+            "Weekend average for the raw single-session values."
+        )
 
     display_df = comparison_df.copy()
     percent_cols = radar_labels + [
@@ -806,4 +1028,5 @@ def _render_team_comparison_section(year: int = 2026) -> None:
         selected_teams=selected_teams,
         profile=profile,
         characteristics_payload=payload or {},
+        history_df=display_history_df,
     )

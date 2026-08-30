@@ -30,6 +30,7 @@ def _stub_streamlit_team(patcher):
         "success": [],
         "expanders": [],
         "checkboxes": [],
+        "toggles": [],
     }
     patcher.setattr(team_comparison.st, "subheader", lambda *_args, **_kwargs: None)
     patcher.setattr(team_comparison.st, "selectbox", lambda _label, options, **_kwargs: options[0])
@@ -39,6 +40,13 @@ def _stub_streamlit_team(patcher):
         "checkbox",
         lambda label, value=False, **_kwargs: (
             calls["checkboxes"].append((str(label), bool(value))) or value
+        ),
+    )
+    patcher.setattr(
+        team_comparison.st,
+        "toggle",
+        lambda label, value=False, **_kwargs: (
+            calls["toggles"].append((str(label), bool(value))) or value
         ),
     )
     patcher.setattr(
@@ -689,6 +697,23 @@ def test_build_latest_snapshot_comparison_payload_carries_forward_latest_long_ru
     assert long_run["tire_deg_slope"] == 0.19
     assert long_run["_tire_deg_history_fallback"] is True
     assert payload["Ferrari"]["testing_characteristics"]["tire_deg_performance"] == 0.67
+    # The view has to name the session a carried value came from, so a stale Tire Deg
+    # is never read as measured in the session the panel is titled after.
+    assert balanced["_tire_deg_history_fallback_source"] == "Australian Grand Prix R"
+    assert long_run["_tire_deg_history_fallback_source"] == "Australian Grand Prix R"
+    assert (
+        team_comparison._resolve_carried_tire_deg_source(payload["Ferrari"], "balanced")
+        == "Australian Grand Prix R"
+    )
+
+
+def test_resolve_carried_tire_deg_source_is_none_when_session_measured_it():
+    team_data = {
+        "testing_characteristics_profiles": {
+            "balanced": {"tire_deg_performance": 0.62, "tire_deg_slope": 0.05}
+        }
+    }
+    assert team_comparison._resolve_carried_tire_deg_source(team_data, "balanced") is None
 
 
 def test_historical_tire_deg_fallback_does_not_distort_current_session_scale():
@@ -2139,6 +2164,167 @@ def test_development_metric_options_include_profile_specific_pace_columns_when_a
     ]
 
 
+def test_unit_chart_axis_starts_at_zero_and_matches_the_radar_ceiling():
+    assert team_comparison._unit_chart_axis_range() == [0.0, team_comparison._RADAR_AXIS_DISPLAY_MAX]
+    assert team_comparison._unit_chart_axis_range()[1] == pytest.approx(1.05)
+
+
+def test_weekend_average_is_an_on_off_toggle_defaulting_to_on(patcher, tmp_path):
+    calls = _stub_streamlit_team(patcher)
+    patcher.setattr(team_comparison.config_loader, "get", lambda key, default=None: str(tmp_path))
+
+    data_path = tmp_path / "car_characteristics" / "2027_car_characteristics.json"
+    data_path.parent.mkdir(parents=True, exist_ok=True)
+    data_path.write_text(
+        json.dumps(
+            {
+                "teams": {
+                    "McLaren": {
+                        "overall_performance": 0.82,
+                        "testing_characteristics_profiles": {
+                            "balanced": {
+                                "overall_pace": 0.78,
+                                "slow_corner_performance": 0.74,
+                                "medium_corner_performance": 0.77,
+                                "fast_corner_performance": 0.79,
+                                "braking_performance": 0.76,
+                                "top_speed": 0.80,
+                                "tire_deg_performance": 0.73,
+                            }
+                        },
+                    }
+                }
+            }
+        )
+    )
+    _write_snapshot(
+        tmp_path,
+        year=2027,
+        event_name="Bahrain Grand Prix",
+        session_name="FP1",
+        round_number=1,
+        session_order=1,
+        team_profiles={"McLaren": {"balanced": {"slow_corner_performance": 0.60}}},
+    )
+
+    team_comparison._load_team_characteristics_payload.clear()
+    team_comparison._load_team_snapshot_history.clear()
+    team_comparison._render_team_comparison_section(year=2027)
+
+    # A switch, not a checkbox, and on by default so both panels start smoothed.
+    assert ("Weekend average", True) in calls["toggles"]
+    assert not any("Smooth" in label for label, _value in calls["checkboxes"])
+
+
+def test_smooth_development_history_fills_unmeasured_metric_from_same_weekend():
+    history_df = pd.DataFrame(
+        {
+            "Snapshot": ["Q", "R"],
+            "Snapshot Order": [1, 2],
+            "Snapshot Timestamp": [
+                "2027-03-01T10:00:00+00:00",
+                "2027-03-01T14:00:00+00:00",
+            ],
+            "Event": ["Bahrain Grand Prix", "Bahrain Grand Prix"],
+            "Team": ["McLaren", "McLaren"],
+            "Session": ["Q", "R"],
+            "Has Data": [True, True],
+            "Tire Deg": [float("nan"), 0.80],
+        }
+    )
+
+    smoothed = team_comparison._smooth_development_history_dataframe(history_df)
+
+    # Qualifying measures no degradation, so the weekend speaks for it.
+    assert smoothed.iloc[0]["Tire Deg"] == pytest.approx(0.80)
+    assert bool(smoothed.iloc[0]["Tire Deg" + team_comparison._WINDOW_FILLED_SUFFIX]) is True
+    assert bool(smoothed.iloc[1]["Tire Deg" + team_comparison._WINDOW_FILLED_SUFFIX]) is False
+
+
+def test_smooth_development_history_never_invents_a_session_the_team_missed():
+    history_df = pd.DataFrame(
+        {
+            "Snapshot": ["FP1", "FP2"],
+            "Snapshot Order": [1, 2],
+            "Snapshot Timestamp": [
+                "2027-03-01T10:00:00+00:00",
+                "2027-03-01T14:00:00+00:00",
+            ],
+            "Event": ["Bahrain Grand Prix", "Bahrain Grand Prix"],
+            "Team": ["McLaren", "McLaren"],
+            "Session": ["FP1", "FP2"],
+            "Has Data": [True, False],
+            "Tire Deg": [0.80, float("nan")],
+        }
+    )
+
+    smoothed = team_comparison._smooth_development_history_dataframe(history_df)
+
+    assert math.isnan(smoothed.iloc[1]["Tire Deg"])
+
+
+def test_smooth_development_history_dataframe_does_not_cross_weekends():
+    rows = []
+    for order, (event, session, value) in enumerate(
+        [
+            ("Bahrain Grand Prix", "Q", 0.20),
+            ("Bahrain Grand Prix", "R", 0.20),
+            ("Saudi Arabian Grand Prix", "FP1", 0.90),
+        ],
+        start=1,
+    ):
+        rows.append(
+            {
+                "Snapshot": f"{event} {session}",
+                "Snapshot Order": order,
+                "Snapshot Timestamp": f"2027-03-0{order}T10:00:00+00:00",
+                "Event": event,
+                "Team": "McLaren",
+                "Session": session,
+                "Has Data": True,
+                "Slow Corners": value,
+            }
+        )
+    smoothed = team_comparison._smooth_development_history_dataframe(pd.DataFrame(rows))
+
+    # Bahrain R must not be pulled toward the next weekend's 0.90.
+    assert smoothed.iloc[1]["Slow Corners"] == pytest.approx(0.20)
+    assert smoothed.iloc[2]["Slow Corners"] == pytest.approx(0.90)
+
+
+def test_rescale_history_dataframe_restores_the_display_range():
+    history_df = pd.DataFrame(
+        {
+            "Snapshot": ["Q", "Q", "Q"],
+            "Team": ["McLaren", "Ferrari", "Williams"],
+            "Has Data": [True, True, True],
+            "Slow Corners": [0.60, 0.50, 0.40],
+        }
+    )
+
+    rescaled = team_comparison._rescale_history_dataframe_per_session(history_df)
+
+    assert rescaled["Slow Corners"].max() == pytest.approx(1.00)
+    assert rescaled["Slow Corners"].min() == pytest.approx(0.10)
+    assert rescaled["Slow Corners"].iloc[1] == pytest.approx(0.55)
+
+
+def test_rescale_history_dataframe_leaves_a_lone_score_alone():
+    history_df = pd.DataFrame(
+        {
+            "Snapshot": ["Q", "Q"],
+            "Team": ["McLaren", "Ferrari"],
+            "Has Data": [True, True],
+            "Tire Deg": [0.42, float("nan")],
+        }
+    )
+
+    rescaled = team_comparison._rescale_history_dataframe_per_session(history_df)
+
+    # Nothing to stretch against; inventing a 100 or a 50 here would be a fabrication.
+    assert rescaled["Tire Deg"].iloc[0] == pytest.approx(0.42)
+
+
 def test_smooth_development_history_dataframe_preserves_gaps():
     history_df = pd.DataFrame(
         {
@@ -2164,7 +2350,7 @@ def test_smooth_development_history_dataframe_preserves_gaps():
     assert smoothed.iloc[1]["Radar Average"] == pytest.approx((0.35 + 0.75 + 0.55) / 3)
 
 
-def test_latest_snapshot_payload_skips_sprint_only_sessions():
+def test_latest_snapshot_payload_uses_sprint_only_sessions():
     snapshots = [
         {
             "event_name": "Chinese Grand Prix",
@@ -2197,7 +2383,7 @@ def test_latest_snapshot_payload_skips_sprint_only_sessions():
     latest = team_comparison._latest_snapshot_payload(snapshots)
 
     assert latest is not None
-    assert latest["session_name"] == "FP1"
+    assert latest["session_name"] == "SQ"
 
 
 def test_build_snapshot_history_dataframe_includes_sprint_weekend_sessions():
@@ -2393,7 +2579,7 @@ def test_render_team_comparison_section_overall_hover_uses_real_metric_coverage(
         team_comparison.st,
         "selectbox",
         lambda label, options, **_kwargs: (
-            "Radar Average" if label == "Development metric" else options[0]
+            "Radar Average" if label == "Relative performance metric" else options[0]
         ),
     )
 
@@ -2466,8 +2652,16 @@ def test_render_team_comparison_section_overall_hover_uses_real_metric_coverage(
     team_comparison._render_team_comparison_section(year=2027)
 
     development_figure = calls["plotly_figures"][1]
-    customdata = development_figure.data[0].customdata.tolist()
-    assert customdata == [[6.0, 1.0], [5.0, 5 / 6]]
+    development_trace = development_figure.data[0]
+    customdata = [list(point) for point in development_trace.customdata]
+    # FP2 stores no tire-deg reading, but FP1 of the same weekend does, so the
+    # three-session window supplies it and both points cover all six metrics.
+    assert [point[1:] for point in customdata] == [[6.0, 1.0], [6.0, 1.0]]
+    # The axis is labelled 0-100 over 0-1 data, so the hover reads a pre-scaled copy.
+    assert [point[0] for point in customdata] == [
+        float(value) * 100.0 for value in development_trace.y
+    ]
+    assert "customdata[0]:.1f" in development_trace.hovertemplate
 
 
 def test_render_team_comparison_section_orders_development_axis_chronologically(patcher, tmp_path):
@@ -2584,7 +2778,8 @@ def test_render_team_comparison_section_orders_development_axis_chronologically(
         "Australian Grand Prix FP2",
         "Australian Grand Prix Q",
     ]
-    assert list(development_figure.layout.yaxis.range) == [-0.02, 1.02]
+    # Score axis is anchored at zero and shares the radar's 105 ceiling.
+    assert list(development_figure.layout.yaxis.range) == [0.0, 1.05]
 
 
 def test_render_team_comparison_section_keeps_weekend_fallback_team_visible(patcher, tmp_path):
@@ -2706,6 +2901,12 @@ def test_render_team_comparison_section_keeps_weekend_fallback_team_visible(patc
     radar_figure = calls["plotly_figures"][0]
     assert "McLaren*" in [trace.name for trace in radar_figure.data]
     assert list(radar_figure.layout.polar.radialaxis.range) == [0.0, 1.05]
+    # Radial ticks read 0-100 over 0-1 data, so the hover must match the ticks.
+    radar_trace = radar_figure.data[0]
+    assert [point[0] for point in radar_trace.customdata] == [
+        float(value) * 100.0 for value in radar_trace.r
+    ]
+    assert "customdata[0]:.1f" in radar_trace.hovertemplate
 
     comparison_df = calls["dataframes"][0]
     assert "McLaren*" in set(comparison_df["Team"])
@@ -2720,7 +2921,7 @@ def test_development_race_ticks_labels_one_tick_per_race():
     rows = []
     order = 0
     for event in ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"]:
-        for session in ["FP1", "FP2", "Q"]:
+        for session in ["FP1", "SQ", "Sprint", "Q", "R"]:
             rows.append(
                 {
                     "Snapshot": f"{event} {session}",
@@ -2735,7 +2936,7 @@ def test_development_race_ticks_labels_one_tick_per_race():
 
     tickvals, ticktext = team_comparison._development_race_ticks(history_df, category_order)
 
-    # One tick per race (at its first session), short race names, not one per session.
+    # One tick per race weekend (at its first session), short race names.
     assert ticktext == ["Bahrain", "Saudi Arabian"]
     assert tickvals == ["Bahrain Grand Prix FP1", "Saudi Arabian Grand Prix FP1"]
 

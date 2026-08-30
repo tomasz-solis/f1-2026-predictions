@@ -26,7 +26,7 @@ def _build_same_event_display_metric_fallbacks(
     """
     Average earlier same-event display scores for teams missing from the latest snapshot.
 
-    A starred comparison row should stay aligned with the Development Over Time
+    A starred comparison row should stay aligned with the Relative Performance Over Time
     chart. That means we need to average the already-rendered event scores, not
     raw session seconds from practice, sprint, and qualifying mixed together.
     """

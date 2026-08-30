@@ -7,6 +7,8 @@ from typing import Any
 import pandas as pd
 
 from src.dashboard.team_radar import (
+    _DISPLAY_SCORE_CEILING,
+    _DISPLAY_SCORE_FLOOR,
     _RAW_METRIC_FIELDS,
     _TEAM_RADAR_METRICS,
     _build_raw_metric_display_scale,
@@ -28,6 +30,22 @@ _PROFILE_DEVELOPMENT_PACE_LABELS = {
     "long_run": "Race Pace",
 }
 _RADAR_AVERAGE_LABEL = "Radar Average"
+# Columns that describe a point rather than score it, so smoothing and rescaling skip them.
+_NON_METRIC_HISTORY_COLUMNS = frozenset(
+    {
+        "Snapshot",
+        "Session",
+        "Team",
+        "Event",
+        "Has Data",
+        "Snapshot Order",
+        "Snapshot Timestamp",
+        "Metric Count",
+        "Metric Coverage",
+    }
+)
+# Suffix flagging a value the session itself did not measure, supplied by its weekend.
+_WINDOW_FILLED_SUFFIX = " Window Filled"
 
 
 def _snapshot_label(snapshot_payload: dict[str, Any]) -> str:
@@ -53,7 +71,9 @@ def _is_comparison_snapshot_session(session_name: str) -> bool:
     normalized = "".join(ch for ch in str(session_name).strip().upper() if ch.isalnum())
     if not normalized:
         return False
-    return session_order_index(normalized) in {1, 2, 3, 6, 7}
+    # Sprint weekends replace FP2/FP3 with SQ/Sprint, so excluding them left those
+    # weekends with only FP1 until Qualifying ran.
+    return session_order_index(normalized) in {1, 2, 3, 4, 5, 6, 7}
 
 
 def _is_history_chart_snapshot_session(session_name: str) -> bool:
@@ -116,13 +136,15 @@ def _build_latest_snapshot_comparison_payload(
             continue
 
         normalized_profiles = deepcopy(profiles_payload)
-        tire_deg_fallback = _resolve_latest_tire_deg_fallback(
+        tire_deg_fallback, tire_deg_fallback_source = _resolve_latest_tire_deg_fallback(
             snapshot_history=history,
             latest_snapshot=latest_snapshot,
             team_name=display_name,
         )
         if tire_deg_fallback:
-            _apply_profile_tire_deg_fallbacks(normalized_profiles, tire_deg_fallback)
+            _apply_profile_tire_deg_fallbacks(
+                normalized_profiles, tire_deg_fallback, tire_deg_fallback_source
+            )
 
         same_event_braking_fallback = _resolve_same_event_metric_average_fallback(
             snapshot_history=history,
@@ -373,7 +395,7 @@ def _resolve_latest_tire_deg_fallback(
     snapshot_history: list[dict[str, Any]],
     latest_snapshot: dict[str, Any],
     team_name: str,
-) -> dict[str, float]:
+) -> tuple[dict[str, float], str]:
     """
     Resolve the newest usable tire-deg payload for a team from snapshot history.
 
@@ -381,6 +403,9 @@ def _resolve_latest_tire_deg_fallback(
     qualifying where a real long-run deg signal does not exist. In that case,
     fall back to the latest previously known long-run signal for the same team
     instead of filling the chart with a neutral 0.5.
+
+    Returns the resolved metrics and the label of the session they came from, so
+    the comparison view can say on screen that the value is carried forward.
     """
     fallback_profiles = ("long_run", "balanced", "short_run")
     latest_identity = _snapshot_identity(latest_snapshot)
@@ -416,14 +441,15 @@ def _resolve_latest_tire_deg_fallback(
                 resolved["tire_deg_performance"] = tire_deg_performance
             if tire_deg_slope is not None:
                 resolved["tire_deg_slope"] = float(tire_deg_slope)
-            return resolved
+            return resolved, _snapshot_label(snapshot_payload)
 
-    return {}
+    return {}, ""
 
 
 def _apply_profile_tire_deg_fallbacks(
     profiles_payload: dict[str, Any],
     tire_deg_fallback: dict[str, float],
+    source_label: str = "",
 ) -> None:
     """Fill missing tire-deg fields and identify their historical basis."""
     if not tire_deg_fallback:
@@ -448,6 +474,8 @@ def _apply_profile_tire_deg_fallbacks(
             fallback_applied = True
         if fallback_applied:
             metrics_payload["_tire_deg_history_fallback"] = True
+            if source_label:
+                metrics_payload["_tire_deg_history_fallback_source"] = source_label
 
 
 def _apply_profile_braking_fallbacks(
@@ -637,32 +665,42 @@ def _ordered_snapshot_labels(history_df: pd.DataFrame) -> list[str]:
     return [str(label) for label in ordered["Snapshot"]]
 
 
+def _history_metric_columns(history_df: pd.DataFrame) -> list[str]:
+    """Return the scored columns of a history frame, ignoring its descriptive ones."""
+    return [
+        column_name
+        for column_name in history_df.columns
+        if column_name not in _NON_METRIC_HISTORY_COLUMNS
+        and not str(column_name).endswith(_WINDOW_FILLED_SUFFIX)
+        and pd.api.types.is_numeric_dtype(history_df[column_name])
+    ]
+
+
 def _smooth_development_history_dataframe(
     history_df: pd.DataFrame,
     *,
-    window: int = 3,
+    window: int = 5,
 ) -> pd.DataFrame:
-    """Return a per-team smoothed copy of the development-history dataframe."""
+    """
+    Return a per-team smoothed copy of the development-history dataframe.
+
+    The window never spans two race weekends. Sessions at different circuits
+    measure different things, so each event is smoothed on its own and the line
+    breaks between weekends rather than blending them.
+
+    It is five wide because a race weekend holds about five sessions. A narrower
+    window leaves the first and last session of every weekend averaged over two
+    points while the middle gets three, and that uneven smoothing is visible as
+    a sawtooth on the season chart.
+
+    Every radar metric also gets a `<label> Window Filled` flag marking a value the
+    session itself never measured, so the view can say where it came from.
+    """
     if history_df.empty or "Team" not in history_df.columns:
         return history_df.copy()
 
     smoothed = history_df.copy()
-    excluded_columns = {
-        "Snapshot",
-        "Session",
-        "Team",
-        "Has Data",
-        "Snapshot Order",
-        "Snapshot Timestamp",
-        "Metric Count",
-        "Metric Coverage",
-    }
-    metric_columns = [
-        column_name
-        for column_name in smoothed.columns
-        if column_name not in excluded_columns
-        and pd.api.types.is_numeric_dtype(smoothed[column_name])
-    ]
+    metric_columns = _history_metric_columns(smoothed)
     if not metric_columns:
         return smoothed
 
@@ -674,18 +712,122 @@ def _smooth_development_history_dataframe(
     if sort_columns:
         smoothed = smoothed.sort_values(sort_columns).reset_index(drop=True)
 
-    for team_name in smoothed["Team"].dropna().unique():
-        team_mask = smoothed["Team"] == team_name
+    radar_labels = {label for _key, label in _TEAM_RADAR_METRICS} & set(metric_columns)
+    for label in radar_labels:
+        smoothed[f"{label}{_WINDOW_FILLED_SUFFIX}"] = False
+    # A team missing from a session stays missing; the window may only speak for a
+    # session the team actually ran.
+    if "Has Data" in smoothed.columns:
+        present = smoothed["Has Data"].fillna(False).astype(bool)
+    else:
+        present = pd.Series(True, index=smoothed.index)
+
+    group_columns = ["Team"] + (["Event"] if "Event" in smoothed.columns else [])
+    for _group_key, group_index in smoothed.groupby(
+        group_columns, dropna=False, sort=False
+    ).groups.items():
+        group_present = present.loc[group_index]
         for column_name in metric_columns:
-            original_values = smoothed.loc[team_mask, column_name]
+            original_values = smoothed.loc[group_index, column_name]
             rolling_mean = original_values.rolling(
-                window=window,
-                center=True,
-                min_periods=1,
+                window=window, center=True, min_periods=1
             ).mean()
-            smoothed.loc[team_mask, column_name] = rolling_mean.where(original_values.notna())
+            if column_name in radar_labels:
+                # Qualifying measures no tire degradation, so the session's own reading
+                # is absent while the weekend around it has one. Letting the window
+                # speak for that session is the whole point of averaging by weekend --
+                # and it keeps the radar and the season chart on the same number.
+                keep = group_present & rolling_mean.notna()
+                smoothed.loc[group_index, f"{column_name}{_WINDOW_FILLED_SUFFIX}"] = (
+                    keep & original_values.isna()
+                ).fillna(False)
+            else:
+                keep = original_values.notna()
+            smoothed.loc[group_index, column_name] = rolling_mean.where(keep)
 
     return smoothed
+
+
+def _rescale_history_dataframe_per_session(history_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Stretch each session's smoothed scores back across the display range.
+
+    Averaging pulls every team toward the middle, so a smoothed session spans a
+    narrow band and the gaps between teams become hard to read. Re-normalising per
+    session puts the best car in that session back at 100 and the slowest at 10,
+    which is what makes the differences legible.
+
+    The cost is that a team leading a metric reads exactly 100 every time, so a
+    dominant car draws a flat line along the ceiling, and a session's score cannot
+    be compared with another session's in absolute terms. The five-wide smoothing
+    window absorbs most of the extra noise this would otherwise re-expand.
+
+    `Radar Average` is not rescaled here: it is recomputed from the rescaled
+    metrics afterwards so the number always equals the mean of the six spokes
+    actually drawn.
+    """
+    if history_df.empty or "Snapshot" not in history_df.columns:
+        return history_df.copy()
+
+    rescaled = history_df.copy()
+    metric_columns = [
+        column_name
+        for column_name in _history_metric_columns(rescaled)
+        if column_name != _RADAR_AVERAGE_LABEL
+    ]
+    if not metric_columns:
+        return rescaled
+
+    span = _DISPLAY_SCORE_CEILING - _DISPLAY_SCORE_FLOOR
+    for _snapshot_label_value, session_index in rescaled.groupby(
+        "Snapshot", dropna=False, sort=False
+    ).groups.items():
+        for column_name in metric_columns:
+            session_values = rescaled.loc[session_index, column_name]
+            scored = session_values.dropna()
+            # One scored team has nothing to stretch against, and an identical
+            # field would divide by zero. Leave both untouched.
+            if len(scored) < 2:
+                continue
+            lowest = float(scored.min())
+            highest = float(scored.max())
+            if highest <= lowest:
+                continue
+            rescaled.loc[session_index, column_name] = _DISPLAY_SCORE_FLOOR + (
+                (session_values - lowest) / (highest - lowest)
+            ) * span
+
+    return rescaled
+
+
+def _recompute_history_composites(history_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Rebuild Radar Average and its coverage from the metrics as they now stand.
+
+    Both are computed before smoothing in the original frame, so after smoothing
+    and rescaling they describe values that no longer exist. Recomputing keeps the
+    hover's "n/6 metrics" honest about the point it is attached to.
+    """
+    if history_df.empty:
+        return history_df.copy()
+
+    recomputed = history_df.copy()
+    radar_labels = [
+        label for _key, label in _TEAM_RADAR_METRICS if label in recomputed.columns
+    ]
+    if not radar_labels:
+        return recomputed
+
+    radar_frame = recomputed[radar_labels]
+    metric_count = radar_frame.count(axis=1)
+    recomputed[_RADAR_AVERAGE_LABEL] = radar_frame.mean(axis=1, skipna=True).where(
+        metric_count > 0
+    )
+    recomputed["Metric Count"] = metric_count.astype(float).where(metric_count > 0)
+    recomputed["Metric Coverage"] = (metric_count / len(_TEAM_RADAR_METRICS)).where(
+        metric_count > 0
+    )
+    return recomputed
 
 
 def _build_development_summary_table(history_df: pd.DataFrame, metric_label: str) -> pd.DataFrame:
