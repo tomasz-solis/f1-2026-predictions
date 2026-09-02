@@ -101,6 +101,25 @@ In DB-backed modes, the same Supabase credentials are used for:
 - operational counters/alerts stream (`operational_events`).
 - dashboard telemetry (`app_events`, service-role only).
 
+## 4. Operator Panel Environment Configuration
+
+The dashboard is public, so the operator panel is hidden behind a token. Set `TL_ADMIN_TOKEN` on the web service, then open `https://<host>/?admin=<TL_ADMIN_TOKEN>`. An `Admin` tab appears and the app opens on it, so no forecast is computed on the way in. Without a matching token the tab does not exist.
+
+The panel carries the grid-penalty and driver-substitution editors, the precompute status for the currently deployed artifact hash, and three buttons.
+
+| Variable | Purpose |
+| --- | --- |
+| `TL_ADMIN_TOKEN` | Gates the whole panel. Compared against the `admin` query parameter. |
+| `RENDER_API_KEY` | Bearer token for the Render API. Create it under Account Settings → API Keys. |
+| `RENDER_PRECOMPUTE_CRON_ID` | Service id of the `preheat` cron job (`crn-…`), used by **Trigger precompute run**. |
+| `RENDER_WEB_SERVICE_ID` | Service id of the `tracksidelabs` web service (`srv-…`), used by **Restart web service**. |
+
+The three `RENDER_*` variables are optional. Without them the panel still renders and the editors still work; the two Render buttons are disabled and name the variables that are missing. **Clear dashboard caches** never needs them.
+
+Below the buttons the panel lists each service's recent Render events: cron run started/ended with its status, and the web service's restarts and deploys. A failed run names its cause — `oomKilled` and `nonZeroExit` both appear there — which the horizon index cannot tell you.
+
+The precompute itself never runs in the web process. The button starts a run of the cron service, which is on a larger plan for that reason. Render runs one instance of a cron job at a time, so triggering cancels a run already in flight.
+
 ## Common Changes
 
 ### Change qualifying team vs driver weighting

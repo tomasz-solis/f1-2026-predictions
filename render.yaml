@@ -16,6 +16,13 @@ services:
         sync: false
       - key: TL_ADMIN_TOKEN
         sync: false
+      # Let the operator panel trigger a precompute run and restart this service.
+      - key: RENDER_API_KEY
+        sync: false
+      - key: RENDER_PRECOMPUTE_CRON_ID
+        sync: false
+      - key: RENDER_WEB_SERVICE_ID
+        sync: false
     autoDeploy: true
   - type: cron
     name: preheat

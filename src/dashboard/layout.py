@@ -1,6 +1,7 @@
 """Dashboard layout, global styling, and navigation sidebar."""
 
 import base64
+import logging
 from functools import lru_cache
 from pathlib import Path
 
@@ -10,6 +11,8 @@ import streamlit.components.v1 as components
 from src.utils.model_version import format_model_version_label
 
 from .styles import CUSTOM_CSS
+
+logger = logging.getLogger(__name__)
 
 # Brand asset filenames.
 BRAND_NAME = "Trackside Labs"
@@ -30,6 +33,7 @@ if ENABLE_PREDICTION_ACCURACY_TAB:
     NAVIGATION_PAGES.append("Prediction Accuracy")
     NAVIGATION_PAGES.append("Checkpoint Viewer")
 NAVIGATION_PAGES.extend(["Model Diagnostics", "Model & Learning", "Contact"])
+ADMIN_PAGE_NAME = "Admin"
 _NAVIGATION_STATE_KEY = "nav_tabs"
 _NAVIGATION_WIDGET_KEY = "nav_tabs_selector"
 _NAVIGATION_FALLBACK_KEY = "nav_tabs_selectbox"
@@ -181,26 +185,56 @@ def render_header() -> None:
     )
 
 
-def _coerce_navigation_page(value: object) -> str | None:
+def _navigation_pages() -> list[str]:
+    """Return the tabs this viewer may see.
+
+    The operator panel appears only for a viewer holding the admin token, and it goes
+    last: an operator checking a forecast should see the same tab order a visitor does.
+    Which page the app *opens* on is decided separately, by ``_default_landing_page``.
+    """
+    try:
+        from .grid_penalty_admin import admin_access_granted
+
+        if admin_access_granted():
+            return [*NAVIGATION_PAGES, ADMIN_PAGE_NAME]
+    except Exception as exc:  # noqa: BLE001 - navigation must never break the app
+        logger.warning("Could not resolve admin access for navigation: %s", exc)
+    return list(NAVIGATION_PAGES)
+
+
+def _default_landing_page(pages: list[str]) -> str:
+    """Return the page to open on when session state holds no choice yet.
+
+    An operator arriving on ``?admin=<token>`` wants the panel, not a forecast computed
+    on the way past it. Everyone else gets the first public tab.
+    """
+    if ADMIN_PAGE_NAME in pages:
+        return ADMIN_PAGE_NAME
+    return pages[0]
+
+
+def _coerce_navigation_page(value: object, options: list[str] | None = None) -> str | None:
     """Return a valid navigation page from a widget value."""
-    if isinstance(value, str) and value in NAVIGATION_PAGES:
+    pages = options if options is not None else _navigation_pages()
+    if isinstance(value, str) and value in pages:
         return value
     return None
 
 
-def _active_navigation_page(default: str | None = None) -> str:
+def _active_navigation_page(default: str | None = None, options: list[str] | None = None) -> str:
     """Return the last valid navigation page stored in session state."""
-    fallback = default if default in NAVIGATION_PAGES else NAVIGATION_PAGES[0]
+    pages = options if options is not None else _navigation_pages()
+    fallback = default if default in pages else _default_landing_page(pages)
     try:
         stored_page = st.session_state.get(_NAVIGATION_STATE_KEY)
     except Exception:
         stored_page = None
-    return _coerce_navigation_page(stored_page) or fallback
+    return _coerce_navigation_page(stored_page, pages) or fallback
 
 
 def _store_navigation_page(page: str) -> None:
     """Remember the active navigation page when session state is available."""
-    if page not in NAVIGATION_PAGES:
+    if page not in _navigation_pages():
         return
     try:
         st.session_state[_NAVIGATION_STATE_KEY] = page
@@ -228,20 +262,21 @@ def _sync_navigation_widget() -> None:
 def render_sidebar() -> tuple[str, bool]:
     """Render sidebar navigation and return selected page with logging enabled."""
     segmented_control = getattr(st, "segmented_control", None)
-    active_page = _active_navigation_page()
+    pages = _navigation_pages()
+    active_page = _active_navigation_page(options=pages)
     if callable(segmented_control):
         # Seed the widget's own state instead of passing `default=`. The deselect
         # callback writes this key, and Streamlit warns when a keyed widget is both
         # given a default and assigned through the Session State API.
         try:
-            if _coerce_navigation_page(st.session_state.get(_NAVIGATION_WIDGET_KEY)) is None:
+            if _coerce_navigation_page(st.session_state.get(_NAVIGATION_WIDGET_KEY), pages) is None:
                 st.session_state[_NAVIGATION_WIDGET_KEY] = active_page
         except Exception:
             pass
         try:
             selection = segmented_control(
                 "Navigation",
-                options=NAVIGATION_PAGES,
+                options=pages,
                 selection_mode="single",
                 key=_NAVIGATION_WIDGET_KEY,
                 on_change=_sync_navigation_widget,
@@ -250,29 +285,31 @@ def render_sidebar() -> tuple[str, bool]:
             try:
                 selection = segmented_control(
                     "Navigation",
-                    options=NAVIGATION_PAGES,
+                    options=pages,
                     key=_NAVIGATION_WIDGET_KEY,
                     on_change=_sync_navigation_widget,
                 )
             except TypeError:
                 selection = segmented_control(
                     "Navigation",
-                    options=NAVIGATION_PAGES,
+                    options=pages,
                     key=_NAVIGATION_WIDGET_KEY,
                 )
 
-        page = _coerce_navigation_page(selection) or _active_navigation_page(active_page)
+        page = _coerce_navigation_page(selection, pages) or _active_navigation_page(
+            active_page, pages
+        )
         _store_navigation_page(page)
         return page, True
 
     page = st.selectbox(
         "Navigation",
-        NAVIGATION_PAGES,
-        index=NAVIGATION_PAGES.index(active_page),
+        pages,
+        index=pages.index(active_page),
         key=_NAVIGATION_FALLBACK_KEY,
         label_visibility="collapsed",
     )
-    page = _coerce_navigation_page(page) or active_page
+    page = _coerce_navigation_page(page, pages) or active_page
     _store_navigation_page(page)
 
     return page, True
