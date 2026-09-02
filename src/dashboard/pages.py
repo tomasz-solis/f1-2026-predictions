@@ -17,6 +17,7 @@ from . import prediction_messages as _prediction_messages
 from . import team_comparison
 from .analytics import track_event
 from .cache import get_artifact_versions
+from .driver_substitution_admin import render_driver_substitution_editor
 from .grid_penalty_admin import render_grid_penalty_editor
 from .layout import BRAND_LAST_UPDATED, BRAND_MODEL_VERSION, ENABLE_PREDICTION_ACCURACY_TAB
 from .live_prediction_flow import (
@@ -855,6 +856,7 @@ def render_live_prediction_page(enable_logging: bool) -> None:
 
     # Operator-only, token-gated: renders nothing for an ordinary visitor.
     render_grid_penalty_editor(race_name=race_name, year=selected_season)
+    render_driver_substitution_editor(race_name=race_name, year=selected_season)
 
     # Horizon-coverage detail (which upcoming races are warmed yet) is operator
     # plumbing, not a fan's answer — it no longer gets its own banner above the

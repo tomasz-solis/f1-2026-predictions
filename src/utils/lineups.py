@@ -11,6 +11,8 @@ from pathlib import Path
 
 import fastf1 as ff1
 
+from src.utils.driver_substitutions import apply_substitutions
+
 logging.getLogger("fastf1").setLevel(logging.CRITICAL)
 logger = logging.getLogger(__name__)
 
@@ -97,13 +99,17 @@ def get_lineups(
     race_name: str | None = None,
     config_path: str = "data/current_lineups.json",
 ) -> dict[str, list[str]]:
-    """Return the best available lineup mapping for one season or event."""
+    """Return the best available lineup mapping for one season or event.
+
+    A race-scoped driver substitution (injury, a mid-season drop) is applied on top of
+    whichever source answered, so every caller sees one consistent lineup for that race.
+    """
     # For historical seasons with specific race, extract from data
     if year <= 2025 and race_name:
         session_lineups = get_lineups_from_session(year, race_name, "Q")
 
         if session_lineups:
-            return session_lineups
+            return apply_substitutions(session_lineups, race_name=race_name, year=year)
 
         # If session data failed, fall through to config
 
@@ -111,7 +117,7 @@ def get_lineups(
     current_lineups = load_current_lineups(config_path)
 
     if current_lineups:
-        return current_lineups
+        return apply_substitutions(current_lineups, race_name=race_name, year=year)
 
     raise ValueError(
         f"No lineup data available for {year}"

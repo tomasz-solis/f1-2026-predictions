@@ -75,3 +75,20 @@ def test_get_lineups_raises_without_any_data(patcher):
 
     with pytest.raises(ValueError, match="No lineup data available"):
         lineups.get_lineups(2026, "Bahrain Grand Prix")
+
+
+def test_get_lineups_applies_a_race_scoped_substitution(patcher, tmp_path):
+    """The injured driver's seat is filled before any caller sees the lineup."""
+    config_path = tmp_path / "current_lineups.json"
+    config_path.write_text(
+        json.dumps({"current_lineups": {"Red Bull Racing": ["VER", "HAD"], "RB": ["LAW", "LIN"]}})
+    )
+    patcher.setattr(
+        lineups,
+        "apply_substitutions",
+        lambda mapping, *, race_name, year: {**mapping, "Red Bull Racing": ["VER", "LAW"]},
+    )
+
+    resolved = lineups.get_lineups(2026, "Dutch Grand Prix", str(config_path))
+
+    assert resolved["Red Bull Racing"] == ["VER", "LAW"]

@@ -131,51 +131,16 @@ def get_artifact_versions(year: int = _DEFAULT_SEASON) -> dict[str, tuple[int, s
             logger.warning("Failed to load version for %s::%s: %s", artifact_type, artifact_key, e)
             versions[f"{artifact_type}::{artifact_key}"] = (0, "")
 
-    # Fold in the most-recent checkpoint snapshot so the prediction cache key changes when
-    # a snapshot is (re)written. Checkpoint reconstructions read snapshots at predict time,
-    # but the cache key derives from this function on both the warmup-write and dashboard-read
-    # sides; without this, a snapshot correction (with no season-artifact change) would keep
-    # serving a stale precomputed prediction. Snapshots auto-increment, so the newest row's
-    # version + created_at advances on every (re)write. Defensive: never break serving.
-    snapshot_fingerprint_key = f"car_characteristics_snapshot::{season_year}"
-    try:
-        recent_snapshots = store.list_artifacts(
-            "car_characteristics_snapshot",
-            key_prefix=f"{season_year}::",
-            limit=1,
-        )
-        if recent_snapshots:
-            newest = recent_snapshots[0]
-            snapshot_version = int(newest.get("version", 0) or 0)
-            snapshot_marker = f"{newest.get('artifact_key', '')}|{newest.get('created_at', '')}"
-            versions[snapshot_fingerprint_key] = (snapshot_version, snapshot_marker)
-        else:
-            versions[snapshot_fingerprint_key] = (0, "")
-    except Exception as exc:  # noqa: BLE001 - cache fingerprint must never break serving
-        logger.warning("Failed to fingerprint car_characteristics_snapshot: %s", exc)
-        versions[snapshot_fingerprint_key] = (0, "")
+    # Checkpoint reconstructions read snapshots at predict time, so a snapshot correction
+    # with no season-artifact change has to move the key too.
+    versions.update(_fingerprint_newest(store, "car_characteristics_snapshot", season_year))
 
-    # Grid penalties are entered at runtime, so a saved penalty has to move the prediction
-    # cache key or every precompute keeps serving the un-penalised grid until an unrelated
-    # artifact happens to change. Same shape as the snapshot fingerprint above.
-    penalty_fingerprint_key = f"grid_penalties::{season_year}"
-    try:
-        recent_penalties = store.list_artifacts(
-            "grid_penalties",
-            key_prefix=f"{season_year}::",
-            limit=1,
-        )
-        if recent_penalties:
-            newest = recent_penalties[0]
-            versions[penalty_fingerprint_key] = (
-                int(newest.get("version", 0) or 0),
-                f"{newest.get('artifact_key', '')}|{newest.get('created_at', '')}",
-            )
-        else:
-            versions[penalty_fingerprint_key] = (0, "")
-    except Exception as exc:  # noqa: BLE001 - cache fingerprint must never break serving
-        logger.warning("Failed to fingerprint grid_penalties: %s", exc)
-        versions[penalty_fingerprint_key] = (0, "")
+    # Grid penalties and driver substitutions are both entered at runtime, so saving one has
+    # to move the prediction cache key or every precompute keeps serving the old grid — the
+    # un-penalised order, or the driver who is not in the car — until an unrelated artifact
+    # happens to change.
+    versions.update(_fingerprint_newest(store, "grid_penalties", season_year))
+    versions.update(_fingerprint_newest(store, "driver_substitutions", season_year))
 
     # In DB-backed modes, ignore mutable local runtime files so hashes remain
     # consistent across web/worker instances (for example Render web + cron).
@@ -186,6 +151,37 @@ def get_artifact_versions(year: int = _DEFAULT_SEASON) -> dict[str, tuple[int, s
     versions.update(file_fingerprints)
 
     return versions
+
+
+def _fingerprint_newest(
+    store: Any,
+    artifact_type: str,
+    season_year: int,
+) -> dict[str, tuple[int, str]]:
+    """Fingerprint the newest artifact of one type so a rewrite moves the cache key.
+
+    These artifacts are written at runtime — a snapshot correction, a Saturday-night
+    penalty, a Thursday driver substitution — with no change to any season artifact. The
+    cache key derives from ``get_artifact_versions`` on both the warmup-write and the
+    dashboard-read side, so without this the precompute keeps serving the stale prediction.
+    Versions auto-increment, so the newest row's version + created_at advances on every
+    write. Defensive throughout: a fingerprint must never break serving.
+    """
+    key = f"{artifact_type}::{season_year}"
+    try:
+        recent = store.list_artifacts(artifact_type, key_prefix=f"{season_year}::", limit=1)
+        if not recent:
+            return {key: (0, "")}
+        newest = recent[0]
+        return {
+            key: (
+                int(newest.get("version", 0) or 0),
+                f"{newest.get('artifact_key', '')}|{newest.get('created_at', '')}",
+            )
+        }
+    except Exception as exc:  # noqa: BLE001 - cache fingerprint must never break serving
+        logger.warning("Failed to fingerprint %s: %s", artifact_type, exc)
+        return {key: (0, "")}
 
 
 def _get_file_timestamps(

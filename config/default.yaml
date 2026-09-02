@@ -24,6 +24,18 @@ grid:
     # Italian Grand Prix:
     #   ANT: 20
 
+  # Race-weekend driver substitutions, keyed by race name then by the driver who is out.
+  # The value is whoever takes that seat. A chain needs no ordering: the map is applied to
+  # the configured lineup in one simultaneous pass, so HAD out for LAW and LAW out for TSU
+  # seats LAW at Red Bull and TSU at RB in the same step.
+  #
+  # The dashboard writes these to the runtime store, so a Thursday injury does not need a
+  # redeploy. Entries are scoped to one race and stop applying at the next one.
+  substitutions: {}
+    # Dutch Grand Prix:
+    #   HAD: LAW
+    #   LAW: TSU
+
 model:
   version: "3.0"
   # Regulation eras for seconds calibration. The gap between a fast car and a slow

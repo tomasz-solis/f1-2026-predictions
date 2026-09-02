@@ -35,6 +35,8 @@ class GridConfig(StrictConfigModel):
     size: int = Field(default=22, ge=2)
     # {race name: {driver code: places dropped | "back" | "pit"}}. See config/default.yaml.
     penalties: dict[str, dict[str, int | str]] = Field(default_factory=dict)
+    # {race name: {driver out: driver in}}. One race's stand-in drivers. See config/default.yaml.
+    substitutions: dict[str, dict[str, str]] = Field(default_factory=dict)
 
 
 class RegulationEra(StrictConfigModel):
