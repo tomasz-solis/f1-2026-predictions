@@ -6,7 +6,7 @@ import json
 import logging
 import time
 from collections import OrderedDict
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from hashlib import sha1
 from threading import RLock
 from typing import Any, Protocol
@@ -24,7 +24,6 @@ from src.utils.operational_observability import (
 )
 
 from . import prediction_boundary as _prediction_boundary
-from . import prediction_cascade as _prediction_cascade
 from . import prediction_checkpointing as _prediction_checkpointing
 from . import prediction_serving as _prediction_serving
 
@@ -37,6 +36,9 @@ class PrecomputedPredictionUnavailableError(RuntimeError):
     """Raised when the dashboard cannot serve a request from warmed artifacts."""
 
 
+# PredictionRunFn keeps its Protocol: the real signature is positional-only
+# (race_name, weather, artifact_versions, /) plus keyword defaults for
+# is_sprint/year, which Callable[...] cannot express.
 class PredictionRunFn(Protocol):
     """Build a full weekend prediction payload."""
 
@@ -51,43 +53,10 @@ class PredictionRunFn(Protocol):
     ) -> PredictionResults: ...
 
 
-class AutoUpdateIfNeededFn(Protocol):
-    """Run a race-update check."""
-
-    def __call__(self, *, year: int, force_recheck: bool = False) -> None: ...
-
-
-class DetectEventBoundaryRefreshFn(Protocol):
-    """Return current event-boundary state for one race."""
-
-    def __call__(
-        self,
-        *,
-        year: int,
-        race_name: str,
-        is_sprint: bool,
-        session_detector: Any | None = None,
-    ) -> dict[str, Any]: ...
-
-
-class AutoUpdatePracticeIfNeededFn(Protocol):
-    """Run a practice-update check."""
-
-    def __call__(
-        self,
-        *,
-        year: int,
-        race_name: str,
-        is_sprint: bool,
-        force_recheck: bool = False,
-        session_detector: Any | None = None,
-    ) -> dict[str, Any]: ...
-
-
-class GetArtifactVersionsFn(Protocol):
-    """Return the current artifact-version map."""
-
-    def __call__(self, *, year: int) -> ArtifactVersions: ...
+AutoUpdateIfNeededFn = Callable[..., None]
+DetectEventBoundaryRefreshFn = Callable[..., dict[str, Any]]
+AutoUpdatePracticeIfNeededFn = Callable[..., dict[str, Any]]
+GetArtifactVersionsFn = Callable[..., ArtifactVersions]
 
 
 logger = logging.getLogger(__name__)
@@ -208,28 +177,6 @@ def prediction_payload_for_session(
     )
 
 
-def _prediction_sections_for_session(
-    *,
-    prediction_results: PredictionResults,
-    is_sprint: bool,
-    session_name: str,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Pick the qualifying and race sections for one checkpoint."""
-    return _prediction_checkpointing.prediction_sections_for_session(
-        prediction_results=prediction_results,
-        is_sprint=is_sprint,
-        session_name=session_name,
-    )
-
-
-def _resolve_prediction_checkpoint_session(latest_session: Any, *, is_sprint: bool) -> str:
-    """Map the latest completed session into the stored checkpoint key."""
-    return _prediction_checkpointing.resolve_prediction_checkpoint_session(
-        latest_session,
-        is_sprint=is_sprint,
-    )
-
-
 def prediction_targets_for_checkpoint(
     *,
     prediction_results: PredictionResults,
@@ -241,56 +188,6 @@ def prediction_targets_for_checkpoint(
         prediction_results=prediction_results,
         is_sprint=is_sprint,
         session_name=session_name,
-    )
-
-
-def _mean_confidence(entries: Any) -> float | None:
-    """Return mean row confidence when entries expose it."""
-    return _prediction_checkpointing.mean_confidence(entries)
-
-
-def _persist_prediction_checkpoint_summary(
-    *,
-    logger_instance: Any,
-    prediction_results: PredictionResults,
-    year: int,
-    race_name: str,
-    session_name: str,
-    weather: str,
-    is_sprint: bool,
-    target_predictions: dict[str, dict[str, Any]],
-) -> None:
-    """Persist a small checkpoint summary for trend views."""
-    _prediction_checkpointing.persist_prediction_checkpoint_summary(
-        logger_instance=logger_instance,
-        prediction_results=prediction_results,
-        year=year,
-        race_name=race_name,
-        session_name=session_name,
-        weather=weather,
-        is_sprint=is_sprint,
-        target_predictions=target_predictions,
-        logger=logger,
-    )
-
-
-def render_prediction_results_core(
-    *,
-    prediction_results: PredictionResults,
-    is_sprint: bool,
-    display_prediction_result_fn: Callable[[PredictionResults, str, bool], None],
-    st_module: Any,
-    prediction_cache_hit: bool = False,
-    pipeline_timing: Mapping[str, Any] | None = None,
-) -> None:
-    """Render saved prediction sections for the active weekend format."""
-    _prediction_cascade.render_prediction_results_core(
-        prediction_results=prediction_results,
-        is_sprint=is_sprint,
-        display_prediction_result_fn=display_prediction_result_fn,
-        st_module=st_module,
-        prediction_cache_hit=prediction_cache_hit,
-        pipeline_timing=pipeline_timing,
     )
 
 
@@ -380,18 +277,6 @@ def _load_warmed_boundary_fallback_prediction(
     )
 
 
-def _served_prediction_boundary_session_name(
-    *,
-    boundary_session_name: str,
-    boundary_fallback: dict[str, str] | None,
-) -> str:
-    """Return the checkpoint label that matches the prediction actually shown to the user."""
-    return _prediction_boundary.served_prediction_boundary_session_name(
-        boundary_session_name=boundary_session_name,
-        boundary_fallback=boundary_fallback,
-    )
-
-
 def _load_served_prediction_bundle(
     *,
     race_name: str,
@@ -426,7 +311,9 @@ def _load_served_prediction_bundle(
         load_warmed_boundary_fallback_prediction_fn=_load_warmed_boundary_fallback_prediction,
         load_precompute_horizon_index_fn=load_precompute_horizon_index,
         load_latest_prediction_for_boundary_fn=load_latest_prediction_for_boundary,
-        served_prediction_boundary_session_name_fn=_served_prediction_boundary_session_name,
+        served_prediction_boundary_session_name_fn=(
+            _prediction_boundary.served_prediction_boundary_session_name
+        ),
         prediction_unavailable_error_type=PrecomputedPredictionUnavailableError,
         notify_fn=notify_fn,
         logger=logger,

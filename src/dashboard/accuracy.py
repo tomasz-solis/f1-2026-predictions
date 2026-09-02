@@ -255,26 +255,12 @@ class AccuracyPipeline:
         return self._snapshots_written
 
     @property
-    def excluded_predictions(self) -> list[dict[str, Any]]:
-        """Return saved prediction rows that produced no scored targets."""
-        self._ensure_deps()
-        return self._excluded_predictions
-
-    @property
     def prediction_status_rows(self) -> list[dict[str, Any]]:
         """Return user-facing status rows for the saved-prediction list."""
         self._ensure_deps()
         if not self._prediction_status_rows:
             self.build_summary()
         return self._prediction_status_rows
-
-    @property
-    def excluded_target_keys(self) -> set[str]:
-        """Return artifact keys for checkpoints with excluded targets."""
-        self._ensure_deps()
-        if not self._prediction_status_rows:
-            self.build_summary()
-        return self._excluded_target_keys
 
     def _clear_cached_summary_state(self) -> None:
         """Reset cached derived summary state after underlying data changes."""

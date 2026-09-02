@@ -108,11 +108,6 @@ def is_db_enabled() -> bool:
     return get_storage_mode() != "file_only"
 
 
-def is_file_enabled() -> bool:
-    """Check if file storage is enabled."""
-    return get_storage_mode() != "db_only"
-
-
 def should_write_to_db() -> bool:
     """Check if writes should go to database."""
     return get_storage_mode() in ("db_only", "fallback", "dual_write")

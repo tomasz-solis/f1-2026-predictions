@@ -38,13 +38,6 @@ from src.utils.team_mapping import map_team_to_characteristics
 from src.utils.weekend import is_sprint_weekend
 
 
-def _copy_payload(payload: dict[str, Any] | None) -> dict[str, Any] | None:
-    """Return a defensive deep copy when a payload is available."""
-    if not isinstance(payload, dict):
-        return None
-    return deepcopy(payload)
-
-
 class SnapshotOverlayArtifactStore:
     """Artifact store view that swaps in one car-characteristics payload."""
 

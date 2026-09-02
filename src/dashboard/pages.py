@@ -14,15 +14,13 @@ from src.utils.weekend import get_fallback_schedule_rows, get_schedule_rows, is_
 
 from . import prediction_horizon as _prediction_horizon
 from . import prediction_messages as _prediction_messages
+from . import team_comparison
 from .analytics import track_event
 from .cache import get_artifact_versions
 from .grid_penalty_admin import render_grid_penalty_editor
 from .layout import BRAND_LAST_UPDATED, BRAND_MODEL_VERSION, ENABLE_PREDICTION_ACCURACY_TAB
 from .live_prediction_flow import (
     execute_live_prediction_pipeline_core as _execute_live_prediction_pipeline_core,
-)
-from .live_prediction_flow import (
-    render_prediction_results_core as _render_prediction_results_core,
 )
 from .live_prediction_flow import (
     save_prediction_if_enabled_core as _save_prediction_if_enabled_core,
@@ -40,6 +38,10 @@ from .precomputed_predictions import (
     load_precompute_horizon_index,
     load_precomputed_prediction,
 )
+from .prediction_cascade import (
+    render_prediction_results_core as _render_prediction_results_core,
+)
+from .rendering import display_prediction_result
 
 logger = logging.getLogger(__name__)
 DEFAULT_SEASON = 2026
@@ -81,54 +83,6 @@ def _artifact_store_class() -> Any:
     from src.persistence.artifact_store import ArtifactStore as artifact_store_class
 
     return artifact_store_class
-
-
-def _team_comparison_attr(name: str) -> Any:
-    from . import team_comparison
-
-    return getattr(team_comparison, name)
-
-
-def _build_team_comparison_dataframe(*args, **kwargs):
-    return _team_comparison_attr("_build_team_comparison_dataframe")(*args, **kwargs)
-
-
-def _coerce_unit_metric(*args, **kwargs):
-    return _team_comparison_attr("_coerce_unit_metric")(*args, **kwargs)
-
-
-def _collect_profile_names(*args, **kwargs):
-    return _team_comparison_attr("_collect_profile_names")(*args, **kwargs)
-
-
-def _default_team_selection(*args, **kwargs):
-    return _team_comparison_attr("_default_team_selection")(*args, **kwargs)
-
-
-def _hex_to_rgba(*args, **kwargs):
-    return _team_comparison_attr("_hex_to_rgba")(*args, **kwargs)
-
-
-def _load_team_characteristics_payload(*args, **kwargs):
-    return _team_comparison_attr("_load_team_characteristics_payload")(*args, **kwargs)
-
-
-def _render_team_comparison_section(*args, **kwargs):
-    return _team_comparison_attr("_render_team_comparison_section")(*args, **kwargs)
-
-
-def _resolve_profile_metrics(*args, **kwargs):
-    return _team_comparison_attr("_resolve_profile_metrics")(*args, **kwargs)
-
-
-def _team_brand_color(*args, **kwargs):
-    return _team_comparison_attr("_team_brand_color")(*args, **kwargs)
-
-
-def display_prediction_result(*args, **kwargs):
-    from .rendering import display_prediction_result as _display_prediction_result
-
-    return _display_prediction_result(*args, **kwargs)
 
 
 def render_notice_banner(*args, **kwargs):
@@ -238,7 +192,7 @@ def render_team_comparison_page() -> None:
         ],
         st_module=st,
     )
-    _render_team_comparison_section(year=selected_season)
+    team_comparison._render_team_comparison_section(year=selected_season)
 
 
 def _clear_fastf1_race_cache(year: int, race_name: str) -> None:
@@ -447,11 +401,6 @@ def _order_races_by_round(
     return ordered, 0
 
 
-def _parse_refresh_timestamp(value: Any) -> datetime | None:
-    """Parse a persisted refresh timestamp into UTC when possible."""
-    return _prediction_horizon.parse_refresh_timestamp(value)
-
-
 def _latest_dashboard_refresh_timestamp(year: int) -> datetime | None:
     """Return the newest refresh stamp that affects dashboard predictions."""
     season_year = int(year)
@@ -564,25 +513,6 @@ def _current_anchor_boundary_signature(year: int, anchor_race_name: str) -> str 
     )
 
 
-def _selected_race_persisted_prediction_available(
-    *,
-    year: int,
-    race_name: str,
-    weather: str,
-) -> bool:
-    """Return whether this race already has a served prediction at the live boundary."""
-    return _prediction_horizon.selected_race_persisted_prediction_available(
-        year=year,
-        race_name=race_name,
-        weather=weather,
-        get_artifact_versions_fn=get_artifact_versions,
-        compute_artifact_hash_fn=compute_artifact_hash,
-        current_anchor_boundary_signature_fn=_current_anchor_boundary_signature,
-        load_precomputed_prediction_fn=load_precomputed_prediction,
-        logger=logger,
-    )
-
-
 def _load_ready_races_from_current_store(
     *,
     year: int,
@@ -598,20 +528,6 @@ def _load_ready_races_from_current_store(
         weather_scenarios=weather_scenarios,
         current_anchor_boundary_signature_fn=_current_anchor_boundary_signature,
         load_precomputed_prediction_fn=load_precomputed_prediction,
-    )
-
-
-def _maybe_scope_race_options_to_planned_horizon(
-    *,
-    race_options: list[str],
-    planned_races: list[str],
-    requested_horizon: int,
-) -> tuple[list[str], bool]:
-    """Trim a full-season dropdown to the live planned horizon when needed."""
-    return _prediction_horizon.maybe_scope_race_options_to_planned_horizon(
-        race_options=race_options,
-        planned_races=planned_races,
-        requested_horizon=requested_horizon,
     )
 
 
@@ -788,11 +704,6 @@ def execute_live_prediction_pipeline(
     )
 
 
-def _prediction_failure_hint(error: Exception) -> str | None:
-    """Return the most relevant user-facing hint for a prediction failure."""
-    return _prediction_messages.prediction_failure_hint(error)
-
-
 def _build_runtime_messages(
     *,
     selected_season: int,
@@ -818,21 +729,6 @@ def _build_runtime_messages(
         completed_races_count=completed_races_count,
         latest_data_status_message_fn=_latest_data_status_message,
     )
-
-
-def _pipeline_timing_caption(pipeline_timing: dict[str, Any] | None) -> str | None:
-    """Format the dashboard pipeline timing caption."""
-    return _prediction_messages.pipeline_timing_caption(pipeline_timing)
-
-
-def _iter_observability_alerts(observability: dict[str, Any]) -> list[tuple[str, str]]:
-    """Normalize observability alerts into display-ready items."""
-    return _prediction_messages.iter_observability_alerts(observability)
-
-
-def _runtime_health_counters_caption(observability: dict[str, Any]) -> str | None:
-    """Build a compact runtime-health counter caption when counters are active."""
-    return _prediction_messages.runtime_health_counters_caption(observability)
 
 
 def _render_forecast_pending_state(
@@ -1027,14 +923,14 @@ def render_live_prediction_page(enable_logging: bool) -> None:
     # into the single collapsible disclosure instead of stacking separate captions
     # and banners above the forecast. A fan sees one "Forecast details" line with
     # everything else one click deep. (impeccable: distill)
-    for severity, formatted in _iter_observability_alerts(observability):
+    for severity, formatted in _prediction_messages.iter_observability_alerts(observability):
         runtime_messages.append(("warning" if severity == "error" else severity, formatted))
 
-    counters_caption = _runtime_health_counters_caption(observability)
+    counters_caption = _prediction_messages.runtime_health_counters_caption(observability)
     if counters_caption:
         runtime_messages.append(("info", counters_caption))
 
-    timing_caption = _pipeline_timing_caption(
+    timing_caption = _prediction_messages.pipeline_timing_caption(
         pipeline_timing if isinstance(pipeline_timing, dict) else None
     )
     if timing_caption:
@@ -1410,11 +1306,6 @@ def render_contact_page() -> None:
         st_module=st,
     )
     st.markdown(CONTACT_PAGE_HTML, unsafe_allow_html=True)
-
-
-def render_about_page() -> None:
-    """Backwards-compatible alias for older routes."""
-    render_contact_page()
 
 
 def render_page(page: str, enable_logging: bool) -> None:

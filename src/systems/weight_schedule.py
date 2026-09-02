@@ -181,24 +181,3 @@ def calculate_blended_performance(
 def get_recommended_schedule(is_regulation_change: bool = True) -> ScheduleType:
     """Get recommended weight schedule. Returns 'extreme' for regulation changes, 'moderate' for stable seasons."""  # noqa: E501
     return "extreme" if is_regulation_change else "moderate"
-
-
-def format_schedule_summary(schedule: ScheduleType) -> str:
-    """Format a human-readable summary of a weight schedule."""
-    schedule_def = SCHEDULES[schedule]
-
-    lines = [
-        f"Weight Schedule: {schedule.upper()}",
-        "",
-    ]
-
-    for race_num in sorted(schedule_def.keys()):
-        baseline, testing, current = schedule_def[race_num]
-        lines.append(
-            f"Race {race_num:2d}+: "
-            f"{baseline * 100:4.0f}% baseline | "
-            f"{testing * 100:4.0f}% testing | "
-            f"{current * 100:4.0f}% current"
-        )
-
-    return "\n".join(lines)

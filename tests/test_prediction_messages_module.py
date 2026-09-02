@@ -3,25 +3,6 @@
 from src.dashboard import prediction_messages
 
 
-def test_build_precompute_horizon_message_reports_boundary_fallback():
-    message, tone = prediction_messages.build_precompute_horizon_message(
-        {
-            "applied": True,
-            "ready_races": ["Australian Grand Prix"],
-            "expected_targets": ["Australian Grand Prix", "Chinese Grand Prix"],
-            "anchor_race_name": "Australian Grand Prix",
-            "anchor_session_name": "FP2",
-            "fallback_boundary_active": True,
-        },
-        race_options=["Australian Grand Prix"],
-        selected_race_prediction_available=True,
-    )
-
-    assert tone == "success"
-    assert "Forecasts are ready for 1 of the next 2 race weekends" in message
-    assert "still being prepared" in message
-
-
 def test_build_runtime_messages_collects_key_runtime_notices():
     messages = prediction_messages.build_runtime_messages(
         selected_season=2026,

@@ -36,7 +36,6 @@ every precompute row for the year so the next warmup regenerates from scratch:
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
@@ -46,6 +45,9 @@ from typing import TYPE_CHECKING, Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+
+from src.utils.env_file import load_env_file as _load_env_file  # noqa: E402
 
 if TYPE_CHECKING:
     from src.persistence.runtime_state_store import RuntimeStateStore
@@ -101,21 +103,6 @@ def _artifact_hash_for_year(year: int) -> str:
     from src.dashboard.precomputed_predictions import compute_artifact_hash
 
     return compute_artifact_hash(get_artifact_versions(year=int(year)))
-
-
-def _load_env_file(env_file: Path) -> None:
-    """Load a simple ``KEY=VALUE`` env file into ``os.environ``."""
-    if not env_file.exists():
-        raise FileNotFoundError(f"Env file not found: {env_file}")
-
-    for raw_line in env_file.read_text().splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if key:
-            os.environ.setdefault(key, value.strip())
 
 
 def _parse_args() -> argparse.Namespace:

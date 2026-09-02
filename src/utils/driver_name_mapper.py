@@ -166,11 +166,6 @@ class DriverNameMapper:
         return name
 
     @classmethod
-    def get_full_name(cls, abbreviation: str) -> str:
-        """Get full name from abbreviation."""
-        return cls.DRIVER_MAP.get(abbreviation.upper(), abbreviation)
-
-    @classmethod
     def normalize_result_list(cls, results: list) -> list:
         """Normalize all driver names in a result list to FastF1 abbreviations."""
         normalized = []
@@ -180,11 +175,3 @@ class DriverNameMapper:
                 normalized_result["driver"] = cls.normalize_driver_name(result["driver"])
             normalized.append(normalized_result)
         return normalized
-
-    @classmethod
-    def add_driver(cls, abbreviation: str, full_name: str) -> None:
-        """Add a new driver mapping for mid-season changes or reserves."""
-        cls.DRIVER_MAP[abbreviation.upper()] = full_name
-        cls.REVERSE_MAP[full_name] = abbreviation.upper()
-        cls.NAME_VARIANTS[full_name.lower()] = abbreviation.upper()
-        logger.info("Added driver mapping: %s -> %s", abbreviation, full_name)

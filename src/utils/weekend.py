@@ -172,15 +172,6 @@ def is_sprint_weekend(year: int, race_name: str) -> bool:
     return get_weekend_type(year, race_name) == "sprint"
 
 
-def get_event_format(year: int, race_name: str) -> str:
-    """Return the raw EventFormat string for one race."""
-    event_format = _find_event_format(year, race_name)
-    if event_format is None:
-        raise ValueError(f"Race '{race_name}' not found in {year} schedule")
-
-    return event_format
-
-
 def get_all_sprint_races(year: int) -> list[str]:
     """Return all sprint weekends in the season."""
     return [
@@ -197,13 +188,3 @@ def get_all_conventional_races(year: int) -> list[str]:
         for event_name, event_format in _get_schedule_rows(year)
         if "sprint" not in event_format
     ]
-
-
-def get_best_qualifying_session(year: int, race_name: str) -> str:
-    """Return the session that best proxies qualifying pace for a race."""
-    weekend_type = get_weekend_type(year, race_name)
-
-    if weekend_type == "sprint":
-        return "Sprint Qualifying"
-    else:
-        return "FP3"

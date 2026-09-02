@@ -12,21 +12,15 @@ from src.simulation.pit_strategy import sample_sprint_compound as _sample_sprint
 from src.types.prediction_types import PitStrategy, QualifyingGridEntry, RaceSimulationResult
 
 from .grid_uncertainty import (
-    coerce_grid_position_metric,
-    normalize_confidence_to_unit_interval,
     prepare_grid_uncertainty_profile,
     sample_probabilistic_grid_positions,
 )
 from .result_processing import (
-    apply_hypothetical_points_floor,
-    apply_low_confidence_interval_floor,
     build_finish_order,
 )
 from .weather_context import (
     build_weather_feature_context,
-    coerce_optional_float,
     resolve_race_environment_context,
-    weather_bucket_mismatch_score,
 )
 
 
@@ -56,16 +50,6 @@ class RaceSimulationDeps:
     aggregate_simulation_results: Callable[[list[RaceSimulationResult]], dict[str, Any]]
 
 
-def _coerce_optional_float(value: Any) -> float | None:
-    """Convert value to float when possible; otherwise return None."""
-    return coerce_optional_float(value)
-
-
-def _weather_bucket_mismatch_score(selected_weather: str, practice_weather: str) -> float:
-    """Return mismatch score between selected and practice-derived weather buckets."""
-    return weather_bucket_mismatch_score(selected_weather, practice_weather)
-
-
 def _build_weather_feature_context(
     *,
     selected_weather: str,
@@ -78,52 +62,6 @@ def _build_weather_feature_context(
         raw_features=raw_features,
         cfg=cfg,
     )
-
-
-def _apply_low_confidence_interval_floor(
-    *,
-    finish_order: list[dict[str, Any]],
-    input_confidence: float | None,
-    cfg: Any,
-    field_size: int,
-) -> None:
-    """Widen top-driver position ranges when run confidence is explicitly low."""
-    apply_low_confidence_interval_floor(
-        finish_order=finish_order,
-        input_confidence=input_confidence,
-        cfg=cfg,
-        field_size=field_size,
-    )
-
-
-def _normalize_confidence_to_unit_interval(value: Any) -> float:
-    """Convert confidence values expressed as 0-1 or 0-100 into a 0-1 scale."""
-    return normalize_confidence_to_unit_interval(value)
-
-
-def _apply_hypothetical_points_floor(
-    *,
-    info: dict[str, Any],
-    position_blend_score: float,
-    blended_position_samples: list[float],
-    reference_grid_pos: float,
-    field_size: int,
-    cfg: Any,
-) -> tuple[float, list[float]]:
-    """Preserve points-finishing evidence for proven drivers in hypothetical team swaps."""
-    return apply_hypothetical_points_floor(
-        info=info,
-        position_blend_score=position_blend_score,
-        blended_position_samples=blended_position_samples,
-        reference_grid_pos=reference_grid_pos,
-        field_size=field_size,
-        cfg=cfg,
-    )
-
-
-def _coerce_grid_position_metric(row: QualifyingGridEntry, key: str, fallback: int) -> int:
-    """Read an integer grid metric from a qualifying row with a safe fallback."""
-    return coerce_grid_position_metric(row, key, fallback)
 
 
 def _prepare_grid_uncertainty_profile(

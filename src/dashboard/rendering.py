@@ -4,44 +4,9 @@ import pandas as pd
 
 from src.dashboard import rendering_html, rendering_qualifying, rendering_race
 
-st = rendering_html.st
-
-_build_context_cards = rendering_html._build_context_cards
-_build_prediction_highlight_cards = rendering_html._build_prediction_highlight_cards
-_build_stat_cards_html = rendering_html._build_stat_cards_html
-_build_surface_header_html = rendering_html._build_surface_header_html
-_build_team_clustering_warning = rendering_html._build_team_clustering_warning
-_build_track_temperature_context_card = rendering_html._build_track_temperature_context_card
-_build_weather_feature_context_card = rendering_html._build_weather_feature_context_card
-_parse_optional_float = rendering_html._parse_optional_float
-_prediction_section_summary = rendering_html._prediction_section_summary
-_render_collapsible_warnings = rendering_html._render_collapsible_warnings
-_short_data_source_label = rendering_html._short_data_source_label
 render_notice_banner = rendering_html.render_notice_banner
 render_page_hero_deck = rendering_html.render_page_hero_deck
 render_prediction_hero_deck = rendering_html.render_prediction_hero_deck
-render_stage_timeline = rendering_html.render_stage_timeline
-render_stat_cards = rendering_html.render_stat_cards
-render_surface_header = rendering_html.render_surface_header
-
-_render_actual_classification = rendering_qualifying._render_actual_classification
-_render_qualifying_result = rendering_qualifying._render_qualifying_result
-_render_teammate_head_to_head_probabilities = (
-    rendering_qualifying._render_teammate_head_to_head_probabilities
-)
-
-_build_position_change_frame = rendering_race._build_position_change_frame
-_movement_bar_labels = rendering_race._movement_bar_labels
-_position_change_chart_figure = rendering_race._position_change_chart_figure
-_position_change_chart_title = rendering_race._position_change_chart_title
-_render_compound_strategies = rendering_race._render_compound_strategies
-_render_pit_lap_distribution = rendering_race._render_pit_lap_distribution
-_render_grid_penalty_notice = rendering_race._render_grid_penalty_notice
-_render_position_change_chart = rendering_race._render_position_change_chart
-_render_race_result = rendering_race._render_race_result
-_render_track_temperature_context = rendering_race._render_track_temperature_context
-_render_weather_feature_context = rendering_race._render_weather_feature_context
-_style_race_table = rendering_race._style_race_table
 
 
 def display_prediction_result(result: dict, prediction_name: str, is_race: bool = False) -> None:
@@ -51,14 +16,14 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
     df["position"] = df["position"].astype(int)
     df.attrs["input_confidence"] = result.get("input_confidence")
     result_mode = str(result.get("result_mode", "")).strip().upper()
-    render_surface_header(
+    rendering_html.render_surface_header(
         title=prediction_name,
-        summary=_prediction_section_summary(result, is_race=is_race),
+        summary=rendering_html._prediction_section_summary(result, is_race=is_race),
         eyebrow="Race projection" if is_race else "Qualifying projection",
     )
 
-    highlight_cards = _build_prediction_highlight_cards(df, result, is_race=is_race)
-    render_stat_cards(highlight_cards)
+    highlight_cards = rendering_html._build_prediction_highlight_cards(df, result, is_race=is_race)
+    rendering_html.render_stat_cards(highlight_cards)
 
     if result_mode == "ACTUAL":
         classification_note = str(result.get("classification_note", "")).strip()
@@ -66,13 +31,13 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
         if classification_note:
             render_notice_banner(classification_note, tone="success", label="Completed session")
         if is_race:
-            _render_grid_penalty_notice(result)
-            _render_position_change_chart(
+            rendering_race._render_grid_penalty_notice(result)
+            rendering_race._render_position_change_chart(
                 df,
                 result=result,
                 prediction_name=prediction_name,
             )
-        _render_actual_classification(
+        rendering_qualifying._render_actual_classification(
             df,
             caption=classification_caption
             or "This table shows the completed-session classification from FastF1.",
@@ -150,7 +115,7 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
                     f"Wide position ranges: {wide_ranges} drivers have 90% ranges spanning 8+ places."
                 )
 
-        team_cluster_warning = _build_team_clustering_warning(
+        team_cluster_warning = rendering_html._build_team_clustering_warning(
             df,
             mean_confidence=mean_qualifying_confidence,
         )
@@ -161,32 +126,32 @@ def display_prediction_result(result: dict, prediction_name: str, is_race: bool 
     pit_lap_distribution = result.get("pit_lap_distribution", {})
 
     if not is_race:
-        _render_collapsible_warnings(
+        rendering_html._render_collapsible_warnings(
             qualifying_warning_messages,
             title="Qualifying warnings",
         )
 
     if is_race:
-        _render_grid_penalty_notice(result)
-        _render_position_change_chart(
+        rendering_race._render_grid_penalty_notice(result)
+        rendering_race._render_position_change_chart(
             df,
             result=result,
             prediction_name=prediction_name,
         )
 
-    context_cards = _build_context_cards(result, is_race=is_race)
-    render_stat_cards(context_cards)
+    context_cards = rendering_html._build_context_cards(result, is_race=is_race)
+    rendering_html.render_stat_cards(context_cards)
 
     if compound_strategies and is_race:
-        _render_compound_strategies(compound_strategies)
+        rendering_race._render_compound_strategies(compound_strategies)
 
     if pit_lap_distribution and is_race:
-        _render_pit_lap_distribution(pit_lap_distribution)
+        rendering_race._render_pit_lap_distribution(pit_lap_distribution)
 
     if is_race:
-        _render_race_result(df)
+        rendering_race._render_race_result(df)
     else:
         teammate_head_to_head = result.get("teammate_head_to_head")
         if isinstance(teammate_head_to_head, list):
-            _render_teammate_head_to_head_probabilities(teammate_head_to_head)
-        _render_qualifying_result(df)
+            rendering_qualifying._render_teammate_head_to_head_probabilities(teammate_head_to_head)
+        rendering_qualifying._render_qualifying_result(df)

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
@@ -15,6 +14,7 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
 
 from scripts.generate_evaluation_report import _prediction_sort_key  # noqa: E402
 
@@ -33,6 +33,7 @@ from src.utils.accuracy_targets import (  # noqa: E402
     sanitize_prediction_rows,
     target_checkpoint_index,
 )
+from src.utils.env_file import load_env_file as _load_env_file  # noqa: E402
 from src.utils.prediction_logger import PredictionLogger  # noqa: E402
 from src.utils.weekend import get_schedule_rows  # noqa: E402
 
@@ -46,20 +47,6 @@ class TargetScore:
     checkpoint: str
     champion_mae: float
     challenger_mae: float | None
-
-
-def _load_env_file(env_file: Path) -> None:
-    """Load KEY=VALUE pairs without overriding already-exported values."""
-    if not env_file.exists():
-        raise FileNotFoundError(f"Env file not found: {env_file}")
-    for raw_line in env_file.read_text().splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if key:
-            os.environ.setdefault(key, value.strip())
 
 
 def _mean(values: list[float]) -> float | None:

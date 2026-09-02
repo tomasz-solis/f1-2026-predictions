@@ -103,7 +103,7 @@ def test_refresh_schedule_cache_forces_new_fastf1_fetch(patcher):
     assert call_count["n"] >= 2
 
 
-def test_get_event_format_and_all_conventional_races(patcher, tmp_path):
+def test_get_all_conventional_races(patcher, tmp_path):
     patcher.chdir(tmp_path)
     weekend.refresh_schedule_cache()
     patcher.setattr(
@@ -117,7 +117,6 @@ def test_get_event_format_and_all_conventional_races(patcher, tmp_path):
         ),
     )
 
-    assert weekend.get_event_format(2026, "Chinese Grand Prix") == "sprint_shootout"
     conventional_races = weekend.get_all_conventional_races(2026)
     assert "Australian Grand Prix" in conventional_races
     assert "Chinese Grand Prix" not in conventional_races

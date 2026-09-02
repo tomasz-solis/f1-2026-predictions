@@ -28,21 +28,6 @@ def calculate_undercut_window(
     return (earliest, latest)
 
 
-def evaluate_overcut(
-    track_overtaking: float,
-    tire_age: int,
-    traffic_penalty: float = 0.0,
-) -> float:
-    """Evaluate overcut potential (>0 favors staying out, <0 favors undercut)."""
-    track_overtaking = float(np.clip(track_overtaking, 0.0, 1.0))
-    tire_age = max(1, int(tire_age))
-    traffic_penalty = max(0.0, float(traffic_penalty))
-
-    track_position_value = track_overtaking * 2.0
-    tire_wear_cost = max(0.0, (tire_age - 15) * 0.05)
-    return float(track_position_value - tire_wear_cost - traffic_penalty)
-
-
 def calculate_pit_timing_bias_laps(
     track_overtaking: float | None,
     grid_position: int | None,

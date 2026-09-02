@@ -172,57 +172,6 @@ def test_save_precomputed_prediction_stamps_model_version_in_metadata(patcher, t
     assert payload["metadata"]["model_version"] == get_model_version()
 
 
-def test_list_precomputed_race_names_filters_by_year_hash_and_boundary(patcher, tmp_path):
-    """Race listing should return only entries matching the requested key dimensions."""
-    precompute_path = tmp_path / "precomputed_predictions.json"
-
-    patcher.setattr(store, "_PRECOMPUTED_PREDICTIONS_FILE", precompute_path)
-    patcher.setattr(store, "should_read_db_first", lambda: False)
-    patcher.setattr(store, "should_write_to_db", lambda: False)
-    patcher.setattr(store, "should_write_to_file", lambda: True)
-
-    store.save_precomputed_prediction(
-        year=2026,
-        race_name="Australian Grand Prix",
-        weather="dry",
-        artifact_hash="artifact_hash",
-        boundary_signature="sig_a",
-        is_sprint=False,
-        prediction_results={"qualifying": {"grid": []}, "race": {"finish_order": []}},
-    )
-    store.save_precomputed_prediction(
-        year=2026,
-        race_name="Chinese Grand Prix",
-        weather="rain",
-        artifact_hash="artifact_hash",
-        boundary_signature="sig_b",
-        is_sprint=True,
-        prediction_results={"sprint_quali": {"grid": []}, "sprint_race": {"finish_order": []}},
-    )
-    store.save_precomputed_prediction(
-        year=2026,
-        race_name="Miami Grand Prix",
-        weather="dry",
-        artifact_hash="different_hash",
-        boundary_signature="sig_a",
-        is_sprint=True,
-        prediction_results={"sprint_quali": {"grid": []}, "sprint_race": {"finish_order": []}},
-    )
-
-    listed_all = store.list_precomputed_race_names(
-        year=2026,
-        artifact_hash="artifact_hash",
-    )
-    listed_boundary = store.list_precomputed_race_names(
-        year=2026,
-        artifact_hash="artifact_hash",
-        boundary_signature="sig_a",
-    )
-
-    assert listed_all == ["Australian Grand Prix", "Chinese Grand Prix"]
-    assert listed_boundary == ["Australian Grand Prix"]
-
-
 def test_save_precomputed_prediction_raises_in_db_only_when_db_write_fails(patcher):
     """DB-only mode should raise so scheduler/app can detect persistence failures."""
     patcher.setattr(store, "should_read_db_first", lambda: True)
@@ -295,46 +244,6 @@ def test_save_precompute_horizon_index_raises_in_db_only_when_db_write_fails(pat
         raise AssertionError("Expected RuntimeError in db_only mode.")
     except RuntimeError as exc:
         assert "db_only mode" in str(exc)
-
-
-def test_list_precomputed_race_names_db_only_does_not_merge_file_fallback(patcher):
-    """DB-first mode without file writes should not pull stale race names from local files."""
-    patcher.setattr(store, "should_read_db_first", lambda: True)
-    patcher.setattr(store, "should_write_to_db", lambda: True)
-    patcher.setattr(store, "should_write_to_file", lambda: False)
-    patcher.setattr(
-        store,
-        "RuntimeStateStore",
-        lambda: type(
-            "_DbStore",
-            (),
-            {
-                "load_namespace": staticmethod(
-                    lambda namespace: {
-                        "k1": {
-                            "year": 2026,
-                            "artifact_hash": "artifact_hash",
-                            "boundary_signature": "sig_a",
-                            "race_name": "Australian Grand Prix",
-                        }
-                    }
-                )
-            },
-        )(),
-    )
-    patcher.setattr(
-        store,
-        "_load_file_state",
-        lambda: (_ for _ in ()).throw(AssertionError("file fallback should not be read")),
-    )
-
-    listed = store.list_precomputed_race_names(
-        year=2026,
-        artifact_hash="artifact_hash",
-        boundary_signature="sig_a",
-    )
-
-    assert listed == ["Australian Grand Prix"]
 
 
 def test_prune_db_namespace_entries_uses_key_only_strategy_when_available():

@@ -10,40 +10,11 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # Expected bounds for extracted F1 data
-_POSITION_MIN = 1
-_POSITION_MAX = 22
 _LAP_TIME_MIN_S = 55.0  # fastest ever ~1:02 (Monaco) with margin
 _LAP_TIME_MAX_S = 180.0  # slow outlier / safety car restart
 
 _MIN_TEAMS = 5
 _MAX_TEAMS = 11
-
-
-class ExtractionValidationError(ValueError):
-    """Raised when extracted data fails sanity checks."""
-
-
-def validate_session_positions(
-    positions: dict[str, int],
-    *,
-    context: str = "",
-) -> list[str]:
-    """Validate extracted position data. Returns list of warnings (empty = clean)."""
-    warnings: list[str] = []
-    prefix = f"[{context}] " if context else ""
-
-    if not positions:
-        warnings.append(f"{prefix}No positions extracted")
-        return warnings
-
-    for driver, pos in positions.items():
-        if not isinstance(pos, int | float):
-            warnings.append(f"{prefix}{driver}: position is not numeric ({pos!r})")
-        elif pos < _POSITION_MIN or pos > _POSITION_MAX:
-            warnings.append(
-                f"{prefix}{driver}: position {pos} outside {_POSITION_MIN}-{_POSITION_MAX}"
-            )
-    return warnings
 
 
 def validate_team_pace_data(

@@ -24,7 +24,6 @@ class PathsConfig(StrictConfigModel):
     data_dir: str = Field(default="data", min_length=1)
     processed: str = Field(default="data/processed", min_length=1)
     raw: str = Field(default="data/raw", min_length=1)
-    driver_chars: str = Field(default="data/processed/driver_characteristics.json", min_length=1)
     track_chars: str = Field(default="data/processed/track_characteristics.json", min_length=1)
     lineups: str = Field(default="data/current_lineups.json", min_length=1)
     cache: str = Field(default=".fastf1_cache", min_length=1)
@@ -75,81 +74,6 @@ class BayesianConfig(StrictConfigModel):
     sprint_race_confidence: float = Field(default=0.20, ge=0.0, le=1.0)
 
 
-class RaceWeightsConfig(StrictConfigModel):
-    """Top-level race weighting inputs."""
-
-    pace_weight: float = Field(default=0.4, ge=0.0, le=1.0)
-    grid_weight: float = Field(default=0.3, ge=0.0, le=1.0)
-    overtaking_weight: float = Field(default=0.15, ge=0.0, le=1.0)
-    tire_deg_weight: float = Field(default=0.15, ge=0.0, le=1.0)
-
-
-class UncertaintyMultipliersConfig(StrictConfigModel):
-    """Named multipliers applied to race uncertainty."""
-
-    rain: float = Field(default=1.5, ge=0.0)
-    easy_overtaking: float = Field(default=0.8, ge=0.0)
-
-
-class DNFConfig(StrictConfigModel):
-    """DNF risk parameters."""
-
-    base_risk: float = Field(default=0.05, ge=0.0, le=1.0)
-    driver_error_factor: float = Field(default=0.15, ge=0.0, le=1.0)
-    street_circuit_risk: float = Field(default=0.05, ge=0.0, le=0.5)
-    rain_risk: float = Field(default=0.10, ge=0.0, le=0.5)
-
-
-class Lap1Config(StrictConfigModel):
-    """Lap-one variance parameters."""
-
-    midfield_variance: float = Field(default=1.5, ge=0.0)
-    front_row_variance: float = Field(default=0.0, ge=0.0)
-
-
-class TireConfig(StrictConfigModel):
-    """Top-level tire degradation parameters."""
-
-    degradation_multiplier: float = Field(default=4.0, ge=0.0)
-    skill_reduction_factor: float = Field(default=0.2, ge=0.0, le=1.0)
-
-
-class WeatherConfig(StrictConfigModel):
-    """Weather impact parameters."""
-
-    rain_position_swing: float = Field(default=6.0, ge=0.0)
-    mixed_intensity: float = Field(default=0.5, ge=0.0, le=1.0)
-
-
-class SafetyCarConfig(StrictConfigModel):
-    """Safety car parameters."""
-
-    compression_factor: float = Field(default=0.1, ge=0.0, le=1.0)
-
-
-class PaceConfig(StrictConfigModel):
-    """Top-level pace calculation parameters."""
-
-    pace_delta_multiplier: float = Field(default=3.0, ge=0.0)
-
-
-class RaceConfig(StrictConfigModel):
-    """Top-level race simulation parameters."""
-
-    weights: RaceWeightsConfig = Field(default_factory=RaceWeightsConfig)
-    base_uncertainty: float = Field(default=2.5, ge=0.0)
-    uncertainty_multipliers: UncertaintyMultipliersConfig = Field(
-        default_factory=UncertaintyMultipliersConfig
-    )
-    dnf: DNFConfig = Field(default_factory=DNFConfig)
-    lap1: Lap1Config = Field(default_factory=Lap1Config)
-    tire: TireConfig = Field(default_factory=TireConfig)
-    weather: WeatherConfig = Field(default_factory=WeatherConfig)
-    safety_car: SafetyCarConfig = Field(default_factory=SafetyCarConfig)
-    pace: PaceConfig = Field(default_factory=PaceConfig)
-    dnf_position_penalty: int = Field(default=22, ge=1)
-
-
 class BlendConfig(StrictConfigModel):
     """Top-level qualifying blend weights."""
 
@@ -178,7 +102,6 @@ class QualifyingConfig(StrictConfigModel):
 class LearningConfig(StrictConfigModel):
     """Top-level learning parameters."""
 
-    performance_window: int = Field(default=5, ge=1)
     min_samples: int = Field(default=3, ge=1)
     min_races_for_blend: int | None = Field(default=None, ge=1)
     driver_error_scale: float = Field(default=0.18, ge=0.0)
@@ -287,16 +210,6 @@ class QualifyingResidualModelConfig(StrictConfigModel):
     )
     clip_positions: float = Field(default=2.0, ge=0.0)
     allow_with_testing_seed: bool = False
-
-
-class PracticeChallengerConfig(StrictConfigModel):
-    """Q1 practice-to-qualifying challenger launch settings.
-
-    An empty ``launch_envelope_path`` keeps the champion path active and makes
-    the challenger fail closed; only a research overlay supplies a real path.
-    """
-
-    launch_envelope_path: str | None = None
 
 
 class RaceResidualModelConfig(StrictConfigModel):
@@ -502,7 +415,6 @@ class BaselineQualifyingConfig(StrictConfigModel):
     fp_blend_weight_min: float = Field(default=0.45, ge=0.0, le=1.0)
     fp_blend_weight_max: float = Field(default=0.85, ge=0.0, le=1.0)
     fp_blend_confidence_scale: float = Field(default=0.30, ge=0.0)
-    fp_blend_weight_testing: bool = True
     fp_normalization: str = Field(default="robust", pattern="^(robust|minmax)$")
     fp_robust_spread_k: float = Field(default=2.0, gt=0.0)
     fp_scale_align: bool = True
@@ -532,7 +444,6 @@ class BaselineQualifyingConfig(StrictConfigModel):
     qualifying_residual_model: QualifyingResidualModelConfig = Field(
         default_factory=QualifyingResidualModelConfig
     )
-    practice_challenger: PracticeChallengerConfig = Field(default_factory=PracticeChallengerConfig)
 
 
 class SprintCompoundDistributionConfig(StrictConfigModel):
@@ -1097,12 +1008,6 @@ class CompoundBlendWeightsConfig(StrictConfigModel):
 class BaselinePredictorSectionConfig(StrictConfigModel):
     """Baseline predictor configuration block."""
 
-    # `model_variant` collides with pydantic's reserved `model_` namespace.
-    model_config = ConfigDict(extra="forbid", protected_namespaces=())
-
-    # Production stays on the immutable champion unless a replay or shadow run
-    # opts into a registered challenger variant explicitly.
-    model_variant: str = Field(default="champion")
     team_strength_schedule: str = Field(default="rapid_adaptive")
     baseline_learning_rate: float = Field(default=0.3, ge=0.0, le=1.0)
     mixed_wet_blend: float = Field(default=0.50, ge=0.0, le=1.0)
@@ -1124,7 +1029,6 @@ class TestingConfig(StrictConfigModel):
     """Standalone testing helpers configuration."""
 
     seed: int = Field(default=42, ge=0)
-    monte_carlo_runs: int = Field(default=100, ge=1)
 
 
 class BaselinePredictorConfig(StrictConfigModel):
@@ -1134,7 +1038,6 @@ class BaselinePredictorConfig(StrictConfigModel):
     grid: GridConfig = Field(default_factory=GridConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
     bayesian: BayesianConfig = Field(default_factory=BayesianConfig)
-    race: RaceConfig = Field(default_factory=RaceConfig)
     qualifying: QualifyingConfig = Field(default_factory=QualifyingConfig)
     learning: LearningConfig = Field(default_factory=LearningConfig)
     track_defaults: TrackDefaultsConfig = Field(default_factory=TrackDefaultsConfig)

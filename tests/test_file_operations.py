@@ -43,21 +43,3 @@ def test_atomic_json_write_raises_and_preserves_original_on_move_failure(tmp_pat
 
     assert json.loads(target.read_text()) == {"old": True}
     assert list(tmp_path.glob(f".{target.name}.*.tmp")) == []
-
-
-def test_restore_from_backup_success_and_failures(tmp_path, patcher):
-    target = tmp_path / "state.json"
-    target.write_text(json.dumps({"current": True}))
-    backup = Path(str(target) + ".backup")
-    backup.write_text(json.dumps({"restored": True}))
-
-    assert file_ops.restore_from_backup(target) is True
-    assert json.loads(target.read_text()) == {"restored": True}
-
-    missing = tmp_path / "missing.json"
-    assert file_ops.restore_from_backup(missing) is False
-
-    patcher.setattr(
-        file_ops.shutil, "copy2", lambda src, dst: (_ for _ in ()).throw(OSError("no copy"))
-    )
-    assert file_ops.restore_from_backup(target) is False

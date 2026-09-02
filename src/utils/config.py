@@ -42,35 +42,6 @@ class ProductionConfig:
         else:
             return quali_config["conventional_weekends"].copy()
 
-    def get_expected_mae(
-        self,
-        prediction_type: Literal["qualifying", "race"],
-        method: str | None = None,
-        weekend_type: Literal["sprint", "conventional"] | None = None,
-    ) -> float:
-        """Get expected MAE from config for the given prediction type."""
-        if prediction_type == "qualifying":
-            if weekend_type:
-                strategy = self.get_qualifying_strategy(weekend_type)
-                return strategy["expected_mae"]
-            else:
-                # Return weighted average
-                sprint = self.config["qualifying_methods"]["sprint_weekends"]
-                conv = self.config["qualifying_methods"]["conventional_weekends"]
-
-                # Assume 6 sprint, 18 conventional (2025 ratio)
-                weighted_mae = (sprint["expected_mae"] * 6 + conv["expected_mae"] * 18) / 24
-                return weighted_mae
-
-        elif prediction_type == "race":
-            return self.config["race_methods"]["default"]["expected_mae"]
-
-        return 4.0  # Conservative fallback
-
-    def get_performance_ranking(self) -> dict:
-        """Get performance ranking from 2025 testing."""
-        return self.config["notes"]["performance_ranking_2025"].copy()
-
     def __str__(self):
         """Display config summary."""
         lines = []
@@ -116,9 +87,3 @@ def load_production_config(
 ) -> ProductionConfig:
     """Load production config."""
     return ProductionConfig(config_path)
-
-
-def get_best_method(weekend_type: Literal["sprint", "conventional"]) -> dict:
-    """Get best method for the given weekend type."""
-    config = load_production_config()
-    return config.get_qualifying_strategy(weekend_type)

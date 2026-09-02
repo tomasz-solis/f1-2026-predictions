@@ -50,11 +50,3 @@ def check_connection() -> str:
         return f"Supabase connection healthy ({len(result.data)} row(s) accessible)"
     except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as e:
         raise RuntimeError(f"Supabase connection failed: {e}") from e
-
-
-def close_client() -> None:
-    """Clear the cached client so tests or shutdown paths can start fresh."""
-    global _supabase_client
-    if _supabase_client is not None:
-        _supabase_client = None
-        logger.info("Supabase client closed")

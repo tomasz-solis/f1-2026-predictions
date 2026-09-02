@@ -52,33 +52,6 @@ class Car:
         self.characteristics.reliability = testing_data.get("consistency", 0.8)
         self.characteristics.tire_preservation = testing_data.get("tire_deg_slope", 0.5)
 
-    def get_performance_score(self, track_type: str = "balanced") -> float:
-        """
-        Calculate a composite performance score (0-20 scale) based on track demands.
-        """
-        c = self.characteristics
-
-        # Base Score (Weighted average of core attributes)
-        # Medium corners and Straights usually dominate lap time
-        base_score = (
-            c.slow_corner * 0.15
-            + c.medium_corner * 0.30
-            + c.fast_corner * 0.25
-            + c.straight_line * 0.30
-        )
-
-        # Track-Specific Modifiers
-        if track_type == "monaco":  # High Downforce, Low Speed
-            score = (c.slow_corner * 0.6) + (c.medium_corner * 0.3) + (c.reliability * 0.1)
-        elif track_type == "monza":  # Low Drag, High Speed
-            score = (c.straight_line * 0.7) + (c.slow_corner * 0.2) + (c.fast_corner * 0.1)
-        elif track_type == "silverstone":  # High Speed Cornering
-            score = (c.fast_corner * 0.5) + (c.medium_corner * 0.3) + (c.straight_line * 0.2)
-        else:
-            score = base_score
-
-        return self._calculate_base_score(score)
-
     def _calculate_base_score(self, raw_score: float) -> float:
         """Convert 0-1 raw score to 0-20 rating scale for Bayesian priors."""
         # 0.0 -> 5.0 (Backmarker)

@@ -558,24 +558,6 @@ def get_fp_session_weather(year: int, race_name: str, session_type: str) -> str 
         return None
 
 
-def get_best_fp_performance(
-    year: int,
-    race_name: str,
-    is_sprint: bool = False,
-    qualifying_stage: str = "auto",
-    predicted_race_weather: str | None = None,
-) -> tuple[str | None, dict[str, float] | None, pd.DataFrame | None]:
-    """Get best available practice session with staleness checks and error reporting."""
-    session_label, performance, laps, _ = get_best_fp_performance_with_session_laps(
-        year=year,
-        race_name=race_name,
-        is_sprint=is_sprint,
-        qualifying_stage=qualifying_stage,
-        predicted_race_weather=predicted_race_weather,
-    )
-    return session_label, performance, laps
-
-
 def get_best_fp_performance_with_session_laps(
     year: int,
     race_name: str,

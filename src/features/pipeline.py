@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
-import logging
-
 import numpy as np
 import pandas as pd
 
 from .telemetry import LapFeatureExtractor, SessionFeatureAggregator
-
-logger = logging.getLogger(__name__)
 
 
 class RelativePerformanceCalculator:
@@ -74,36 +70,3 @@ class F1FeaturePipeline:
             with_ranks["session_date"] = session.date
 
         return with_ranks
-
-    def process_multiple_sessions(self, sessions, verbose: bool = True) -> pd.DataFrame:
-        """Process multiple sessions and concatenate their feature tables."""
-        all_features: list[pd.DataFrame] = []
-
-        for i, session in enumerate(sessions):
-            if verbose:
-                logger.info(
-                    "Processing %s/%s: %s - %s",
-                    i + 1,
-                    len(sessions),
-                    session.event["EventName"],
-                    session.name,
-                )
-
-            features = self.process_session(session)
-            if len(features) > 0:
-                all_features.append(features)
-
-        if len(all_features) == 0:
-            return pd.DataFrame()
-
-        combined = pd.concat(all_features, ignore_index=True)
-
-        if verbose:
-            logger.info("Processed %s sessions", len(all_features))
-            logger.info(
-                "%s total rows, %s drivers",
-                len(combined),
-                combined["driver_number"].nunique(),
-            )
-
-        return combined

@@ -12,7 +12,6 @@ from typing import Any
 import yaml
 
 logger = logging.getLogger(__name__)
-ValidationSpec = tuple[str, type[int] | type[float], float, float]
 
 
 class Config:
@@ -52,31 +51,18 @@ class Config:
         logger.info("Configuration loaded successfully from %s", config_path)
 
     def _validate_config(self) -> None:
-        """Validate that required config sections exist, with correct structure and value ranges."""
+        """Validate against the Pydantic schema, then check constraints it cannot express."""
         config = self._config
         if config is None:
             raise ValueError("Config validation failed: configuration is not loaded")
 
-        # Fast-fail validation using Pydantic schema (if available)
-        try:
-            from src.utils.config_schema import validate_config
+        from src.utils.config_schema import validate_config
 
-            # Validate against Pydantic schema for structured validation
-            try:
-                validate_config(config)
-                logger.info("Config passed Pydantic schema validation")
-            except Exception as pydantic_error:
-                logger.warning(
-                    "Pydantic validation failed (falling back to legacy): %s", pydantic_error
-                )
-                # Continue with legacy validation below
-        except ImportError:
-            logger.debug("Pydantic schemas not available, using legacy validation")
+        validate_config(config)
 
         required_sections = [
             "paths",
             "bayesian",
-            "race",
             "qualifying",
             "baseline_predictor",
         ]
@@ -101,116 +87,6 @@ class Config:
             raise ValueError("Config missing baseline_predictor.qualifying section")
         if "race" not in baseline_predictor_config:
             raise ValueError("Config missing baseline_predictor.race section")
-
-        validations: list[ValidationSpec] = [
-            # Bayesian model parameters
-            ("bayesian.base_volatility", float, 0.0, 1.0),
-            ("bayesian.base_observation_noise", float, 0.0, 100.0),
-            ("bayesian.shock_threshold", float, 0.0, 10.0),
-            # Qualifying parameters
-            ("baseline_predictor.qualifying.noise_std_sprint", float, 0.0, 0.5),
-            ("baseline_predictor.qualifying.noise_std_normal", float, 0.0, 0.5),
-            ("baseline_predictor.qualifying.team_weight", float, 0.0, 1.0),
-            ("baseline_predictor.qualifying.skill_weight", float, 0.0, 1.0),
-            ("baseline_predictor.qualifying.fp_blend_weight", float, 0.0, 1.0),
-            ("baseline_predictor.qualifying.confidence_cap", int, 1, 100),
-            ("baseline_predictor.qualifying.confidence_min", int, 1, 100),
-            ("baseline_predictor.qualifying.default_skill", float, 0.0, 1.0),
-            ("baseline_predictor.qualifying.default_team_strength", float, 0.0, 1.0),
-            # Race parameters - base chaos
-            ("baseline_predictor.race.base_chaos.dry", float, 0.0, 1.0),
-            ("baseline_predictor.race.base_chaos.wet", float, 0.0, 1.0),
-            ("baseline_predictor.race.track_chaos_multiplier", float, 0.0, 1.0),
-            # Race parameters - safety car
-            ("baseline_predictor.race.sc_base_probability.dry", float, 0.0, 1.0),
-            ("baseline_predictor.race.sc_base_probability.wet", float, 0.0, 1.0),
-            ("baseline_predictor.race.sc_track_modifier", float, 0.0, 1.0),
-            ("baseline_predictor.race.safety_car_trigger_lap", int, 1, 70),
-            # Race parameters - grid and pace
-            ("baseline_predictor.race.grid_weight_min", float, 0.0, 1.0),
-            ("baseline_predictor.race.grid_weight_multiplier", float, 0.0, 1.0),
-            ("baseline_predictor.race.grid_divisor", int, 18, 22),
-            ("baseline_predictor.race.pace_weight_base", float, 0.0, 1.0),
-            ("baseline_predictor.race.pace_weight_track_modifier", float, 0.0, 1.0),
-            # Race parameters - DNF caps
-            ("baseline_predictor.race.dnf_rate_historical_cap", float, 0.0, 1.0),
-            ("baseline_predictor.race.dnf_rate_final_cap", float, 0.0, 1.0),
-            ("baseline_predictor.race.dnf_rate_floor", float, 0.0, 1.0),
-            ("baseline_predictor.race.dnf_season_calibration_multiplier", float, 0.1, 5.0),
-            ("baseline_predictor.race.team_uncertainty_dnf_multiplier", float, 0.0, 1.0),
-            ("baseline_predictor.race.missing_driver_teammate_weight", float, 0.0, 1.0),
-            ("baseline_predictor.race.missing_driver_default_dnf_rate", float, 0.0, 1.0),
-            ("baseline_predictor.race.missing_driver_rookie_dnf_penalty", float, 0.0, 0.5),
-            ("baseline_predictor.race.missing_driver_second_year_penalty_scale", float, 0.0, 1.0),
-            ("baseline_predictor.race.min_laps_for_compound_data", int, 1, 500),
-            ("baseline_predictor.race.weekend_long_run_min_laps", int, 1, 70),
-            ("baseline_predictor.race.long_run_outlier_threshold", float, 0.1, 5.0),
-            # Race parameters - low-confidence interval floor
-            (
-                "baseline_predictor.race.position_interval_floor.apply_below_input_confidence",
-                float,
-                0.0,
-                1.0,
-            ),
-            ("baseline_predictor.race.position_interval_floor.top_n", int, 1, 22),
-            ("baseline_predictor.race.position_interval_floor.min_width", int, 0, 21),
-            ("baseline_predictor.race.position_interval_floor.max_extra_width", int, 0, 21),
-            # Race parameters - overtaking transition blend
-            (
-                "baseline_predictor.race.overtaking_transition.min_observed_weight",
-                float,
-                0.0,
-                1.0,
-            ),
-            (
-                "baseline_predictor.race.overtaking_transition.max_observed_weight",
-                float,
-                0.0,
-                1.0,
-            ),
-            (
-                "baseline_predictor.race.overtaking_transition.races_to_full_weight",
-                int,
-                1,
-                50,
-            ),
-            (
-                "baseline_predictor.race.overtaking_transition.max_delta_from_prior",
-                float,
-                0.0,
-                1.0,
-            ),
-        ]
-
-        errors = []
-        for key, expected_type, min_val, max_val in validations:
-            value = self.get(key)
-
-            # Check if value exists
-            if value is None:
-                errors.append(f"Missing required config key: {key}")
-                continue
-
-            # Check type
-            if not isinstance(value, expected_type):
-                expected_type_name = expected_type.__name__
-                errors.append(
-                    f"Invalid type for {key}: expected {expected_type_name}, "
-                    f"got {type(value).__name__}"
-                )
-                continue
-
-            # Check range
-            numeric_value = float(value)
-            if not (min_val <= numeric_value <= max_val):
-                errors.append(
-                    f"Value out of range for {key}: {numeric_value} "
-                    f"(must be between {min_val} and {max_val})"
-                )
-
-        if errors:
-            error_msg = "Config validation failed:\n  - " + "\n  - ".join(errors)
-            raise ValueError(error_msg)
 
         confidence_cap = self.get("baseline_predictor.qualifying.confidence_cap", 60)
         confidence_min = self.get("baseline_predictor.qualifying.confidence_min", 40)
@@ -265,16 +141,6 @@ class Config:
             raise ValueError(
                 "baseline_predictor.race.position_scaling thresholds must satisfy "
                 "front_threshold < upper_threshold < mid_threshold"
-            )
-
-        team_weight = self.get("baseline_predictor.qualifying.team_weight", 0.60)
-        skill_weight = self.get("baseline_predictor.qualifying.skill_weight", 0.40)
-        weight_sum = team_weight + skill_weight
-
-        if not (0.99 <= weight_sum <= 1.01):  # Allow small floating point error
-            raise ValueError(
-                f"baseline_predictor.qualifying weights must sum to 1.0, got {weight_sum:.3f} "
-                f"(team_weight={team_weight}, skill_weight={skill_weight})"
             )
 
         logger.debug("Config validation passed")

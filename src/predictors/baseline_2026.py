@@ -11,7 +11,9 @@ from src.persistence.artifact_store import ArtifactStore
 from src.predictors.baseline import (
     BaselineDataMixin,
     BaselineQualifyingMixin,
-    BaselineRaceMixin,
+    BaselineRaceParamsMixin,
+    BaselineRacePredictionMixin,
+    BaselineRacePreparationMixin,
 )
 from src.systems.systematic_learning import SystematicLearningSystem
 from src.utils.config_loader import Config
@@ -22,7 +24,9 @@ logger = logging.getLogger(__name__)
 class Baseline2026Predictor(
     BaselineDataMixin,
     BaselineQualifyingMixin,
-    BaselineRaceMixin,
+    BaselineRacePreparationMixin,
+    BaselineRaceParamsMixin,
+    BaselineRacePredictionMixin,
 ):
     """Baseline predictor used by the dashboard and command-line tools."""
 

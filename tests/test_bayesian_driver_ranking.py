@@ -154,16 +154,6 @@ class TestBayesianDriverRanking:
         assert ver_row["expected_position"] == 1.0
         assert bot_row["expected_position"] == 22.0
 
-    def test_get_history_df_returns_updates(self, sample_priors):
-        """History export should work."""
-        ranker = BayesianDriverRanking(sample_priors)
-        ranker.update({"1": 1}, "test", confidence=1.0)
-
-        history_df = ranker.get_history_df()
-        assert len(history_df) == 1
-        assert "session_name" in history_df.columns
-        assert history_df.iloc[0]["session_name"] == "test"
-
     def test_update_ignores_unknown_drivers(self, sample_priors):
         """Should skip drivers not in priors."""
         ranker = BayesianDriverRanking(sample_priors)

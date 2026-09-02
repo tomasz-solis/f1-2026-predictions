@@ -4,9 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 
-from src.dashboard import pages
-from src.dashboard.live_prediction_flow import PrecomputedPredictionUnavailableError
-from src.dashboard.prediction_flow import CompetitiveSessionStatusUnavailableError
+from src.dashboard import pages, team_comparison
 
 
 def test_load_race_options_filters_testing_and_tags_sprint(patcher):
@@ -324,40 +322,6 @@ def test_prediction_action_state_reports_rewarm_when_artifact_hash_changed():
     assert "refreshed for the latest model version" in state["pending_message"]
 
 
-def test_selected_race_persisted_prediction_available_uses_current_boundary_and_weather(patcher):
-    patcher.setattr(pages, "get_artifact_versions", lambda year=2026: {"k": (1, "ts")})
-    patcher.setattr(pages, "compute_artifact_hash", lambda versions: "artifact_hash")
-    patcher.setattr(
-        pages,
-        "_current_anchor_boundary_signature",
-        lambda year, anchor_race_name: "boundary_sig",
-    )
-
-    captured: dict[str, object] = {}
-
-    def _load_precomputed_prediction(**kwargs):
-        captured.update(kwargs)
-        return {"qualifying": {"grid": []}, "race": {"finish_order": []}}
-
-    patcher.setattr(pages, "load_precomputed_prediction", _load_precomputed_prediction)
-
-    assert (
-        pages._selected_race_persisted_prediction_available(
-            year=2026,
-            race_name="Japanese Grand Prix",
-            weather="Dry",
-        )
-        is True
-    )
-    assert captured == {
-        "year": 2026,
-        "race_name": "Japanese Grand Prix",
-        "weather": "dry",
-        "artifact_hash": "artifact_hash",
-        "boundary_signature": "boundary_sig",
-    }
-
-
 def test_prediction_action_state_keeps_selected_race_enabled_when_exact_prediction_exists(
     patcher,
 ):
@@ -455,52 +419,6 @@ def test_clear_fastf1_race_cache_removes_date_prefixed_race_dirs_only(patcher, t
     assert not target_primary.exists()
     assert not target_testing.exists()
     assert untouched_other_race.exists()
-
-
-def test_prediction_failure_hint_uses_fastf1_specific_guidance():
-    hint = pages._prediction_failure_hint(
-        CompetitiveSessionStatusUnavailableError(
-            "Could not verify completion state for Australian Grand Prix 2026 Q; "
-            "refusing to fall back to predicted grid."
-        )
-    )
-
-    assert hint is not None
-    assert "live-data sync problem" in hint
-    assert "missing artifact problem" in hint
-
-
-def test_prediction_failure_hint_uses_artifact_guidance_for_missing_data():
-    hint = pages._prediction_failure_hint(
-        FileNotFoundError("Could not locate driver characteristics fallback for season 2026")
-    )
-
-    assert hint is not None
-    assert "extract_driver_characteristics.py" in hint
-
-
-def test_prediction_failure_hint_uses_precompute_guidance_when_db_prediction_missing():
-    hint = pages._prediction_failure_hint(
-        PrecomputedPredictionUnavailableError("Persisted prediction is not available")
-    )
-
-    assert hint is not None
-    assert "warmup_precompute.py" in hint
-    assert "--require-db" in hint
-
-
-def test_prediction_failure_hint_uses_schedule_guidance_for_weekend_lookup_failures():
-    """Schedule lookup failures should not point users at warmup as the primary fix."""
-    hint = pages._prediction_failure_hint(
-        PrecomputedPredictionUnavailableError(
-            "Could not resolve weekend format for Mystery Grand Prix 2026 because schedule "
-            "lookup failed: missing schedule row. The dashboard refuses to guess sprint vs conventional."
-        )
-    )
-
-    assert hint is not None
-    assert "refused to guess" in hint
-    assert "warmup_precompute.py" not in hint
 
 
 def test_dashboard_refresh_label_prefers_newest_runtime_timestamp(patcher):
@@ -1084,7 +1002,9 @@ def test_render_model_insights_page_executes(patcher):
 def test_render_team_comparison_page_executes(patcher):
     _stub_page_streamlit(patcher)
     calls: list[int] = []
-    patcher.setattr(pages, "_render_team_comparison_section", lambda year: calls.append(year))
+    patcher.setattr(
+        team_comparison, "_render_team_comparison_section", lambda year: calls.append(year)
+    )
     patcher.setattr(pages, "_get_selected_season", lambda default=pages.DEFAULT_SEASON: 2026)
 
     pages.render_team_comparison_page()
@@ -1095,7 +1015,9 @@ def test_render_team_comparison_page_executes(patcher):
 def test_render_team_comparison_page_uses_selected_season(patcher):
     _stub_page_streamlit(patcher)
     calls: list[int] = []
-    patcher.setattr(pages, "_render_team_comparison_section", lambda year: calls.append(year))
+    patcher.setattr(
+        team_comparison, "_render_team_comparison_section", lambda year: calls.append(year)
+    )
     patcher.setattr(pages, "_get_selected_season", lambda default=pages.DEFAULT_SEASON: 2027)
 
     pages.render_team_comparison_page()
@@ -1478,7 +1400,7 @@ def test_build_team_comparison_dataframe_uses_profile_metrics():
         },
     }
 
-    frame, neutral_fallbacks = pages._build_team_comparison_dataframe(
+    frame, neutral_fallbacks = team_comparison._build_team_comparison_dataframe(
         teams_payload=teams_payload,
         selected_teams=["Team A", "Team B"],
         profile="balanced",
@@ -1491,16 +1413,16 @@ def test_build_team_comparison_dataframe_uses_profile_metrics():
 
 
 def test_team_brand_color_uses_flagship_palette():
-    assert pages._team_brand_color("Ferrari") == "#DC0000"
-    assert pages._team_brand_color("Scuderia Ferrari") == "#DC0000"
-    assert pages._team_brand_color("McLaren") == "#FF8700"
-    assert pages._team_brand_color("Unknown Team") == pages._DEFAULT_TEAM_COLOR
+    assert team_comparison._team_brand_color("Ferrari") == "#DC0000"
+    assert team_comparison._team_brand_color("Scuderia Ferrari") == "#DC0000"
+    assert team_comparison._team_brand_color("McLaren") == "#FF8700"
+    assert team_comparison._team_brand_color("Unknown Team") == pages._DEFAULT_TEAM_COLOR
 
 
 def test_default_team_selection_prefers_big4_order():
     teams = ["Williams", "Ferrari", "McLaren", "Red Bull Racing", "Mercedes", "Aston Martin"]
 
-    selected = pages._default_team_selection(teams, max_teams=4)
+    selected = team_comparison._default_team_selection(teams, max_teams=4)
 
     assert selected == ["McLaren", "Mercedes", "Ferrari", "Red Bull Racing"]
 

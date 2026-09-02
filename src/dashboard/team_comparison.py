@@ -95,7 +95,9 @@ _apply_profile_braking_fallbacks = team_snapshot_history._apply_profile_braking_
 _build_snapshot_history_dataframe = team_snapshot_history._build_snapshot_history_dataframe
 _ordered_snapshot_labels = team_snapshot_history._ordered_snapshot_labels
 _smooth_development_history_dataframe = team_snapshot_history._smooth_development_history_dataframe
-_rescale_history_dataframe_per_session = team_snapshot_history._rescale_history_dataframe_per_session
+_rescale_history_dataframe_per_session = (
+    team_snapshot_history._rescale_history_dataframe_per_session
+)
 _recompute_history_composites = team_snapshot_history._recompute_history_composites
 _WINDOW_FILLED_SUFFIX = team_snapshot_history._WINDOW_FILLED_SUFFIX
 _build_development_summary_table = team_snapshot_history._build_development_summary_table
@@ -845,7 +847,9 @@ def _render_team_comparison_section(year: int = 2026) -> None:
             radar_hover_notes = [
                 f"<br>carried from {carried_source}"
                 if label == "Tire Deg" and carried_source
-                else ("<br>from other sessions this weekend" if label in team_filled_metrics else "")
+                else (
+                    "<br>from other sessions this weekend" if label in team_filled_metrics else ""
+                )
                 for label in radar_labels
             ]
             trace_color = _team_brand_color(team_name)

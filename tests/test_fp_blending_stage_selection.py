@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from src.utils.fp_blending import _circuit_breaker, get_best_fp_performance
+from src.utils.fp_blending import _circuit_breaker, get_best_fp_performance_with_session_laps
 
 
 @pytest.fixture(autouse=True)
@@ -36,11 +36,13 @@ def test_sprint_qualifying_stage_uses_fp1_only():
             "src.utils.fp_blending.get_fp_team_performance",
             side_effect=_mock_get_fp_team_performance,
         ):
-            session_label, perf, laps = get_best_fp_performance(
-                year=2026,
-                race_name="Chinese Grand Prix",
-                is_sprint=True,
-                qualifying_stage="sprint",
+            session_label, perf, laps, _session_laps_by_code = (
+                get_best_fp_performance_with_session_laps(
+                    year=2026,
+                    race_name="Chinese Grand Prix",
+                    is_sprint=True,
+                    qualifying_stage="sprint",
+                )
             )
 
     assert calls == ["FP1"]
@@ -93,11 +95,13 @@ def test_main_qualifying_stage_blends_sq_sprint_and_fp1():
             "src.utils.fp_blending.get_fp_team_performance",
             side_effect=_mock_get_fp_team_performance,
         ):
-            session_label, perf, laps = get_best_fp_performance(
-                year=2026,
-                race_name="Chinese Grand Prix",
-                is_sprint=True,
-                qualifying_stage="main",
+            session_label, perf, laps, _session_laps_by_code = (
+                get_best_fp_performance_with_session_laps(
+                    year=2026,
+                    race_name="Chinese Grand Prix",
+                    is_sprint=True,
+                    qualifying_stage="main",
+                )
             )
 
     assert calls == ["Sprint Qualifying", "Sprint", "FP1"]
@@ -109,7 +113,7 @@ def test_main_qualifying_stage_blends_sq_sprint_and_fp1():
 
 def test_invalid_qualifying_stage_raises_value_error():
     with pytest.raises(ValueError, match="qualifying_stage"):
-        get_best_fp_performance(
+        get_best_fp_performance_with_session_laps(
             year=2026,
             race_name="Chinese Grand Prix",
             is_sprint=True,
@@ -145,11 +149,13 @@ def test_main_stage_skips_future_session_before_fetching_laps():
             "src.utils.fp_blending.get_fp_team_performance",
             side_effect=_mock_get_fp_team_performance,
         ):
-            session_label, perf, laps = get_best_fp_performance(
-                year=2026,
-                race_name="Chinese Grand Prix",
-                is_sprint=False,
-                qualifying_stage="main",
+            session_label, perf, laps, _session_laps_by_code = (
+                get_best_fp_performance_with_session_laps(
+                    year=2026,
+                    race_name="Chinese Grand Prix",
+                    is_sprint=False,
+                    qualifying_stage="main",
+                )
             )
 
     assert calls == ["FP2", "FP1"]

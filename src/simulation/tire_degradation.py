@@ -257,49 +257,6 @@ def get_fresh_tire_advantage(
     return float(max(0.0, advantage))
 
 
-def estimate_stint_pace_degradation(
-    tire_deg_slope: float,
-    stint_length: int,
-    compound: str,
-    fuel_load_start_kg: float = 110.0,
-    track_temp: float | None = None,
-) -> float:
-    """Estimate total pace loss over a stint from tire degradation.
-
-    Useful for strategy optimization before race simulation.
-    """
-    if tire_deg_slope <= 0.0 or stint_length <= 0:
-        return 0.0
-
-    total_deg = 0.0
-
-    for lap_index in range(stint_length):
-        # Keep indexing aligned with lap simulator (new stint starts at laps_on_tire=0).
-        fuel_remaining = fuel_load_start_kg - (lap_index * 1.5)
-        fuel_remaining = max(0.0, fuel_remaining)
-
-        # Calculate degradation for this lap
-        lap_deg = calculate_tire_deg_delta(
-            tire_deg_slope=tire_deg_slope,
-            laps_on_tire=lap_index,
-            fuel_load_kg=fuel_remaining,
-            initial_fuel_kg=fuel_load_start_kg,
-            compound=compound,
-            track_temp=track_temp,
-        )
-
-        # Subtract fresh tire advantage (first few laps)
-        fresh_advantage = get_fresh_tire_advantage(
-            compound,
-            lap_index,
-            track_temp=track_temp,
-        )
-
-        total_deg += lap_deg - fresh_advantage
-
-    return float(max(0.0, total_deg))
-
-
 def get_effective_tire_deg_slope(
     base_tire_deg_slope: float | None,
     traffic_position: int,

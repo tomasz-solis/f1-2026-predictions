@@ -55,28 +55,6 @@ CAT_FEATURE_COLUMNS = (
 )
 
 
-def default_race_residual_artifact_path(*, data_root: str | Path = "data") -> Path:
-    """Return the default artifact path for the race residual model."""
-    return (
-        Path(data_root)
-        / "processed"
-        / "model_artifacts"
-        / "race_residual"
-        / "race_residual_model.pkl"
-    )
-
-
-def default_race_residual_summary_path(*, data_root: str | Path = "data") -> Path:
-    """Return the default summary path for the race residual model."""
-    return (
-        Path(data_root)
-        / "processed"
-        / "model_artifacts"
-        / "race_residual"
-        / "race_residual_model.summary.json"
-    )
-
-
 def _build_one_hot_encoder() -> OneHotEncoder:
     """Return a version-compatible one-hot encoder."""
     try:
@@ -414,36 +392,6 @@ def build_race_residual_dataset(
                 dataset_rows.append(row)
 
     return pd.DataFrame(dataset_rows)
-
-
-def build_race_residual_model(
-    *,
-    years: list[int] | tuple[int, ...],
-    artifact_path: str | Path,
-    summary_path: str | Path | None = None,
-    clip_positions_gained: float = 2.5,
-    max_races: int | None = None,
-    config_path: str = "config/default.yaml",
-    data_root: str | Path = "data",
-    weather: str = "dry",
-    seed: int = 42,
-) -> tuple[FittedRaceResidualModel, pd.DataFrame]:
-    """Build and persist a fitted race residual artifact from historical years."""
-    dataset = build_race_residual_dataset(
-        years=years,
-        max_races=max_races,
-        config_path=config_path,
-        data_root=data_root,
-        weather=weather,
-        seed=seed,
-    )
-    model = fit_race_residual_model(dataset, clip_positions_gained=clip_positions_gained)
-    save_race_residual_model(
-        model=model,
-        artifact_path=artifact_path,
-        summary_path=summary_path,
-    )
-    return model, dataset
 
 
 def apply_race_residual_model(

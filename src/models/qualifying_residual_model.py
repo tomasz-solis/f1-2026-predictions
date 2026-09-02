@@ -57,28 +57,6 @@ CAT_FEATURE_COLUMNS = (
 )
 
 
-def default_qualifying_residual_artifact_path(*, data_root: str | Path = "data") -> Path:
-    """Return the default artifact path for the qualifying residual model."""
-    return (
-        Path(data_root)
-        / "processed"
-        / "model_artifacts"
-        / "qualifying_residual"
-        / "qualifying_residual_model.pkl"
-    )
-
-
-def default_qualifying_residual_summary_path(*, data_root: str | Path = "data") -> Path:
-    """Return the default metadata summary path for the qualifying residual model."""
-    return (
-        Path(data_root)
-        / "processed"
-        / "model_artifacts"
-        / "qualifying_residual"
-        / "qualifying_residual_model.summary.json"
-    )
-
-
 def _build_one_hot_encoder() -> OneHotEncoder:
     """Return a version-compatible one-hot encoder."""
     try:
@@ -504,36 +482,6 @@ def build_qualifying_residual_dataset(
                 dataset_rows.append(row)
 
     return pd.DataFrame(dataset_rows)
-
-
-def build_qualifying_residual_model(
-    *,
-    years: list[int] | tuple[int, ...],
-    artifact_path: str | Path,
-    summary_path: str | Path | None = None,
-    clip_positions: float = 2.0,
-    max_races: int | None = None,
-    config_path: str = "config/default.yaml",
-    data_root: str | Path = "data",
-    weather: str = "dry",
-    seed: int = 42,
-) -> tuple[FittedQualifyingResidualModel, pd.DataFrame]:
-    """Build and persist a fitted qualifying residual artifact from historical years."""
-    dataset = build_qualifying_residual_dataset(
-        years=years,
-        max_races=max_races,
-        config_path=config_path,
-        data_root=data_root,
-        weather=weather,
-        seed=seed,
-    )
-    model = fit_qualifying_residual_model(dataset, clip_positions=clip_positions)
-    save_qualifying_residual_model(
-        model=model,
-        artifact_path=artifact_path,
-        summary_path=summary_path,
-    )
-    return model, dataset
 
 
 def apply_qualifying_residual_model(

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -17,6 +16,7 @@ from src.models.team_strength_mapping import (
     build_construct_aligned_driver_observations,
     load_live_team_strength_mappings,
 )
+from src.utils.json_io import read_json_object as _read_json
 from src.utils.model_version import get_model_version
 
 REPLAY_LEAKAGE_ARTIFACT_TYPE = "model_diagnostics"
@@ -1015,15 +1015,6 @@ def _coerce_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    """Read a JSON file as a dictionary."""
-    with path.open(encoding="utf-8") as file_handle:
-        payload = json.load(file_handle)
-    if not isinstance(payload, dict):
-        raise ValueError(f"Expected JSON object in {path}")
-    return payload
 
 
 def _fmt(value: Any) -> str:

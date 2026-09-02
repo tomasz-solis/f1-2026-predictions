@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from src.dashboard import rendering
+from src.dashboard import rendering, rendering_html, rendering_qualifying, rendering_race
 
 
 class _Ctx:
@@ -16,38 +16,40 @@ class _Ctx:
 def _stub_streamlit(patcher):
     calls: list[tuple[str, str]] = []
 
-    patcher.setattr(rendering.st, "subheader", lambda msg: calls.append(("subheader", str(msg))))
-    patcher.setattr(rendering.st, "caption", lambda msg: calls.append(("caption", str(msg))))
-    patcher.setattr(rendering.st, "info", lambda msg: calls.append(("info", str(msg))))
-    patcher.setattr(rendering.st, "warning", lambda msg: calls.append(("warning", str(msg))))
-    patcher.setattr(rendering.st, "success", lambda msg: calls.append(("success", str(msg))))
-    patcher.setattr(rendering.st, "header", lambda msg: calls.append(("header", str(msg))))
     patcher.setattr(
-        rendering.st, "markdown", lambda msg, **_kwargs: calls.append(("markdown", str(msg)))
+        rendering_html.st, "subheader", lambda msg: calls.append(("subheader", str(msg)))
+    )
+    patcher.setattr(rendering_html.st, "caption", lambda msg: calls.append(("caption", str(msg))))
+    patcher.setattr(rendering_html.st, "info", lambda msg: calls.append(("info", str(msg))))
+    patcher.setattr(rendering_html.st, "warning", lambda msg: calls.append(("warning", str(msg))))
+    patcher.setattr(rendering_html.st, "success", lambda msg: calls.append(("success", str(msg))))
+    patcher.setattr(rendering_html.st, "header", lambda msg: calls.append(("header", str(msg))))
+    patcher.setattr(
+        rendering_html.st, "markdown", lambda msg, **_kwargs: calls.append(("markdown", str(msg)))
     )
     patcher.setattr(
-        rendering.st,
+        rendering_html.st,
         "metric",
         lambda *args, **kwargs: calls.append(
             ("metric", str(kwargs.get("label", args[0] if args else "")))
         ),
     )
-    patcher.setattr(rendering.st, "progress", lambda *_args, **_kwargs: None)
-    patcher.setattr(rendering.st, "write", lambda msg: calls.append(("write", str(msg))))
-    patcher.setattr(rendering.st, "dataframe", lambda *_args, **_kwargs: None)
-    patcher.setattr(rendering.st, "container", lambda **_kwargs: _Ctx())
+    patcher.setattr(rendering_html.st, "progress", lambda *_args, **_kwargs: None)
+    patcher.setattr(rendering_html.st, "write", lambda msg: calls.append(("write", str(msg))))
+    patcher.setattr(rendering_html.st, "dataframe", lambda *_args, **_kwargs: None)
+    patcher.setattr(rendering_html.st, "container", lambda **_kwargs: _Ctx())
     patcher.setattr(
-        rendering.st,
+        rendering_html.st,
         "plotly_chart",
         lambda _fig, **_kwargs: calls.append(("plotly_chart", "rendered")),
     )
-    patcher.setattr(rendering.st, "columns", lambda n, **_kwargs: [_Ctx() for _ in range(n)])
+    patcher.setattr(rendering_html.st, "columns", lambda n, **_kwargs: [_Ctx() for _ in range(n)])
 
     def _expander(label, *_, **__):
         calls.append(("expander", str(label)))
         return _Ctx()
 
-    patcher.setattr(rendering.st, "expander", _expander)
+    patcher.setattr(rendering_html.st, "expander", _expander)
 
     return calls
 
@@ -55,7 +57,7 @@ def _stub_streamlit(patcher):
 def test_render_compound_strategies_shows_top_entries(patcher):
     calls = _stub_streamlit(patcher)
 
-    rendering._render_compound_strategies(
+    rendering_race._render_compound_strategies(
         {
             "SOFT->MEDIUM": 0.42,
             "MEDIUM->HARD": 0.35,
@@ -72,7 +74,7 @@ def test_render_compound_strategies_shows_top_entries(patcher):
 def test_render_pit_lap_distribution_builds_summary(patcher):
     calls = _stub_streamlit(patcher)
 
-    rendering._render_pit_lap_distribution({"lap_10-15": 10, "lap_20-25": 30, "lap_15-20": 20})
+    rendering_race._render_pit_lap_distribution({"lap_10-15": 10, "lap_20-25": 30, "lap_15-20": 20})
 
     assert ("subheader", "Pit Stop Windows") in calls
     info_messages = [value for kind, value in calls if kind == "info"]
@@ -82,7 +84,7 @@ def test_render_pit_lap_distribution_builds_summary(patcher):
 def test_render_track_temperature_context_shows_blend_details(patcher):
     calls = _stub_streamlit(patcher)
 
-    rendering._render_track_temperature_context(
+    rendering_race._render_track_temperature_context(
         {
             "track_temperature_context": {
                 "track_temperature_c": 31.4,
@@ -105,7 +107,7 @@ def test_render_track_temperature_context_shows_blend_details(patcher):
 def test_render_weather_feature_context_shows_practice_source(patcher):
     calls = _stub_streamlit(patcher)
 
-    rendering._render_weather_feature_context(
+    rendering_race._render_weather_feature_context(
         {
             "weather_feature_context": {
                 "available": True,
@@ -157,7 +159,7 @@ def test_render_race_result_warns_on_high_dnf(patcher):
         ]
     )
 
-    rendering._render_race_result(df)
+    rendering_race._render_race_result(df)
 
     markdown_messages = [value for kind, value in calls if kind == "markdown"]
     assert any("High DNF risk" in msg for msg in markdown_messages)
@@ -193,7 +195,7 @@ def test_render_race_result_handles_saved_checkpoint_payload_without_optional_co
         ]
     )
 
-    rendering._render_race_result(df)
+    rendering_race._render_race_result(df)
 
     captions = [value for kind, value in calls if kind == "caption"]
     markdown_blocks = [value for kind, value in calls if kind == "markdown" and "<table" in value]
@@ -220,7 +222,7 @@ def test_render_race_result_explains_sorting_and_interval(patcher):
         ]
     )
 
-    rendering._render_race_result(df)
+    rendering_race._render_race_result(df)
 
     captions = [value for kind, value in calls if kind == "caption"]
     table_html_blocks = [value for kind, value in calls if kind == "markdown" and "<table" in value]
@@ -261,7 +263,7 @@ def test_render_race_result_warns_on_low_confidence_signals(patcher):
     )
     df.attrs["input_confidence"] = 0.42
 
-    rendering._render_race_result(df)
+    rendering_race._render_race_result(df)
 
     details = [value for kind, value in calls if kind == "markdown"]
     assert any("Tightly-packed field" in text for text in details)
@@ -276,7 +278,7 @@ def test_render_qualifying_result_splits_grid_columns(patcher):
         [{"position": idx, "driver": f"D{idx:02d}", "team": "Team"} for idx in range(1, 23)]
     )
 
-    rendering._render_qualifying_result(df)
+    rendering_qualifying._render_qualifying_result(df)
 
     markdown_blocks = [value for kind, value in calls if kind == "markdown"]
     assert any("Q1 Eliminated (Final Grid P17-P22)" in block for block in markdown_blocks)
@@ -294,7 +296,7 @@ def test_render_position_change_chart_shows_plot_for_starting_grid(patcher):
         ]
     )
 
-    rendering._render_position_change_chart(
+    rendering_race._render_position_change_chart(
         finish_df,
         result={
             "starting_grid": [
@@ -323,12 +325,12 @@ def test_render_position_change_chart_keys_are_unique_per_section(patcher):
     chart_keys: list[str] = []
     _stub_streamlit(patcher)
     patcher.setattr(
-        rendering.st,
+        rendering_html.st,
         "container",
         lambda **kwargs: (container_keys.append(kwargs.get("key")), _Ctx())[1],
     )
     patcher.setattr(
-        rendering.st,
+        rendering_html.st,
         "plotly_chart",
         lambda _fig, **kwargs: chart_keys.append(kwargs.get("key")),
     )
@@ -347,7 +349,7 @@ def test_render_position_change_chart_keys_are_unique_per_section(patcher):
     )
 
     for prediction_name in ("Sprint Race Prediction", "Main Race Prediction"):
-        rendering._render_position_change_chart(
+        rendering_race._render_position_change_chart(
             finish_df,
             result={"starting_grid": starting_grid, "starting_session_name": "Q"},
             prediction_name=prediction_name,
@@ -360,7 +362,7 @@ def test_render_position_change_chart_keys_are_unique_per_section(patcher):
 def test_render_prediction_hero_deck_uses_fixed_meta_grid(patcher):
     calls = _stub_streamlit(patcher)
 
-    rendering.render_prediction_hero_deck(
+    rendering_html.render_prediction_hero_deck(
         title="Race Weekend Prediction",
         summary="Practice-aware forecasts.",
         eyebrow="Weekend forecast",
@@ -382,16 +384,16 @@ def test_display_prediction_result_routes_race_sections(patcher):
     routed: list[str] = []
 
     patcher.setattr(
-        rendering,
+        rendering_race,
         "_render_compound_strategies",
         lambda _strategies: routed.append("compound"),
     )
     patcher.setattr(
-        rendering,
+        rendering_race,
         "_render_pit_lap_distribution",
         lambda _distribution: routed.append("pit"),
     )
-    patcher.setattr(rendering, "_render_race_result", lambda _df: routed.append("race"))
+    patcher.setattr(rendering_race, "_render_race_result", lambda _df: routed.append("race"))
 
     rendering.display_prediction_result(
         result={
@@ -445,7 +447,9 @@ def test_display_prediction_result_routes_qualifying_sections(patcher):
     calls = _stub_streamlit(patcher)
     routed: list[str] = []
 
-    patcher.setattr(rendering, "_render_qualifying_result", lambda _df: routed.append("quali"))
+    patcher.setattr(
+        rendering_qualifying, "_render_qualifying_result", lambda _df: routed.append("quali")
+    )
 
     rendering.display_prediction_result(
         result={
@@ -470,7 +474,7 @@ def test_display_prediction_result_routes_qualifying_sections(patcher):
 def test_display_prediction_result_explains_low_qualifying_order_confidence(patcher):
     """Qualifying warnings should not imply order confidence rises with race count alone."""
     calls = _stub_streamlit(patcher)
-    patcher.setattr(rendering, "_render_qualifying_result", lambda _df: None)
+    patcher.setattr(rendering_qualifying, "_render_qualifying_result", lambda _df: None)
 
     rendering.display_prediction_result(
         result={
@@ -500,7 +504,7 @@ def test_display_prediction_result_routes_actual_qualifying_classification(patch
     routed: list[str] = []
 
     patcher.setattr(
-        rendering,
+        rendering_qualifying,
         "_render_actual_classification",
         lambda _df, caption: routed.append(str(caption)),
     )
@@ -528,7 +532,9 @@ def test_display_prediction_result_renders_teammate_head_to_head_probabilities(p
     calls = _stub_streamlit(patcher)
     routed: list[str] = []
 
-    patcher.setattr(rendering, "_render_qualifying_result", lambda _df: routed.append("quali"))
+    patcher.setattr(
+        rendering_qualifying, "_render_qualifying_result", lambda _df: routed.append("quali")
+    )
 
     rendering.display_prediction_result(
         result={

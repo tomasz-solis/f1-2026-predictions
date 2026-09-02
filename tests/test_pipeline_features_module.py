@@ -77,22 +77,3 @@ def test_f1_feature_pipeline_process_session_empty_features(patcher):
 
     out = pipeline.process_session(_fake_session("FP1"))
     assert out.empty
-
-
-def test_f1_feature_pipeline_process_multiple_sessions(patcher):
-    pipeline = F1FeaturePipeline()
-
-    def _process(session, add_metadata=True):
-        if session.name == "FP1":
-            return pd.DataFrame([{"driver_number": "1", "event": "Bahrain Grand Prix"}])
-        return pd.DataFrame([{"driver_number": "2", "event": "Saudi Arabian Grand Prix"}])
-
-    patcher.setattr(pipeline, "process_session", _process)
-
-    combined = pipeline.process_multiple_sessions(
-        [_fake_session("FP1"), _fake_session("FP2", event_name="Saudi Arabian Grand Prix")],
-        verbose=False,
-    )
-
-    assert len(combined) == 2
-    assert set(combined["driver_number"]) == {"1", "2"}

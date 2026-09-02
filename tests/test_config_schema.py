@@ -11,8 +11,6 @@ from pydantic import ValidationError
 from src.utils.config_schema import (
     BayesianConfig,
     BlendConfig,
-    DNFConfig,
-    RaceWeightsConfig,
     validate_config,
 )
 
@@ -27,29 +25,6 @@ def test_bayesian_config_validates_volatility_range():
 
     with pytest.raises(ValidationError):
         BayesianConfig(base_volatility=-0.1)
-
-
-def test_race_weights_cap_each_component():
-    """Top-level race weights are individually bounded."""
-    valid = RaceWeightsConfig(
-        pace_weight=0.4,
-        grid_weight=0.3,
-        overtaking_weight=0.15,
-        tire_deg_weight=0.15,
-    )
-    assert valid.pace_weight == 0.4
-
-    with pytest.raises(ValidationError):
-        RaceWeightsConfig(pace_weight=1.5)
-
-
-def test_dnf_config_validates_probability_fields():
-    """DNF probabilities must stay inside valid ranges."""
-    valid = DNFConfig(base_risk=0.05, driver_error_factor=0.15)
-    assert valid.base_risk == 0.05
-
-    with pytest.raises(ValidationError):
-        DNFConfig(base_risk=1.5)
 
 
 def test_blend_config_validates_weights():

@@ -334,7 +334,3 @@ class SessionDetector:
 
         duration = self.SESSION_DURATIONS.get(session_name, 2.0)
         return now >= session_date + timedelta(hours=duration)
-
-    def get_sessions_for_weekend(self, is_sprint: bool) -> list[str]:
-        """Get session names for a weekend type."""
-        return self.SPRINT_WEEKEND_SESSIONS if is_sprint else self.NORMAL_WEEKEND_SESSIONS

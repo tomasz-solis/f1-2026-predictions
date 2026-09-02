@@ -6,7 +6,6 @@ The fix: Extract fastest laps for FP, use positions for Quali/Race.
 """
 
 import logging
-from typing import Any
 
 import fastf1 as ff1
 import numpy as np
@@ -217,84 +216,3 @@ def calculate_order_mae(
             errors.append(error)
 
     return float(np.mean(errors)) if errors else None
-
-
-def test_session_as_predictor_fixed(
-    year: int,
-    race_name: str,
-    predictor_session: str,
-    target_session: str = "Q",
-    driver_ranker: Any | None = None,
-    lineups: dict[str, list[str]] | None = None,
-    actual_driver_results: list[dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    """Test how well one session predicts a later qualifying or race result."""
-    # Get predictor session order
-    predictor_order = extract_session_order_safe(year, race_name, predictor_session)
-
-    if predictor_order is None:
-        return {
-            "status": "failed",
-            "reason": f"{predictor_session} data not available",
-            "race": race_name,
-        }
-
-    # Get actual qualifying order
-    actual_order = extract_session_order_safe(year, race_name, target_session)
-
-    if actual_order is None:
-        return {
-            "status": "failed",
-            "reason": f"{target_session} data not available",
-            "race": race_name,
-        }
-
-    # Calculate team-level MAE
-    team_mae = calculate_order_mae(predictor_order, actual_order)
-
-    result = {
-        "status": "success",
-        "race": race_name,
-        "predictor_session": predictor_session,
-        "target_session": target_session,
-        "team_mae": team_mae,
-        "predictor_order": predictor_order,
-        "actual_order": actual_order,
-    }
-
-    # If driver ranker provided, test driver-level
-    if driver_ranker and lineups and actual_driver_results:
-        try:
-            # Predict drivers using predictor session order
-            driver_preds = driver_ranker.predict_positions(
-                team_predictions=predictor_order,
-                team_lineups=lineups,
-                session_type="qualifying",
-            )
-
-            # Calculate driver MAE
-            errors = []
-
-            for pred in driver_preds["predictions"]:
-                actual_pos = next(
-                    (p["position"] for p in actual_driver_results if p["driver"] == pred.driver),
-                    None,
-                )
-
-                if actual_pos and pd.notna(actual_pos):
-                    errors.append(abs(pred.position - actual_pos))
-
-            if errors:
-                result["driver_mae"] = np.mean(errors)
-                result["driver_within_1"] = sum(1 for e in errors if e <= 1) / len(errors)
-                result["driver_within_2"] = sum(1 for e in errors if e <= 2) / len(errors)
-                result["driver_within_3"] = sum(1 for e in errors if e <= 3) / len(errors)
-        except (AttributeError, KeyError, ValueError, TypeError) as e:
-            logger.error(
-                "Error calculating driver-level accuracy for %s: %s. Driver metrics will be unavailable.",
-                race_name,
-                e,
-            )
-            result["driver_error"] = str(e)
-
-    return result

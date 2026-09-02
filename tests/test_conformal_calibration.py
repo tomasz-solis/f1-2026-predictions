@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from src.models.conformal_calibration import (
-    apply_interval_radius_floor,
-    build_conformal_calibration_artifact,
-)
+from src.models.conformal_calibration import build_conformal_calibration_artifact
 
 
 def test_build_conformal_calibration_artifact_groups_by_session_and_regime():
@@ -45,18 +42,3 @@ def test_build_conformal_calibration_artifact_groups_by_session_and_regime():
     assert qualifying_bucket["radius"] >= 2.0
     assert race_bucket["sample_count"] == 1
     assert race_bucket["radius"] == 0.0
-
-
-def test_apply_interval_radius_floor_widens_rows_in_place():
-    """Interval floor should widen narrow rows without leaving field bounds."""
-    rows = [
-        {"median_position": 2, "p5": 2, "p95": 2},
-        {"median_position": 10, "p5": 9, "p95": 10},
-    ]
-
-    apply_interval_radius_floor(rows=rows, radius=2.0, field_size=12)
-
-    assert rows == [
-        {"median_position": 2, "p5": 1, "p95": 4},
-        {"median_position": 10, "p5": 8, "p95": 12},
-    ]

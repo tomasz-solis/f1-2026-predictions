@@ -55,6 +55,7 @@ from src.utils.accuracy_targets import (
     sanitize_actual_rows,
     sanitize_prediction_rows,
 )
+from src.utils.env_file import load_env_file as _load_env_file  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -98,20 +99,6 @@ def _load_predictions_from_files(year: int, predictions_dir: Path) -> list[dict[
                 logger.warning("Skipping %s: %s", pred_file, exc)
 
     return predictions
-
-
-def _load_env_file(env_file: Path) -> None:
-    """Load KEY=VALUE pairs from an env file without overriding exported values."""
-    if not env_file.exists():
-        raise FileNotFoundError(f"Env file not found: {env_file}")
-    for raw_line in env_file.read_text().splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if key:
-            os.environ.setdefault(key, value.strip())
 
 
 def _load_predictions(year: int, predictions_dir: Path) -> tuple[list[dict[str, Any]], str]:

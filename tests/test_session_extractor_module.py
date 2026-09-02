@@ -1,7 +1,5 @@
 """Tests for session-order extraction utilities."""
 
-from types import SimpleNamespace
-
 import pandas as pd
 
 from src.extractors import session as session_extractor
@@ -136,49 +134,3 @@ def test_calculate_order_mae():
 
     mae = session_extractor.calculate_order_mae(predicted, actual)
     assert mae == (1 + 0 + 1) / 3
-
-
-def test_test_session_as_predictor_fixed_failure_path(patcher):
-    patcher.setattr(session_extractor, "extract_session_order_safe", lambda *_args: None)
-
-    result = session_extractor.test_session_as_predictor_fixed(
-        2026, "Bahrain Grand Prix", "FP2", target_session="Q"
-    )
-
-    assert result["status"] == "failed"
-    assert "FP2 data not available" in result["reason"]
-
-
-def test_test_session_as_predictor_fixed_with_driver_metrics(patcher):
-    def _extract(_year: int, _race: str, session_type: str):
-        if session_type == "FP2":
-            return {"McLaren": 1, "Ferrari": 2}
-        return {"McLaren": 2, "Ferrari": 1}
-
-    patcher.setattr(session_extractor, "extract_session_order_safe", _extract)
-
-    class _Ranker:
-        def predict_positions(self, team_predictions, team_lineups, session_type):
-            assert team_predictions == {"McLaren": 1, "Ferrari": 2}
-            assert session_type == "qualifying"
-            return {
-                "predictions": [
-                    SimpleNamespace(driver="NOR", position=1),
-                    SimpleNamespace(driver="LEC", position=2),
-                ]
-            }
-
-    result = session_extractor.test_session_as_predictor_fixed(
-        2026,
-        "Bahrain Grand Prix",
-        "FP2",
-        target_session="Q",
-        driver_ranker=_Ranker(),
-        lineups={"McLaren": ["NOR"], "Ferrari": ["LEC"]},
-        actual_driver_results=[{"driver": "NOR", "position": 2}, {"driver": "LEC", "position": 1}],
-    )
-
-    assert result["status"] == "success"
-    assert result["team_mae"] == 1.0
-    assert result["driver_mae"] == 1.0
-    assert result["driver_within_1"] == 1.0

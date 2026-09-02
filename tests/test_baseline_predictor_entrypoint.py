@@ -7,7 +7,8 @@ from pathlib import Path
 import src.predictors.baseline_2026 as predictor_module
 from src.predictors.baseline.data_mixin import BaselineDataMixin
 from src.predictors.baseline.qualifying_mixin import BaselineQualifyingMixin
-from src.predictors.baseline.race_mixin import BaselineRaceMixin
+from src.predictors.baseline.race.prediction_mixin import BaselineRacePredictionMixin
+from src.predictors.baseline.race.preparation_mixin import BaselineRacePreparationMixin
 from src.predictors.baseline_2026 import Baseline2026Predictor
 
 
@@ -29,7 +30,7 @@ def test_predictor_public_methods_are_inherited_from_mixins():
     )
     assert Baseline2026Predictor.predict_qualifying is BaselineQualifyingMixin.predict_qualifying
     assert Baseline2026Predictor.predict_sprint_race is BaselineQualifyingMixin.predict_sprint_race
-    assert Baseline2026Predictor.predict_race is BaselineRaceMixin.predict_race
+    assert Baseline2026Predictor.predict_race is BaselineRacePredictionMixin.predict_race
 
 
 def test_predictor_helpers_are_inherited_without_magic_getattr():
@@ -45,7 +46,7 @@ def test_predictor_helpers_are_inherited_without_magic_getattr():
     )
     assert (
         Baseline2026Predictor._prepare_driver_info_with_compounds
-        is BaselineRaceMixin._prepare_driver_info_with_compounds
+        is BaselineRacePreparationMixin._prepare_driver_info_with_compounds
     )
 
 

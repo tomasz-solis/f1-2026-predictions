@@ -117,21 +117,6 @@ class TestWeekendModule:
         assert "Australian Grand Prix" not in sprint_races
         assert len(sprint_races) == len(set(sprint_races))
 
-    def test_get_best_qualifying_session(self):
-        """Best qualifying source should follow weekend format."""
-        from src.utils import weekend
-
-        weekend.refresh_schedule_cache()
-        with patch(
-            "src.utils.weekend.fastf1.get_event_schedule",
-            return_value=self._mock_schedule(),
-        ):
-            assert (
-                weekend.get_best_qualifying_session(2026, "Chinese Grand Prix")
-                == "Sprint Qualifying"
-            )
-            assert weekend.get_best_qualifying_session(2026, "Australian Grand Prix") == "FP3"
-
     def test_invalid_race_name_handling(self):
         """Invalid race names should return default values."""
         from src.utils.weekend import get_weekend_type

@@ -2165,7 +2165,10 @@ def test_development_metric_options_include_profile_specific_pace_columns_when_a
 
 
 def test_unit_chart_axis_starts_at_zero_and_matches_the_radar_ceiling():
-    assert team_comparison._unit_chart_axis_range() == [0.0, team_comparison._RADAR_AXIS_DISPLAY_MAX]
+    assert team_comparison._unit_chart_axis_range() == [
+        0.0,
+        team_comparison._RADAR_AXIS_DISPLAY_MAX,
+    ]
     assert team_comparison._unit_chart_axis_range()[1] == pytest.approx(1.05)
 
 

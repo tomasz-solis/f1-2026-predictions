@@ -5,7 +5,6 @@ import pytest
 from src.simulation.tire_degradation import (
     calculate_fuel_delta,
     calculate_tire_deg_delta,
-    estimate_stint_pace_degradation,
     get_effective_tire_deg_slope,
     get_fresh_tire_advantage,
 )
@@ -247,23 +246,6 @@ class TestIntegrationScenarios:
         lap20_net = lap20_deg - lap20_fresh + lap20_fuel
         assert lap20_net > 2.0  # Slower late in stint
 
-    def test_estimate_stint_pace_degradation_includes_compound_cliff(self):
-        """Long soft stints should degrade faster per lap once they run past the cliff."""
-        long_stint = estimate_stint_pace_degradation(
-            tire_deg_slope=0.05,
-            stint_length=35,
-            compound="SOFT",
-            fuel_load_start_kg=110.0,
-        )
-        short_stint = estimate_stint_pace_degradation(
-            tire_deg_slope=0.05,
-            stint_length=15,
-            compound="SOFT",
-            fuel_load_start_kg=110.0,
-        )
-
-        assert long_stint / 35 > short_stint / 15
-
     def test_red_bull_high_deg_scenario(self):
         """Test Red Bull's high SOFT degradation (0.421 s/lap)."""
         tire_deg_slope = 0.421
@@ -292,24 +274,3 @@ class TestIntegrationScenarios:
         )
 
         assert result == 0.0
-
-    def test_stint_estimator_uses_lap_zero_tire_age(self):
-        """Stint estimator should include lap-0 fresh-tire behavior."""
-        short_stint = estimate_stint_pace_degradation(
-            tire_deg_slope=0.15,
-            stint_length=1,
-            compound="SOFT",
-            fuel_load_start_kg=110.0,
-            track_temp=30.0,
-        )
-        longer_stint = estimate_stint_pace_degradation(
-            tire_deg_slope=0.15,
-            stint_length=5,
-            compound="SOFT",
-            fuel_load_start_kg=110.0,
-            track_temp=30.0,
-        )
-
-        # One-lap stint should carry near-zero degradation due to fresh tire lap.
-        assert short_stint == pytest.approx(0.0, abs=0.001)
-        assert longer_stint > short_stint

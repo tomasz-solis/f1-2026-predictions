@@ -5,7 +5,6 @@ import pytest
 
 from src.extractors.validation import (
     validate_fp_team_order,
-    validate_session_positions,
     validate_team_pace_data,
 )
 from src.simulation.tire_degradation import (
@@ -214,20 +213,6 @@ class TestSimulatorEdgeCases:
 # Extraction validation edge cases
 # ---------------------------------------------------------------------------
 class TestExtractionValidation:
-    def test_empty_positions_warns(self):
-        warnings = validate_session_positions({})
-        assert len(warnings) == 1
-        assert "No positions" in warnings[0]
-
-    def test_out_of_range_position_warns(self):
-        warnings = validate_session_positions({"VER": 0, "HAM": 25})
-        assert len(warnings) == 2
-
-    def test_valid_positions_no_warnings(self):
-        positions = {f"D{i}": i for i in range(1, 21)}
-        warnings = validate_session_positions(positions)
-        assert warnings == []
-
     def test_negative_degradation_warns(self):
         data = {"McLaren": {"avg_pace": 90.0, "degradation": -0.05}}
         warnings = validate_team_pace_data(data)

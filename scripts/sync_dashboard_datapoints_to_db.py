@@ -41,6 +41,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+
+from src.utils.env_file import load_env_file as _load_env_file  # noqa: E402
+
 if TYPE_CHECKING:
     from src.persistence.artifact_store import ArtifactStore
 
@@ -137,22 +140,6 @@ def _parse_args() -> argparse.Namespace:
         help="Write mismatched local artifacts to Supabase and verify the saved payloads.",
     )
     return parser.parse_args()
-
-
-def _load_env_file(env_file: Path) -> None:
-    """Load a simple KEY=VALUE env file into the process environment."""
-    if not env_file.exists():
-        raise FileNotFoundError(f"Env file not found: {env_file}")
-
-    for raw_line in env_file.read_text().splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if not key:
-            continue
-        os.environ.setdefault(key, value.strip())
 
 
 def _configure_db_environment(env_file: Path | None) -> None:

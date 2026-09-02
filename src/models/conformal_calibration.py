@@ -25,17 +25,6 @@ _DATA_REGIMES = (
 )
 
 
-def default_conformal_artifact_path(*, data_root: str | Path = "data") -> Path:
-    """Return the default conformal-artifact path under processed model artifacts."""
-    return (
-        Path(data_root)
-        / "processed"
-        / "model_artifacts"
-        / "conformal_calibration"
-        / "conformal_calibration.json"
-    )
-
-
 def resolve_qualifying_data_regime(
     *,
     practice_like_stored_profiles: bool,
@@ -233,35 +222,3 @@ def save_conformal_calibration_artifact(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(artifact.to_dict(), indent=2))
     return output_path
-
-
-def apply_interval_radius_floor(
-    *,
-    rows: list[dict[str, Any]],
-    radius: float,
-    field_size: int,
-) -> None:
-    """Widen interval rows in place so each gets at least the requested radius."""
-    target_half_width = int(np.ceil(max(0.0, float(radius))))
-    if target_half_width <= 0:
-        return
-
-    max_field_size = max(1, int(field_size))
-    for row in rows:
-        try:
-            center = int(row.get("median_position", row.get("position", 1)))
-        except (TypeError, ValueError):
-            continue
-        try:
-            lower = int(row.get("p5", center))
-            upper = int(row.get("p95", center))
-        except (TypeError, ValueError):
-            lower = center
-            upper = center
-
-        lower = max(1, min(lower, upper, max_field_size))
-        upper = max(lower, min(max(lower, upper), max_field_size))
-        current_half_width = max(center - lower, upper - center)
-        required_half_width = max(current_half_width, target_half_width)
-        row["p5"] = max(1, center - required_half_width)
-        row["p95"] = min(max_field_size, center + required_half_width)

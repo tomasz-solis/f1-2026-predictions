@@ -50,21 +50,3 @@ def atomic_json_write(file_path: Path, data: dict[str, Any], create_backup: bool
         except BaseException as exc:
             logger.debug("Could not remove temp file %s: %s", temp_path, exc)
         raise OSError(f"Failed to write {file_path}: {e}") from e
-
-
-def restore_from_backup(file_path: Path) -> bool:
-    """Restore file from backup, returning success status."""
-    file_path = Path(file_path)
-    backup_path = file_path.with_suffix(file_path.suffix + ".backup")
-
-    if not backup_path.exists():
-        logger.warning("No backup found: %s", backup_path)
-        return False
-
-    try:
-        shutil.copy2(backup_path, file_path)
-        logger.info("Restored from backup: %s", file_path)
-        return True
-    except OSError as e:
-        logger.error("Failed to restore from backup: %s", e)
-        return False

@@ -83,10 +83,3 @@ def test_check_connection_failure(patcher):
 
     with pytest.raises(RuntimeError, match="auth failed"):
         db_module.check_connection()
-
-
-def test_close_client_resets_singleton(patcher):
-    patcher.setattr(db_module, "_supabase_client", object())
-    db_module.close_client()
-
-    assert db_module._supabase_client is None

@@ -7,7 +7,6 @@ import pytest
 from src.simulation.strategy_optimizer import (
     calculate_pit_timing_bias_laps,
     calculate_undercut_window,
-    evaluate_overcut,
 )
 
 
@@ -23,14 +22,6 @@ def test_calculate_undercut_window_returns_reasonable_bounds():
     assert earliest >= 5
     assert latest <= 57
     assert earliest <= latest
-
-
-def test_evaluate_overcut_prefers_hard_overtaking_tracks():
-    """Overcut score should be higher when overtaking is difficult."""
-    monaco_score = evaluate_overcut(track_overtaking=0.95, tire_age=18)
-    monza_score = evaluate_overcut(track_overtaking=0.20, tire_age=18)
-
-    assert monaco_score > monza_score
 
 
 def test_pit_timing_bias_monaco_vs_monza():

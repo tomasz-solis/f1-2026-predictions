@@ -729,9 +729,7 @@ def _smooth_development_history_dataframe(
         group_present = present.loc[group_index]
         for column_name in metric_columns:
             original_values = smoothed.loc[group_index, column_name]
-            rolling_mean = original_values.rolling(
-                window=window, center=True, min_periods=1
-            ).mean()
+            rolling_mean = original_values.rolling(window=window, center=True, min_periods=1).mean()
             if column_name in radar_labels:
                 # Qualifying measures no tire degradation, so the session's own reading
                 # is absent while the weekend around it has one. Letting the window
@@ -793,9 +791,9 @@ def _rescale_history_dataframe_per_session(history_df: pd.DataFrame) -> pd.DataF
             highest = float(scored.max())
             if highest <= lowest:
                 continue
-            rescaled.loc[session_index, column_name] = _DISPLAY_SCORE_FLOOR + (
-                (session_values - lowest) / (highest - lowest)
-            ) * span
+            rescaled.loc[session_index, column_name] = (
+                _DISPLAY_SCORE_FLOOR + ((session_values - lowest) / (highest - lowest)) * span
+            )
 
     return rescaled
 
@@ -812,17 +810,13 @@ def _recompute_history_composites(history_df: pd.DataFrame) -> pd.DataFrame:
         return history_df.copy()
 
     recomputed = history_df.copy()
-    radar_labels = [
-        label for _key, label in _TEAM_RADAR_METRICS if label in recomputed.columns
-    ]
+    radar_labels = [label for _key, label in _TEAM_RADAR_METRICS if label in recomputed.columns]
     if not radar_labels:
         return recomputed
 
     radar_frame = recomputed[radar_labels]
     metric_count = radar_frame.count(axis=1)
-    recomputed[_RADAR_AVERAGE_LABEL] = radar_frame.mean(axis=1, skipna=True).where(
-        metric_count > 0
-    )
+    recomputed[_RADAR_AVERAGE_LABEL] = radar_frame.mean(axis=1, skipna=True).where(metric_count > 0)
     recomputed["Metric Count"] = metric_count.astype(float).where(metric_count > 0)
     recomputed["Metric Coverage"] = (metric_count / len(_TEAM_RADAR_METRICS)).where(
         metric_count > 0

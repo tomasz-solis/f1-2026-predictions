@@ -4,7 +4,6 @@ import pytest
 
 from src.systems.weight_schedule import (
     calculate_blended_performance,
-    format_schedule_summary,
     get_recommended_schedule,
     get_schedule_weights,
 )
@@ -50,9 +49,3 @@ def test_calculate_blended_performance_uses_schedule_weights():
 def test_get_recommended_schedule_switches_with_regulation_flag():
     assert get_recommended_schedule(is_regulation_change=True) == "extreme"
     assert get_recommended_schedule(is_regulation_change=False) == "moderate"
-
-
-def test_format_schedule_summary_contains_schedule_lines():
-    summary = format_schedule_summary("extreme")
-    assert "Weight Schedule: EXTREME" in summary
-    assert "Race  1+" in summary

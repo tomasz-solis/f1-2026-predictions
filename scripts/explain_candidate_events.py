@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -11,6 +10,7 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
 
 from scripts.audit_model_candidates import (  # noqa: E402
     _blend_with_previous,
@@ -23,21 +23,8 @@ from scripts.generate_evaluation_report import (  # noqa: E402
 )
 
 from src.analysis.model_evaluation import compute_prediction_accuracy  # noqa: E402
+from src.utils.env_file import load_env_file as _load_env_file  # noqa: E402
 from src.utils.prediction_logger import PredictionLogger  # noqa: E402
-
-
-def _load_env_file(env_file: Path) -> None:
-    """Load KEY=VALUE pairs without overriding exported values."""
-    if not env_file.exists():
-        raise FileNotFoundError(f"Env file not found: {env_file}")
-    for raw_line in env_file.read_text().splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if key:
-            os.environ.setdefault(key, value.strip())
 
 
 def _rank_summary(rows: list[dict[str, Any]], limit: int) -> str:

@@ -29,6 +29,7 @@ from src.models.team_strength_mapping import (  # noqa: E402
 from src.persistence.artifact_store import ArtifactStore  # noqa: E402
 from src.utils.accuracy_targets import TARGET_SPRINT_QUALIFYING  # noqa: E402
 from src.utils.historical_replay import run_historical_checkpoint_replay  # noqa: E402
+from src.utils.json_io import read_json_object as _read_json  # noqa: E402
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -173,15 +174,6 @@ def main() -> int:
 def _slugify(value: str) -> str:
     """Return a stable filesystem-safe race label."""
     return str(value).strip().lower().replace(" ", "_").replace("'", "")
-
-
-def _read_json(path: Path) -> dict:
-    """Read a JSON object from disk."""
-    with path.open(encoding="utf-8") as file_handle:
-        payload = json.load(file_handle)
-    if not isinstance(payload, dict):
-        raise ValueError(f"Expected JSON object in {path}")
-    return payload
 
 
 def _write_json(path: Path, payload: dict) -> None:

@@ -43,13 +43,6 @@ def test_normalize_case_insensitive():
     assert DriverNameMapper.normalize_driver_name("VeRsTaPpEn") == "VER"
 
 
-def test_get_full_name():
-    """Test getting full name from abbreviation."""
-    assert DriverNameMapper.get_full_name("VER") == "Verstappen"
-    assert DriverNameMapper.get_full_name("NOR") == "Norris"
-    assert DriverNameMapper.get_full_name("HAM") == "Hamilton"
-
-
 def test_normalize_result_list():
     """Test normalizing a list of results."""
     results = [
@@ -75,15 +68,6 @@ def test_unknown_uppercase_driver_code_does_not_warn(caplog):
     """Valid-looking historical or future driver codes should pass through quietly."""
     assert DriverNameMapper.normalize_driver_name("XYZ") == "XYZ"
     assert "Could not normalize driver name" not in caplog.text
-
-
-def test_add_driver():
-    """Test adding a new driver mapping."""
-    DriverNameMapper.add_driver("LAW", "Lawson")
-
-    assert DriverNameMapper.normalize_driver_name("LAW") == "LAW"
-    assert DriverNameMapper.normalize_driver_name("Lawson") == "LAW"
-    assert DriverNameMapper.get_full_name("LAW") == "Lawson"
 
 
 def test_2026_grid_coverage():
@@ -113,5 +97,5 @@ def test_2026_grid_coverage():
 
     for abbr in drivers_2026:
         assert abbr in DriverNameMapper.DRIVER_MAP
-        full_name = DriverNameMapper.get_full_name(abbr)
+        full_name = DriverNameMapper.DRIVER_MAP[abbr]
         assert DriverNameMapper.normalize_driver_name(full_name) == abbr

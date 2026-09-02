@@ -207,10 +207,6 @@ class BayesianDriverRanking:
             observed_positions=adjusted_positions,
         )
 
-    def get_history_df(self) -> pd.DataFrame:
-        """Export update history for visualization."""
-        return pd.DataFrame([vars(r) for r in self.history])
-
     def _update_single_driver_rating(
         self,
         *,

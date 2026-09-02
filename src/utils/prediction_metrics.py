@@ -11,7 +11,6 @@ from scipy.stats import spearmanr
 from src.utils.accuracy_targets import (
     explicit_target_actuals,
     explicit_target_predictions,
-    legacy_target_keys_for_prediction,
     sanitize_actual_rows,
     sanitize_prediction_rows,
     synthesize_legacy_actuals,
@@ -245,44 +244,6 @@ class PredictionMetrics:
                 "std": float(np.std(values)),
             }
         return aggregate
-
-    @staticmethod
-    def aggregate_target_metrics(
-        all_predictions: list[dict[str, Any]],
-    ) -> dict[str, dict[str, Any]]:
-        """Aggregate target-aware metrics across multiple saved predictions."""
-        grouped_metrics: dict[str, list[dict[str, Any]]] = {}
-        for prediction in all_predictions:
-            metadata = prediction.get("metadata", {})
-            weekend_format = str(metadata.get("weekend_format", "")).strip().lower()
-            is_sprint = weekend_format == "sprint"
-            checkpoint_session = str(metadata.get("session_name", "")).strip().upper()
-            if weekend_format not in {"normal", "sprint"}:
-                qualifying_target, race_target = legacy_target_keys_for_prediction(
-                    checkpoint_session,
-                    is_sprint=False,
-                )
-                is_sprint = (
-                    qualifying_target is not None
-                    and race_target is not None
-                    and checkpoint_session
-                    in {
-                        "SQ",
-                        "SPRINT",
-                    }
-                )
-            target_metrics = PredictionMetrics.calculate_prediction_target_metrics(
-                prediction,
-                is_sprint=is_sprint,
-            )
-            for target_key, metrics in target_metrics.items():
-                grouped_metrics.setdefault(target_key, []).append(metrics)
-
-        return {
-            target_key: PredictionMetrics._aggregate_metric_rows(metric_rows)
-            for target_key, metric_rows in grouped_metrics.items()
-            if metric_rows
-        }
 
     @staticmethod
     def calculate_all_metrics(prediction_data: dict[str, Any]) -> dict[str, Any] | None:
