@@ -25,13 +25,21 @@ tree. See `shelved/challenger-research` and `shelved/dnf-calibration`.
 
 ## Verifying before you claim done
 
-**CI pins `ruff==0.9.6`, which is older than the local venv. Local lint passing
-proves nothing.** Reproduce the gate exactly:
+**Ruff is pinned to the same exact version in three places, so local lint now
+does prove something about CI.** As of 2026-09-02 that version is `0.15.1`, in:
+
+- `pyproject.toml` (`ruff==0.15.1`)
+- `.pre-commit-config.yaml` (`rev: v0.15.1`)
+- `.github/workflows/lint.yml` (`pip install ruff==0.15.1`)
+
+**Bump all three together, or the drift returns.** They were previously
+`>=0.9,<1` / `v0.9.6` / `0.9.6`, which let the local venv run a formatter CI did
+not have — three files sat unformatted on `master` because of it.
 
 ```bash
-pip install ruff==0.9.6
-ruff check src tests scripts app.py predict_weekend.py
-ruff format --check src tests scripts app.py predict_weekend.py
+uv sync --extra dev
+uv run ruff check src tests scripts app.py predict_weekend.py
+uv run ruff format --check src tests scripts app.py predict_weekend.py
 make typecheck MYPY=mypy
 ```
 

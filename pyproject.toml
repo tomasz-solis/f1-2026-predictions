@@ -16,10 +16,7 @@ dependencies = [
   "scikit-learn>=1.4,<2",
   "PyYAML>=6,<7",
   "plotly>=5.24,<7",
-  "tabulate>=0.9,<1",
-  "requests>=2.31,<3",
   "supabase>=2.0,<3",
-  "h2>=4.1,<5",
   "jsonschema>=4.20,<5",
   "pydantic>=2.7,<3",
 ]
@@ -35,7 +32,10 @@ dev = [
   "pytest-benchmark>=5,<6",
   "pytest-mock>=3.14,<4",
   "hypothesis>=6.120,<7",
-  "ruff>=0.9,<1",
+  # Pinned exactly, and kept in lockstep with .pre-commit-config.yaml and
+  # .github/workflows/lint.yml. A range here let the local venv drift ahead of
+  # the CI pin, so local lint stopped proving anything about CI.
+  "ruff==0.15.1",
 ]
 
 [tool.black]
