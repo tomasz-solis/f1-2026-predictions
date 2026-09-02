@@ -32,9 +32,15 @@ Examples:
 
 ### Other sections in `default.yaml`
 
-Sections such as `bayesian`, `race`, and `qualifying` are still useful for
-other modules/scripts, but they are not the primary scoring knobs for the
-baseline predictor race/qualifying simulation path.
+Sections such as `bayesian` and `qualifying` are still useful for other
+modules/scripts, but they are not the primary scoring knobs for the baseline
+predictor race/qualifying simulation path.
+
+The top-level `race:` section was removed on 2026-09-02. Nothing read it — the
+predictor reads `baseline_predictor.race.*`, and the two had silently drifted
+apart (the removed block said `overtaking_weight: 0.15` while
+`src/data/data_generator.py` hardcoded `0.2`). Race knobs live under
+`baseline_predictor.race.*` only.
 
 The top-level `learning` section is active. It controls adaptive calibration
 sample gates, adjustment scales, and interval widening thresholds used by
@@ -235,13 +241,24 @@ pytest tests/test_fastf1_live_refresh.py -m live_fastf1
 
 ## Validation Rules
 
-`src/utils/config_loader.py` validates:
+Validation runs in two layers, both on startup:
 
-- required sections exist,
-- critical values are present and in range,
-- qualifying weights sum to ~1.0.
+1. **Pydantic schema** (`src/utils/config_schema.py`). Types, per-field ranges
+   (`Field(ge=, le=)`), unknown-key rejection (`extra="forbid"`), and cross-field
+   model validators such as the qualifying `team_weight + skill_weight == 1.0`
+   check. Since 2026-09-02 a schema failure **raises**; it previously logged a
+   warning and fell through to the hand-rolled checks below.
+2. **`src/utils/config_loader.py`** for the things the schema cannot express:
+   required top-level sections (every schema field has a `default_factory`, so
+   pydantic alone accepts an empty config), and cross-field ordering constraints
+   — `confidence_min <= confidence_cap`, `overtaking_transition.min_observed_weight
+   <= max_observed_weight`, `position_scaling` front/upper/mid ordering,
+   `testing_modifier_clip_range` bounds, and `default_experience_tier` membership.
 
-If validation fails, startup will raise an explicit error.
+The duplicated per-key type/range table that used to live in `config_loader.py`
+was removed on 2026-09-02; those bounds are declared once, in the schema.
+
+If either layer fails, startup raises an explicit error.
 
 Release-quality validation also includes the machine-readable production gate
 emitted by `scripts/generate_evaluation_report.py`. The gate must pass before

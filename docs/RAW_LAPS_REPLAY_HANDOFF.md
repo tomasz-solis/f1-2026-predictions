@@ -36,7 +36,9 @@ because their runtime guards require raw laps that the harness never loads
 
 - `config/production_config.json` untouched (sha256
   `c690aa54e054f05a65f7ce565f0c195533723beaa21951ec63ac9daf4fbb96e1`);
-  `config/default.yaml` keeps `baseline_predictor.model_variant: champion`.
+  `config/default.yaml` no longer carries `baseline_predictor.model_variant`;
+  the key was removed on 2026-09-02 as dead configuration (no code read it), so
+  "stay on champion" is now the only behaviour rather than a setting to hold.
 - No champion weights, active artifacts, prediction artifacts, or served
   forecasts modified. No commits/pushes unless explicitly requested.
 - Leakage discipline: a checkpoint may load raw laps ONLY from sessions whose

@@ -6,6 +6,15 @@
 > resolve there. The framework does not run against current production code
 > (`predict_qualifying` no longer accepts `include_grid_scenarios`). Measured
 > verdicts live in `docs/MODEL_LEDGER.md`. Kept for the methodology.
+>
+> **Config note (2026-09-02):** the keys this document sets —
+> `baseline_predictor.model_variant` and
+> `baseline_predictor.qualifying.practice_challenger.launch_envelope_path` —
+> were removed from `config/default.yaml` and `src/utils/config_schema.py` as
+> dead configuration. No code on `master` ever read either one. Because the
+> schema uses `extra="forbid"`, pasting the YAML examples below into
+> `config/default.yaml` as-is will now fail validation at startup; restoring
+> this workflow means restoring those schema fields alongside the branch code.
 
 # Qualifying and Race Challenger Workflow
 

@@ -8,25 +8,40 @@ backtest that has been stalling.
 
 ## How DNFs are modelled today (mapped in code)
 
+> **Correction (2026-09-02).** Item 4 below was wrong when written, and the code
+> pointers have since moved. `params_mixin.py::_calculate_driver_race_score` —
+> the race-long single-Bernoulli draw this brief was scoped around — had **no
+> callers**; it was dead code, and was deleted in the 2026-09-02 cleanup. The
+> live draw is **per-lap**, in `src/utils/lap_by_lap_simulator.py:444`:
+> `rng.random() < info["dnf_probability"] / race_distance`. So the simulator
+> already has a lap notion, and any calibration scoped against "one draw per
+> race" is aimed at a mechanism that never ran. Re-scope before implementing.
+> Pointers below are refreshed to current lines.
+
 1. **Per-driver rate, learned by a track-AGNOSTIC EMA.**
-   `src/systems/updater.py:488` `_update_dnf_rate_ema`: for each driver,
+   `src/systems/updater.py:472` `_update_dnf_rate_ema`: for each driver,
    `updated = (1-w)*existing + w*(1 if retired else 0)`, clipped to
    [floor, cap]. It keys only on driver code — **a retirement at Monaco updates
    the driver's global rate identically to one at Monza.**
 2. **Experience add-ons (flat).** `src/predictors/baseline/race/preparation_flow.py:18`
    `_EXPERIENCE_DNF_MODIFIERS`: rookie +0.05, second_year +0.03, developing
    +0.02, established +0.00. Added to the driver rate.
-3. **Config bounds.** `src/utils/config_schema.py:996-1000` and
-   `src/utils/constants.py:15-16,41`: base_rate 0.04, default 0.10, historical
-   cap 0.20, final cap 0.35, floor 0.02.
-4. **Simulator draw (single Bernoulli, race-long).**
-   `src/predictors/baseline/race/params_mixin.py:110`:
-   `dnf_occurred = rng.random() < info["dnf_probability"]`; a hit scores the
-   driver `-10 + uniform(-1,0)` (dumped to the back). One draw per driver per
-   race — no lap, no grid position, no first-lap notion.
-5. **Scoring already exists.** `src/analysis/model_evaluation.py:347+` computes a
-   DNF Brier score and `actual_dnf_rate` vs predicted — so we can measure
-   calibration WITHOUT running the race Monte Carlo.
+3. **Config bounds.** `src/utils/config_schema.py:890,926-928`:
+   `missing_driver_default_dnf_rate` 0.10, historical cap 0.20, final cap 0.35,
+   floor 0.02. (`src/utils/constants.py`, previously cited here for the same
+   numbers, was deleted in the 2026-09-02 cleanup as unreferenced by any code
+   path; the schema is now the single source.)
+4. **Simulator draw (per-lap Bernoulli).**
+   `src/utils/lap_by_lap_simulator.py:444`:
+   `if rng.random() < info["dnf_probability"] / race_distance` — evaluated each
+   lap, so the race-long probability is spread across the distance. The reported
+   figure is separately capped and shrunk toward the field base rate by
+   `calibrated_dnf_probability` in
+   `src/predictors/baseline/race/result_processing.py:285`, which recalibrates
+   only the *reported* number, not the sampling.
+5. **Scoring already exists.** `src/analysis/model_evaluation.py:272+` computes a
+   DNF Brier score, `baseline_brier`, and `brier_skill_score` vs predicted — so we
+   can measure calibration WITHOUT running the race Monte Carlo.
 
 ## DNF is TWO processes, not one (the load-bearing insight)
 
